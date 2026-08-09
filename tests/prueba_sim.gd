@@ -24,6 +24,7 @@ func _initialize() -> void:
 	_prueba_targets()
 	_prueba_combate()
 	_prueba_escena_principal()
+	_prueba_adornos()
 
 	print("")
 	if _fallos == 0:
@@ -397,6 +398,76 @@ func _prueba_catalogo() -> void:
 			faltan.append(e.id + " (stats)")
 	_comprobar("todos los enemigos tienen sprite y stats validos",
 		faltan.is_empty(), str(faltan))
+
+## Los adornos del suelo están colocados a mano, que es justo lo que se
+## descoloca sin avisar. Aquí se comprueba que caben en el campo, que solo la
+## rejilla pisa el corredor del drenaje, y —midiéndolo de verdad— que la bola
+## apenas pasa por encima de ellos.
+func _prueba_adornos() -> void:
+	var fuera: Array[String] = []
+	var en_corredor: Array[String] = []
+	var cajas: Array[Rect2] = []
+	var nombres: Array[String] = []
+	var muertas: Array[bool] = []
+	for adorno in VistaMesa.ADORNOS:
+		var ruta := "res://assets/mesa_deco/%s.png" % adorno["tex"]
+		if not ResourceLoader.exists(ruta):
+			fuera.append(str(adorno["tex"]) + " (no existe)")
+			continue
+		var caja := VistaMesa.caja_adorno(adorno, load(ruta))
+		cajas.append(caja)
+		nombres.append(str(adorno["tex"]))
+		muertas.append(bool(adorno["muerta"]))
+		if not VistaMesa.CAMPO.encloses(caja):
+			fuera.append("%s %s" % [adorno["tex"], str(caja)])
+		if adorno["tex"] != "rejilla" and VistaMesa.CORREDOR_DRENAJE.intersects(caja):
+			en_corredor.append(str(adorno["tex"]))
+	_comprobar("los adornos caben dentro del campo", fuera.is_empty(), str(fuera))
+	_comprobar("solo la rejilla pisa el corredor del drenaje",
+		en_corredor.is_empty(), str(en_corredor))
+
+	# Ocupación real: se muestrea la bola en partidas aleatorias y se cuenta
+	# cuántos fotogramas la tapa cada adorno.
+	var visitas := PackedInt32Array()
+	visitas.resize(cajas.size())
+	var muestras := 0
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	for _i in 40:
+		var m := _nueva_mesa()
+		m.nueva_bola()
+		m.bola.en_carril = false
+		m.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(150, 450))
+		var ang := rng.randf_range(0.0, TAU)
+		m.bola.vel = Vector2(cos(ang), sin(ang)) * rng.randf_range(200.0, 1500.0)
+		for paso in int(25.0 / DT):
+			if not m.bola.viva:
+				break
+			m.avanzar(DT)
+			if paso % 4 != 0 or not m.bola.viva:
+				continue
+			muestras += 1
+			for j in cajas.size():
+				if cajas[j].grow(m.p.radio_bola).has_point(m.bola.pos):
+					visitas[j] += 1
+
+	# Los de zona muerta tienen que dar cero clavado: si uno empieza a marcar
+	# algo es que se ha movido a donde la bola sí llega. Los de campo abierto
+	# solo tienen que quedarse por debajo del 3 %. La rejilla queda exenta:
+	# está en el drenaje a propósito y marca un 13 %.
+	var pisados: Array[String] = []
+	var ruidosos: Array[String] = []
+	for j in cajas.size():
+		var pct := 100.0 * float(visitas[j]) / float(maxi(muestras, 1))
+		if muertas[j]:
+			if visitas[j] > 0:
+				pisados.append("%s %.2f%%" % [nombres[j], pct])
+		elif nombres[j] != "rejilla" and pct > 3.0:
+			ruidosos.append("%s %.2f%%" % [nombres[j], pct])
+	_comprobar("la bola no llega a los adornos de zona muerta (%d muestras)" % muestras,
+		pisados.is_empty(), str(pisados))
+	_comprobar("y por los de campo abierto apenas pasa",
+		ruidosos.is_empty(), str(ruidosos))
 
 ## La suite solo tocaba sim/, así que un error de sintaxis en la vista pasaba
 ## desapercibido y solo se veía al abrir el juego. Esto la carga y la arranca.

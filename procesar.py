@@ -8,6 +8,10 @@ listo para el juego.
 
 Uso:
     python3 procesar.py entrada.png --rejilla 3x3 --tam 64 --salida assets/
+
+Lo de assets/shell/ (la cascara de TILT OS) NO lleva la paleta de la mazmorra:
+si hay que procesarlo, es con --sin-cuantizar. Sin esa opcion el script se
+niega, para que un reprocesado en bloque no lo destroce.
 """
 
 import argparse
@@ -42,6 +46,12 @@ PALETA = np.array([[int(h[i:i+2], 16) for i in (0, 2, 4)] for h in PALETA_HEX],
 
 FONDO = np.array([243, 16, 233], dtype=np.float32)   # magenta real del generador
 TOL_FONDO = 95.0
+
+# Carpetas cuyo contenido NO lleva la paleta de la mazmorra y no se debe
+# cuantizar. La cascara de TILT OS es Windows XP de 2002: sus azules y sus
+# grises no estan en PALETA_HEX y pasarlos por aqui los destrozaria. Si algun
+# dia hay que procesar algo de aqui, es con --sin-cuantizar.
+SIN_PALETA = ("assets/shell", "assets\\shell")
 
 
 # ------------------------------------------------------------------- color
@@ -123,7 +133,8 @@ def desflecar(rgb, objeto):
     return salida
 
 
-def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False):
+def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False,
+                   cuantizar_paleta=True):
     fondo = mascara_fondo(rgb)
     objeto = ~fondo
     if not objeto.any():
@@ -149,7 +160,7 @@ def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False):
 
     a = np.array(lienzo)
     alfa = a[..., 3] > 128            # umbral: sin bordes semitransparentes
-    color = cuantizar(a[..., :3], alfa)
+    color = cuantizar(a[..., :3], alfa) if cuantizar_paleta else a[..., :3]
     salida = np.dstack([color, (alfa * 255).astype(np.uint8)])
     salida[~alfa] = 0
     return Image.fromarray(salida, "RGBA")
@@ -201,7 +212,21 @@ def main():
                         "conserva los tamanos relativos entre sprites")
     p.add_argument("--nombres", default=None,
                    help="nombres separados por coma, en orden de lectura")
+    p.add_argument("--sin-cuantizar", action="store_true",
+                   dest="sin_cuantizar",
+                   help="no forzar la paleta cerrada: para lo que no es de la "
+                        "mazmorra, como la cascara de TILT OS")
     args = p.parse_args()
+
+    # Red de seguridad para el dia en que se reprocese todo de golpe: lo que
+    # esta bajo assets/shell/ no lleva la paleta de la mazmorra.
+    ruta = args.entrada.replace("\\", "/")
+    destino = args.salida.replace("\\", "/")
+    if not args.sin_cuantizar and any(
+            c.replace("\\", "/") in ruta or c.replace("\\", "/") in destino
+            for c in SIN_PALETA):
+        p.error("esto es de la cascara de TILT OS y no lleva la paleta de la "
+                "mazmorra: repite con --sin-cuantizar")
 
     im = Image.open(args.entrada).convert("RGB")
     a = np.array(im)
@@ -227,7 +252,8 @@ def main():
         recorte[ajeno] = FONDO.astype(np.uint8)
 
         sp = procesar_celda(recorte, args.tam, escala=escala,
-                            al_suelo=args.conjunto)
+                            al_suelo=args.conjunto,
+                            cuantizar_paleta=not args.sin_cuantizar)
         if sp is None:
             continue
         nombre = nombres[i].strip() if nombres and i < len(nombres) \

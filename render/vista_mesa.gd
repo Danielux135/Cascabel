@@ -42,6 +42,54 @@ const ENEMIGO_CENTRO_X := 200.0
 const ENEMIGO_SUELO_Y := 158.0
 const ALTO_TARGET := 30.0
 
+## El campo de juego, donde va el suelo de piedra.
+const CAMPO := Rect2(20, 60, 360, 620)
+## Por donde cae la bola al drenar, bajo los flippers. Nada de adornos aquí
+## salvo la rejilla, que va justo ahí a propósito.
+const CORREDOR_DRENAJE := Rect2(170, 600, 60, 100)
+
+## Adornos del suelo, puestos a mano.
+##
+## Los de "zona muerta" están en sitios a los que la bola no puede llegar: bajo
+## los carriles de retorno, que quedan sellados por los postes de goma. Los del
+## final son campo abierto, que la bola cruza pero donde no se queda.
+##
+## Escalas de 1.0 o 0.5 y espejo en vez de giros libres: rotar pixelart en
+## ángulos sueltos rompe la rejilla de píxeles y se nota.
+## `muerta` marca los que están en sitios a los que la bola NO PUEDE llegar.
+## No es una intención: está medido, esos ocho dan 0,00 % de ocupación en las
+## partidas aleatorias de tests/prueba_sim.gd, y la prueba lo exige.
+const ADORNOS := [
+	# zona muerta bajo el carril de retorno izquierdo
+	{"tex": "grieta",       "pos": Vector2(56, 612),  "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "huesos",       "pos": Vector2(50, 652),  "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "musgo",        "pos": Vector2(88, 640),  "escala": 0.5, "espejo": false, "muerta": true},
+	# zona muerta bajo el carril de retorno derecho
+	{"tex": "baldosa_rota", "pos": Vector2(326, 616), "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "mancha",       "pos": Vector2(324, 651), "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "musgo",        "pos": Vector2(342, 630), "escala": 0.5, "espejo": true,  "muerta": true},
+	# franja bajo los flippers, a los lados del corredor de drenaje
+	{"tex": "remaches",     "pos": Vector2(126, 664), "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "remaches",     "pos": Vector2(274, 664), "escala": 1.0, "espejo": true,  "muerta": true},
+	# la rejilla, en el drenaje: aquí sí pasa la bola, y es el sitio que le toca
+	{"tex": "rejilla",      "pos": Vector2(200, 650), "escala": 1.0, "espejo": false, "muerta": false},
+	# campo alto. La bola vive abajo, así que aquí arriba apenas pasa: 2,6 % y
+	# 0,5 % de los fotogramas. Sitios sacados del mapa de ocupación, no a ojo.
+	{"tex": "espiral",      "pos": Vector2(128, 300), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "sigilo",       "pos": Vector2(285, 130), "escala": 1.0, "espejo": false, "muerta": false},
+]
+
+## Rectángulo que ocupa un adorno en la mesa, contando solo su parte opaca:
+## varios sprites tienen relleno transparente y medir el marco de 64x64 daría
+## una caja mucho mayor de la que se ve.
+static func caja_adorno(adorno: Dictionary, tex: Texture2D) -> Rect2:
+	var usado := tex.get_image().get_used_rect()
+	var escala: float = adorno["escala"]
+	var centro: Vector2 = adorno["pos"]
+	var origen := centro - Vector2(tex.get_width(), tex.get_height()) * 0.5 * escala
+	return Rect2(origen + Vector2(usado.position) * escala,
+		Vector2(usado.size) * escala)
+
 var combate: Combate
 var mesa: Mesa
 
@@ -60,10 +108,20 @@ var _tex_poste: Texture2D
 var _tex_bumper: Texture2D
 var _tex_target: Array[Texture2D] = []
 var _tex_enemigo: Texture2D
+var _tex_suelo: Texture2D
+var _tex_deco: Dictionary = {}
 var _fuente: Font
 
 func _ready() -> void:
+	# El suelo se dibuja repitiendo la baldosa de 128x128, así que este
+	# CanvasItem tiene que permitir repetición de textura.
+	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_fuente = ThemeDB.fallback_font
+	_tex_suelo = load("res://assets/mesa_suelo/suelo_piedra.png")
+	for adorno in ADORNOS:
+		var nombre: String = adorno["tex"]
+		if not _tex_deco.has(nombre):
+			_tex_deco[nombre] = load("res://assets/mesa_deco/%s.png" % nombre)
 	_tex_bola = load("res://assets/mesa/bola.png")
 	_tex_poste = load("res://assets/mesa/poste_goma.png")
 	_tex_bumper = load("res://assets/mesa/bumper_gargola.png")
@@ -174,9 +232,12 @@ func _al_atacar_enemigo(_dano: int) -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, Mesa.ANCHO, Mesa.ALTO), C_CABINA)
-	draw_rect(Rect2(20, 60, 360, 620), C_MESA)
-	draw_rect(Rect2(20, 560, 360, 140), C_MESA_BAJA)
-	draw_rect(Rect2(358, 300, 22, 360), C_CARRIL)
+	_dibujar_suelo()
+	_dibujar_adornos()
+	# Sombreados de profundidad. Van translúcidos para que la piedra siga
+	# viéndose por debajo; antes eran planos y tapaban el suelo.
+	draw_rect(Rect2(20, 560, 360, 120), Color(C_MESA_BAJA, 0.30))
+	draw_rect(Rect2(358, 300, 22, 360), Color(C_CARRIL, 0.80))
 	draw_rect(Rect2(0, int(mesa.p.y_drenaje) - 8, Mesa.ANCHO, 8), C_DRENAJE)
 
 	_dibujar_enemigo()
@@ -189,6 +250,25 @@ func _draw() -> void:
 	if _depuracion:
 		_dibujar_depuracion()
 	_dibujar_hud()
+
+## Baldosa de 128x128 que repite sin costuras, teselada sobre todo el campo.
+func _dibujar_suelo() -> void:
+	draw_rect(CAMPO, C_MESA)      # base por si faltara la textura
+	if _tex_suelo != null:
+		draw_texture_rect(_tex_suelo, CAMPO, true)
+
+func _dibujar_adornos() -> void:
+	for adorno in ADORNOS:
+		var tex: Texture2D = _tex_deco.get(adorno["tex"])
+		if tex == null:
+			continue
+		var escala: float = adorno["escala"]
+		var ancho: float = -escala if adorno["espejo"] else escala
+		var mitad := Vector2(tex.get_width(), tex.get_height()) * 0.5
+		draw_set_transform((adorno["pos"] as Vector2).round(), 0.0,
+			Vector2(ancho, escala))
+		draw_texture(tex, -mitad)
+		draw_set_transform_matrix(Transform2D.IDENTITY)
 
 func _dibujar_enemigo() -> void:
 	if _tex_enemigo == null or combate.enemigo == null:
@@ -328,14 +408,17 @@ func _dibujar_hud() -> void:
 		var col_enemigo := C_GOMA_LUZ if _flash_enemigo <= 0.0 else C_ORO_CLARO
 		_barra(Rect2(22, 22, 356, 8), float(e.vida) / float(e.vida_maxima), col_enemigo)
 
+	# El HUD del jugador va arriba, en la franja de cabina, no sobre la mesa:
+	# encima del suelo de piedra el texto se lee fatal y además tapaba los
+	# adornos de la parte baja.
 	var col_jugador := C_VERDE if _flash_jugador <= 0.0 else C_GOMA_LUZ
-	draw_string(_fuente, Vector2(22, 654),
+	draw_string(_fuente, Vector2(22, 46),
 		"VIDA %d/%d" % [combate.vida_jugador, combate.p.vida_jugador],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO)
-	_barra(Rect2(22, 658, 160, 7),
+	_barra(Rect2(88, 40, 94, 7),
 		float(combate.vida_jugador) / float(combate.p.vida_jugador), col_jugador)
 
-	draw_string(_fuente, Vector2(210, 654), "DANO ACUMULADO  %d" % combate.dano_pendiente,
+	draw_string(_fuente, Vector2(210, 46), "DANO ACUMULADO  %d" % combate.dano_pendiente,
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
 		C_ORO_CLARO if combate.dano_pendiente > 0 else C_TEXTO_TENUE)
 
