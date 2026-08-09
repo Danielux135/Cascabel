@@ -109,6 +109,8 @@ static func caja_adorno(adorno: Dictionary, tex: Texture2D) -> Rect2:
 var combate: Combate
 var mesa: Mesa
 var anim := ParametrosAnimacion.new()
+var cam := ParametrosCamara.new()
+var camara: CamaraMesa
 
 const TAMANO_GIRADOR := 32
 
@@ -117,8 +119,8 @@ var _indice_enemigo: int = 0
 var _depuracion := false
 var _sacudida: float = 0.0
 var _tiempo: float = 0.0
-var _flash_enemigo: float = 0.0
-var _flash_jugador: float = 0.0
+var flash_enemigo: float = 0.0
+var flash_jugador: float = 0.0
 var _hitstop: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _nodo_suelo: NodoSuelo
@@ -167,10 +169,16 @@ func _ready() -> void:
 	_giro.resize(mesa.giradores.size())
 	_giro_velocidad.resize(mesa.giradores.size())
 	_flash_bumper.resize(mesa.bumpers.size())
+	add_child(NodoEscritorio.new(cam))
 	_nodo_suelo = NodoSuelo.new(self)
 	add_child(_nodo_suelo)
 	_nodo_enemigo = NodoEnemigo.new(anim)
 	add_child(_nodo_enemigo)
+
+	camara = CamaraMesa.new(cam, Mesa.ALTO, Mesa.ANCHO * 0.5)
+	add_child(camara)
+	camara.make_current()
+	add_child(NodoHud.new(self, cam))
 
 	_catalogo = CatalogoEnemigos.cargar()
 	if _catalogo.is_empty():
@@ -222,12 +230,15 @@ func _sacudir(cantidad: float) -> void:
 func _process(delta: float) -> void:
 	_tiempo += delta
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
-	_flash_enemigo = maxf(_flash_enemigo - delta * 2.2, 0.0)
-	_flash_jugador = maxf(_flash_jugador - delta * 2.2, 0.0)
+	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
+	flash_jugador = maxf(flash_jugador - delta * 2.2, 0.0)
 	# La sacudida SIEMPRE en píxeles enteros: a medio píxel, con el filtro
 	# nearest y el escalado entero del proyecto, la mesa entera se ve borrosa
 	# justo en el momento en que más se mira.
-	position = anim.desplazamiento_sacudida(_sacudida, _rng)
+	# La sacudida va en el offset de la CÁMARA. Moviendo el nodo de la mesa no
+	# se vería: la cámara es hija suya y se movería con él.
+	camara.sacudida = anim.desplazamiento_sacudida(_sacudida, _rng)
+	camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, mesa.bola.viva)
 
 	for i in _flash_bumper.size():
 		_flash_bumper[i] = maxf(
@@ -296,7 +307,7 @@ func _al_buscar_bola(punto: Vector2) -> void:
 
 func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
 	_numeros.append({"pos": punto, "t": 0.7, "texto": "%d" % dano, "col": C_ORO_CLARO})
-	_flash_enemigo = maxf(_flash_enemigo, 0.7)
+	flash_enemigo = maxf(flash_enemigo, 0.7)
 	_nodo_enemigo.recibir_dano()
 	_sacudir(anim.sacudida_dano)
 
@@ -307,7 +318,7 @@ func _al_cambiar_combo(multiplicador: int, _golpes: int) -> void:
 		_sacudir(anim.sacudida_dano)
 
 func _al_atacar_enemigo(_dano: int) -> void:
-	_flash_jugador = 1.0
+	flash_jugador = 1.0
 	_nodo_enemigo.embestir()
 	_sacudir(anim.sacudida_ataque)
 	_hitstop = maxf(_hitstop, anim.hitstop)
@@ -321,10 +332,11 @@ func _al_terminar_combate(victoria: bool) -> void:
 # ------------------------------------------------------------------- dibujo
 
 func _draw() -> void:
-	# El fondo, el suelo, los adornos y el combo los pinta _nodo_suelo (z -2) y
-	# el enemigo
-	# _nodo_enemigo (z -1): el enemigo tiene que quedar entre medias y un solo
-	# CanvasItem no se puede partir. Aquí empieza ya la capa 0.
+	# Las capas: el fondo, el suelo, los adornos y el combo los pinta _nodo_suelo
+	# (z -2) y el enemigo _nodo_enemigo (z -1), porque el enemigo tiene que
+	# quedar entre medias y un solo CanvasItem no se puede partir. El HUD y el
+	# escritorio van en CanvasLayer aparte, para que no se los lleve la cámara.
+	# Aquí empieza la capa 0.
 	# Sombreados de profundidad. Van translúcidos para que la piedra siga
 	# viéndose por debajo; antes eran planos y tapaban el suelo.
 	draw_rect(Rect2(20, 560, 360, 120), Color(C_MESA_BAJA, 0.30))
@@ -340,11 +352,18 @@ func _draw() -> void:
 	_dibujar_destellos()
 	_dibujar_bola()
 	_dibujar_numeros()
+	_dibujar_lanzador()
 	if _depuracion:
 		_dibujar_depuracion()
-	_dibujar_hud()
 
-
+## El medidor de carga del lanzador va pegado al carril, en el mundo: es parte
+## de la mesa, no del HUD.
+func _dibujar_lanzador() -> void:
+	if not (mesa.cargando or mesa.carga_lanzador > 0.0):
+		return
+	draw_rect(Rect2(366, 600, 6, 50), C_CABINA)
+	var alto := 50.0 * mesa.carga_lanzador
+	draw_rect(Rect2(366, 650 - alto, 6, alto), C_ORO)
 
 ## Los carriles de retorno del arreglo 1, sombreados para que se lean.
 func _dibujar_inlanes() -> void:
@@ -478,72 +497,3 @@ func _dibujar_depuracion() -> void:
 
 
 
-# ---------------------------------------------------------------------- HUD
-
-func _barra(rect: Rect2, proporcion: float, color: Color) -> void:
-	draw_rect(rect, C_CABINA)
-	draw_rect(Rect2(rect.position, Vector2(rect.size.x * clampf(proporcion, 0.0, 1.0),
-		rect.size.y)), color)
-
-func _dibujar_hud() -> void:
-	var e := combate.enemigo
-	if e != null:
-		draw_string(_fuente, Vector2(22, 16), e.nombre,
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 10, C_TEXTO)
-		draw_string(_fuente, Vector2(0, 16), "%d/%d" % [e.vida, e.vida_maxima],
-			HORIZONTAL_ALIGNMENT_RIGHT, 378, 10, C_TEXTO_TENUE)
-		var col_enemigo := C_GOMA_LUZ if _flash_enemigo <= 0.0 else C_ORO_CLARO
-		_barra(Rect2(22, 22, 356, 8), float(e.vida) / float(e.vida_maxima), col_enemigo)
-
-	# El HUD del jugador va arriba, en la franja de cabina, no sobre la mesa:
-	# encima del suelo de piedra el texto se lee fatal y además tapaba los
-	# adornos de la parte baja.
-	var col_jugador := C_VERDE if _flash_jugador <= 0.0 else C_GOMA_LUZ
-	draw_string(_fuente, Vector2(22, 46),
-		"VIDA %d/%d" % [combate.vida_jugador, combate.p.vida_jugador],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO)
-	_barra(Rect2(88, 40, 94, 7),
-		float(combate.vida_jugador) / float(combate.p.vida_jugador), col_jugador)
-
-	draw_string(_fuente, Vector2(210, 46),
-		"ESTA BOLA  %d  (%d golpes)" % [combate.dano_de_la_bola, combate.golpes],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
-
-	if mesa.cargando or mesa.carga_lanzador > 0.0:
-		draw_rect(Rect2(366, 600, 6, 50), C_CABINA)
-		var alto := 50.0 * mesa.carga_lanzador
-		draw_rect(Rect2(366, 650 - alto, 6, alto), C_ORO)
-
-	_dibujar_mensaje()
-	draw_string(_fuente, Vector2(22, 690),
-		"A/D flippers  ESPACIO lanzar  R reiniciar  N otro enemigo  F1 colisiones",
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, C_TEXTO_TENUE)
-
-func _dibujar_mensaje() -> void:
-	var texto := ""
-	var col := C_TEXTO
-	match combate.fase:
-		Combate.Fase.LANZANDO:
-			if mesa.bola.viva and mesa.bola.en_carril:
-				texto = "ESPACIO: mantener y soltar para lanzar"
-				col = C_TEXTO_TENUE
-		Combate.Fase.DRENADA:
-			texto = "BOLA PERDIDA  ·  COMBO A x1"
-			col = C_TEXTO_TENUE
-		Combate.Fase.RESOLVIENDO_ATAQUE:
-			texto = "%s ATACA  -%d" % [combate.enemigo.nombre.to_upper(), combate.ultimo_ataque]
-			col = C_GOMA_LUZ
-		Combate.Fase.VICTORIA:
-			texto = "VICTORIA"
-			col = C_VERDE
-		Combate.Fase.DERROTA:
-			texto = "DERROTA"
-			col = C_GOMA_LUZ
-	if texto == "":
-		return
-	draw_string(_fuente, Vector2(0, 400), texto, HORIZONTAL_ALIGNMENT_CENTER,
-		Mesa.ANCHO, 14, col)
-	if combate.terminado():
-		draw_string(_fuente, Vector2(0, 420), "R para repetir  ·  N para otro enemigo",
-			HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO, 9, C_TEXTO_TENUE)

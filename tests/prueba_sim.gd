@@ -27,6 +27,7 @@ func _initialize() -> void:
 	_prueba_adornos()
 	_prueba_giradores()
 	_prueba_animacion()
+	_prueba_camara()
 
 	print("")
 	if _fallos == 0:
@@ -92,9 +93,11 @@ func _prueba_ajustes() -> void:
 		ProjectSettings.get_setting("rendering/textures/canvas_textures/default_texture_filter") == 0)
 	_comprobar("stretch/scale_mode = integer",
 		ProjectSettings.get_setting("display/window/stretch/scale_mode") == "integer")
-	_comprobar("viewport 400x700",
-		ProjectSettings.get_setting("display/window/size/viewport_width") == 400
-		and ProjectSettings.get_setting("display/window/size/viewport_height") == 700)
+	# 640x360 con escalado entero: x2 = 720p, x3 = 1080p, x4 = 1440p. La mesa
+	# sigue midiendo 400 de ancho y los ~240 que sobran son el escritorio.
+	_comprobar("viewport 640x360",
+		ProjectSettings.get_setting("display/window/size/viewport_width") == 640
+		and ProjectSettings.get_setting("display/window/size/viewport_height") == 360)
 
 ## El arreglo 1 depende de que no quede ningún hueco por el que quepa la bola
 ## entre el final del carril de retorno, el poste y el eje del flipper.
@@ -528,6 +531,64 @@ func _prueba_adornos() -> void:
 		pisados.is_empty(), str(pisados))
 	_comprobar("y por los de campo abierto apenas pasa",
 		ruidosos.is_empty(), str(ruidosos))
+
+## Las cuatro reglas de la cámara de PLAN.md, una por una y encima jugando.
+func _prueba_camara() -> void:
+	var cp := ParametrosCamara.new()
+	var camara := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
+
+	# REGLA 1: con la bola cayendo, la cámara mira por DEBAJO de ella.
+	var cayendo := camara.objetivo(400.0, 800.0, true)
+	var subiendo := camara.objetivo(400.0, -800.0, true)
+	_comprobar("regla 1: cayendo, la camara se adelanta por debajo de la bola",
+		cayendo > 400.0 and cayendo > subiendo,
+		"cayendo %.0f, subiendo %.0f" % [cayendo, subiendo])
+
+	# REGLA 2: por debajo de la línea de seguridad, anclada abajo.
+	var y_baja := Mesa.ALTO - cp.margen_ancla + 10.0
+	_comprobar("regla 2: bajo la linea de seguridad la camara se ancla abajo",
+		is_equal_approx(camara.objetivo(y_baja, 400.0, true), camara.limite_abajo()),
+		"objetivo %.0f, ancla %.0f" % [camara.objetivo(y_baja, 400.0, true),
+			camara.limite_abajo()])
+	_comprobar("y con los flippers a la vista",
+		camara.limite_abajo() + cp.alto_visible * 0.5 >= Mesa.ALTO - 1.0)
+
+	# REGLA 4: un temblorcito de la bola no mueve la cámara.
+	camara.y_actual = 300.0
+	camara.avanzar(DT, 300.0 - cp.adelanto + cp.zona_muerta * 0.5, 500.0, true)
+	_comprobar("regla 4: dentro de la zona muerta la camara no se mueve",
+		is_equal_approx(camara.y_actual, 300.0), "se movio a %.2f" % camara.y_actual)
+
+	# REGLA 3 y garantía de la 1, jugando de verdad.
+	var fraccionarias := 0
+	var fuera := 0
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.cargar_lanzador(1.0)
+	m.soltar_lanzador()
+	camara.y_actual = camara.limite_abajo()
+	for _i in int(30.0 / DT):
+		if not m.bola.viva:
+			break
+		m.avanzar(DT)
+		camara.avanzar(DT, m.bola.pos.y, m.bola.vel.y, m.bola.viva)
+		if camara.position != camara.position.round():
+			fraccionarias += 1
+		var vista := camara.rect_visible()
+		if m.bola.viva and m.bola.pos.y < Mesa.ALTO - 20.0 \
+				and (m.bola.pos.y < vista.position.y
+					or m.bola.pos.y > vista.position.y + vista.size.y):
+			fuera += 1
+	_comprobar("regla 3: la camara siempre en pixeles enteros",
+		fraccionarias == 0, "%d fotogramas a medio pixel" % fraccionarias)
+	_comprobar("regla 1: la bola nunca se sale de la pantalla",
+		fuera == 0, "%d fotogramas con la bola fuera" % fuera)
+
+	# Y nunca se enseña fuera de la mesa.
+	_comprobar("la camara no se sale de la mesa",
+		camara.limite_arriba() >= cp.alto_visible * 0.5
+		and camara.limite_abajo() <= Mesa.ALTO - cp.alto_visible * 0.5 + 0.01)
+	camara.free()
 
 func _prueba_giradores() -> void:
 	var m := _nueva_mesa()
