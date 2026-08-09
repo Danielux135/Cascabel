@@ -315,70 +315,128 @@ func _drenar(c: Combate) -> void:
 	c.mesa.bola.vel = Vector2.ZERO
 	c.mesa.bola_drenada.emit()
 
+## Golpea un bumper `veces` veces, como si la bola fuera dando tumbos.
+func _golpear(c: Combate, veces: int) -> void:
+	for _i in veces:
+		c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+
+## Pone el combate en juego con la bola fuera del carril.
+func _en_juego(c: Combate) -> void:
+	c.mesa.bola.en_carril = false
+	c.avanzar(DT)
+
 func _prueba_combate() -> void:
 	_prueba_bumper_no_repite()
 
 	var c := Combate.new()
-	c.iniciar(Enemigo.new({"nombre": "Prueba", "vida": 50, "ataque": 10}))
+	c.iniciar(Enemigo.new({"nombre": "Prueba", "vida": 500, "ataque": 10}))
 	_comprobar("el combate arranca con la vida del jugador a tope",
 		c.vida_jugador == c.p.vida_jugador)
 	_comprobar("y con la bola en el carril", c.mesa.bola.en_carril)
+	_en_juego(c)
 
-	# Golpear acumula, no pega todavía.
-	c.mesa.bola.en_carril = false
-	c.avanzar(DT)
-	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
-	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
-	_comprobar("golpear bumpers acumula dano",
-		c.dano_pendiente == c.p.dano_bumper * 2, "pendiente %d" % c.dano_pendiente)
-	_comprobar("el enemigo aun no ha perdido vida", c.enemigo.vida == 50)
+	# El daño se aplica EN VIVO, no al drenar.
+	_golpear(c, 1)
+	_comprobar("golpear un bumper le quita vida al enemigo en el acto",
+		c.enemigo.vida == 500 - c.p.dano_bumper, "vida %d" % c.enemigo.vida)
+	_comprobar("y cuenta como un golpe del combo", c.golpes == 1)
 
-	# Drenar resuelve: pega y luego el enemigo contraataca.
-	var pendiente := c.dano_pendiente
+	# Drenar no pega: solo tira el combo y trae el contraataque.
+	_golpear(c, 6)
+	var vida_enemigo := c.enemigo.vida
 	_drenar(c)
-	_comprobar("al drenar se le pega al enemigo con lo acumulado",
-		c.enemigo.vida == 50 - pendiente, "vida %d" % c.enemigo.vida)
-	_comprobar("y el acumulador se vacia", c.dano_pendiente == 0)
+	_comprobar("drenar no le hace dano al enemigo",
+		c.enemigo.vida == vida_enemigo, "vida %d" % c.enemigo.vida)
+	_comprobar("drenar resetea el combo a x1",
+		c.golpes == 0 and c.multiplicador() == 1,
+		"%d golpes, x%d" % [c.golpes, c.multiplicador()])
 	_comprobar("el jugador aun no ha recibido el ataque",
 		c.vida_jugador == c.p.vida_jugador)
-	_avanzar_combate(c, c.p.pausa_golpe + DT * 4.0)
+	_avanzar_combate(c, c.p.pausa_drenaje + DT * 4.0)
 	_comprobar("tras la pausa el enemigo contraataca",
 		c.vida_jugador == c.p.vida_jugador - 10, "vida %d" % c.vida_jugador)
 	_avanzar_combate(c, c.p.pausa_ataque + DT * 4.0)
 	_comprobar("y se sirve otra bola",
 		c.mesa.bola.viva and c.mesa.bola.en_carril and c.fase == Combate.Fase.LANZANDO)
 
-	# Golpear entre turnos no debe acumular.
+	# Golpear entre turnos no debe contar.
 	_drenar(c)
-	var antes := c.dano_pendiente
-	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
-	_comprobar("durante la resolucion no se acumula dano",
-		c.dano_pendiente == antes, "pendiente %d" % c.dano_pendiente)
+	var antes := c.enemigo.vida
+	_golpear(c, 1)
+	_comprobar("durante la resolucion los golpes no cuentan",
+		c.enemigo.vida == antes and c.golpes == 0,
+		"vida %d, %d golpes" % [c.enemigo.vida, c.golpes])
 
+	_prueba_combo()
 	_prueba_victoria()
 	_prueba_derrota()
 	_prueba_catalogo()
 
+## Los tramos: x1 hasta 4 golpes, x2 hasta 9, x3 hasta 19, x4 a partir de 20.
+func _prueba_combo() -> void:
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c)
+	var esperado := {0: 1, 1: 1, 4: 1, 5: 2, 9: 2, 10: 3, 19: 3, 20: 4, 60: 4}
+	var mal: Array[String] = []
+	var dados := 0
+	for golpes in [0, 1, 4, 5, 9, 10, 19, 20, 60]:
+		_golpear(c, golpes - dados)
+		dados = golpes
+		if c.multiplicador() != esperado[golpes]:
+			mal.append("%d golpes -> x%d (esperado x%d)"
+				% [golpes, c.multiplicador(), esperado[golpes]])
+	_comprobar("los tramos del combo son los que dice el parametro",
+		mal.is_empty(), str(mal))
+
+	# El multiplicador se aplica al golpe que cruza el tramo, no al siguiente.
+	var c2 := Combate.new()
+	c2.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c2)
+	_golpear(c2, 4)
+	var tras_cuatro := c2.enemigo.vida
+	_golpear(c2, 1)
+	_comprobar("el quinto golpe ya vale x2",
+		tras_cuatro - c2.enemigo.vida == c2.p.dano_bumper * 2,
+		"quito %d" % (tras_cuatro - c2.enemigo.vida))
+	_comprobar("los cuatro primeros valieron x1",
+		c2.p.vida_jugador > 0 and (100000 - tras_cuatro) == c2.p.dano_bumper * 4,
+		"quitaron %d" % (100000 - tras_cuatro))
+
+	# Completar un banco da daño pero no es un golpe: si contara, el target que
+	# lo cierra sumaría dos veces al combo.
+	var c3 := Combate.new()
+	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c3)
+	var vida_antes := c3.enemigo.vida
+	c3.mesa.banco_completado.emit(Vector2(56, 360), 0)
+	_comprobar("la bonificacion de banco hace dano pero no suma golpe",
+		c3.golpes == 0 and vida_antes - c3.enemigo.vida == c3.p.dano_banco,
+		"%d golpes, %d de dano" % [c3.golpes, vida_antes - c3.enemigo.vida])
+
 func _prueba_victoria() -> void:
 	var c := Combate.new()
-	c.iniciar(Enemigo.new({"nombre": "Debil", "vida": 8, "ataque": 99}))
-	c.mesa.bola.en_carril = false
-	c.avanzar(DT)
-	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
-	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
-	_drenar(c)
-	_comprobar("matar al enemigo da la victoria", c.fase == Combate.Fase.VICTORIA)
+	c.iniciar(Enemigo.new({"nombre": "Debil", "vida": 5, "ataque": 99}))
+	_en_juego(c)
+	_golpear(c, 3)
+	_comprobar("matar al enemigo da la victoria en el acto, sin drenar",
+		c.fase == Combate.Fase.VICTORIA)
+	_comprobar("y se retira la bola", not c.mesa.bola.viva)
 	_avanzar_combate(c, 3.0)
 	_comprobar("un enemigo muerto no contraataca",
 		c.vida_jugador == c.p.vida_jugador, "vida %d" % c.vida_jugador)
+	var vida_muerto := c.enemigo.vida
+	_golpear(c, 5)
+	_comprobar("tras la victoria los golpes ya no hacen nada",
+		c.enemigo.vida == vida_muerto and c.golpes == 3,
+		"vida %d, %d golpes" % [c.enemigo.vida, c.golpes])
 
 func _prueba_derrota() -> void:
 	var c := Combate.new()
 	c.iniciar(Enemigo.new({"nombre": "Duro", "vida": 9999, "ataque": 1000}))
-	c.mesa.bola.en_carril = false
-	c.avanzar(DT)
+	_en_juego(c)
 	_drenar(c)
-	_avanzar_combate(c, c.p.pausa_golpe + 0.1)
+	_avanzar_combate(c, c.p.pausa_drenaje + 0.1)
 	_comprobar("quedarse sin vida es derrota", c.fase == Combate.Fase.DERROTA)
 	_comprobar("la vida no baja de cero", c.vida_jugador == 0,
 		"vida %d" % c.vida_jugador)

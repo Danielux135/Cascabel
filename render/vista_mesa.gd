@@ -24,6 +24,22 @@ const C_TEXTO_TENUE := Color("62636F")
 const C_ARCANO      := Color("A97BD9")
 const C_DRENAJE     := Color("4A3A42")
 const C_VERDE       := Color("7BA84A")
+const C_FUEGO       := Color("E8814A")
+
+## El multiplicador va grande, en el hueco entre los slingshots y los flippers,
+## que es donde tienes puesto el ojo mientras juegas. Se dibuja pegado al suelo,
+## por debajo de paredes, objetos y bola, así que nunca tapa el juego: lo que
+## hace que se vea es que se enciende conforme sube.
+## Y no más abajo: con los flippers levantados las palas llegan a y=559 y se
+## comían la línea de debajo del número.
+const COMBO_CENTRO := Vector2(200, 520)
+const COMBO_TAMANO := 46
+const COMBO_ESTILO := {
+	1: {"col": C_TEXTO_TENUE, "alfa": 0.22},
+	2: {"col": C_ORO,         "alfa": 0.45},
+	3: {"col": C_ORO_CLARO,   "alfa": 0.62},
+	4: {"col": C_FUEGO,       "alfa": 0.82},
+}
 const C_FLIPPER       := Color("2A2A33")
 const C_FLIPPER_BORDE := Color("14121A")
 const C_FLIPPER_LINEA := Color("E4E6EC")
@@ -100,6 +116,7 @@ var _sacudida: float = 0.0
 var _tiempo: float = 0.0
 var _flash_enemigo: float = 0.0
 var _flash_jugador: float = 0.0
+var _pulso_combo: float = 0.0
 var _destellos: Array[Dictionary] = []
 var _numeros: Array[Dictionary] = []
 
@@ -136,8 +153,8 @@ func _ready() -> void:
 	mesa.poste_golpeado.connect(_al_golpear_poste)
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
-	combate.dano_sumado.connect(_al_sumar_dano)
-	combate.golpe_resuelto.connect(_al_resolver_golpe)
+	combate.dano_infligido.connect(_al_infligir_dano)
+	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
 
 	_catalogo = CatalogoEnemigos.cargar()
@@ -175,6 +192,7 @@ func _process(delta: float) -> void:
 	_sacudida = maxf(_sacudida - delta * 26.0, 0.0)
 	_flash_enemigo = maxf(_flash_enemigo - delta * 2.2, 0.0)
 	_flash_jugador = maxf(_flash_jugador - delta * 2.2, 0.0)
+	_pulso_combo = maxf(_pulso_combo - delta * 2.6, 0.0)
 	position = Vector2(roundf(randf_range(-_sacudida, _sacudida)),
 		roundf(randf_range(-_sacudida, _sacudida)))
 	_destellos = _caducar(_destellos, delta)
@@ -217,12 +235,15 @@ func _al_buscar_bola(punto: Vector2) -> void:
 	_destellos.append({"pos": punto, "t": 0.3, "r": 34.0, "col": C_ARCANO})
 	_sacudida = 3.0
 
-func _al_sumar_dano(_total: int, incremento: int, punto: Vector2) -> void:
-	_numeros.append({"pos": punto, "t": 0.7, "texto": "+%d" % incremento, "col": C_ORO_CLARO})
+func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
+	_numeros.append({"pos": punto, "t": 0.7, "texto": "%d" % dano, "col": C_ORO_CLARO})
+	_flash_enemigo = maxf(_flash_enemigo, 0.7)
 
-func _al_resolver_golpe(dano: int) -> void:
-	_flash_enemigo = 1.0
-	_sacudida = maxf(_sacudida, 2.0 if dano > 0 else 0.0)
+## Solo salta cuando el multiplicador cambia de tramo, no en cada golpe.
+func _al_cambiar_combo(multiplicador: int, _golpes: int) -> void:
+	_pulso_combo = 1.0
+	if multiplicador > 1:
+		_sacudida = maxf(_sacudida, 1.6)
 
 func _al_atacar_enemigo(_dano: int) -> void:
 	_flash_jugador = 1.0
@@ -234,6 +255,7 @@ func _draw() -> void:
 	draw_rect(Rect2(0, 0, Mesa.ANCHO, Mesa.ALTO), C_CABINA)
 	_dibujar_suelo()
 	_dibujar_adornos()
+	_dibujar_combo()
 	# Sombreados de profundidad. Van translúcidos para que la piedra siga
 	# viéndose por debajo; antes eran planos y tapaban el suelo.
 	draw_rect(Rect2(20, 560, 360, 120), Color(C_MESA_BAJA, 0.30))
@@ -391,6 +413,40 @@ func _dibujar_depuracion() -> void:
 		draw_circle(mesa.bola.pos, mesa.p.radio_bola, C_ORO, false, 1.0)
 		draw_line(mesa.bola.pos, mesa.bola.pos + mesa.bola.vel * 0.08, C_ORO, 1.0)
 
+## El multiplicador de combo, que es lo que más importa mientras juegas. Va
+## pegado al suelo (se dibuja justo detrás de todo lo demás) y grande, y se
+## enciende conforme sube: a x1 es casi invisible, a x4 quema.
+func _dibujar_combo() -> void:
+	if combate == null or combate.enemigo == null:
+		return
+	var factor := combate.multiplicador()
+	var estilo: Dictionary = COMBO_ESTILO.get(factor, COMBO_ESTILO[1])
+	var col: Color = estilo["col"]
+	col.a = float(estilo["alfa"]) * (1.0 if not combate.terminado() else 0.35)
+	var escala := 1.0 + _pulso_combo * 0.35
+
+	draw_set_transform(COMBO_CENTRO, 0.0, Vector2(escala, escala))
+	draw_string(_fuente, Vector2(-100, 0), "x%d" % factor,
+		HORIZONTAL_ALIGNMENT_CENTER, 200, COMBO_TAMANO, col)
+	draw_set_transform_matrix(Transform2D.IDENTITY)
+
+	# Cuántos golpes faltan para el tramo siguiente: sin esto el número grande
+	# sube de golpe y no sabes si te falta uno o doce.
+	var siguiente := _golpes_para_subir()
+	if siguiente > 0 and not combate.terminado():
+		var tenue := Color(col, col.a * 0.8)
+		draw_string(_fuente, Vector2(COMBO_CENTRO.x - 100, COMBO_CENTRO.y + 14),
+			"%d para x%d" % [siguiente, factor + 1],
+			HORIZONTAL_ALIGNMENT_CENTER, 200, 9, tenue)
+
+## Golpes que faltan para el siguiente tramo, o 0 si ya está en el último.
+func _golpes_para_subir() -> int:
+	var factor := combate.multiplicador()
+	for tramo in combate.p.tramos_combo:
+		if int((tramo as Dictionary)["factor"]) > factor:
+			return int((tramo as Dictionary)["golpes"]) - combate.golpes
+	return 0
+
 # ---------------------------------------------------------------------- HUD
 
 func _barra(rect: Rect2, proporcion: float, color: Color) -> void:
@@ -418,9 +474,10 @@ func _dibujar_hud() -> void:
 	_barra(Rect2(88, 40, 94, 7),
 		float(combate.vida_jugador) / float(combate.p.vida_jugador), col_jugador)
 
-	draw_string(_fuente, Vector2(210, 46), "DANO ACUMULADO  %d" % combate.dano_pendiente,
+	draw_string(_fuente, Vector2(210, 46),
+		"ESTA BOLA  %d  (%d golpes)" % [combate.dano_de_la_bola, combate.golpes],
 		HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-		C_ORO_CLARO if combate.dano_pendiente > 0 else C_TEXTO_TENUE)
+		C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
 
 	if mesa.cargando or mesa.carga_lanzador > 0.0:
 		draw_rect(Rect2(366, 600, 6, 50), C_CABINA)
@@ -440,9 +497,9 @@ func _dibujar_mensaje() -> void:
 			if mesa.bola.viva and mesa.bola.en_carril:
 				texto = "ESPACIO: mantener y soltar para lanzar"
 				col = C_TEXTO_TENUE
-		Combate.Fase.RESOLVIENDO_GOLPE:
-			texto = "GOLPE  -%d" % combate.ultimo_golpe
-			col = C_ORO_CLARO
+		Combate.Fase.DRENADA:
+			texto = "BOLA PERDIDA  ·  COMBO A x1"
+			col = C_TEXTO_TENUE
 		Combate.Fase.RESOLVIENDO_ATAQUE:
 			texto = "%s ATACA  -%d" % [combate.enemigo.nombre.to_upper(), combate.ultimo_ataque]
 			col = C_GOMA_LUZ
