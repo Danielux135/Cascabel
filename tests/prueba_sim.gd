@@ -596,9 +596,12 @@ func _prueba_rampas() -> void:
 	m4.platillo_expulsado.connect(func(_pt: Vector2, _i: int) -> void: expulsiones[0] += 1)
 	# La velocidad hay que medirla EN el aviso: un par de fotogramas después la
 	# bola ya ha rebotado en un bumper y marca 1486.
+	# La lambda captura la BOLA, no la mesa: capturando `m4` se cierra un ciclo
+	# (mesa -> señal -> lambda -> mesa) y la mesa no se libera nunca.
 	var salio_a := [0.0]
+	var bola4 := m4.bola
 	m4.platillo_expulsado.connect(func(_pt: Vector2, _i: int) -> void:
-		salio_a[0] = m4.bola.velocidad())
+		salio_a[0] = bola4.velocidad())
 	m4.avanzar(DT)
 	_comprobar("el platillo captura la bola",
 		capturas[0] == 1 and m4.bola.platillo >= 0 and m4.bola.velocidad() == 0.0)
