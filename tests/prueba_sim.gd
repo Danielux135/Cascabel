@@ -21,6 +21,9 @@ func _initialize() -> void:
 	_prueba_flipper_empuja()
 	_prueba_ball_search()
 	_prueba_lanzador()
+	_prueba_targets()
+	_prueba_combate()
+	_prueba_escena_principal()
 
 	print("")
 	if _fallos == 0:
@@ -218,6 +221,197 @@ func _prueba_ball_search() -> void:
 		m2.avanzar(DT)
 	_comprobar("cazar la bola con el flipper no dispara el ball search",
 		disparos2[0] == 0, "%d disparos en 4 s" % disparos2[0])
+
+func _prueba_targets() -> void:
+	var m := _nueva_mesa()
+	_comprobar("hay dos bancos de tres targets",
+		m.bancos.size() == 2 and m.targets.size() == 6,
+		"%d bancos, %d targets" % [m.bancos.size(), m.targets.size()])
+
+	# Los targets no pueden sellar el carril lateral: con el banco en pie se
+	# tiene que poder seguir bajando al inlane.
+	for datos in [{"banco": 0, "pared_x": 20.0}, {"banco": 1, "pared_x": 350.0}]:
+		var c: Colisionador = m.bancos[datos["banco"]][0]
+		var carril: float = absf(c.a.x - (datos["pared_x"] as float)) \
+			- m.p.target_radio - m.p.radio_bola * 2.0
+		_comprobar("queda carril entre el banco %d y la pared" % datos["banco"],
+			carril > 2.0, "solo %.1f px libres" % carril)
+
+	# Y entre target y target NO tiene que caber, o se acuñaría.
+	var banco: Array = m.bancos[0]
+	var hueco: float = (banco[0] as Colisionador).a.distance_to((banco[1] as Colisionador).a) \
+		- m.p.target_radio * 2.0
+	_comprobar("entre dos targets no cabe la bola",
+		hueco < m.p.radio_bola * 2.0, "hueco %.1f px" % hueco)
+
+	# Abatir el banco entero lo vuelve a levantar tras el retardo.
+	var completados := [0]
+	m.banco_completado.connect(func(_pt: Vector2, _b: int) -> void: completados[0] += 1)
+	for c in m.bancos[0]:
+		m._abatir(c)
+	_comprobar("abatir los tres avisa de banco completado", completados[0] == 1,
+		"%d avisos" % completados[0])
+	_comprobar("los targets abatidos dejan de colisionar",
+		not (m.bancos[0][0] as Colisionador).activo)
+	for _i in int(m.p.target_tiempo_reset / DT) + 4:
+		m.avanzar(DT)
+	_comprobar("el banco se vuelve a levantar solo",
+		(m.bancos[0][0] as Colisionador).activo)
+
+## Un bumper solo puede dar un aviso por golpe. Sin el filtro de `empuje`, una
+## bola apoyada emitía uno por subpaso: 480 golpes por segundo de daño gratis.
+func _prueba_bumper_no_repite() -> void:
+	# El bumper izquierdo, no el de arriba: sobre el de arriba la bola rebota en
+	# el arco y vuelve a caer dentro de la ventana de medida, y ese segundo
+	# aviso es legítimo. Aquí el empuje de 620 se queda 24 px por debajo del
+	# arco, así que en 0,4 s no puede haber dos golpes.
+	var arriba := Vector2(140, 225)
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.bola.pos = arriba - Vector2(0, m.p.bumper_radio + m.p.radio_bola + 40.0)
+	m.bola.vel = Vector2(0, 200)
+	var avisos := [0]
+	m.bumper_golpeado.connect(func(_pt: Vector2, _f: float) -> void: avisos[0] += 1)
+	# No vale medir por ventana de tiempo: con restitución 1,8 la bola sale al
+	# tope de 1500 px/s, rebota en el arco y vuelve a caer en 0,26 s, y ese
+	# segundo aviso es legítimo. Se mide el contacto: en cuanto sale despedida
+	# se dejan correr unos ticks más y no puede haber aparecido otro aviso.
+	var golpeada := false
+	var extra := 0
+	for _i in int(1.0 / DT):
+		m.avanzar(DT)
+		if golpeada:
+			extra += 1
+			if extra >= 6:
+				break
+		elif m.bola.vel.y < -100.0:
+			golpeada = true
+	_comprobar("un golpe de bumper da exactamente un aviso",
+		golpeada and avisos[0] == 1, "%d avisos" % avisos[0])
+
+	# Y una bola apoyada encima, sin fuerza para disparar el interruptor, no
+	# tiene que dar ninguno.
+	var m2 := _nueva_mesa()
+	m2.nueva_bola()
+	m2.bola.en_carril = false
+	m2.bola.pos = arriba - Vector2(0, m2.p.bumper_radio + m2.p.radio_bola - 0.2)
+	m2.bola.vel = Vector2.ZERO
+	var avisos2 := [0]
+	m2.bumper_golpeado.connect(func(_pt: Vector2, _f: float) -> void: avisos2[0] += 1)
+	for _i in int(0.5 / DT):
+		m2.avanzar(DT)
+	_comprobar("una bola apoyada en un bumper no da avisos",
+		avisos2[0] == 0, "%d avisos en 0,5 s" % avisos2[0])
+
+func _avanzar_combate(c: Combate, segundos: float) -> void:
+	for _i in int(segundos / DT):
+		c.avanzar(DT)
+
+## Drena como lo haría la mesa de verdad: mata la bola y luego avisa.
+func _drenar(c: Combate) -> void:
+	c.mesa.bola.viva = false
+	c.mesa.bola.vel = Vector2.ZERO
+	c.mesa.bola_drenada.emit()
+
+func _prueba_combate() -> void:
+	_prueba_bumper_no_repite()
+
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Prueba", "vida": 50, "ataque": 10}))
+	_comprobar("el combate arranca con la vida del jugador a tope",
+		c.vida_jugador == c.p.vida_jugador)
+	_comprobar("y con la bola en el carril", c.mesa.bola.en_carril)
+
+	# Golpear acumula, no pega todavía.
+	c.mesa.bola.en_carril = false
+	c.avanzar(DT)
+	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+	_comprobar("golpear bumpers acumula dano",
+		c.dano_pendiente == c.p.dano_bumper * 2, "pendiente %d" % c.dano_pendiente)
+	_comprobar("el enemigo aun no ha perdido vida", c.enemigo.vida == 50)
+
+	# Drenar resuelve: pega y luego el enemigo contraataca.
+	var pendiente := c.dano_pendiente
+	_drenar(c)
+	_comprobar("al drenar se le pega al enemigo con lo acumulado",
+		c.enemigo.vida == 50 - pendiente, "vida %d" % c.enemigo.vida)
+	_comprobar("y el acumulador se vacia", c.dano_pendiente == 0)
+	_comprobar("el jugador aun no ha recibido el ataque",
+		c.vida_jugador == c.p.vida_jugador)
+	_avanzar_combate(c, c.p.pausa_golpe + DT * 4.0)
+	_comprobar("tras la pausa el enemigo contraataca",
+		c.vida_jugador == c.p.vida_jugador - 10, "vida %d" % c.vida_jugador)
+	_avanzar_combate(c, c.p.pausa_ataque + DT * 4.0)
+	_comprobar("y se sirve otra bola",
+		c.mesa.bola.viva and c.mesa.bola.en_carril and c.fase == Combate.Fase.LANZANDO)
+
+	# Golpear entre turnos no debe acumular.
+	_drenar(c)
+	var antes := c.dano_pendiente
+	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+	_comprobar("durante la resolucion no se acumula dano",
+		c.dano_pendiente == antes, "pendiente %d" % c.dano_pendiente)
+
+	_prueba_victoria()
+	_prueba_derrota()
+	_prueba_catalogo()
+
+func _prueba_victoria() -> void:
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Debil", "vida": 8, "ataque": 99}))
+	c.mesa.bola.en_carril = false
+	c.avanzar(DT)
+	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+	c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+	_drenar(c)
+	_comprobar("matar al enemigo da la victoria", c.fase == Combate.Fase.VICTORIA)
+	_avanzar_combate(c, 3.0)
+	_comprobar("un enemigo muerto no contraataca",
+		c.vida_jugador == c.p.vida_jugador, "vida %d" % c.vida_jugador)
+
+func _prueba_derrota() -> void:
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Duro", "vida": 9999, "ataque": 1000}))
+	c.mesa.bola.en_carril = false
+	c.avanzar(DT)
+	_drenar(c)
+	_avanzar_combate(c, c.p.pausa_golpe + 0.1)
+	_comprobar("quedarse sin vida es derrota", c.fase == Combate.Fase.DERROTA)
+	_comprobar("la vida no baja de cero", c.vida_jugador == 0,
+		"vida %d" % c.vida_jugador)
+	_avanzar_combate(c, 3.0)
+	_comprobar("tras la derrota no se sirven mas bolas", not c.mesa.bola.viva)
+
+func _prueba_catalogo() -> void:
+	var lista := CatalogoEnemigos.cargar()
+	_comprobar("data/enemigos.json carga", lista.size() == 9,
+		"%d enemigos" % lista.size())
+	var faltan: Array[String] = []
+	for datos in lista:
+		var e := Enemigo.new(datos)
+		if e.sprite == "" or not ResourceLoader.exists(e.sprite):
+			faltan.append(e.id)
+		if e.vida_maxima <= 0 or e.ataque <= 0:
+			faltan.append(e.id + " (stats)")
+	_comprobar("todos los enemigos tienen sprite y stats validos",
+		faltan.is_empty(), str(faltan))
+
+## La suite solo tocaba sim/, así que un error de sintaxis en la vista pasaba
+## desapercibido y solo se veía al abrir el juego. Esto la carga y la arranca.
+func _prueba_escena_principal() -> void:
+	var ruta := str(ProjectSettings.get_setting("application/run/main_scene"))
+	var escena: PackedScene = load(ruta)
+	_comprobar("la escena principal carga", escena != null, ruta)
+	if escena == null:
+		return
+	var nodo := escena.instantiate()
+	var guion := nodo.get_script() as GDScript
+	_comprobar("la vista tiene guion y compila",
+		guion != null and guion.can_instantiate(),
+		"un error de sintaxis en render/ se ve aqui, no al abrir el juego")
+	nodo.free()
 
 func _prueba_lanzador() -> void:
 	var m := _nueva_mesa()

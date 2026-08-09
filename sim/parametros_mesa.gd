@@ -42,6 +42,18 @@ var slingshot_empuje: float = 700.0
 var slingshot_rebote: float = 0.55
 var slingshot_velocidad_minima: float = 90.0  # (*) umbral del interruptor
 
+# --- Targets abatibles (*) ---
+# No venían del prototipo: la geometría de CONTEXTO no los colocaba. Van en dos
+# bancos de tres, pegados a las paredes laterales pero dejando 23 px de carril
+# libre por fuera para que se pueda seguir bajando al inlane con el banco en pie.
+var target_radio: float = 13.0
+var target_rebote: float = 0.45
+var target_velocidad_minima: float = 30.0
+## Al abatir el banco entero se vuelve a levantar, pero con retardo: si se
+## levantara en el mismo instante aparecería encima de la bola y el solver la
+## tendría que expulsar 22 px de golpe.
+var target_tiempo_reset: float = 0.5
+
 # --- Lanzador ---
 var impulso_lanzador: float = 1350.0
 var tiempo_carga_lanzador: float = 0.8      # (*) mantener espacio para cargar

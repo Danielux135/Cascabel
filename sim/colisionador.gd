@@ -5,7 +5,7 @@ extends RefCounted
 ## Todo el mundo de la mesa se monta con esto (paredes, arco teselado, bumpers,
 ## slingshots y los postes de goma).
 
-enum Tipo { PARED, BUMPER, SLINGSHOT, POSTE, PUERTA, FLIPPER }
+enum Tipo { PARED, BUMPER, SLINGSHOT, POSTE, PUERTA, FLIPPER, TARGET }
 
 var a: Vector2
 var b: Vector2
@@ -19,6 +19,9 @@ var activo := true
 ## Puerta antirretorno: solo existe para una bola que ya está por encima de ella
 ## y va bajando. Desde abajo (subiendo por el carril) no está.
 var una_direccion := false
+
+## Solo para targets: a qué banco pertenece. -1 si no es un target.
+var banco: int = -1
 
 var _aabb: Rect2
 var _normal_degenerada := Vector2.UP

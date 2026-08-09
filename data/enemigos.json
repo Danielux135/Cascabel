@@ -1,0 +1,14 @@
+{
+  "_comentario": "Vida y ataque son de primera pasada, sin jugar. Ver sim/parametros_combate.gd para la cuenta con la que estan puestos.",
+  "enemigos": [
+    { "id": "rata",                "nombre": "Rata",               "vida": 60,  "ataque": 6,  "sprite": "res://assets/enemigos/rata.png" },
+    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 75,  "ataque": 5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
+    { "id": "goblin_carroniero",   "nombre": "Goblin carronero",   "vida": 85,  "ataque": 8,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
+    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 95,  "ataque": 16, "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
+    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 100, "ataque": 10, "sprite": "res://assets/enemigos/esqueleto.png" },
+    { "id": "cultista",            "nombre": "Cultista",           "vida": 110, "ataque": 13, "sprite": "res://assets/enemigos/cultista.png" },
+    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 130, "ataque": 14, "sprite": "res://assets/enemigos/goblin_bruto.png" },
+    { "id": "armadura_vacia",      "nombre": "Armadura vacia",     "vida": 160, "ataque": 12, "sprite": "res://assets/enemigos/armadura_vacia.png" },
+    { "id": "gargola",             "nombre": "Gargola",            "vida": 180, "ataque": 15, "sprite": "res://assets/enemigos/gargola.png" }
+  ]
+}

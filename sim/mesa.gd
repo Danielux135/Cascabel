@@ -10,6 +10,8 @@ signal bumper_golpeado(punto: Vector2, fuerza: float)
 signal slingshot_golpeado(punto: Vector2, fuerza: float)
 signal poste_golpeado(punto: Vector2, fuerza: float)
 signal flipper_golpeado(punto: Vector2, fuerza: float)
+signal target_abatido(punto: Vector2, banco: int)
+signal banco_completado(punto: Vector2, banco: int)
 signal bola_drenada()
 signal busqueda_bola(punto: Vector2)
 
@@ -30,6 +32,10 @@ var arco := PackedVector2Array()
 ## Solo para dibujar: centros y radios de bumpers y postes.
 var bumpers: Array[Vector2] = []
 var postes: Array[Vector2] = []
+## Targets abatibles, agrupados en bancos. `activo` dice si están en pie.
+var targets: Array[Colisionador] = []
+var bancos: Array[Array] = []
+var _reset_banco: Array[float] = []
 
 var carga_lanzador: float = 0.0
 var cargando := false
@@ -88,6 +94,13 @@ func _construir() -> void:
 	_bumper(Vector2(260, 225))
 	_bumper(Vector2(200, 165))
 
+	# --- Bancos de targets ---
+	# Pegados a las paredes pero sin sellarlas: quedan 23 px de carril por fuera
+	# (la bola mide 18) para poder seguir bajando al inlane con el banco en pie.
+	# Entre target y target solo quedan 14 px, así que por ahí no se cuela.
+	_banco_targets(Vector2(56, 320), Vector2(56, 400), 3)
+	_banco_targets(Vector2(314, 320), Vector2(314, 400), 3)
+
 	flipper_izq = Flipper.new(
 		p.flipper_eje_izq, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
@@ -121,6 +134,52 @@ func _bumper(centro: Vector2) -> Colisionador:
 	colisionadores.append(c)
 	bumpers.append(centro)
 	return c
+
+func _banco_targets(desde: Vector2, hasta: Vector2, cantidad: int) -> void:
+	var indice := bancos.size()
+	var banco: Array[Colisionador] = []
+	for i in cantidad:
+		var t := float(i) / float(cantidad - 1) if cantidad > 1 else 0.0
+		var centro := desde.lerp(hasta, t)
+		var c := Colisionador.new(centro, centro, p.target_radio,
+			Colisionador.Tipo.TARGET, p.target_rebote, 0.0, p.target_velocidad_minima)
+		c.banco = indice
+		colisionadores.append(c)
+		targets.append(c)
+		banco.append(c)
+	bancos.append(banco)
+	_reset_banco.append(0.0)
+
+## Vuelve a poner todos los targets en pie. Para empezar un combate nuevo.
+func reiniciar_targets() -> void:
+	for c in targets:
+		c.activo = true
+	for i in _reset_banco.size():
+		_reset_banco[i] = 0.0
+
+func centro_banco(indice: int) -> Vector2:
+	var suma := Vector2.ZERO
+	for c in bancos[indice]:
+		suma += c.a
+	return suma / float(bancos[indice].size())
+
+func _abatir(c: Colisionador) -> void:
+	c.activo = false
+	target_abatido.emit(c.a, c.banco)
+	for otro in bancos[c.banco]:
+		if otro.activo:
+			return
+	_reset_banco[c.banco] = p.target_tiempo_reset
+	banco_completado.emit(centro_banco(c.banco), c.banco)
+
+func _avanzar_bancos(h: float) -> void:
+	for i in _reset_banco.size():
+		if _reset_banco[i] <= 0.0:
+			continue
+		_reset_banco[i] -= h
+		if _reset_banco[i] <= 0.0:
+			for c in bancos[i]:
+				c.activo = true
 
 func _poste(centro: Vector2) -> Colisionador:
 	var c := Colisionador.new(centro, centro, p.poste_radio, Colisionador.Tipo.POSTE,
@@ -165,6 +224,7 @@ func avanzar(dt: float) -> void:
 func _subpaso(h: float) -> void:
 	flipper_izq.avanzar(h)
 	flipper_der.avanzar(h)
+	_avanzar_bancos(h)
 	if not bola.viva:
 		return
 
@@ -226,19 +286,31 @@ func _colisionar() -> void:
 			else:
 				e = p.rebote_pared   # por debajo del umbral el interruptor no salta
 		bola.vel += c.normal * (-(1.0 + e) * vn + empuje)
-		_avisar(c, velocidad)
+		_avisar(c, velocidad, empuje)
 	_limitar_velocidad()
 
-func _avisar(c: Contacto, fuerza: float) -> void:
+## Los avisos son la fuente del daño del combate, así que tienen que salir UNA
+## vez por golpe de verdad. Sin el filtro, una bola rodando apoyada en un bumper
+## emitía un aviso por subpaso: 480 golpes por segundo.
+func _avisar(c: Contacto, fuerza: float, empuje: float) -> void:
 	match c.tipo:
 		Colisionador.Tipo.BUMPER:
-			bumper_golpeado.emit(c.punto, fuerza)
+			if empuje > 0.0:
+				bumper_golpeado.emit(c.punto, fuerza)
 		Colisionador.Tipo.SLINGSHOT:
-			slingshot_golpeado.emit(c.punto, fuerza)
+			if empuje > 0.0:
+				slingshot_golpeado.emit(c.punto, fuerza)
 		Colisionador.Tipo.POSTE:
-			poste_golpeado.emit(c.punto, fuerza)
+			if empuje > 0.0:
+				poste_golpeado.emit(c.punto, fuerza)
 		Colisionador.Tipo.FLIPPER:
-			flipper_golpeado.emit(c.punto, fuerza)
+			if fuerza >= 50.0:
+				flipper_golpeado.emit(c.punto, fuerza)
+		Colisionador.Tipo.TARGET:
+			# El target se abate y deja de colisionar, así que no se repite.
+			var col := c.origen as Colisionador
+			if col.activo and fuerza >= col.velocidad_minima:
+				_abatir(col)
 
 func _actualizar_estado() -> void:
 	if bola.en_carril and bola.pos.y < 295.0:
