@@ -108,6 +108,9 @@ static func caja_adorno(adorno: Dictionary, tex: Texture2D) -> Rect2:
 
 var combate: Combate
 var mesa: Mesa
+var anim := ParametrosAnimacion.new()
+
+const TAMANO_GIRADOR := 32
 
 var _catalogo: Array = []
 var _indice_enemigo: int = 0
@@ -116,7 +119,14 @@ var _sacudida: float = 0.0
 var _tiempo: float = 0.0
 var _flash_enemigo: float = 0.0
 var _flash_jugador: float = 0.0
-var _pulso_combo: float = 0.0
+var _hitstop: float = 0.0
+var _rng := RandomNumberGenerator.new()
+var _nodo_suelo: NodoSuelo
+var _nodo_enemigo: NodoEnemigo
+var _tex_girador: Array[Texture2D] = []
+var _giro: Array[float] = []
+var _giro_velocidad: Array[float] = []
+var _flash_bumper: Array[float] = []
 var _destellos: Array[Dictionary] = []
 var _numeros: Array[Dictionary] = []
 
@@ -125,8 +135,6 @@ var _tex_poste: Texture2D
 var _tex_bumper: Texture2D
 var _tex_target: Array[Texture2D] = []
 var _tex_enemigo: Texture2D
-var _tex_suelo: Texture2D
-var _tex_deco: Dictionary = {}
 var _fuente: Font
 
 func _ready() -> void:
@@ -134,11 +142,6 @@ func _ready() -> void:
 	# CanvasItem tiene que permitir repetición de textura.
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_fuente = ThemeDB.fallback_font
-	_tex_suelo = load("res://assets/mesa_suelo/suelo_piedra.png")
-	for adorno in ADORNOS:
-		var nombre: String = adorno["tex"]
-		if not _tex_deco.has(nombre):
-			_tex_deco[nombre] = load("res://assets/mesa_deco/%s.png" % nombre)
 	_tex_bola = load("res://assets/mesa/bola.png")
 	_tex_poste = load("res://assets/mesa/poste_goma.png")
 	_tex_bumper = load("res://assets/mesa/bumper_gargola.png")
@@ -146,6 +149,8 @@ func _ready() -> void:
 		load("res://assets/mesa/target_escudo.png"),
 		load("res://assets/mesa/target_lapida.png"),
 	]
+	_tex_girador = Girador.generar(load("res://assets/mesa/girador.png"),
+		anim.girador_fotogramas, TAMANO_GIRADOR)
 
 	combate = Combate.new()
 	mesa = combate.mesa
@@ -153,9 +158,19 @@ func _ready() -> void:
 	mesa.poste_golpeado.connect(_al_golpear_poste)
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
+	mesa.girador_girado.connect(_al_girar_girador)
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
+	combate.combate_terminado.connect(_al_terminar_combate)
+
+	_giro.resize(mesa.giradores.size())
+	_giro_velocidad.resize(mesa.giradores.size())
+	_flash_bumper.resize(mesa.bumpers.size())
+	_nodo_suelo = NodoSuelo.new(self)
+	add_child(_nodo_suelo)
+	_nodo_enemigo = NodoEnemigo.new(anim)
+	add_child(_nodo_enemigo)
 
 	_catalogo = CatalogoEnemigos.cargar()
 	if _catalogo.is_empty():
@@ -169,6 +184,8 @@ func _empezar_combate(indice: int) -> void:
 	_indice_enemigo = clampi(indice, 0, _catalogo.size() - 1)
 	_tex_enemigo = load(str((_catalogo[_indice_enemigo] as Dictionary)["sprite"]))
 	combate.iniciar(Enemigo.new(_catalogo[_indice_enemigo]))
+	_nodo_enemigo.suelo = Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y)
+	_nodo_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
 	_destellos.clear()
 	_numeros.clear()
 
@@ -185,16 +202,40 @@ func _physics_process(delta: float) -> void:
 	elif mesa.cargando:
 		mesa.soltar_lanzador()
 
+	# HITSTOP: se congela la SIMULACIÓN, no el dibujado. La capa visual sigue
+	# corriendo durante el parón, así que el destello y la sacudida se ven
+	# mientras el juego está quieto, que es lo que hace que el golpe suene seco.
+	if _hitstop > 0.0:
+		_hitstop = maxf(_hitstop - delta, 0.0)
+		return
+
 	combate.avanzar(delta)
+
+## Congela el juego, pero solo si el impacto es de los fuertes: si no, un
+## bumper rozado daría tirones todo el rato.
+func _congelar(fuerza: float) -> void:
+	_hitstop = maxf(_hitstop, anim.congelacion(fuerza))
+
+func _sacudir(cantidad: float) -> void:
+	_sacudida = minf(maxf(_sacudida, cantidad), anim.sacudida_maxima)
 
 func _process(delta: float) -> void:
 	_tiempo += delta
-	_sacudida = maxf(_sacudida - delta * 26.0, 0.0)
+	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	_flash_enemigo = maxf(_flash_enemigo - delta * 2.2, 0.0)
 	_flash_jugador = maxf(_flash_jugador - delta * 2.2, 0.0)
-	_pulso_combo = maxf(_pulso_combo - delta * 2.6, 0.0)
-	position = Vector2(roundf(randf_range(-_sacudida, _sacudida)),
-		roundf(randf_range(-_sacudida, _sacudida)))
+	# La sacudida SIEMPRE en píxeles enteros: a medio píxel, con el filtro
+	# nearest y el escalado entero del proyecto, la mesa entera se ve borrosa
+	# justo en el momento en que más se mira.
+	position = anim.desplazamiento_sacudida(_sacudida, _rng)
+
+	for i in _flash_bumper.size():
+		_flash_bumper[i] = maxf(
+			_flash_bumper[i] - delta / anim.bumper_destello_duracion, 0.0)
+	for i in _giro.size():
+		_giro[i] += _giro_velocidad[i] * delta
+		_giro_velocidad[i] = maxf(_giro_velocidad[i] - anim.girador_frenado * delta, 0.0)
+
 	_destellos = _caducar(_destellos, delta)
 	_numeros = _caducar(_numeros, delta)
 	queue_redraw()
@@ -223,7 +264,25 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 
 func _al_golpear_bumper(punto: Vector2, fuerza: float) -> void:
 	_destellos.append({"pos": punto, "t": 0.16, "r": 26.0, "col": C_ORO})
-	_sacudida = maxf(_sacudida, minf(fuerza / 260.0, 2.5))
+	_sacudir(anim.sacudida_bumper)
+	_congelar(fuerza)
+	var i := _bumper_mas_cercano(punto)
+	if i >= 0:
+		_flash_bumper[i] = 1.0
+
+func _bumper_mas_cercano(punto: Vector2) -> int:
+	var mejor := -1
+	var d := INF
+	for i in mesa.bumpers.size():
+		var dd: float = (mesa.bumpers[i] as Vector2).distance_squared_to(punto)
+		if dd < d:
+			d = dd
+			mejor = i
+	return mejor
+
+func _al_girar_girador(_punto: Vector2, indice: int, fuerza: float) -> void:
+	var ratio := clampf(fuerza / mesa.p.velocidad_maxima, 0.2, 1.0)
+	_giro_velocidad[indice] = anim.girador_velocidad_maxima * ratio
 
 func _al_golpear_slingshot(punto: Vector2, _fuerza: float) -> void:
 	_destellos.append({"pos": punto, "t": 0.12, "r": 16.0, "col": C_GOMA_LUZ})
@@ -233,36 +292,48 @@ func _al_golpear_poste(punto: Vector2, _fuerza: float) -> void:
 
 func _al_buscar_bola(punto: Vector2) -> void:
 	_destellos.append({"pos": punto, "t": 0.3, "r": 34.0, "col": C_ARCANO})
-	_sacudida = 3.0
+	_sacudir(anim.sacudida_ataque)
 
 func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
 	_numeros.append({"pos": punto, "t": 0.7, "texto": "%d" % dano, "col": C_ORO_CLARO})
 	_flash_enemigo = maxf(_flash_enemigo, 0.7)
+	_nodo_enemigo.recibir_dano()
+	_sacudir(anim.sacudida_dano)
 
 ## Solo salta cuando el multiplicador cambia de tramo, no en cada golpe.
 func _al_cambiar_combo(multiplicador: int, _golpes: int) -> void:
-	_pulso_combo = 1.0
+	_nodo_suelo.pulsar()
 	if multiplicador > 1:
-		_sacudida = maxf(_sacudida, 1.6)
+		_sacudir(anim.sacudida_dano)
 
 func _al_atacar_enemigo(_dano: int) -> void:
 	_flash_jugador = 1.0
-	_sacudida = 3.0
+	_nodo_enemigo.embestir()
+	_sacudir(anim.sacudida_ataque)
+	_hitstop = maxf(_hitstop, anim.hitstop)
+
+func _al_terminar_combate(victoria: bool) -> void:
+	if victoria:
+		_nodo_enemigo.morir()
+		_sacudir(anim.sacudida_muerte)
+		_hitstop = maxf(_hitstop, anim.hitstop)
 
 # ------------------------------------------------------------------- dibujo
 
 func _draw() -> void:
-	draw_rect(Rect2(0, 0, Mesa.ANCHO, Mesa.ALTO), C_CABINA)
-	_dibujar_suelo()
-	_dibujar_adornos()
-	_dibujar_combo()
+	# El fondo, el suelo, los adornos y el combo los pinta _nodo_suelo (z -2) y
+	# el enemigo
+	# _nodo_enemigo (z -1): el enemigo tiene que quedar entre medias y un solo
+	# CanvasItem no se puede partir. Aquí empieza ya la capa 0.
 	# Sombreados de profundidad. Van translúcidos para que la piedra siga
 	# viéndose por debajo; antes eran planos y tapaban el suelo.
 	draw_rect(Rect2(20, 560, 360, 120), Color(C_MESA_BAJA, 0.30))
 	draw_rect(Rect2(358, 300, 22, 360), Color(C_CARRIL, 0.80))
 	draw_rect(Rect2(0, int(mesa.p.y_drenaje) - 8, Mesa.ANCHO, 8), C_DRENAJE)
 
-	_dibujar_enemigo()
+	# El enemigo NO se dibuja aquí: vive en _nodo_enemigo, que tiene material
+	# propio para el destello y la disolución y se cuela por z_index entre el
+	# suelo y todo lo demás.
 	_dibujar_inlanes()
 	_dibujar_paredes()
 	_dibujar_objetos()
@@ -273,40 +344,7 @@ func _draw() -> void:
 		_dibujar_depuracion()
 	_dibujar_hud()
 
-## Baldosa de 128x128 que repite sin costuras, teselada sobre todo el campo.
-func _dibujar_suelo() -> void:
-	draw_rect(CAMPO, C_MESA)      # base por si faltara la textura
-	if _tex_suelo != null:
-		draw_texture_rect(_tex_suelo, CAMPO, true)
 
-func _dibujar_adornos() -> void:
-	for adorno in ADORNOS:
-		var tex: Texture2D = _tex_deco.get(adorno["tex"])
-		if tex == null:
-			continue
-		var escala: float = adorno["escala"]
-		var ancho: float = -escala if adorno["espejo"] else escala
-		var mitad := Vector2(tex.get_width(), tex.get_height()) * 0.5
-		draw_set_transform((adorno["pos"] as Vector2).round(), 0.0,
-			Vector2(ancho, escala))
-		draw_texture(tex, -mitad)
-		draw_set_transform_matrix(Transform2D.IDENTITY)
-
-func _dibujar_enemigo() -> void:
-	if _tex_enemigo == null or combate.enemigo == null:
-		return
-	var alto := float(_tex_enemigo.get_height())
-	var y := ENEMIGO_SUELO_Y - alto
-	if combate.enemigo.flota:
-		# La calavera llameante no se apoya en el suelo: flota con vaivén propio.
-		y += -10.0 + sin(_tiempo * 2.2) * 3.0
-	var tinte := Color.WHITE
-	if not combate.enemigo.vivo():
-		tinte = Color(0.45, 0.4, 0.45, 0.55)
-	elif _flash_enemigo > 0.0:
-		tinte = Color.WHITE.lerp(C_GOMA_LUZ, _flash_enemigo)
-	draw_texture(_tex_enemigo,
-		Vector2(ENEMIGO_CENTRO_X - _tex_enemigo.get_width() * 0.5, y).round(), tinte)
 
 ## Los carriles de retorno del arreglo 1, sombreados para que se lean.
 func _dibujar_inlanes() -> void:
@@ -333,8 +371,8 @@ func _dibujar_objetos() -> void:
 		else:
 			# Abatido: se ve la ranura por la que ha bajado.
 			draw_rect(Rect2(c.a.x - 11, c.a.y + 8, 22, 3), C_CABINA)
-	for centro in mesa.bumpers:
-		_dibujar_sprite_centrado(_tex_bumper, centro, mesa.p.bumper_radio * 2.0, 60.0)
+	_dibujar_giradores()
+	_dibujar_bumpers()
 	# Los postes van ANTES que los flippers: solapan con la cápsula del eje (es
 	# lo que sella el hueco del atasco) y dibujar la pala encima deja el perno
 	# del pivote a la vista.
@@ -342,6 +380,31 @@ func _dibujar_objetos() -> void:
 		_dibujar_sprite_centrado(_tex_poste, centro, mesa.p.poste_radio * 2.0, 60.0)
 	_dibujar_flipper(mesa.flipper_izq)
 	_dibujar_flipper(mesa.flipper_der)
+
+## El bumper crece un número ENTERO de píxeles al golpearlo y se enciende.
+## Crecer con una escala continua sobre un sprite de 38 px deja el borde
+## temblando durante todo el destello.
+func _dibujar_bumpers() -> void:
+	var base := int(roundf(mesa.p.bumper_radio * 2.0))
+	for i in mesa.bumpers.size():
+		var flash: float = _flash_bumper[i]
+		var crecimiento := int(roundf(flash * float(anim.bumper_crecimiento_pixeles)))
+		var lado := base + crecimiento
+		var centro: Vector2 = mesa.bumpers[i]
+		var esquina := (centro - Vector2(lado, lado) * 0.5).round()
+		var tinte := Color.WHITE.lerp(C_ORO_CLARO, flash * 0.8)
+		draw_texture_rect(_tex_bumper, Rect2(esquina, Vector2(lado, lado)), false, tinte)
+
+## Ocho escorzos pregenerados: se elige uno, no se rota nada en vivo.
+func _dibujar_giradores() -> void:
+	if _tex_girador.is_empty():
+		return
+	for i in mesa.giradores.size():
+		var indice := int(_giro[i]) % _tex_girador.size()
+		var tex := _tex_girador[indice]
+		var esquina := ((mesa.giradores[i] as Vector2)
+			- Vector2(tex.get_width(), tex.get_height()) * 0.5).round()
+		draw_texture(tex, esquina)
 
 ## Los objetos fijos se pegan a la rejilla de píxeles.
 func _dibujar_sprite_centrado(tex: Texture2D, centro: Vector2, tamano: float, visible_px: float) -> void:
@@ -413,39 +476,7 @@ func _dibujar_depuracion() -> void:
 		draw_circle(mesa.bola.pos, mesa.p.radio_bola, C_ORO, false, 1.0)
 		draw_line(mesa.bola.pos, mesa.bola.pos + mesa.bola.vel * 0.08, C_ORO, 1.0)
 
-## El multiplicador de combo, que es lo que más importa mientras juegas. Va
-## pegado al suelo (se dibuja justo detrás de todo lo demás) y grande, y se
-## enciende conforme sube: a x1 es casi invisible, a x4 quema.
-func _dibujar_combo() -> void:
-	if combate == null or combate.enemigo == null:
-		return
-	var factor := combate.multiplicador()
-	var estilo: Dictionary = COMBO_ESTILO.get(factor, COMBO_ESTILO[1])
-	var col: Color = estilo["col"]
-	col.a = float(estilo["alfa"]) * (1.0 if not combate.terminado() else 0.35)
-	var escala := 1.0 + _pulso_combo * 0.35
 
-	draw_set_transform(COMBO_CENTRO, 0.0, Vector2(escala, escala))
-	draw_string(_fuente, Vector2(-100, 0), "x%d" % factor,
-		HORIZONTAL_ALIGNMENT_CENTER, 200, COMBO_TAMANO, col)
-	draw_set_transform_matrix(Transform2D.IDENTITY)
-
-	# Cuántos golpes faltan para el tramo siguiente: sin esto el número grande
-	# sube de golpe y no sabes si te falta uno o doce.
-	var siguiente := _golpes_para_subir()
-	if siguiente > 0 and not combate.terminado():
-		var tenue := Color(col, col.a * 0.8)
-		draw_string(_fuente, Vector2(COMBO_CENTRO.x - 100, COMBO_CENTRO.y + 14),
-			"%d para x%d" % [siguiente, factor + 1],
-			HORIZONTAL_ALIGNMENT_CENTER, 200, 9, tenue)
-
-## Golpes que faltan para el siguiente tramo, o 0 si ya está en el último.
-func _golpes_para_subir() -> int:
-	var factor := combate.multiplicador()
-	for tramo in combate.p.tramos_combo:
-		if int((tramo as Dictionary)["factor"]) > factor:
-			return int((tramo as Dictionary)["golpes"]) - combate.golpes
-	return 0
 
 # ---------------------------------------------------------------------- HUD
 

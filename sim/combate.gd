@@ -42,6 +42,7 @@ func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.target_abatido.connect(_al_abatir_target)
 	mesa.banco_completado.connect(_al_completar_banco)
+	mesa.girador_girado.connect(_al_girar_girador)
 	mesa.bola_drenada.connect(_al_drenar)
 
 func iniciar(el_enemigo: Enemigo) -> void:
@@ -108,6 +109,9 @@ func _al_abatir_target(punto: Vector2, _banco: int) -> void:
 
 func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 	_golpear(p.dano_banco, punto, false)
+
+func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
+	_golpear(p.dano_girador, punto, true)
 
 # ------------------------------------------------------------- resolución
 

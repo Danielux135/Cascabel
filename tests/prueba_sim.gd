@@ -25,6 +25,8 @@ func _initialize() -> void:
 	_prueba_combate()
 	_prueba_escena_principal()
 	_prueba_adornos()
+	_prueba_giradores()
+	_prueba_animacion()
 
 	print("")
 	if _fallos == 0:
@@ -526,6 +528,148 @@ func _prueba_adornos() -> void:
 		pisados.is_empty(), str(pisados))
 	_comprobar("y por los de campo abierto apenas pasa",
 		ruidosos.is_empty(), str(ruidosos))
+
+func _prueba_giradores() -> void:
+	var m := _nueva_mesa()
+	_comprobar("hay un girador en cada carril de retorno",
+		m.giradores.size() == 2, "%d giradores" % m.giradores.size())
+
+	# Hay que soltarla BAJANDO POR EL CARRIL: el carril de retorno izquierdo va
+	# en diagonal, y a plomo desde arriba la bola cae fuera, sobre el slingshot.
+	var carril := (Vector2(99, 584) - Vector2(20, 480)).normalized()
+
+	# Pasada rápida: un aviso, no uno por subpaso.
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.bola.pos = m.giradores[0] - carril * 40.0
+	m.bola.vel = carril * 400.0
+	var avisos := [0]
+	m.girador_girado.connect(func(_pt: Vector2, _i: int, _f: float) -> void:
+		avisos[0] += 1)
+	# Se corta en cuanto la bola ha pasado de largo: si se deja correr, rebota
+	# en el poste, vuelve a subir y lo cruza otra vez, y ese aviso es legítimo.
+	for _i in int(0.5 / DT):
+		m.avanzar(DT)
+		if (m.bola.pos - m.giradores[0]).dot(carril) > 20.0:
+			break
+	_comprobar("una pasada por el girador da un solo aviso",
+		avisos[0] == 1, "%d avisos" % avisos[0])
+
+	# Y no colisiona. Dos cosas: que no exista colisionador donde está, y que la
+	# bola pase POR DENTRO en vez de rodearlo.
+	# (No vale comprobar que no se desvía: bajando por el carril la bola se
+	# apoya en la pared, que es el suelo del carril, y eso sí la desvía.)
+	var sobre_girador: Array[String] = []
+	for c in m.colisionadores:
+		for g in m.giradores:
+			if c.punto_mas_cercano(g).distance_to(g) < c.radio + m.p.girador_radio:
+				sobre_girador.append(str(g))
+	_comprobar("no hay ningun colisionador encima de un girador",
+		sobre_girador.is_empty(), str(sobre_girador))
+
+	var m2 := _nueva_mesa()
+	m2.nueva_bola()
+	m2.bola.en_carril = false
+	m2.bola.pos = m2.giradores[0] - carril * 40.0
+	m2.bola.vel = carril * 400.0
+	var mas_cerca := INF
+	for _i in int(0.5 / DT):
+		m2.avanzar(DT)
+		mas_cerca = minf(mas_cerca, m2.bola.pos.distance_to(m2.giradores[0]))
+		if (m2.bola.pos - m2.giradores[0]).dot(carril) > 20.0:
+			break
+	_comprobar("la bola atraviesa el girador por dentro",
+		mas_cerca < m2.p.girador_radio
+		and m2.bola.pos.y > (m2.giradores[0] as Vector2).y,
+		"paso a %.1f px del centro" % mas_cerca)
+
+## Ocho escorzos pregenerados, no rotación continua. Lo que hay que comprobar
+## es que salen ocho, que todos miden lo mismo y que el escorzo es de verdad.
+func _prueba_animacion() -> void:
+	var anim := ParametrosAnimacion.new()
+	var fotogramas := Girador.generar(
+		load("res://assets/mesa/girador.png"), anim.girador_fotogramas, 32)
+	_comprobar("el girador tiene ocho fotogramas pregenerados",
+		fotogramas.size() == anim.girador_fotogramas,
+		"%d fotogramas" % fotogramas.size())
+
+	var alturas: Array[int] = []
+	var tamanos_mal: Array[String] = []
+	for f in fotogramas:
+		if f.get_width() != 32 or f.get_height() != 32:
+			tamanos_mal.append("%dx%d" % [f.get_width(), f.get_height()])
+		alturas.append(f.get_image().get_used_rect().size.y)
+	_comprobar("todos los fotogramas del girador miden lo mismo",
+		tamanos_mal.is_empty(), str(tamanos_mal))
+	_comprobar("el girador escorza: de frente es alto y de canto una raya",
+		alturas[0] > alturas[anim.girador_fotogramas / 2] * 3,
+		"de frente %d px, de canto %d px" % [alturas[0], alturas[anim.girador_fotogramas / 2]])
+	_comprobar("y ningun fotograma desaparece del todo",
+		alturas.min() >= 1, "el mas fino mide %d px" % alturas.min())
+
+	# Hitstop: solo en los golpes fuertes, o serían tirones todo el rato.
+	_comprobar("un impacto fuerte congela %.0f ms" % (anim.hitstop * 1000.0),
+		is_equal_approx(anim.congelacion(anim.hitstop_fuerza_minima), anim.hitstop),
+		"congelo %.3f s" % anim.congelacion(anim.hitstop_fuerza_minima))
+	_comprobar("un roce no congela nada",
+		anim.congelacion(anim.hitstop_fuerza_minima - 1.0) == 0.0)
+
+	# Sacudida: siempre en píxeles enteros y dentro del tope.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	var no_enteros := 0
+	var pasados := 0
+	for _i in 500:
+		var d := anim.desplazamiento_sacudida(anim.sacudida_maxima * 2.0, rng)
+		if d != d.round():
+			no_enteros += 1
+		if absf(d.x) > anim.sacudida_maxima or absf(d.y) > anim.sacudida_maxima:
+			pasados += 1
+	_comprobar("la sacudida siempre cae en pixeles enteros",
+		no_enteros == 0, "%d de 500 a medio pixel" % no_enteros)
+	_comprobar("y nunca se pasa del tope",
+		pasados == 0, "%d de 500 se pasaron" % pasados)
+
+	_prueba_respiracion(anim)
+
+## La respiración va en pasos de píxel entero y con el pivote en los pies.
+func _prueba_respiracion(anim: ParametrosAnimacion) -> void:
+	var nodo := NodoEnemigo.new(anim)
+	nodo.suelo = Vector2(200, 158)
+	nodo.configurar(load("res://assets/enemigos/esqueleto.png"), false)
+
+	var no_enteros: Array[String] = []
+	var pies: Array[float] = []
+	var altos := {}
+	for _i in int(anim.respiracion_periodo * 2.0 / DT):
+		nodo._process(DT)
+		var r := nodo.rect_dibujo()
+		if r.position != r.position.round() or r.size != r.size.round():
+			no_enteros.append(str(r))
+		pies.append(r.position.y + r.size.y)
+		altos[int(r.size.y)] = true
+	_comprobar("la respiracion cae siempre en pixeles enteros",
+		no_enteros.is_empty(), str(no_enteros.slice(0, 3)))
+	_comprobar("los pies no se mueven al respirar (el pivote esta abajo)",
+		pies.min() == 158.0 and pies.max() == 158.0,
+		"pies entre %.1f y %.1f" % [pies.min(), pies.max()])
+	_comprobar("y el sprite cambia de alto de verdad",
+		altos.size() >= 3, "%d alturas distintas" % altos.size())
+
+	# Los que flotan no se apoyan en el suelo.
+	var flotante := NodoEnemigo.new(anim)
+	flotante.suelo = Vector2(200, 158)
+	flotante.configurar(load("res://assets/enemigos/calavera_llameante.png"), true)
+	var pies_flota: Array[float] = []
+	for _i in int(anim.flotante_periodo * 2.0 / DT):
+		flotante._process(DT)
+		var r := flotante.rect_dibujo()
+		pies_flota.append(r.position.y + r.size.y)
+	_comprobar("el que flota se despega del suelo y se mueve",
+		pies_flota.max() < 158.0 and pies_flota.max() > pies_flota.min(),
+		"pies entre %.0f y %.0f" % [pies_flota.min(), pies_flota.max()])
+	nodo.free()
+	flotante.free()
 
 ## La suite solo tocaba sim/, así que un error de sintaxis en la vista pasaba
 ## desapercibido y solo se veía al abrir el juego. Esto la carga y la arranca.

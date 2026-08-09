@@ -38,3 +38,7 @@ var tramos_combo: Array = [
 # --- Ritmo de la resolución al drenar ---
 var pausa_drenaje: float = 0.7   # la bola se ha perdido y el combo cae a x1
 var pausa_ataque: float = 0.9    # enseñando el contraataque
+
+## El girador: la bola lo atraviesa y lo hace girar. Cuenta como golpe, igual
+## que un bumper, pero pega menos porque es mucho más fácil de encadenar.
+var dano_girador: int = 1

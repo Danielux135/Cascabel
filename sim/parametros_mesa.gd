@@ -54,6 +54,15 @@ var target_velocidad_minima: float = 30.0
 ## tendría que expulsar 22 px de golpe.
 var target_tiempo_reset: float = 0.5
 
+# --- Giradores (*) ---
+# No son colisionadores: la bola pasa a través y los hace girar, como los de
+# verdad. Van uno en cada carril de retorno.
+## 10 y no más: el carril de retorno derecho mide 23,8 px de ancho, así que un
+## radio de 13 se salía por encima del slingshot y una bola que rebotara por
+## FUERA del carril habría hecho girar el girador de dentro.
+var girador_radio: float = 10.0
+var girador_velocidad_minima: float = 80.0
+
 # --- Lanzador ---
 var impulso_lanzador: float = 1350.0
 var tiempo_carga_lanzador: float = 0.8      # (*) mantener espacio para cargar

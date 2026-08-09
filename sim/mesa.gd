@@ -11,6 +11,7 @@ signal slingshot_golpeado(punto: Vector2, fuerza: float)
 signal poste_golpeado(punto: Vector2, fuerza: float)
 signal flipper_golpeado(punto: Vector2, fuerza: float)
 signal target_abatido(punto: Vector2, banco: int)
+signal girador_girado(punto: Vector2, indice: int, fuerza: float)
 signal banco_completado(punto: Vector2, banco: int)
 signal bola_drenada()
 signal busqueda_bola(punto: Vector2)
@@ -36,6 +37,9 @@ var postes: Array[Vector2] = []
 var targets: Array[Colisionador] = []
 var bancos: Array[Array] = []
 var _reset_banco: Array[float] = []
+## Giradores: no colisionan, la bola los atraviesa y los hace girar.
+var giradores: Array[Vector2] = []
+var _girador_dentro: Array[bool] = []
 
 var carga_lanzador: float = 0.0
 var cargando := false
@@ -101,6 +105,10 @@ func _construir() -> void:
 	_banco_targets(Vector2(56, 320), Vector2(56, 400), 3)
 	_banco_targets(Vector2(314, 320), Vector2(314, 400), 3)
 
+	# --- Giradores, en mitad de cada carril de retorno ---
+	_girador(Vector2(87, 545))
+	_girador(Vector2(300, 545))
+
 	flipper_izq = Flipper.new(
 		p.flipper_eje_izq, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
@@ -149,6 +157,21 @@ func _banco_targets(desde: Vector2, hasta: Vector2, cantidad: int) -> void:
 		banco.append(c)
 	bancos.append(banco)
 	_reset_banco.append(0.0)
+
+func _girador(centro: Vector2) -> void:
+	giradores.append(centro)
+	_girador_dentro.append(false)
+
+## Los giradores no colisionan: la bola los atraviesa. Se disparan al ENTRAR,
+## una vez por pasada, así que mientras la bola siga dentro no vuelven a avisar.
+func _avanzar_giradores() -> void:
+	for i in giradores.size():
+		var dentro := bola.viva \
+			and bola.pos.distance_to(giradores[i]) < p.girador_radio
+		if dentro and not _girador_dentro[i] \
+				and bola.velocidad() >= p.girador_velocidad_minima:
+			girador_girado.emit(giradores[i], i, bola.velocidad())
+		_girador_dentro[i] = dentro
 
 ## Vuelve a poner todos los targets en pie. Para empezar un combate nuevo.
 func reiniciar_targets() -> void:
@@ -234,6 +257,7 @@ func _subpaso(h: float) -> void:
 	bola.pos += bola.vel * h
 
 	_colisionar()
+	_avanzar_giradores()
 	_actualizar_estado()
 	_ball_search(h)
 
