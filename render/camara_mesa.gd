@@ -54,9 +54,19 @@ func avanzar(delta: float, bola_y: float, bola_vy: float, hay_bola: bool) -> voi
 	if hay_bola:
 		var media := p.alto_visible * 0.5
 		y_actual = maxf(y_actual, bola_y + p.margen_bola - media)
-		y_actual = minf(y_actual, bola_y - p.margen_bola + media)
+		# Por arriba el margen es mayor: la franja del HUD tapa los primeros
+		# 58 px de pantalla y la bola se escondía detrás en lo alto de la órbita.
+		y_actual = minf(y_actual,
+			bola_y + media - p.alto_franja_hud - p.margen_superior)
 	y_actual = clampf(y_actual, limite_arriba(), limite_abajo())
 	_colocar()
+
+## La sacudida se actualiza a ritmo de fotograma, pero `avanzar` va con la
+## física: hacer las dos cosas juntas dejaba la cámara con la posición de la
+## bola de un fotograma antes, y en la órbita esos 22 px la metían tras el HUD.
+func aplicar_sacudida(v: Vector2) -> void:
+	sacudida = v
+	offset = sacudida.round()
 
 func _colocar() -> void:
 	# REGLA 3: posición en píxeles enteros. Con posición fraccionaria, filtro

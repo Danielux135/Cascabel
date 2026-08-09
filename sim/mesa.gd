@@ -133,6 +133,30 @@ func _construir() -> void:
 	# la habilidad del tiro inicial.
 	_orbita()
 
+	# --- Carriles de retorno: tres recorridos, tres sitios de salida ---
+	# La órbita te devuelve a la boca contraria, arriba del campo. Estos dos
+	# bajan la bola a sitios distintos, y por eso tienen bocas distintas: hay
+	# que decidir a cuál tiras.
+	#
+	# No son bidireccionales: se entra por su boca y punto. Una órbita se
+	# recorre en los dos sentidos, un carril de retorno no.
+
+	# Izquierda -> carril de retorno DERECHO, o sea que vuelve al flipper
+	# contrario. Es el tiro que cruza la mesa.
+	_carril(PackedVector2Array([
+		Vector2(95, 790), Vector2(78, 690), Vector2(66, 560), Vector2(86, 430),
+		Vector2(140, 340), Vector2(215, 315), Vector2(290, 360),
+		Vector2(332, 470), Vector2(342, 620), Vector2(338, 780),
+		Vector2(334, 940), Vector2(330, 1085),
+	]))
+
+	# Derecha -> cae en el racimo de bumpers, por el centro y desde arriba.
+	_carril(PackedVector2Array([
+		Vector2(305, 790), Vector2(322, 690), Vector2(334, 560), Vector2(314, 430),
+		Vector2(258, 342), Vector2(196, 312), Vector2(166, 380),
+		Vector2(166, 500), Vector2(184, 610), Vector2(200, 690),
+	]))
+
 	# --- Platillo, metido bajo el arco a la izquierda ---
 	# Hay que buscarlo: no está en el camino de la bola. Captura, pausa, y
 	# escupe hacia el campo.
@@ -199,6 +223,14 @@ func _orbita() -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
+	rampas.append(r)
+
+## Carril de retorno: como la órbita pero de un solo sentido.
+func _carril(control: PackedVector2Array) -> void:
+	var r := Rampa.new(control)
+	r.entrada_radio = p.rampa_entrada_radio
+	r.velocidad_minima = p.rampa_velocidad_minima
+	r.bidireccional = false
 	rampas.append(r)
 
 func _platillo(centro: Vector2, direccion: Vector2) -> void:

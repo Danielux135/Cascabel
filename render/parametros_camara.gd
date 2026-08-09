@@ -20,6 +20,16 @@ var adelanto_subiendo: float = 0.0
 ## quedarse atrás. Es la garantía dura de la regla 1.
 var margen_bola: float = 24.0
 
+## APAÑO PROVISIONAL. Por arriba hace falta más margen que por abajo, porque la
+## franja del HUD son 58 px opacos pegados al borde superior y la bola se metía
+## detrás justo en lo alto de la órbita: el tiro más largo de la mesa era el
+## único que no se veía. Con esto la cámara nunca deja subir la bola por encima
+## de la franja.
+## Cuando la fase 5 rehaga la interfaz y el HUD deje de estar ahí, este número
+## baja a `margen_bola` y ya.
+var alto_franja_hud: float = 58.0
+var margen_superior: float = 16.0
+
 ## REGLA 2 — ancla inferior. Con la bola por debajo de esta línea (medida desde
 ## el fondo de la mesa) la cámara se fija abajo y no se mueve más: el tercio de
 ## los flippers es intocable.

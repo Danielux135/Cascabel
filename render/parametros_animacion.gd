@@ -64,6 +64,17 @@ var sacudida_dano: float = 2.5
 var sacudida_ataque: float = 4.0
 var sacudida_muerte: float = 5.0
 
+# --- Escritorio de los lados ---
+## Cuánto se apaga el escritorio durante el combate. El fondo es cielo azul y
+## hierba verde a los lados de una mesa casi negra: a plena luz se lleva el ojo
+## justo cuando hay que seguir una bola de 18 px por el centro.
+## Provisional: cuando la fase 5 monte la cáscara, esto será el estado "ventana
+## de combate en primer plano" en vez de un tinte fijo.
+var escritorio_oscurecido: float = 0.66
+## Y un poco más oscuro pegado al borde de la pantalla, para cerrar el encuadre.
+var escritorio_borde: float = 0.30
+var escritorio_borde_ancho: int = 28
+
 ## Cuánto hay que congelar por un impacto de esta fuerza. 0 = no congelar.
 func congelacion(fuerza: float) -> float:
 	return hitstop if fuerza >= hitstop_fuerza_minima else 0.0

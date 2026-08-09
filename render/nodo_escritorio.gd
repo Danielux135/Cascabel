@@ -17,9 +17,11 @@ const C_VACIO := Color("14121A")
 var _tex: Texture2D
 var _lienzo: Node2D
 var _p: ParametrosCamara
+var _anim: ParametrosAnimacion
 
-func _init(parametros: ParametrosCamara) -> void:
+func _init(parametros: ParametrosCamara, animacion: ParametrosAnimacion) -> void:
 	_p = parametros
+	_anim = animacion
 	layer = -10
 
 func _ready() -> void:
@@ -34,3 +36,14 @@ func _dibujar() -> void:
 	_lienzo.draw_rect(rect, C_VACIO)
 	if _tex != null:
 		_lienzo.draw_texture_rect(_tex, rect, false)
+	# Apagado general durante el combate.
+	_lienzo.draw_rect(rect, Color(C_VACIO, _anim.escritorio_oscurecido))
+	# Y unos escalones más oscuros pegados al borde, para cerrar el encuadre
+	# hacia el centro. En pasos de píxel entero, como todo lo demás.
+	var pasos := 4
+	for i in pasos:
+		var grosor := _anim.escritorio_borde_ancho - i * (_anim.escritorio_borde_ancho / pasos)
+		var alfa := _anim.escritorio_borde / float(pasos)
+		_lienzo.draw_rect(Rect2(0, 0, grosor, _p.alto_visible), Color(C_VACIO, alfa))
+		_lienzo.draw_rect(Rect2(_p.ancho_visible - grosor, 0, grosor, _p.alto_visible),
+			Color(C_VACIO, alfa))

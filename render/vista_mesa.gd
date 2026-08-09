@@ -127,6 +127,9 @@ var flash_enemigo: float = 0.0
 var flash_jugador: float = 0.0
 var _hitstop: float = 0.0
 var _rng := RandomNumberGenerator.new()
+var _flipper_izq_antes := false
+var _flipper_der_antes := false
+var _sonido: NodoSonido
 var _nodo_suelo: NodoSuelo
 var _nodo_enemigo: NodoEnemigo
 var _tex_girador: Array[Texture2D] = []
@@ -165,6 +168,15 @@ func _ready() -> void:
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
+	mesa.target_abatido.connect(func(_pt: Vector2, _b: int) -> void:
+		_sonido.reproducir("target"))
+	mesa.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void:
+		_sonido.reproducir("rampa_entrada"))
+	mesa.rampa_salida.connect(func(_pt: Vector2, _i: int) -> void:
+		_sonido.reproducir("rampa_salida"))
+	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
+		_sonido.reproducir("platillo"))
+	mesa.bola_drenada.connect(func() -> void: _sonido.reproducir("drenaje"))
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
@@ -173,7 +185,9 @@ func _ready() -> void:
 	_giro.resize(mesa.giradores.size())
 	_giro_velocidad.resize(mesa.giradores.size())
 	_flash_bumper.resize(mesa.bumpers.size())
-	add_child(NodoEscritorio.new(cam))
+	_sonido = NodoSonido.new()
+	add_child(_sonido)
+	add_child(NodoEscritorio.new(cam, anim))
 	_nodo_suelo = NodoSuelo.new(self)
 	add_child(_nodo_suelo)
 	_nodo_enemigo = NodoEnemigo.new(anim)
@@ -209,6 +223,12 @@ func _physics_process(delta: float) -> void:
 		or Input.is_physical_key_pressed(KEY_RIGHT) \
 		or Input.is_physical_key_pressed(KEY_CTRL)
 
+	if mesa.flipper_izq.pulsado != _flipper_izq_antes 			or mesa.flipper_der.pulsado != _flipper_der_antes:
+		if mesa.flipper_izq.pulsado or mesa.flipper_der.pulsado:
+			_sonido.reproducir("flipper")
+	_flipper_izq_antes = mesa.flipper_izq.pulsado
+	_flipper_der_antes = mesa.flipper_der.pulsado
+
 	if Input.is_physical_key_pressed(KEY_SPACE):
 		mesa.cargar_lanzador(delta)
 	elif mesa.cargando:
@@ -222,6 +242,9 @@ func _physics_process(delta: float) -> void:
 		return
 
 	combate.avanzar(delta)
+	# La cámara se mueve AQUÍ, pegada a la física: en `_process` iba un
+	# fotograma por detrás de la bola y en la órbita eso la metía tras el HUD.
+	camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, mesa.bola.viva)
 
 ## Congela el juego, pero solo si el impacto es de los fuertes: si no, un
 ## bumper rozado daría tirones todo el rato.
@@ -279,6 +302,7 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 
 func _al_golpear_bumper(punto: Vector2, fuerza: float) -> void:
 	_destellos.append({"pos": punto, "t": 0.16, "r": 26.0, "col": C_ORO})
+	_sonido.reproducir("bumper")
 	_sacudir(anim.sacudida_bumper)
 	_congelar(fuerza)
 	var i := _bumper_mas_cercano(punto)
@@ -316,8 +340,12 @@ func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
 	_sacudir(anim.sacudida_dano)
 
 ## Solo salta cuando el multiplicador cambia de tramo, no en cada golpe.
-func _al_cambiar_combo(multiplicador: int, _golpes: int) -> void:
+func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 	_nodo_suelo.pulsar()
+	# `combo_cambiado` también salta al drenar, cuando cae a x1. Ahí no suena:
+	# el sonido de subir de tramo es un premio y sonaría a burla.
+	if golpes > 0:
+		_sonido.reproducir("combo")
 	if multiplicador > 1:
 		_sacudir(anim.sacudida_dano)
 
@@ -329,6 +357,7 @@ func _al_atacar_enemigo(_dano: int) -> void:
 
 func _al_terminar_combate(victoria: bool) -> void:
 	if victoria:
+		_sonido.reproducir("muerte")
 		_nodo_enemigo.morir()
 		_sacudir(anim.sacudida_muerte)
 		_hitstop = maxf(_hitstop, anim.hitstop)

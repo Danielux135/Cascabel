@@ -29,6 +29,7 @@ func _initialize() -> void:
 	_prueba_animacion()
 	_prueba_camara()
 	_prueba_rampas()
+	_prueba_sonido()
 
 	print("")
 	if _fallos == 0:
@@ -535,14 +536,44 @@ func _prueba_adornos() -> void:
 	_comprobar("y por los de campo abierto apenas pasa",
 		ruidosos.is_empty(), str(ruidosos))
 
+## Los wav los genera sonidos.py y no están en el control de nadie más, así que
+## lo que hay que comprobar es que existan todos los que el juego pide: si se
+## renombra uno en el script y se olvida regenerar, el juego se queda mudo en
+## ese golpe y no da ningún error.
+func _prueba_sonido() -> void:
+	var faltan: Array[String] = []
+	var vacios: Array[String] = []
+	for nombre in NodoSonido.AJUSTES:
+		var ruta: String = NodoSonido.RUTA % nombre
+		if not ResourceLoader.exists(ruta):
+			faltan.append(str(nombre))
+			continue
+		var stream := load(ruta) as AudioStream
+		if stream == null or stream.get_length() <= 0.005:
+			vacios.append(str(nombre))
+	_comprobar("estan los nueve wav que pide el juego",
+		faltan.is_empty() and NodoSonido.AJUSTES.size() == 9,
+		"faltan %s (hay %d ajustes)" % [str(faltan), NodoSonido.AJUSTES.size()])
+	_comprobar("y ninguno esta vacio", vacios.is_empty(), str(vacios))
+
+	# Los que suenan en racimo necesitan desafine, o el oído los junta en un
+	# zumbido. Los que suenan una vez van clavados a propósito.
+	var repetidos := ["bumper", "target", "flipper"]
+	var sin_variacion: Array[String] = []
+	for nombre in repetidos:
+		if float((NodoSonido.AJUSTES[nombre] as Dictionary)["tono"]) <= 0.0:
+			sin_variacion.append(nombre)
+	_comprobar("los golpes que se repiten llevan variacion de tono",
+		sin_variacion.is_empty(), str(sin_variacion))
+
 ## El criterio de salida de la fase 1: la bola sube por una rampa, desaparece
 ## de vista, y sabes dónde va a salir. Aquí se comprueba que sale SIEMPRE por
 ## el mismo sitio, que tarda lo que tiene que tardar, y que no hay forma de que
 ## se quede a medias.
 func _prueba_rampas() -> void:
 	var m := _nueva_mesa()
-	_comprobar("hay una orbita y un platillo",
-		m.rampas.size() == 1 and m.platillos.size() == 1,
+	_comprobar("hay tres recorridos y un platillo",
+		m.rampas.size() == 3 and m.platillos.size() == 1,
 		"%d rampas, %d platillos" % [m.rampas.size(), m.platillos.size()])
 	var r: Rampa = m.rampas[0]
 	_comprobar("la orbita llega a la zona alta",
@@ -574,6 +605,43 @@ func _prueba_rampas() -> void:
 		_comprobar("y el viaje dura lo que dice la curva (sentido %d)" % sentido,
 			absf(segundos - r.largo / 700.0) < 0.25,
 			"tardo %.2f s, la curva mide %.0f px a 700 px/s" % [segundos, r.largo])
+
+	# Los tres recorridos tienen que devolver la bola a sitios DISTINTOS, y sus
+	# bocas tienen que estar separadas: si se solapan, no puedes elegir a cuál
+	# tiras y dejan de ser tres tiros para ser uno con suerte.
+	var salidas_finales: Array[Vector2] = []
+	var bocas: Array[Vector2] = []
+	for ra in m.rampas:
+		salidas_finales.append(ra.punto_en(ra.largo))
+		bocas.append(ra.boca(1))
+		if ra.bidireccional:
+			bocas.append(ra.boca(-1))
+	var juntas: Array[String] = []
+	for i in salidas_finales.size():
+		for j in range(i + 1, salidas_finales.size()):
+			if salidas_finales[i].distance_to(salidas_finales[j]) < 60.0:
+				juntas.append("%s y %s" % [str(salidas_finales[i]), str(salidas_finales[j])])
+	_comprobar("los tres recorridos sueltan la bola en sitios distintos",
+		juntas.is_empty(), str(juntas))
+
+	var pegadas: Array[String] = []
+	for i in bocas.size():
+		for j in range(i + 1, bocas.size()):
+			if bocas[i].distance_to(bocas[j]) < m.p.rampa_entrada_radio * 2.0:
+				pegadas.append("%s y %s" % [str(bocas[i]), str(bocas[j])])
+	_comprobar("y sus bocas no se pisan entre ellas",
+		pegadas.is_empty(), str(pegadas))
+
+	# Ninguna boca ni salida puede caer dentro de un colisionador, o la bola
+	# aparecería empotrada y el solver la escupiría a cualquier sitio.
+	var empotradas: Array[String] = []
+	for punto in bocas + salidas_finales:
+		for c in m.colisionadores:
+			if c.punto_mas_cercano(punto).distance_to(punto) < c.radio + m.p.radio_bola:
+				empotradas.append(str(punto))
+				break
+	_comprobar("ninguna boca ni salida cae dentro de un colisionador",
+		empotradas.is_empty(), str(empotradas))
 
 	# Una bola lenta no engancha: rebota de largo.
 	var m3 := _nueva_mesa()
@@ -700,6 +768,34 @@ func _prueba_camara() -> void:
 		fraccionarias == 0, "%d fotogramas a medio pixel" % fraccionarias)
 	_comprobar("regla 1: la bola nunca se sale de la pantalla",
 		fuera == 0, "%d fotogramas con la bola fuera" % fuera)
+
+	# La franja del HUD son 58 px opacos pegados al borde de arriba, y en lo
+	# alto de la órbita la bola se metía detrás: el tiro más largo de la mesa
+	# era el único que no se veía. Se recorren las tres rampas midiéndolo.
+	var tapada := 0
+	var mas_arriba_pantalla := INF
+	for indice in 3:
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		var ra: Rampa = m2.rampas[indice]
+		m2.bola.pos = ra.boca(1)
+		m2.bola.vel = Vector2(0, -720)
+		var cam2 := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
+		cam2.y_actual = cam2.limite_abajo()
+		for _i in int(6.0 / DT):
+			m2.avanzar(DT)
+			cam2.avanzar(DT, m2.bola.pos.y, m2.bola.vel.y, m2.bola.viva)
+			if m2.bola.rampa != indice:
+				continue
+			var en_pantalla := m2.bola.pos.y - cam2.y_actual + cp.alto_visible * 0.5
+			mas_arriba_pantalla = minf(mas_arriba_pantalla, en_pantalla)
+			if en_pantalla < cp.alto_franja_hud:
+				tapada += 1
+		cam2.free()
+	_comprobar("la bola nunca se esconde tras la franja del HUD",
+		tapada == 0, "%d fotogramas tapada; lo mas alto fue y=%.0f de pantalla"
+			% [tapada, mas_arriba_pantalla])
 
 	# Y nunca se enseña fuera de la mesa.
 	_comprobar("la camara no se sale de la mesa",
