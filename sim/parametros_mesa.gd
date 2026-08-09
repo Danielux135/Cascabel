@@ -28,8 +28,10 @@ var flipper_activo_der: float = 212.0
 ## diámetro. El desagüe central quedaba sellado y la bola no podía drenar nunca.
 ## Separándolos 6 px por lado quedan 22,3 px libres y el drenaje central funciona.
 ## Es una decisión de tacto: si prefieres el hueco original, cámbialo aquí.
-var flipper_eje_izq := Vector2(112.0, 600.0)
-var flipper_eje_der := Vector2(288.0, 600.0)
+## En la mesa de 700 estaban en (112,600) y (288,600). La zona baja es esa
+## misma mesa bajada Mesa.DESPLAZAMIENTO px, así que aquí van ya en absoluto.
+var flipper_eje_izq := Vector2(112.0, 1200.0)
+var flipper_eje_der := Vector2(288.0, 1200.0)
 
 # --- Bumpers ---
 var bumper_empuje: float = 620.0
@@ -89,5 +91,14 @@ var busqueda_dispersion: float = 0.6        # (*) rad de aleatoriedad del empuj�
 var busqueda_ignora_flipper_sostenido: bool = true
 
 # --- Mundo ---
-var inicio_bola := Vector2(369.0, 651.0)    # dentro del carril lanzador
-var y_drenaje: float = 700.0
+var inicio_bola := Vector2(369.0, 1251.0)   # dentro del carril lanzador
+var y_drenaje: float = 1300.0
+
+# --- Rampas y platillos (*) ---
+## Velocidad mínima para engancharse a una órbita. Con esto, un lanzamiento a
+## tope la coge y uno flojo no: es la habilidad del tiro inicial.
+var rampa_velocidad_minima: float = 500.0
+var rampa_entrada_radio: float = 18.0
+var platillo_radio: float = 14.0
+var platillo_tiempo: float = 0.9
+var platillo_impulso: float = 780.0

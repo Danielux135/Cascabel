@@ -43,6 +43,8 @@ func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	mesa.target_abatido.connect(_al_abatir_target)
 	mesa.banco_completado.connect(_al_completar_banco)
 	mesa.girador_girado.connect(_al_girar_girador)
+	mesa.rampa_salida.connect(_al_salir_de_rampa)
+	mesa.platillo_expulsado.connect(_al_salir_del_platillo)
 	mesa.bola_drenada.connect(_al_drenar)
 
 func iniciar(el_enemigo: Enemigo) -> void:
@@ -112,6 +114,14 @@ func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 
 func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
 	_golpear(p.dano_girador, punto, true)
+
+## La órbita paga al SALIR, no al entrar: el premio es completarla.
+func _al_salir_de_rampa(punto: Vector2, _indice: int) -> void:
+	_golpear(p.dano_rampa, punto, true)
+
+## Y el platillo al escupir, que es donde está el golpe.
+func _al_salir_del_platillo(punto: Vector2, _indice: int) -> void:
+	_golpear(p.dano_platillo, punto, true)
 
 # ------------------------------------------------------------- resolución
 

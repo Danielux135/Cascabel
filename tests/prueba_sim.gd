@@ -28,6 +28,7 @@ func _initialize() -> void:
 	_prueba_giradores()
 	_prueba_animacion()
 	_prueba_camara()
+	_prueba_rampas()
 
 	print("")
 	if _fallos == 0:
@@ -69,7 +70,9 @@ func _simular(m: Mesa, segundos: float) -> Dictionary:
 		if not m.bola.viva:
 			break
 		var pos := m.bola.pos
-		if pos.x < 20.0 or pos.x > 380.0 or pos.y < 55.0 or pos.y > 701.0:
+		if not m.bola.libre():
+			continue
+		if pos.x < 20.0 or pos.x > 380.0 or pos.y < 655.0 or pos.y > 1301.0:
 			escapes += 1
 		if m.bola.velocidad() < 12.0:
 			quieta += DT
@@ -105,8 +108,8 @@ func _prueba_geometria_sellada() -> void:
 	var m := _nueva_mesa()
 	var d := m.p.radio_bola * 2.0
 	for lado in [
-			{"poste": Vector2(102, 596), "fin_rampa": Vector2(99, 584), "eje": m.p.flipper_eje_izq},
-			{"poste": Vector2(298, 596), "fin_rampa": Vector2(301, 584), "eje": m.p.flipper_eje_der}]:
+			{"poste": Vector2(102, 1196), "fin_rampa": Vector2(99, 1184), "eje": m.p.flipper_eje_izq},
+			{"poste": Vector2(298, 1196), "fin_rampa": Vector2(301, 1184), "eje": m.p.flipper_eje_der}]:
 		var hueco_rampa: float = (lado["poste"] as Vector2).distance_to(lado["fin_rampa"]) - m.p.poste_radio
 		var hueco_eje: float = (lado["poste"] as Vector2).distance_to(lado["eje"]) \
 			- m.p.poste_radio - m.p.flipper_radio
@@ -132,7 +135,7 @@ func _prueba_no_se_escapa() -> void:
 		var m := _nueva_mesa()
 		m.nueva_bola()
 		m.bola.en_carril = false
-		m.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(150, 450))
+		m.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(760, 1050))
 		var ang := rng.randf_range(0.0, TAU)
 		m.bola.vel = Vector2(cos(ang), sin(ang)) * rng.randf_range(200.0, 1500.0)
 		var r := _simular(m, 60.0)
@@ -148,10 +151,10 @@ func _prueba_no_se_escapa() -> void:
 ## punto exacto donde se acuñaba. Tiene que salir al flipper y acabar drenando.
 func _prueba_sin_atasco_en_el_inlane() -> void:
 	var puntos := [
-		Vector2(55, 520), Vector2(80, 555), Vector2(95, 575),   # inlane izquierdo
-		Vector2(111, 594), Vector2(105, 592),                   # el punto del bug
-		Vector2(330, 495), Vector2(310, 545), Vector2(290, 575),# inlane derecho
-		Vector2(289, 594),
+		Vector2(55, 1120), Vector2(80, 1155), Vector2(95, 1175),   # inlane izquierdo
+		Vector2(111, 1194), Vector2(105, 1192),                   # el punto del bug
+		Vector2(330, 1095), Vector2(310, 1145), Vector2(290, 1175),# inlane derecho
+		Vector2(289, 1194),
 	]
 	var atascadas := 0
 	var sin_drenar := 0
@@ -200,11 +203,11 @@ func _prueba_ball_search() -> void:
 	var m := _nueva_mesa()
 	m.nueva_bola()
 	m.bola.en_carril = false
-	m.bola.pos = Vector2(200, 400)
+	m.bola.pos = Vector2(200, 1000)
 	m.bola.vel = Vector2.ZERO
 	# Suelo falso justo debajo para que se quede parada de verdad.
 	m.colisionadores.append(Colisionador.new(
-		Vector2(120, 420), Vector2(280, 420), 0.0, Colisionador.Tipo.PARED, 0.0))
+		Vector2(120, 1020), Vector2(280, 1020), 0.0, Colisionador.Tipo.PARED, 0.0))
 	var disparos := [0]
 	m.busqueda_bola.connect(func(_pt: Vector2) -> void: disparos[0] += 1)
 	for _i in int(3.0 / DT):
@@ -271,7 +274,7 @@ func _prueba_bumper_no_repite() -> void:
 	# el arco y vuelve a caer dentro de la ventana de medida, y ese segundo
 	# aviso es legítimo. Aquí el empuje de 620 se queda 24 px por debajo del
 	# arco, así que en 0,4 s no puede haber dos golpes.
-	var arriba := Vector2(140, 225)
+	var arriba := Vector2(140, 825)
 	var m := _nueva_mesa()
 	m.nueva_bola()
 	m.bola.en_carril = false
@@ -323,7 +326,7 @@ func _drenar(c: Combate) -> void:
 ## Golpea un bumper `veces` veces, como si la bola fuera dando tumbos.
 func _golpear(c: Combate, veces: int) -> void:
 	for _i in veces:
-		c.mesa.bumper_golpeado.emit(Vector2(200, 200), 500.0)
+		c.mesa.bumper_golpeado.emit(Vector2(200, 800), 500.0)
 
 ## Pone el combate en juego con la bola fuera del carril.
 func _en_juego(c: Combate) -> void:
@@ -414,7 +417,7 @@ func _prueba_combo() -> void:
 	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
 	_en_juego(c3)
 	var vida_antes := c3.enemigo.vida
-	c3.mesa.banco_completado.emit(Vector2(56, 360), 0)
+	c3.mesa.banco_completado.emit(Vector2(56, 960), 0)
 	_comprobar("la bonificacion de banco hace dano pero no suma golpe",
 		c3.golpes == 0 and vida_antes - c3.enemigo.vida == c3.p.dano_banco,
 		"%d golpes, %d de dano" % [c3.golpes, vida_antes - c3.enemigo.vida])
@@ -500,7 +503,7 @@ func _prueba_adornos() -> void:
 		var m := _nueva_mesa()
 		m.nueva_bola()
 		m.bola.en_carril = false
-		m.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(150, 450))
+		m.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(760, 1050))
 		var ang := rng.randf_range(0.0, TAU)
 		m.bola.vel = Vector2(cos(ang), sin(ang)) * rng.randf_range(200.0, 1500.0)
 		for paso in int(25.0 / DT):
@@ -531,6 +534,117 @@ func _prueba_adornos() -> void:
 		pisados.is_empty(), str(pisados))
 	_comprobar("y por los de campo abierto apenas pasa",
 		ruidosos.is_empty(), str(ruidosos))
+
+## El criterio de salida de la fase 1: la bola sube por una rampa, desaparece
+## de vista, y sabes dónde va a salir. Aquí se comprueba que sale SIEMPRE por
+## el mismo sitio, que tarda lo que tiene que tardar, y que no hay forma de que
+## se quede a medias.
+func _prueba_rampas() -> void:
+	var m := _nueva_mesa()
+	_comprobar("hay una orbita y un platillo",
+		m.rampas.size() == 1 and m.platillos.size() == 1,
+		"%d rampas, %d platillos" % [m.rampas.size(), m.platillos.size()])
+	var r: Rampa = m.rampas[0]
+	_comprobar("la orbita llega a la zona alta",
+		r.punto_en(r.largo * 0.5).y < 320.0,
+		"lo mas alto que llega es y=%.0f" % r.punto_en(r.largo * 0.5).y)
+
+	# Entra por la boca izquierda y sale por la derecha, y al reves. Siempre.
+	for sentido in [1, -1]:
+		var boca := r.boca(sentido)
+		var salida := r.boca(-sentido)
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.bola.pos = boca
+		m2.bola.vel = Vector2(0, -700)
+		var salidas := []
+		m2.rampa_salida.connect(func(pt: Vector2, _i: int) -> void: salidas.append(pt))
+		var pasos := 0
+		for _i in int(8.0 / DT):
+			m2.avanzar(DT)
+			pasos += 1
+			if not salidas.is_empty():
+				break
+		_comprobar("entrando por un lado se sale por el otro (sentido %d)" % sentido,
+			not salidas.is_empty()
+			and (salidas[0] as Vector2).distance_to(salida) < 4.0,
+			"salio en %s, se esperaba %s" % [str(salidas), str(salida)])
+		var segundos := float(pasos) * DT
+		_comprobar("y el viaje dura lo que dice la curva (sentido %d)" % sentido,
+			absf(segundos - r.largo / 700.0) < 0.25,
+			"tardo %.2f s, la curva mide %.0f px a 700 px/s" % [segundos, r.largo])
+
+	# Una bola lenta no engancha: rebota de largo.
+	var m3 := _nueva_mesa()
+	m3.nueva_bola()
+	m3.bola.en_carril = false
+	m3.bola.pos = r.boca(1)
+	m3.bola.vel = Vector2(0, -(m3.p.rampa_velocidad_minima - 80.0))
+	m3.avanzar(DT)
+	_comprobar("una bola lenta no engancha en la orbita", m3.bola.rampa < 0)
+
+	# El platillo captura, espera y escupe.
+	var m4 := _nueva_mesa()
+	m4.nueva_bola()
+	m4.bola.en_carril = false
+	m4.bola.pos = (m4.platillos[0] as Platillo).centro
+	m4.bola.vel = Vector2(0, 60)
+	var capturas := [0]
+	var expulsiones := [0]
+	m4.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void: capturas[0] += 1)
+	m4.platillo_expulsado.connect(func(_pt: Vector2, _i: int) -> void: expulsiones[0] += 1)
+	# La velocidad hay que medirla EN el aviso: un par de fotogramas después la
+	# bola ya ha rebotado en un bumper y marca 1486.
+	var salio_a := [0.0]
+	m4.platillo_expulsado.connect(func(_pt: Vector2, _i: int) -> void:
+		salio_a[0] = m4.bola.velocidad())
+	m4.avanzar(DT)
+	_comprobar("el platillo captura la bola",
+		capturas[0] == 1 and m4.bola.platillo >= 0 and m4.bola.velocidad() == 0.0)
+	for _i in int((m4.p.platillo_tiempo + 0.1) / DT):
+		m4.avanzar(DT)
+	_comprobar("y la escupe tras la pausa con impulso fijo",
+		expulsiones[0] == 1 and m4.bola.platillo < 0
+		and absf(salio_a[0] - m4.p.platillo_impulso) < 1.0,
+		"salio a %.0f px/s" % salio_a[0])
+
+	# La zona alta es inalcanzable, pero NO por el tope de subida: la bola sube
+	# 643 px y el desplazamiento son 600, o sea que por ahí llegaría. Lo que la
+	# sella es el arco, que es techo macizo de la zona baja. Se comprueba
+	# jugando, que es la única forma de estar seguro.
+	var mas_arriba := INF
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	for _i in 30:
+		var m6 := _nueva_mesa()
+		m6.nueva_bola()
+		m6.bola.en_carril = false
+		m6.bola.pos = Vector2(rng.randf_range(40, 340), rng.randf_range(760, 1050))
+		var ang := rng.randf_range(0.0, TAU)
+		m6.bola.vel = Vector2(cos(ang), sin(ang)) * rng.randf_range(800.0, 1500.0)
+		for _j in int(20.0 / DT):
+			if not m6.bola.viva:
+				break
+			m6.avanzar(DT)
+			if m6.bola.viva and m6.bola.libre():
+				mas_arriba = minf(mas_arriba, m6.bola.pos.y)
+	_comprobar("el arco sella la zona alta: sin la orbita no se sube",
+		mas_arriba > Mesa.DESPLAZAMIENTO + 55.0,
+		"una bola suelta llego a y=%.0f" % mas_arriba)
+
+	# Y el lanzamiento a tope sí engancha: es el tiro de habilidad.
+	var m5 := _nueva_mesa()
+	m5.nueva_bola()
+	m5.cargar_lanzador(1.0)
+	m5.soltar_lanzador()
+	var engancho := false
+	for _i in int(3.0 / DT):
+		m5.avanzar(DT)
+		if m5.bola.rampa >= 0:
+			engancho = true
+			break
+	_comprobar("un lanzamiento a tope engancha la orbita", engancho)
 
 ## Las cuatro reglas de la cámara de PLAN.md, una por una y encima jugando.
 func _prueba_camara() -> void:
@@ -597,7 +711,7 @@ func _prueba_giradores() -> void:
 
 	# Hay que soltarla BAJANDO POR EL CARRIL: el carril de retorno izquierdo va
 	# en diagonal, y a plomo desde arriba la bola cae fuera, sobre el slingshot.
-	var carril := (Vector2(99, 584) - Vector2(20, 480)).normalized()
+	var carril := (Vector2(99, 1184) - Vector2(20, 1080)).normalized()
 
 	# Pasada rápida: un aviso, no uno por subpaso.
 	m.nueva_bola()

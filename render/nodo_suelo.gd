@@ -10,6 +10,7 @@ extends Node2D
 
 const C_MESA := Color("2A2A33")
 const C_CABINA := Color("14121A")
+const C_HUECO := Color("1C1A22")
 
 var vista: VistaMesa
 var _tex_suelo: Texture2D
@@ -48,6 +49,8 @@ func _draw() -> void:
 
 ## Baldosa de 128x128 que repite sin costuras, teselada sobre todo el campo.
 func _dibujar_suelo() -> void:
+	# La zona alta es hueco de raíl, no mesa: se queda oscura.
+	draw_rect(VistaMesa.ZONA_ALTA, C_HUECO)
 	draw_rect(VistaMesa.CAMPO, C_MESA)      # base por si faltara la textura
 	if _tex_suelo != null:
 		draw_texture_rect(_tex_suelo, VistaMesa.CAMPO, true)

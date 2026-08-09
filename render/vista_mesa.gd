@@ -32,7 +32,7 @@ const C_FUEGO       := Color("E8814A")
 ## hace que se vea es que se enciende conforme sube.
 ## Y no más abajo: con los flippers levantados las palas llegan a y=559 y se
 ## comían la línea de debajo del número.
-const COMBO_CENTRO := Vector2(200, 520)
+const COMBO_CENTRO := Vector2(200, 1120)
 const COMBO_TAMANO := 46
 const COMBO_ESTILO := {
 	1: {"col": C_TEXTO_TENUE, "alfa": 0.22},
@@ -55,14 +55,18 @@ const GROSOR_BORDE_FLIPPER := 1.5
 ## sprites son 96x96 con los pies ya alineados dentro del marco, así que basta
 ## con posar el borde inferior del marco en el suelo.
 const ENEMIGO_CENTRO_X := 200.0
-const ENEMIGO_SUELO_Y := 158.0
+const ENEMIGO_SUELO_Y := 758.0
 const ALTO_TARGET := 30.0
 
-## El campo de juego, donde va el suelo de piedra.
-const CAMPO := Rect2(20, 60, 360, 620)
+## El campo de juego de verdad: la mesa validada, con su suelo de piedra.
+const CAMPO := Rect2(20, 660, 360, 620)
+## Los 660 px de arriba NO son campo de juego: son el hueco por el que sube la
+## órbita. Van en oscuro para que se lea que el raíl va elevado por detrás y no
+## que la mesa sigue.
+const ZONA_ALTA := Rect2(20, 20, 360, 640)
 ## Por donde cae la bola al drenar, bajo los flippers. Nada de adornos aquí
 ## salvo la rejilla, que va justo ahí a propósito.
-const CORREDOR_DRENAJE := Rect2(170, 600, 60, 100)
+const CORREDOR_DRENAJE := Rect2(170, 1200, 60, 100)
 
 ## Adornos del suelo, puestos a mano.
 ##
@@ -77,22 +81,22 @@ const CORREDOR_DRENAJE := Rect2(170, 600, 60, 100)
 ## partidas aleatorias de tests/prueba_sim.gd, y la prueba lo exige.
 const ADORNOS := [
 	# zona muerta bajo el carril de retorno izquierdo
-	{"tex": "grieta",       "pos": Vector2(56, 612),  "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "huesos",       "pos": Vector2(50, 652),  "escala": 1.0, "espejo": true,  "muerta": true},
-	{"tex": "musgo",        "pos": Vector2(88, 640),  "escala": 0.5, "espejo": false, "muerta": true},
+	{"tex": "grieta",       "pos": Vector2(56, 1212),  "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "huesos",       "pos": Vector2(50, 1252),  "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "musgo",        "pos": Vector2(88, 1240),  "escala": 0.5, "espejo": false, "muerta": true},
 	# zona muerta bajo el carril de retorno derecho
-	{"tex": "baldosa_rota", "pos": Vector2(326, 616), "escala": 1.0, "espejo": true,  "muerta": true},
-	{"tex": "mancha",       "pos": Vector2(324, 651), "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "musgo",        "pos": Vector2(342, 630), "escala": 0.5, "espejo": true,  "muerta": true},
+	{"tex": "baldosa_rota", "pos": Vector2(326, 1216), "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "mancha",       "pos": Vector2(324, 1251), "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "musgo",        "pos": Vector2(342, 1230), "escala": 0.5, "espejo": true,  "muerta": true},
 	# franja bajo los flippers, a los lados del corredor de drenaje
-	{"tex": "remaches",     "pos": Vector2(126, 664), "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "remaches",     "pos": Vector2(274, 664), "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "remaches",     "pos": Vector2(126, 1264), "escala": 1.0, "espejo": false, "muerta": true},
+	{"tex": "remaches",     "pos": Vector2(274, 1264), "escala": 1.0, "espejo": true,  "muerta": true},
 	# la rejilla, en el drenaje: aquí sí pasa la bola, y es el sitio que le toca
-	{"tex": "rejilla",      "pos": Vector2(200, 650), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "rejilla",      "pos": Vector2(200, 1250), "escala": 1.0, "espejo": false, "muerta": false},
 	# campo alto. La bola vive abajo, así que aquí arriba apenas pasa: 2,6 % y
 	# 0,5 % de los fotogramas. Sitios sacados del mapa de ocupación, no a ojo.
-	{"tex": "espiral",      "pos": Vector2(128, 300), "escala": 1.0, "espejo": false, "muerta": false},
-	{"tex": "sigilo",       "pos": Vector2(285, 130), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "espiral",      "pos": Vector2(128, 900), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "sigilo",       "pos": Vector2(285, 730), "escala": 1.0, "espejo": false, "muerta": false},
 ]
 
 ## Rectángulo que ocupa un adorno en la mesa, contando solo su parte opaca:
@@ -339,14 +343,16 @@ func _draw() -> void:
 	# Aquí empieza la capa 0.
 	# Sombreados de profundidad. Van translúcidos para que la piedra siga
 	# viéndose por debajo; antes eran planos y tapaban el suelo.
-	draw_rect(Rect2(20, 560, 360, 120), Color(C_MESA_BAJA, 0.30))
-	draw_rect(Rect2(358, 300, 22, 360), Color(C_CARRIL, 0.80))
+	draw_rect(Rect2(20, 1160, 360, 120), Color(C_MESA_BAJA, 0.30))
+	draw_rect(Rect2(358, 900, 22, 360), Color(C_CARRIL, 0.80))
 	draw_rect(Rect2(0, int(mesa.p.y_drenaje) - 8, Mesa.ANCHO, 8), C_DRENAJE)
 
 	# El enemigo NO se dibuja aquí: vive en _nodo_enemigo, que tiene material
 	# propio para el destello y la disolución y se cuela por z_index entre el
 	# suelo y todo lo demás.
 	_dibujar_inlanes()
+	_dibujar_rampas()
+	_dibujar_platillos()
 	_dibujar_paredes()
 	_dibujar_objetos()
 	_dibujar_destellos()
@@ -361,15 +367,33 @@ func _draw() -> void:
 func _dibujar_lanzador() -> void:
 	if not (mesa.cargando or mesa.carga_lanzador > 0.0):
 		return
-	draw_rect(Rect2(366, 600, 6, 50), C_CABINA)
+	draw_rect(Rect2(366, 1200, 6, 50), C_CABINA)
 	var alto := 50.0 * mesa.carga_lanzador
-	draw_rect(Rect2(366, 650 - alto, 6, alto), C_ORO)
+	draw_rect(Rect2(366, 1250 - alto, 6, alto), C_ORO)
+
+## La órbita es una curva, no paredes, así que se dibuja como lo que es: un
+## carril elevado. La bola se pinta después, encima, porque va por arriba.
+func _dibujar_rampas() -> void:
+	for r in mesa.rampas:
+		draw_polyline(r.puntos, Color(C_CABINA, 0.85), 15.0)
+		draw_polyline(r.puntos, Color(C_MESA_BAJA, 0.9), 11.0)
+		draw_polyline(r.puntos, Color(C_PARED, 0.55), 1.0)
+		for extremo in [r.puntos[0], r.puntos[r.puntos.size() - 1]]:
+			draw_circle(extremo, r.entrada_radio, Color(C_ORO, 0.30))
+			draw_circle(extremo, r.entrada_radio, C_ORO, false, 1.0)
+
+func _dibujar_platillos() -> void:
+	for pl in mesa.platillos:
+		draw_circle(pl.centro, pl.radio + 3.0, C_METAL)
+		draw_circle(pl.centro, pl.radio, C_CABINA)
+		draw_line(pl.centro, pl.centro + pl.direccion * (pl.radio + 8.0),
+			Color(C_ORO, 0.5), 1.0)
 
 ## Los carriles de retorno del arreglo 1, sombreados para que se lean.
 func _dibujar_inlanes() -> void:
 	var tinte := Color(C_CARRIL, 0.55)
-	draw_line(Vector2(48, 494), Vector2(112, 578), tinte, 26.0)
-	draw_line(Vector2(332, 480), Vector2(288, 578), tinte, 24.0)
+	draw_line(Vector2(48, 1094), Vector2(112, 1178), tinte, 26.0)
+	draw_line(Vector2(332, 1080), Vector2(288, 1178), tinte, 24.0)
 
 func _dibujar_paredes() -> void:
 	for c in mesa.colisionadores:
@@ -459,6 +483,10 @@ func _dibujar_flipper(f: Flipper) -> void:
 func _dibujar_bola() -> void:
 	if not mesa.bola.viva:
 		return
+	if mesa.bola.rampa >= 0:
+		# Va por encima de la mesa: una sombra debajo lo cuenta sin texto.
+		draw_circle(mesa.bola.pos + Vector2(3, 6), mesa.p.radio_bola * 0.8,
+			Color(C_CABINA, 0.5))
 	var escala := mesa.p.radio_bola * 2.0 / 20.0
 	var mitad := Vector2(_tex_bola.get_width(), _tex_bola.get_height()) * 0.5
 	draw_set_transform(mesa.bola.pos, 0.0, Vector2(escala, escala))

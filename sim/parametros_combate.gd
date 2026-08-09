@@ -42,3 +42,9 @@ var pausa_ataque: float = 0.9    # enseñando el contraataque
 ## El girador: la bola lo atraviesa y lo hace girar. Cuenta como golpe, igual
 ## que un bumper, pero pega menos porque es mucho más fácil de encadenar.
 var dano_girador: int = 1
+
+## Completar la órbita entera y sacar la bola del platillo. Pagan bien porque
+## las dos hay que buscarlas: la órbita pide un tiro fuerte y limpio, y el
+## platillo está escondido bajo el arco.
+var dano_rampa: int = 10
+var dano_platillo: int = 14
