@@ -30,6 +30,7 @@ func _initialize() -> void:
 	_prueba_camara()
 	_prueba_rampas()
 	_prueba_sonido()
+	_prueba_impactos()
 
 	print("")
 	if _fallos == 0:
@@ -535,6 +536,59 @@ func _prueba_adornos() -> void:
 		pisados.is_empty(), str(pisados))
 	_comprobar("y por los de campo abierto apenas pasa",
 		ruidosos.is_empty(), str(ruidosos))
+
+## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
+## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no
+## caduca, una partida larga acaba arrastrando miles de partículas.
+func _prueba_impactos() -> void:
+	var pi := ParametrosImpacto.new()
+	var fx := Impactos.new(pi)
+	fx.rng.seed = SEMILLA
+
+	fx.onda(Vector2(200, 900), Color.WHITE)
+	fx.polvo(Vector2(200, 900), Vector2.UP, Color.WHITE)
+	fx.chispas(Vector2(200, 900), Vector2.UP, Color.WHITE)
+	_comprobar("un impacto crea onda, polvo y chispas",
+		fx.vivos() == 1 + pi.polvo_cantidad + pi.chispa_cantidad,
+		"%d partículas" % fx.vivos())
+
+	# Todo tiene que apagarse solo, y antes de la duración más larga.
+	var mas_largo: float = maxf(pi.onda_duracion,
+		maxf(pi.polvo_duracion, pi.chispa_duracion))
+	for _i in int((mas_largo + 0.2) / DT):
+		fx.avanzar(DT)
+	_comprobar("y todo se apaga solo", fx.vivos() == 0,
+		"quedan %d tras %.2f s" % [fx.vivos(), mas_largo + 0.2])
+
+	# El tope aguanta aunque se dispare sin parar.
+	for _i in 200:
+		fx.chispas(Vector2(200, 900), Vector2.ZERO, Color.WHITE)
+		fx.polvo(Vector2(200, 900), Vector2.ZERO, Color.WHITE)
+	_comprobar("el tope de particulas aguanta un aporreo",
+		fx.vivos() <= pi.maximo_particulas + 1,
+		"%d vivas, tope %d" % [fx.vivos(), pi.maximo_particulas])
+
+	# Dirección omni (Vector2.ZERO) no puede dar NaN al normalizar.
+	fx.limpiar()
+	fx.chispas(Vector2(200, 900), Vector2.ZERO, Color.WHITE)
+	fx.polvo(Vector2(200, 900), Vector2.ZERO, Color.WHITE)
+	for _i in 30:
+		fx.avanzar(DT)
+	var malas := 0
+	for lista in [fx._polvo, fx._chispas]:
+		for part in lista:
+			var pos: Vector2 = part["pos"]
+			if not (is_finite(pos.x) and is_finite(pos.y)):
+				malas += 1
+	_comprobar("sin direccion, las particulas salen en todas y sin NaN",
+		malas == 0, "%d posiciones invalidas" % malas)
+
+	# La escala manda en cuántas salen: es el mando para distinguir un roce de
+	# una muerte sin tocar los parámetros.
+	fx.limpiar()
+	fx.chispas(Vector2.ZERO, Vector2.UP, Color.WHITE, 3.0)
+	_comprobar("la escala multiplica la cantidad",
+		fx.vivos() == pi.chispa_cantidad * 3, "%d chispas" % fx.vivos())
 
 ## Los wav los genera sonidos.py y no están en el control de nadie más, así que
 ## lo que hay que comprobar es que existan todos los que el juego pide: si se

@@ -25,6 +25,7 @@ const C_ARCANO      := Color("A97BD9")
 const C_DRENAJE     := Color("4A3A42")
 const C_VERDE       := Color("7BA84A")
 const C_FUEGO       := Color("E8814A")
+const C_PIEDRA      := Color("7A7669")
 
 ## El multiplicador va grande, en el hueco entre los slingshots y los flippers,
 ## que es donde tienes puesto el ojo mientras juegas. Se dibuja pegado al suelo,
@@ -113,6 +114,8 @@ static func caja_adorno(adorno: Dictionary, tex: Texture2D) -> Rect2:
 var combate: Combate
 var mesa: Mesa
 var anim := ParametrosAnimacion.new()
+var impacto := ParametrosImpacto.new()
+var impactos: Impactos
 var cam := ParametrosCamara.new()
 var camara: CamaraMesa
 
@@ -136,7 +139,6 @@ var _tex_girador: Array[Texture2D] = []
 var _giro: Array[float] = []
 var _giro_velocidad: Array[float] = []
 var _flash_bumper: Array[float] = []
-var _destellos: Array[Dictionary] = []
 var _numeros: Array[Dictionary] = []
 
 var _tex_bola: Texture2D
@@ -168,15 +170,14 @@ func _ready() -> void:
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
-	mesa.target_abatido.connect(func(_pt: Vector2, _b: int) -> void:
-		_sonido.reproducir("target"))
+	mesa.target_abatido.connect(_al_abatir_target)
 	mesa.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("rampa_entrada"))
 	mesa.rampa_salida.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("rampa_salida"))
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
-	mesa.bola_drenada.connect(func() -> void: _sonido.reproducir("drenaje"))
+	mesa.bola_drenada.connect(_al_drenar_bola)
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
@@ -185,6 +186,7 @@ func _ready() -> void:
 	_giro.resize(mesa.giradores.size())
 	_giro_velocidad.resize(mesa.giradores.size())
 	_flash_bumper.resize(mesa.bumpers.size())
+	impactos = Impactos.new(impacto)
 	_sonido = NodoSonido.new()
 	add_child(_sonido)
 	add_child(NodoEscritorio.new(cam, anim))
@@ -212,7 +214,7 @@ func _empezar_combate(indice: int) -> void:
 	combate.iniciar(Enemigo.new(_catalogo[_indice_enemigo]))
 	_nodo_enemigo.suelo = Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y)
 	_nodo_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
-	_destellos.clear()
+	impactos.limpiar()
 	_numeros.clear()
 
 func _physics_process(delta: float) -> void:
@@ -259,13 +261,12 @@ func _process(delta: float) -> void:
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
 	flash_jugador = maxf(flash_jugador - delta * 2.2, 0.0)
-	# La sacudida SIEMPRE en píxeles enteros: a medio píxel, con el filtro
-	# nearest y el escalado entero del proyecto, la mesa entera se ve borrosa
-	# justo en el momento en que más se mira.
-	# La sacudida va en el offset de la CÁMARA. Moviendo el nodo de la mesa no
-	# se vería: la cámara es hija suya y se movería con él.
-	camara.sacudida = anim.desplazamiento_sacudida(_sacudida, _rng)
-	camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, mesa.bola.viva)
+	# La sacudida va en el offset de la CÁMARA, y SIEMPRE en píxeles enteros:
+	# moviendo el nodo de la mesa no se vería, porque la cámara es hija suya y
+	# se movería con él; y a medio píxel, con filtro nearest y escalado entero,
+	# la mesa se ve borrosa justo en el momento en el que más se mira.
+	# Aquí solo la sacudida: el seguimiento de la bola va en _physics_process.
+	camara.aplicar_sacudida(anim.desplazamiento_sacudida(_sacudida, _rng))
 
 	for i in _flash_bumper.size():
 		_flash_bumper[i] = maxf(
@@ -274,7 +275,7 @@ func _process(delta: float) -> void:
 		_giro[i] += _giro_velocidad[i] * delta
 		_giro_velocidad[i] = maxf(_giro_velocidad[i] - anim.girador_frenado * delta, 0.0)
 
-	_destellos = _caducar(_destellos, delta)
+	impactos.avanzar(delta)
 	_numeros = _caducar(_numeros, delta)
 	queue_redraw()
 
@@ -301,13 +302,32 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 			get_tree().quit()
 
 func _al_golpear_bumper(punto: Vector2, fuerza: float) -> void:
-	_destellos.append({"pos": punto, "t": 0.16, "r": 26.0, "col": C_ORO})
 	_sonido.reproducir("bumper")
 	_sacudir(anim.sacudida_bumper)
 	_congelar(fuerza)
 	var i := _bumper_mas_cercano(punto)
 	if i >= 0:
 		_flash_bumper[i] = 1.0
+	# La dirección del material sale del bumper hacia el punto de contacto: es
+	# por donde ha entrado la bola, y por donde tiene sentido que salte todo.
+	var fuera := Vector2.ZERO if i < 0 else (punto - (mesa.bumpers[i] as Vector2))
+	impactos.onda(punto, C_ORO, 1.0)
+	impactos.chispas(punto, fuera, C_ORO_CLARO, 1.0)
+	impactos.polvo(punto, fuera, C_PIEDRA, 0.6)
+
+## El target cae hacia dentro de la mesa, así que el polvo sale hacia el
+## centro: hacia fuera se metería dentro de la pared.
+func _al_abatir_target(punto: Vector2, _banco: int) -> void:
+	_sonido.reproducir("target")
+	var adentro := Vector2(signf(Mesa.ANCHO * 0.5 - punto.x), -0.35)
+	impactos.onda(punto, C_ORO, 0.5)
+	impactos.chispas(punto, adentro, C_ORO_CLARO, 0.7)
+	impactos.polvo(punto, adentro, C_PIEDRA, 1.0)
+
+func _al_drenar_bola() -> void:
+	_sonido.reproducir("drenaje")
+	impactos.polvo(Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 26.0),
+		Vector2.UP, C_PIEDRA, 1.4)
 
 func _bumper_mas_cercano(punto: Vector2) -> int:
 	var mejor := -1
@@ -324,13 +344,14 @@ func _al_girar_girador(_punto: Vector2, indice: int, fuerza: float) -> void:
 	_giro_velocidad[indice] = anim.girador_velocidad_maxima * ratio
 
 func _al_golpear_slingshot(punto: Vector2, _fuerza: float) -> void:
-	_destellos.append({"pos": punto, "t": 0.12, "r": 16.0, "col": C_GOMA_LUZ})
+	impactos.onda(punto, C_GOMA_LUZ, 0.55)
+	impactos.chispas(punto, Vector2.ZERO, C_GOMA_LUZ, 0.5)
 
 func _al_golpear_poste(punto: Vector2, _fuerza: float) -> void:
-	_destellos.append({"pos": punto, "t": 0.10, "r": 14.0, "col": C_GOMA_LUZ})
+	impactos.onda(punto, C_GOMA_LUZ, 0.42)
 
 func _al_buscar_bola(punto: Vector2) -> void:
-	_destellos.append({"pos": punto, "t": 0.3, "r": 34.0, "col": C_ARCANO})
+	impactos.onda(punto, C_ARCANO, 1.3)
 	_sacudir(anim.sacudida_ataque)
 
 func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
@@ -338,6 +359,7 @@ func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
 	flash_enemigo = maxf(flash_enemigo, 0.7)
 	_nodo_enemigo.recibir_dano()
 	_sacudir(anim.sacudida_dano)
+	impactos.chispas(punto, Vector2.ZERO, C_ORO_CLARO, 0.6)
 
 ## Solo salta cuando el multiplicador cambia de tramo, no en cada golpe.
 func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
@@ -359,6 +381,10 @@ func _al_terminar_combate(victoria: bool) -> void:
 	if victoria:
 		_sonido.reproducir("muerte")
 		_nodo_enemigo.morir()
+		var centro := Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y - 40.0)
+		impactos.onda(centro, C_FUEGO, 2.2)
+		impactos.chispas(centro, Vector2.ZERO, C_FUEGO, 3.0)
+		impactos.polvo(centro, Vector2.ZERO, C_PIEDRA, 2.5)
 		_sacudir(anim.sacudida_muerte)
 		_hitstop = maxf(_hitstop, anim.hitstop)
 
@@ -384,7 +410,7 @@ func _draw() -> void:
 	_dibujar_platillos()
 	_dibujar_paredes()
 	_dibujar_objetos()
-	_dibujar_destellos()
+	impactos.dibujar(self)
 	_dibujar_bola()
 	_dibujar_numeros()
 	_dibujar_lanzador()
@@ -522,11 +548,6 @@ func _dibujar_bola() -> void:
 	draw_texture(_tex_bola, -mitad)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
-func _dibujar_destellos() -> void:
-	for d in _destellos:
-		var col: Color = d["col"]
-		col.a = clampf(d["t"] * 4.0, 0.0, 0.8)
-		draw_circle(d["pos"], d["r"] * (1.4 - d["t"]), col, false, 2.0)
 
 func _dibujar_numeros() -> void:
 	for d in _numeros:
