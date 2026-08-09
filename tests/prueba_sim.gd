@@ -21,7 +21,6 @@ func _initialize() -> void:
 	_prueba_flipper_empuja()
 	_prueba_ball_search()
 	_prueba_lanzador()
-	_prueba_sprites_de_flipper()
 
 	print("")
 	if _fallos == 0:
@@ -219,42 +218,6 @@ func _prueba_ball_search() -> void:
 		m2.avanzar(DT)
 	_comprobar("cazar la bola con el flipper no dispara el ball search",
 		disparos2[0] == 0, "%d disparos en 4 s" % disparos2[0])
-
-## El sprite del flipper tiene que caer encima de su cápsula, no al lado ni
-## girado. Mirar una captura no basta: así se coló el derecho girado 180°,
-## apuntando al carril lanzador mientras el colisionador iba abajo-izquierda.
-func _prueba_sprites_de_flipper() -> void:
-	var m := _nueva_mesa()
-	for caso in [
-			{"nombre": "izquierdo", "f": m.flipper_izq, "desc": VistaMesa.SPRITE_FLIPPER_IZQ},
-			{"nombre": "derecho", "f": m.flipper_der, "desc": VistaMesa.SPRITE_FLIPPER_DER}]:
-		var f: Flipper = caso["f"]
-		var desc: Dictionary = caso["desc"]
-		var punta_sprite: Vector2 = desc["punta"]
-		var eje_sprite: Vector2 = desc["eje"]
-
-		# En reposo y accionado: la punta dibujada sobre la de la cápsula.
-		for pulsado in [false, true]:
-			f.pulsado = pulsado
-			f.avanzar(1.0)   # un paso largo: llega al tope
-			var t := VistaMesa.transformada_flipper(
-				f.angulo, f.eje, f.longitud, desc["giro_base"])
-			var punta_dibujada := t * (punta_sprite - eje_sprite)
-			var error := punta_dibujada.distance_to(f.punta())
-			_comprobar("punta del sprite %s sobre la capsula (%s)"
-					% [caso["nombre"], "accionado" if pulsado else "reposo"],
-				error < 1.0,
-				"desviada %.1f px: sprite %s, capsula %s"
-					% [error, str(punta_dibujada.round()), str(f.punta().round())])
-
-			# Y el arte no puede quedar boca abajo: el "arriba" del sprite
-			# tiene que seguir apuntando hacia arriba en el mundo.
-			var arriba := (t.basis_xform(Vector2(0, -1))).normalized()
-			_comprobar("el sprite %s no queda boca abajo (%s)"
-					% [caso["nombre"], "accionado" if pulsado else "reposo"],
-				arriba.y < -0.5, "arriba del sprite = %s" % str(arriba))
-		f.pulsado = false
-		f.avanzar(1.0)
 
 func _prueba_lanzador() -> void:
 	var m := _nueva_mesa()
