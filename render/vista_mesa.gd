@@ -1,3 +1,4 @@
+class_name VistaMesa
 extends Node2D
 
 ## Banco de pruebas de la mesa. Dibuja la simulación y la deja jugar.
@@ -25,18 +26,37 @@ const C_TEXTO_TENUE := Color("62636F")
 const C_ARCANO      := Color("A97BD9")
 const C_DRENAJE     := Color("4A3A42")
 
-# Los sprites de flipper apuntan a +X con el eje en el píxel (14,32).
-# flipper_izq.png es flipper_der.png reflejado, así que su eje cae en (50,32) y
-# apunta a -X. El flipper IZQUIERDO de la mesa apunta a +X (reposo 28°), o sea
-# que le toca flipper_der.png. Los nombres de los ficheros van al revés que la
-# geometría; se cambian aquí y ya.
-const EJE_SPRITE_MAS_X := Vector2(14, 32)
-const EJE_SPRITE_MENOS_X := Vector2(50, 32)
+# flipper_der.png tiene el eje en el píxel (14,32) y la punta en (62,32): apunta
+# a +X. flipper_izq.png es ese mismo reflejado, así que su eje cae en (50,32),
+# su punta en (2,32) y apunta a -X.
+#
+# El flipper IZQUIERDO de la mesa apunta a +X (reposo 28°) y el DERECHO a -X
+# (reposo 152°), o sea que los ficheros van al revés que la geometría. Y al
+# sprite que apunta a -X hay que sumarle 180° de giro base: su dirección natural
+# ya es -X, y rotarlo por `angulo` a secas lo manda arriba-derecha, al carril
+# lanzador. Sumar PI (en vez de reflejar en Y) deja el sombreado bien.
+const SPRITE_FLIPPER_IZQ := {
+	"tex": "res://assets/mesa/flipper_der.png",
+	"eje": Vector2(14, 32), "punta": Vector2(62, 32), "giro_base": 0.0,
+}
+const SPRITE_FLIPPER_DER := {
+	"tex": "res://assets/mesa/flipper_izq.png",
+	"eje": Vector2(50, 32), "punta": Vector2(2, 32), "giro_base": PI,
+}
 ## PENDIENTE DE ARTE: el sprite mide 48 px de largo por 28 de grueso en la base
 ## (1,7:1). La cápsula validada mide 78 x 16 (4,9:1). Se escala por LARGO, para
 ## que la bola golpee donde se ve que está el flipper; el precio es que la base
 ## se ve gorda. Lo suyo es redibujar el flipper más largo y más fino.
 const LARGO_SPRITE_FLIPPER := 48.0
+
+## La transformación con la que se dibuja un flipper. Está aparte y es estática
+## para poder comprobar en headless que la punta del sprite cae sobre la punta
+## de la cápsula (tests/prueba_sim.gd). Mirar la captura no vale: así se me coló
+## el flipper derecho girado 180°.
+static func transformada_flipper(angulo: float, eje_mundo: Vector2,
+		longitud: float, giro_base: float) -> Transform2D:
+	var escala := longitud / LARGO_SPRITE_FLIPPER
+	return Transform2D(angulo + giro_base, Vector2(escala, escala), 0.0, eje_mundo)
 
 var mesa: Mesa
 var bolas_restantes: int = BOLAS_POR_COMBATE
@@ -48,8 +68,8 @@ var _destellos: Array[Dictionary] = []
 var _tex_bola: Texture2D
 var _tex_poste: Texture2D
 var _tex_bumper: Texture2D
-var _tex_flipper_mas_x: Texture2D
-var _tex_flipper_menos_x: Texture2D
+var _tex_flipper_izq: Texture2D
+var _tex_flipper_der: Texture2D
 var _fuente: Font
 
 func _ready() -> void:
@@ -57,8 +77,8 @@ func _ready() -> void:
 	_tex_bola = load("res://assets/mesa/bola.png")
 	_tex_poste = load("res://assets/mesa/poste_goma.png")
 	_tex_bumper = load("res://assets/mesa/bumper_gargola.png")
-	_tex_flipper_mas_x = load("res://assets/mesa/flipper_der.png")
-	_tex_flipper_menos_x = load("res://assets/mesa/flipper_izq.png")
+	_tex_flipper_izq = load(SPRITE_FLIPPER_IZQ["tex"])
+	_tex_flipper_der = load(SPRITE_FLIPPER_DER["tex"])
 
 	mesa = Mesa.new()
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
@@ -175,8 +195,8 @@ func _dibujar_paredes() -> void:
 func _dibujar_objetos() -> void:
 	for centro in mesa.bumpers:
 		_dibujar_sprite_redondo(_tex_bumper, centro, mesa.p.bumper_radio * 2.0, 60.0)
-	_dibujar_flipper(mesa.flipper_izq, _tex_flipper_mas_x, EJE_SPRITE_MAS_X)
-	_dibujar_flipper(mesa.flipper_der, _tex_flipper_menos_x, EJE_SPRITE_MENOS_X)
+	_dibujar_flipper(mesa.flipper_izq, _tex_flipper_izq, SPRITE_FLIPPER_IZQ)
+	_dibujar_flipper(mesa.flipper_der, _tex_flipper_der, SPRITE_FLIPPER_DER)
 	# Los postes van DESPUÉS de los flippers: solapan con la cápsula del eje (es
 	# lo que sella el hueco del atasco) y si se dibujan antes quedan tapados.
 	for centro in mesa.postes:
@@ -190,10 +210,10 @@ func _dibujar_sprite_redondo(tex: Texture2D, centro: Vector2, diametro: float, v
 	draw_texture(tex, -mitad)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
-func _dibujar_flipper(f: Flipper, tex: Texture2D, eje_sprite: Vector2) -> void:
-	var escala := f.longitud / LARGO_SPRITE_FLIPPER
-	draw_set_transform(f.eje.round(), f.angulo, Vector2(escala, escala))
-	draw_texture(tex, -eje_sprite)
+func _dibujar_flipper(f: Flipper, tex: Texture2D, desc: Dictionary) -> void:
+	draw_set_transform_matrix(
+		transformada_flipper(f.angulo, f.eje, f.longitud, desc["giro_base"]))
+	draw_texture(tex, -(desc["eje"] as Vector2))
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 ## La bola NO se pega a la rejilla: a 1500 px/s tiritaría de forma horrible.
