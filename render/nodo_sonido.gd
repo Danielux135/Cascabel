@@ -22,6 +22,8 @@ const AJUSTES := {
 	"rampa_fuerte":  {"db": -1.0, "tono": 0.03},
 	"platillo":      {"db": -2.0, "tono": 0.00},
 	"combo":         {"db":  1.0, "tono": 0.00},
+	"reloj":         {"db": -4.0, "tono": 0.00},
+	"ataque":        {"db":  0.0, "tono": 0.00},
 	"drenaje":       {"db": -2.0, "tono": 0.00},
 	"muerte":        {"db":  0.0, "tono": 0.00},
 }
@@ -29,7 +31,10 @@ const AJUSTES := {
 ## Sonidos con reproductor propio, fuera de la rueda. El arpegio del
 ## multiplicador dura medio segundo y en ese medio segundo caben catorce
 ## golpes de racimo: en la rueda se lo llevaba por delante su propio banco.
-const PROPIOS := ["combo"]
+##
+## El reloj y su golpe van igual, y por el mismo motivo: los tres son
+## información, no adorno, y los tres suenan justo cuando hay más ruido.
+const PROPIOS := ["combo", "reloj", "ataque"]
 
 var _voces: Array[AudioStreamPlayer] = []
 var _propias: Dictionary = {}

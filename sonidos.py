@@ -103,6 +103,23 @@ SONIDOS = {
         caida=13, caida_ultima=6, ataque=0.004, filtro=8000, crush=6, vol=0.52,
     ),
 
+    # --- El reloj del enemigo. El tic de la cuenta atrás suena tres veces por
+    # ciclo, así que puede permitirse ser seco y grave: no compite con el
+    # racimo por agudos, se cuela por debajo. ---
+    "reloj": dict(
+        onda="triangulo", f0=150, f1=110, dur=0.10, caida=40,
+        ruido=0.06, filtro=1800, crush=5, vol=0.45,
+    ),
+
+    # Y el golpe cuando llega. Cae en mitad de la bola, sin pausa que lo
+    # anuncie, así que tiene que reconocerse en el primer instante: grave,
+    # sucio y distinto del drenaje, que es lo único parecido que suena.
+    "ataque": dict(vol=0.62, mezcla=[
+        dict(onda="cuadrada", f0=210, f1=42, dur=0.38, caida=9.0,
+             filtro=1500, crush=4, vol=0.7),
+        dict(onda="ruido", dur=0.20, caida=13.0, filtro=2200, crush=4, vol=0.55),
+    ]),
+
     # --- Perder la bola y matar al enemigo. Los dos largos, que son los dos
     # momentos en los que el juego se para a decirte algo. ---
     "drenaje": dict(

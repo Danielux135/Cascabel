@@ -17,6 +17,9 @@ extends RefCounted
 signal dano_infligido(dano: int, multiplicador: int, punto: Vector2)
 signal combo_cambiado(multiplicador: int, golpes: int)
 signal enemigo_ataca(dano: int)
+## El reloj entra en la cuenta atrás. `segundos` va 3, 2, 1 y salta una sola vez
+## por número: el aviso es para que el golpe no llegue de la nada.
+signal reloj_avisa(segundos: int)
 signal bola_servida()
 signal combate_terminado(victoria: bool)
 
@@ -32,9 +35,17 @@ var golpes: int = 0
 ## Lo que lleva hecho la bola que está en juego, solo para poder enseñarlo.
 var dano_de_la_bola: int = 0
 var ultimo_ataque: int = 0
+## Si el último ataque vino del reloj o del drenaje. Solo para poder contarlo.
+var ultimo_ataque_por_reloj: bool = false
 var fase: int = Fase.LANZANDO
 
+## Carga del reloj del enemigo, de 0 a 1. Sube mientras la bola está en juego y
+## al llegar a 1 el enemigo pega, drenes o no.
+var carga_reloj: float = 0.0
+
 var _temporizador: float = 0.0
+## Último segundo avisado, para no repetir el aviso en cada fotograma.
+var _aviso_dado: int = -1
 
 func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	p = parametros if parametros != null else ParametrosCombate.new()
@@ -53,8 +64,11 @@ func iniciar(el_enemigo: Enemigo) -> void:
 	golpes = 0
 	dano_de_la_bola = 0
 	ultimo_ataque = 0
+	ultimo_ataque_por_reloj = false
 	fase = Fase.LANZANDO
+	carga_reloj = 0.0
 	_temporizador = 0.0
+	_aviso_dado = -1
 	mesa.reiniciar_targets()
 	mesa.nueva_bola()
 	combo_cambiado.emit(1, 0)
@@ -70,15 +84,39 @@ func multiplicador() -> int:
 			factor = int((tramo as Dictionary)["factor"])
 	return factor
 
+## Segundos que le quedan al reloj para pegar.
+func reloj_restante() -> float:
+	return maxf((1.0 - carga_reloj) * p.reloj_carga, 0.0)
+
 func avanzar(dt: float) -> void:
 	mesa.avanzar(dt)
 	if fase == Fase.LANZANDO and mesa.bola.viva and not mesa.bola.en_carril:
 		fase = Fase.BOLA_VIVA
+	# El reloj corre solo mientras se juega. En las pausas de resolución el
+	# jugador no tiene la bola, y cobrarle ahí sería cobrarle por esperar.
+	if _en_juego():
+		_avanzar_reloj(dt)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
 			_temporizador = 0.0
 			_siguiente_fase()
+
+# ------------------------------------------------------------- el reloj
+
+func _avanzar_reloj(dt: float) -> void:
+	carga_reloj += dt / maxf(p.reloj_carga, 0.001)
+	if carga_reloj >= 1.0:
+		carga_reloj = 0.0
+		_aviso_dado = -1
+		_atacar(enemigo.ataque, true)
+		return
+	var restante := reloj_restante()
+	if restante <= p.reloj_aviso:
+		var segundos := int(ceil(restante))
+		if segundos != _aviso_dado:
+			_aviso_dado = segundos
+			reloj_avisa.emit(segundos)
 
 # ------------------------------------------------------------- golpear
 
@@ -167,16 +205,30 @@ func _al_drenar() -> void:
 	fase = Fase.DRENADA
 	_temporizador = p.pausa_drenaje
 
+## El golpe del enemigo, venga del reloj o del drenaje. El del reloj cae en
+## mitad de la bola y no para nada: la bola sigue rodando y tú sigues jugando.
+func _atacar(dano: int, por_reloj: bool) -> void:
+	ultimo_ataque = maxi(dano, 0)
+	ultimo_ataque_por_reloj = por_reloj
+	vida_jugador = maxi(vida_jugador - ultimo_ataque, 0)
+	enemigo_ataca.emit(ultimo_ataque)
+	if vida_jugador <= 0:
+		fase = Fase.DERROTA
+		_temporizador = 0.0
+		mesa.bola.viva = false
+		mesa.bola.vel = Vector2.ZERO
+		combate_terminado.emit(false)
+
+## Drenar pega menos que el reloj: ya no es la única presión del combate.
+func _dano_drenaje() -> int:
+	return maxi(int(round(float(enemigo.ataque) * p.factor_ataque_drenaje)), 1)
+
 func _siguiente_fase() -> void:
 	match fase:
 		Fase.DRENADA:
-			ultimo_ataque = enemigo.ataque
-			vida_jugador = maxi(vida_jugador - ultimo_ataque, 0)
 			fase = Fase.RESOLVIENDO_ATAQUE
-			enemigo_ataca.emit(ultimo_ataque)
-			if vida_jugador <= 0:
-				fase = Fase.DERROTA
-				combate_terminado.emit(false)
+			_atacar(_dano_drenaje(), false)
+			if fase == Fase.DERROTA:
 				return
 			_temporizador = p.pausa_ataque
 		Fase.RESOLVIENDO_ATAQUE:

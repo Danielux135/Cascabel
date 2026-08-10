@@ -80,7 +80,10 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **Un cambio de recompensa puede romper la mesa sin romper la física.** El
   cañón devolvía la bola al racimo de bumpers y alimentaba un bucle que
   mataba al enemigo sin que las palas participaran nunca. Cuando cambies
-  dónde sale un recorrido, mira qué bucle acabas de crear.
+  dónde sale un recorrido, mira qué bucle acabas de crear. **El criterio no
+  es que haya bucle, es quién lo mantiene:** uno que exige control del
+  jugador en cada vuelta es bueno —es el eje de build "golpe único"—; uno
+  que se sostiene solo está roto.
 
 ## Cómo trabajar
 

@@ -35,6 +35,29 @@ var tramos_combo: Array = [
 	{"golpes": 20, "factor": 4},
 ]
 
+# --- El reloj del enemigo ---
+## `DISEÑO.md` §2. El enemigo pega por reloj, drenes o no. Es lo que mueve la
+## presión fuera del drenaje: aguantar la bola sigue siendo lo mejor, pero deja
+## de ser gratis, porque el reloj corre igual mientras juegas.
+##
+## Segundos de carga. ES EL DIAL de la fase 3A: decide si el combate es una
+## carrera tensa o un paseo. Solo se sabe jugando.
+## De dónde sale el 18: la bola dura ~10 s y los combates largos rondan el
+## minuto, o sea unos tres golpes de reloj por combate. Con los ataques de
+## `data/enemigos.json` (6 a 16) eso son 18-48 de los 60 de vida, más lo que
+## cueste drenar. Menos de 15 y los enemigos de abajo de la tabla son un muro;
+## más de 25 y el reloj deja de presionar.
+var reloj_carga: float = 18.0
+## Últimos segundos en los que el reloj avisa, por pantalla y por sonido. Sin
+## aviso el golpe llega de la nada y se lee como injusto.
+var reloj_aviso: float = 3.0
+
+## Cuánto pesa el contraataque por drenaje frente al del reloj. Drenar sigue
+## costando vida —es invariante— pero ya no es la única presión, así que si
+## pegara lo mismo que antes la presión se habría duplicado de golpe. A la
+## mitad, drenar es el tropiezo que describe `DISEÑO.md` §2 y no la catástrofe.
+var factor_ataque_drenaje: float = 0.5
+
 # --- Ritmo de la resolución al drenar ---
 var pausa_drenaje: float = 0.7   # la bola se ha perdido y el combo cae a x1
 var pausa_ataque: float = 0.9    # enseñando el contraataque

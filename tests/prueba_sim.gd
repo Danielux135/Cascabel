@@ -434,8 +434,13 @@ func _prueba_combate() -> void:
 	_comprobar("el jugador aun no ha recibido el ataque",
 		c.vida_jugador == c.p.vida_jugador)
 	_avanzar_combate(c, c.p.pausa_drenaje + DT * 4.0)
+	# Drenar pega la mitad que el reloj: sigue costando vida, pero ya no es la
+	# única presión del combate.
+	var golpe_drenaje := int(round(10.0 * c.p.factor_ataque_drenaje))
 	_comprobar("tras la pausa el enemigo contraataca",
-		c.vida_jugador == c.p.vida_jugador - 10, "vida %d" % c.vida_jugador)
+		c.vida_jugador == c.p.vida_jugador - golpe_drenaje, "vida %d" % c.vida_jugador)
+	_comprobar("y el golpe por drenaje pesa menos que el del reloj",
+		golpe_drenaje < 10 and golpe_drenaje >= 1, "%d" % golpe_drenaje)
 	_avanzar_combate(c, c.p.pausa_ataque + DT * 4.0)
 	_comprobar("y se sirve otra bola",
 		c.mesa.bola.viva and c.mesa.bola.en_carril and c.fase == Combate.Fase.LANZANDO)
@@ -448,10 +453,49 @@ func _prueba_combate() -> void:
 		c.enemigo.vida == antes and c.golpes == 0,
 		"vida %d, %d golpes" % [c.enemigo.vida, c.golpes])
 
+	_prueba_reloj()
 	_prueba_combo()
 	_prueba_victoria()
 	_prueba_derrota()
 	_prueba_catalogo()
+
+## El reloj del enemigo (DISEÑO.md §2): pega llegue o no la bola al drenaje.
+## La bola se deja en el carril a propósito: el reloj tiene que correr también
+## ahí, y así la prueba no depende de cuánto aguante una bola suelta.
+func _prueba_reloj() -> void:
+	var c := Combate.new()
+	c.p.reloj_carga = 4.0
+	c.p.reloj_aviso = 3.0
+	c.iniciar(Enemigo.new({"nombre": "Reloj", "vida": 100000, "ataque": 7}))
+	var avisos: Array[int] = []
+	c.reloj_avisa.connect(func(s: int) -> void: avisos.append(s))
+
+	_avanzar_combate(c, 1.0)
+	_comprobar("el reloj carga mientras juegas",
+		absf(c.carga_reloj - 0.25) < 0.02, "carga %.3f" % c.carga_reloj)
+	_comprobar("y todavia no ha pegado", c.vida_jugador == c.p.vida_jugador)
+
+	_avanzar_combate(c, 3.1)
+	_comprobar("al llenarse el reloj el enemigo pega sin haber drenado",
+		c.vida_jugador == c.p.vida_jugador - 7, "vida %d" % c.vida_jugador)
+	_comprobar("y consta que el golpe vino del reloj", c.ultimo_ataque_por_reloj)
+	_comprobar("el golpe del reloj no para la bola ni el combate",
+		not c.terminado() and c.fase == Combate.Fase.LANZANDO,
+		"fase %d" % c.fase)
+	_comprobar("el reloj se rearma solo",
+		c.carga_reloj < 0.2, "carga %.3f" % c.carga_reloj)
+	_comprobar("avisa una vez por cada segundo de la cuenta atras",
+		avisos == [3, 2, 1], str(avisos))
+
+	# Drenar no alivia el reloj: si lo reseteara, perder la bola sería una
+	# jugada defensiva y el reloj dejaría de presionar.
+	var carga_antes := c.carga_reloj
+	_drenar(c)
+	_avanzar_combate(c, c.p.pausa_drenaje + c.p.pausa_ataque + DT * 8.0)
+	_comprobar("drenar no rearma el reloj",
+		c.carga_reloj >= carga_antes, "%.3f -> %.3f" % [carga_antes, c.carga_reloj])
+	_comprobar("y el reloj no corre durante la resolucion del drenaje",
+		c.carga_reloj - carga_antes < 0.05, "subio %.3f" % (c.carga_reloj - carga_antes))
 
 ## Los tramos: x1 hasta 4 golpes, x2 hasta 9, x3 hasta 19, x4 a partir de 20.
 func _prueba_combo() -> void:

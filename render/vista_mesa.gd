@@ -180,6 +180,7 @@ func _ready() -> void:
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
+	combate.reloj_avisa.connect(_al_avisar_reloj)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
 	_giro.resize(mesa.giradores.size())
@@ -399,8 +400,14 @@ func _tono_combo(multiplicador: int) -> float:
 func _al_atacar_enemigo(_dano: int) -> void:
 	flash_jugador = 1.0
 	_nodo_enemigo.embestir()
+	_sonido.reproducir("ataque")
 	_sacudir(anim.sacudida_ataque)
 	_hitstop = maxf(_hitstop, anim.hitstop)
+
+## La cuenta atrás del reloj. Sube de tono según se acerca el golpe: es el mismo
+## tic tres veces y lo que cambia es la urgencia, no la información.
+func _al_avisar_reloj(segundos: int) -> void:
+	_sonido.reproducir("reloj", 1.0 + 0.18 * float(3 - segundos))
 
 func _al_terminar_combate(victoria: bool) -> void:
 	if victoria:

@@ -7,14 +7,15 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** cierre de la Fase 2
+**Última actualización:** Fase 2 cerrada y 3A construida
 
 ---
 
 ## Fase actual
 
-**Fase 2 — Sensación: cerrada.** Falta que Daniel valide el tacto jugando.
-Lo siguiente es la Fase 3, empezando por la identidad de los tiros.
+**Fase 3A — El reloj del enemigo: construido, sin validar.** El criterio de
+salida ("un combate se siente como una carrera") depende de `reloj_carga` y
+eso solo se sabe jugando. Hasta que Daniel lo diga, 3B no empieza.
 
 ## Hecho
 
@@ -36,6 +37,10 @@ Lo siguiente es la Fase 3, empezando por la identidad de los tiros.
   cuadradas y se lo comían), cinco notas con la última sostenida, 548 ms,
   +1 dB, reproductor propio fuera de la rueda de voces, y transposición por
   tramo en intervalos musicales: x2 en su tono, x3 tercera menor, x4 quinta
+- **Fase 3A** reloj del enemigo: carga mientras juegas, pega drenes o no, no
+  para la bola, avisa 3-2-1 por pantalla y por sonido, y no se rearma al
+  drenar. El contraataque por drenaje baja a la mitad para que la presión no
+  se duplique. Dos sonidos nuevos: el tic y el golpe
 
 ## Diales vivos
 
@@ -49,6 +54,8 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `flipper_agarre` | 40 | Si no se queda quieta, o si se queda pegada |
 | `flipper_agarre_velocidad` | 700 | Por encima de esto no agarra |
 | `target_canto` | 8 | Cuánto sobresale el target al campo |
+| `reloj_carga` | 18 s | **El dial de 3A.** Carrera tensa o paseo. Suelo 15, techo 25 |
+| `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
 
 **Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
@@ -65,12 +72,21 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 6. **Subir de tramo, con el racimo sonando.** ¿Se oye que has subido sin
    mirar el número? ¿Y se distingue x3 de x4 solo por el tono? Si tapa
    demasiado los golpes, el dial es `db` de `combo` en `nodo_sonido.gd`.
+7. **El reloj, que es el criterio de salida de 3A.** ¿El combate se siente
+   como una carrera? Contra la Rata y contra la Gárgola, que son los dos
+   extremos de la tabla (N cambia de enemigo). Un jugador bueno debe ganar
+   con vida de sobra y uno malo quedarse sin vida.
+8. **Que el golpe del reloj no se lea como injusto.** Llega en mitad de la
+   bola y no para nada, a propósito. Si sorprende, el aviso de 3-2-1 es
+   corto: `reloj_aviso`.
 
 ## Siguiente
 
-1. **Identidad de los tiros** (`DISEÑO.md` §4). Es el arranque real de la
-   Fase 3, antes que el mapa: sin tiros distintos no hay decisiones
-2. Mapa del run
+1. Ajustar `reloj_carga` con lo que diga Daniel y **cerrar 3A**
+2. **3B, identidad de los tiros** (`DISEÑO.md` §4). Quedan el cañón y el
+   platillo; el platillo ya puede pagar algo que no sea daño, porque el
+   reloj existe: frenarlo, retrasarlo o robarle carga
+3. **3C, mapa del run**
 
 ## Mediciones
 
@@ -94,5 +110,10 @@ perdido.
   eso alimentaba un bucle que mataba al enemigo sin que las palas
   participaran. Ahora baja a la pala izquierda, o sea que los dos carriles
   hacen lo mismo. Se le devolverá identidad al hacer `DISEÑO.md` §4.
+- **La tabla de enemigos no está balanceada contra el reloj.** Con vidas de
+  180 a 540 y ataques de 6 a 16, los de arriba caen antes del primer golpe
+  de reloj y los de abajo pueden ser un muro. La tabla se rehace entera
+  después de 3B, cuando los tiros paguen cosas distintas: ajustarla ahora es
+  trabajo perdido otra vez.
 - Enemigo fuera de pantalla al hacer scroll → Fase 5, ventana propia
 - Laterales del escritorio apagados al 66% como apaño → Fase 5

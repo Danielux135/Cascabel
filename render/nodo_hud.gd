@@ -74,11 +74,26 @@ func _dibujar() -> void:
 		"ESTA BOLA  %d  (%d golpes)" % [combate.dano_de_la_bola, combate.golpes],
 		9, C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
 
+	_dibujar_reloj(combate, d)
 	_dibujar_mensaje(combate, mesa, d)
 
 	_texto(Vector2(d + 12, _p.alto_visible - 8),
 		"A/D flippers  ESPACIO lanzar  R reiniciar  N otro enemigo  F1 colisiones",
 		8, C_TEXTO_TENUE)
+
+## El reloj del enemigo, pegado al fondo de la franja y a todo lo ancho. Va ahí
+## y no en un rincón porque es la presión del combate: si no se ve de reojo sin
+## dejar de mirar la bola, no sirve de nada.
+##
+## En la cuenta atrás parpadea. El parpadeo va por tramos enteros de tiempo, no
+## por seno, para que no haya medio píxel de color a medio camino.
+func _dibujar_reloj(combate: Combate, d: float) -> void:
+	var avisando := combate.reloj_restante() <= combate.p.reloj_aviso
+	var col := C_GOMA_LUZ
+	if avisando:
+		var parpadeo := int(combate.reloj_restante() * 6.0) % 2 == 0
+		col = C_ORO_CLARO if parpadeo else C_GOMA_LUZ
+	_barra(Rect2(d + 12, 49, Mesa.ANCHO - 24, 6), combate.carga_reloj, col)
 
 func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 	var texto := ""
@@ -88,6 +103,12 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 			if mesa.bola.viva and mesa.bola.en_carril:
 				texto = "ESPACIO: mantener y soltar para lanzar"
 				col = C_TEXTO_TENUE
+		Combate.Fase.BOLA_VIVA:
+			# El golpe del reloj no para el juego, así que el aviso es lo único
+			# que lo anuncia. Sin esto se lee como un mordisco de la nada.
+			if combate.reloj_restante() <= combate.p.reloj_aviso:
+				texto = "ATAQUE EN %d" % int(ceil(combate.reloj_restante()))
+				col = C_ORO_CLARO
 		Combate.Fase.DRENADA:
 			texto = "BOLA PERDIDA  ·  COMBO A x1"
 			col = C_TEXTO_TENUE
