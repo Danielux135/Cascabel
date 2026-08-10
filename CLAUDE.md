@@ -19,6 +19,16 @@ necesites un dato concreto de ahí**, no por costumbre.
 abierto, qué es lo siguiente y qué necesitas que Daniel pruebe. Si no lo
 haces, la siguiente sesión empieza a ciegas.
 
+## Godot
+
+No está en el PATH. El ejecutable de consola (el que devuelve la salida) es:
+
+`C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe`
+
+Batería de pruebas, sin abrir ventana:
+
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
+
 ## Invariantes
 
 Decisiones cerradas. No las reabras sin que Daniel lo pida.

@@ -78,6 +78,58 @@ castiga lo que tiene que castigar. Falta el punto 5.
   con la pala corta la bola drena antes, la muestra se acorta y la espiral
   pasaba del 3 % que tolera `_prueba_adornos`. En el sitio nuevo marca 1,6 %.
 
+## Corrección tras la primera prueba de manos del bloque 1
+
+Daniel probó y salieron dos cosas, las dos con causa localizada:
+
+- **"La bola vive arriba y el monstruo muere antes de que las palas la
+  toquen."** La causa NO era física. Era la economía de la mesa: de los tres
+  recorridos, la órbita devolvía arriba y el **cañón acababa en (200,690)**,
+  o sea dentro del racimo de bumpers y arriba del todo. Y el cañón es el que
+  más daño paga (`DANO_FUERTE`). El bucle se alimentaba solo —cañón →
+  bumpers → rampa → cañón— pegando en cada vuelta, y el enemigo se moría sin
+  que las palas participaran nunca.
+  **El cañón ahora baja a la pala izquierda**, saliendo en (66,1020). Los dos
+  carriles quedan simétricos en función: cada uno sirve la bola a una pala
+  distinta. Pierde su identidad de "te mete en el racimo"; decisión de Daniel.
+  Descartado por el camino: `bumper_rebote` (1,8 → 1,0 rompe tres pruebas y
+  además el racimo no era el sitio donde se quedaba la bola). Sigue en 1,8.
+
+- **Vida de enemigos ×3** en `data/enemigos.json` (60-180 → 180-540). Una
+  bola buena hace 160 de daño, así que con la tabla vieja una sola bola
+  mataba a cualquiera. Parche declarado: la tabla se rehace en la Fase 3.
+
+- **Prueba nueva:** "los carriles de retorno dejan la bola al alcance de la
+  pala". Exige que al menos dos recorridos suelten por debajo de y=950, para
+  que el cañón no se vuelva a ir hacia arriba sin que nadie se entere.
+  La salida NO puede ser el espejo del otro carril: (70,1085) cae dentro de
+  un colisionador y lo cazó la prueba de bocas empotradas.
+- **"Solo una vez consiguió atrapar la bola; si va rápido, rebota."** No era
+  `flipper_rebote`. Era `flipper_agarre_velocidad`, que valía **300**: el
+  agarre se apagaba por encima de esa velocidad, y la bola baja muy por
+  encima de 300 (el tope son 1500). El umbral venía de la mesa pequeña.
+  Subido a **700**.
+
+**138/138 pruebas en verde.** Probado por Daniel: la bola ya baja y se juega
+con las palas. El combate sigue siendo corto, pero más largo que antes, y la
+vida de los enemigos se queda como está (×3).
+
+**Godot no estaba en el PATH**; está en `C:\Users\Daniel\Desktop\Godot` y ya
+queda apuntado en `CLAUDE.md` con el comando de la batería.
+
+### Trampa nueva, apuntada porque costará tiempo otra vez
+
+`Mesa.new()` **copia** los parámetros dentro de cada colisionador en el
+constructor (`_bumper`, `_slingshot`… en `mesa.gd:216-227`). Cambiar
+`m.p.bumper_rebote` DESPUÉS de crear la mesa no hace nada: el colisionador ya
+tiene su copia. Un barrido de parámetros escrito así mide seis veces lo
+mismo y da seis filas idénticas. Para barrer hay que tocar
+`parametros_mesa.gd` y volver a lanzar.
+
+Y al editar `.gd` desde PowerShell, **`Set-Content -Encoding utf8` corrompe
+los acentos** (doble codificación: `restitución` → `restituciÃ³n`). Editar
+con herramientas de fichero, no con `-replace` desde la consola.
+
 ## Hecho en sesiones anteriores
 
 - **960×540.** `project.godot` y `ParametrosCamara`. Todo lo demás sale de

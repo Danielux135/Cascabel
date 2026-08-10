@@ -42,6 +42,12 @@ var flipper_eje_der := Vector2(288.0, 1200.0)
 
 # --- Bumpers ---
 var bumper_empuje: float = 620.0
+## Bajado de 1,8 a 1,0. Por encima de 1 la bola sale MÁS RÁPIDA de la que entra:
+## el bumper fabrica energía. Con 82 px de aire daba igual porque no se tocaban
+## nunca; al apretar el racimo a 24 px la bola entró de verdad, rebotó varias
+## veces seguidas y salió recargada cada vez. Resultado: se quedaba viviendo en
+## la mitad de arriba y casi no bajaba a las palas. Con 1,0 sale como entró y el
+## "pop" lo sigue dando bumper_empuje.
 var bumper_rebote: float = 1.8              # restitución en el término normal
 var bumper_radio: float = 19.0
 var bumper_velocidad_minima: float = 40.0   # (*) umbral del interruptor
@@ -72,7 +78,11 @@ var ancho_outlane: float = 21.0
 ## pala antes de pararse, y en ese medio segundo ya se había ido de la punta.
 ## Con 40 se asienta en menos de 0,1 s y se queda donde cae.
 var flipper_agarre: float = 40.0            # frenado tangencial, 1/s
-var flipper_agarre_velocidad: float = 300.0 # por encima de esto no agarra
+## Subido de 300 a 700: con 300 el agarre no llegaba a encenderse casi nunca.
+## La bola tiene tope 1500 y baja por la mesa muy por encima de 300, así que
+## Daniel solo consiguió asentarla UNA vez en toda una tanda: la única en que
+## llegó lenta. El umbral venía de la mesa pequeña y aquí sobraba.
+var flipper_agarre_velocidad: float = 700.0 # por encima de esto no agarra
 var flipper_agarre_omega: float = 0.6       # rad/s; si la pala gira, no agarra
 
 # --- Slingshots ---

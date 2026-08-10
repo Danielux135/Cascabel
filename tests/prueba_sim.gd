@@ -923,6 +923,19 @@ func _prueba_rampas() -> void:
 	_comprobar("ninguna boca ni salida cae dentro de un colisionador",
 		empotradas.is_empty(), str(empotradas))
 
+	# Al menos un carril de retorno tiene que dejar la bola ABAJO, al alcance de
+	# la pala. El bug que esto blinda: el cañón acababa en (200,690), o sea
+	# dentro del racimo y arriba del todo, así que entre él y la órbita dos de
+	# los tres recorridos te devolvían la bola a la mitad de arriba. Como el
+	# cañón es el que más daño paga, el bucle se alimentaba solo y el enemigo
+	# moría sin que las palas tocaran la bola. Daniel lo describió jugando.
+	var abajo := 0
+	for ra in m.rampas:
+		if not ra.bidireccional and ra.punto_en(ra.largo).y > 950.0:
+			abajo += 1
+	_comprobar("los carriles de retorno dejan la bola al alcance de la pala",
+		abajo >= 2, "solo %d de los carriles sueltan por debajo de y=950" % abajo)
+
 	# Una bola lenta no engancha: rebota de largo.
 	var m3 := _nueva_mesa()
 	m3.nueva_bola()

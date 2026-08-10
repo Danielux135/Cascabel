@@ -19,12 +19,9 @@ config/icon="res://icon.svg"
 
 window/size/viewport_width=960
 window/size/viewport_height=540
-; La ventana de escritorio medía 1908x960: con base 960x540 el escalado entero
-; caía a x1 y el juego se veía diminuto. En pantalla completa a 1080p sale x2
-; exacto. El override solo se usa al salir de pantalla completa.
+window/size/mode=3
 window/size/window_width_override=1920
 window/size/window_height_override=1080
-window/size/mode=3
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
 window/stretch/scale_mode="integer"
