@@ -20,7 +20,9 @@ var flotante_periodo: float = 2.8
 
 # --- Destello blanco al recibir daño (shader) ---
 var destello_duracion: float = 0.18
-var destello_color := Color(1, 1, 1)
+## El blanco de la paleta (E4E6EC), no el blanco puro: un 255,255,255 en una
+## pantalla de 33 colores canta como un agujero.
+var destello_color := Paleta.DESTELLO
 
 # --- Embestida al atacar ---
 ## Hacia abajo, que es donde está el jugador. También en píxeles enteros.
@@ -32,7 +34,7 @@ var embestida_vuelta: float = 0.38   # y vuelve despacio
 var disolucion_duracion: float = 1.1
 ## Franja de píxeles a punto de irse que se enciende antes de desaparecer.
 var disolucion_borde: float = 0.14
-var disolucion_color_borde := Color("E8814A")
+var disolucion_color_borde := Paleta.FUEGO
 
 # --- Bumpers ---
 var bumper_destello_duracion: float = 0.22

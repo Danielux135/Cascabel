@@ -8,24 +8,24 @@ extends Node2D
 ## combate hasta que uno de los dos muera. Las paredes, los flippers y los
 ## targets se dibujan por código; bumpers, postes, bola y enemigo van con sprite.
 
-# Paleta cerrada (CONTEXTO.md).
-const C_CABINA      := Color("14121A")
-const C_MESA        := Color("2A2A33")
-const C_MESA_BAJA   := Color("43434F")
-const C_PARED       := Color("8C8D99")
-const C_PARED_LUZ   := Color("B9BAC4")
-const C_CARRIL      := Color("274A63")
-const C_GOMA        := Color("8C2E2E")
-const C_GOMA_LUZ    := Color("C74A3C")
-const C_ORO         := Color("E0A63C")
-const C_ORO_CLARO   := Color("F7D86B")
-const C_TEXTO       := Color("B9BAC4")
-const C_TEXTO_TENUE := Color("62636F")
-const C_ARCANO      := Color("A97BD9")
-const C_DRENAJE     := Color("4A3A42")
-const C_VERDE       := Color("7BA84A")
-const C_FUEGO       := Color("E8814A")
-const C_PIEDRA      := Color("7A7669")
+# Paleta cerrada: los hex viven en render/paleta.gd y en ningún sitio más.
+const C_CABINA      := Paleta.CABINA
+const C_MESA        := Paleta.MESA
+const C_MESA_BAJA   := Paleta.MESA_BAJA
+const C_PARED       := Paleta.PARED
+const C_PARED_LUZ   := Paleta.PARED_LUZ
+const C_CARRIL      := Paleta.CARRIL
+const C_GOMA        := Paleta.GOMA
+const C_GOMA_LUZ    := Paleta.GOMA_LUZ
+const C_ORO         := Paleta.ORO
+const C_ORO_CLARO   := Paleta.ORO_CLARO
+const C_TEXTO       := Paleta.TEXTO
+const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
+const C_ARCANO      := Paleta.ARCANO
+const C_DRENAJE     := Paleta.DRENAJE
+const C_VERDE       := Paleta.VERDE
+const C_FUEGO       := Paleta.FUEGO
+const C_PIEDRA      := Paleta.PIEDRA
 
 ## El multiplicador va grande, en el hueco entre los slingshots y los flippers,
 ## que es donde tienes puesto el ojo mientras juegas. Se dibuja pegado al suelo,
@@ -41,11 +41,11 @@ const COMBO_ESTILO := {
 	3: {"col": C_ORO_CLARO,   "alfa": 0.62},
 	4: {"col": C_FUEGO,       "alfa": 0.82},
 }
-const C_FLIPPER       := Color("2A2A33")
-const C_FLIPPER_BORDE := Color("14121A")
-const C_FLIPPER_LINEA := Color("E4E6EC")
-const C_METAL         := Color("8C8D99")
-const C_METAL_LUZ     := Color("E4E6EC")
+const C_FLIPPER       := Paleta.FLIPPER
+const C_FLIPPER_BORDE := Paleta.FLIPPER_BORDE
+const C_FLIPPER_LINEA := Paleta.FLIPPER_LINEA
+const C_METAL         := Paleta.METAL
+const C_METAL_LUZ     := Paleta.METAL_LUZ
 
 ## Los flippers van por código, no con sprite: se dibuja la misma cápsula que
 ## usa el colisionador, así que el arte sigue solo a `flipper_longitud` y
@@ -531,6 +531,9 @@ func _dibujar_bumpers() -> void:
 		var lado := base + crecimiento
 		var centro: Vector2 = mesa.bumpers[i]
 		var esquina := (centro - Vector2(lado, lado) * 0.5).round()
+		# El WHITE de aquí NO es un color de la paleta: es el tinte neutro de
+		# draw_texture_rect, o sea "no tiñas". Poner E4E6EC oscurecería el
+		# sprite. Se queda.
 		var tinte := Color.WHITE.lerp(C_ORO_CLARO, flash * 0.8)
 		draw_texture_rect(_tex_bumper, Rect2(esquina, Vector2(lado, lado)), false, tinte)
 

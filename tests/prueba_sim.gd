@@ -36,6 +36,7 @@ func _initialize() -> void:
 	_prueba_outlanes()
 	_prueba_agarre()
 	_prueba_identidad_recorridos()
+	_prueba_paleta()
 
 	print("")
 	if _fallos == 0:
@@ -1280,3 +1281,52 @@ func _prueba_lanzador() -> void:
 		"se quedo en %s" % str(r["pos"]))
 	_comprobar("una bola lanzada a tope no se sale de la mesa",
 		r["escapes"] == 0, "%d fotogramas fuera" % r["escapes"])
+
+## Bloque 2, coherencia visual: la paleta de CONTEXTO.md manda.
+##
+## Antes cada archivo que dibujaba se copiaba su propio bloque de hex y había
+## tres colores inventados (1C1A22 para los huecos y dos blancos puros). Con
+## cuatro copias del mismo bloque, cambiar un color era acordarse de cuatro
+## sitios, y no acordarse no rompía nada: solo se quedaba un color viejo.
+func _prueba_paleta() -> void:
+	var permitidos := {}
+	for c in Paleta.TODOS:
+		permitidos[c.to_html(false).to_upper()] = true
+	_comprobar("la paleta tiene los colores de CONTEXTO.md",
+		Paleta.TODOS.size() == 33, "hay %d" % Paleta.TODOS.size())
+
+	# Ningún Color("...") suelto fuera de paleta.gd. Se permite el hex que ya
+	# esté en la paleta (no molesta), pero no uno inventado.
+	var dir := DirAccess.open("res://render")
+	var intrusos: Array[String] = []
+	var re := RegEx.new()
+	re.compile(r'Color\("([0-9A-Fa-f]{6})"\)')
+	for archivo in (dir.get_files() if dir else PackedStringArray()):
+		if not archivo.ends_with(".gd") or archivo == "paleta.gd":
+			continue
+		var texto := FileAccess.get_file_as_string("res://render/" + archivo)
+		for m in re.search_all(texto):
+			var hex := m.get_string(1).to_upper()
+			if not permitidos.has(hex):
+				intrusos.append("%s: %s" % [archivo, hex])
+	_comprobar("ningun color inventado fuera de la paleta",
+		intrusos.is_empty(), str(intrusos))
+
+	# Y los alias por uso tienen que ser colores de la paleta de verdad, no un
+	# hex escrito a mano que se parezca.
+	var fuera: Array[String] = []
+	for pareja in [
+			["CABINA", Paleta.CABINA], ["MESA", Paleta.MESA],
+			["MESA_BAJA", Paleta.MESA_BAJA], ["HUECO", Paleta.HUECO],
+			["PARED", Paleta.PARED], ["PARED_LUZ", Paleta.PARED_LUZ],
+			["CARRIL", Paleta.CARRIL], ["GOMA", Paleta.GOMA],
+			["GOMA_LUZ", Paleta.GOMA_LUZ], ["DRENAJE", Paleta.DRENAJE],
+			["PIEDRA", Paleta.PIEDRA], ["FUEGO", Paleta.FUEGO],
+			["FLIPPER", Paleta.FLIPPER], ["FLIPPER_BORDE", Paleta.FLIPPER_BORDE],
+			["FLIPPER_LINEA", Paleta.FLIPPER_LINEA], ["METAL", Paleta.METAL],
+			["METAL_LUZ", Paleta.METAL_LUZ], ["TEXTO", Paleta.TEXTO],
+			["TEXTO_TENUE", Paleta.TEXTO_TENUE], ["DESTELLO", Paleta.DESTELLO]]:
+		if not Paleta.TODOS.has(pareja[1]):
+			fuera.append(str(pareja[0]))
+	_comprobar("todos los alias por uso salen de la paleta",
+		fuera.is_empty(), str(fuera))

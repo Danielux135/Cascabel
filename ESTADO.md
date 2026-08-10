@@ -156,14 +156,42 @@ con herramientas de fichero, no con `-replace` desde la consola.
   los dos bancos se distinguen por color (oro el izquierdo, arcano el
   derecho).
 
+## Hecho esta sesión (bloque 2: coherencia visual)
+
+- **`render/paleta.gd`, sitio único.** Los 33 colores de `CONTEXTO.md` (no 26
+  como decía esta nota) más una capa de alias por USO (`CABINA`, `GOMA`,
+  `FLIPPER_LINEA`…), que es lo que se escribe al dibujar. `vista_mesa`,
+  `nodo_hud`, `nodo_suelo` y `nodo_escritorio` repetían cada uno su bloque de
+  hex: cambiar un color eran cuatro sitios, y olvidarse de uno no rompía
+  nada, solo dejaba el color viejo. Ahora todos apuntan a `Paleta`.
+- **Los tres colores que sí estaban fuera de la paleta.** No eran "dorados,
+  rojos y lavandas" como decía la nota vieja —esos ya salían de la paleta—,
+  eran: `1C1A22` para los huecos del tablero (un intermedio inventado entre
+  el negro y el gris; pasa a `NEGRO`, que además es lo que se ve por un
+  agujero: el mueble) y dos blancos puros, el destello de daño y el borde de
+  disolución (pasan a `E4E6EC` y `E8814A`).
+- **El `Color.WHITE` de `vista_mesa.gd:534` se queda.** No es un color, es el
+  tinte neutro de `draw_texture_rect`; ponerle `E4E6EC` oscurecería el sprite
+  del bumper. Anotado ahí mismo para que no lo "arregle" nadie.
+- **La banda gris de la derecha.** El fondo se dibujaba sobre `ancho_visible`
+  (960 fijo), pero con `stretch/aspect="expand"` el viewport crece cuando la
+  pantalla no da 16:9 exacto, y el fondo no llegaba al borde. Ahora sale del
+  tamaño real del viewport, y la textura de 320×180 se sube por múltiplos
+  ENTEROS y se centra: lo que sobra se sale por los lados, que es justo donde
+  van las ventanas en la Fase 5. Se repinta al cambiar el tamaño de ventana.
+- **Prueba nueva `_prueba_paleta`:** que la paleta tenga los 33, que no haya
+  ningún `Color("...")` inventado en `render/` fuera de `paleta.gd`, y que
+  todos los alias por uso salgan de la paleta de verdad.
+
+**141/141 pruebas.** El juego arranca sin errores. Falta que Daniel mire si
+algún color ha cambiado a peor: lo único que cambia de aspecto son los huecos
+del tablero y el destello blanco al pegar.
+
 ## Siguiente
 
-- **Bloque 2, coherencia visual.** Solo cuando Daniel dé el visto bueno al
-  bloque 1. Todo lo que se dibuja por código (postes, slingshots, paredes,
-  targets, carriles, HUD) tiene que salir de la paleta de 26 colores de
-  `CONTEXTO.md`, centralizada en un único sitio. Ahora hay dorados, rojos
-  puros y lavandas que no están en la paleta. Y el fondo del escritorio no
-  cubre todo el ancho: queda una banda gris a la derecha.
+- Que Daniel mire el bloque 2 (arriba: solo cambian huecos y destello).
+- Punto 5 pendiente de la tanda de dificultad: **multiplicador audible** al
+  subir de tramo.
 - Fase 3: el mapa del run.
 
 ## Mediciones de referencia

@@ -7,13 +7,13 @@ extends CanvasLayer
 ## Todo va dentro de la franja de la mesa (x 280..680 en pantalla) para que se
 ## lea como parte del juego y no invada el escritorio de los lados.
 
-const C_CABINA      := Color("14121A")
-const C_ORO         := Color("E0A63C")
-const C_ORO_CLARO   := Color("F7D86B")
-const C_GOMA_LUZ    := Color("C74A3C")
-const C_TEXTO       := Color("B9BAC4")
-const C_TEXTO_TENUE := Color("62636F")
-const C_VERDE       := Color("7BA84A")
+const C_CABINA      := Paleta.CABINA
+const C_ORO         := Paleta.ORO
+const C_ORO_CLARO   := Paleta.ORO_CLARO
+const C_GOMA_LUZ    := Paleta.GOMA_LUZ
+const C_TEXTO       := Paleta.TEXTO
+const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
+const C_VERDE       := Paleta.VERDE
 
 var vista: VistaMesa
 var _p: ParametrosCamara

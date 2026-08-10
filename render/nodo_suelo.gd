@@ -8,9 +8,9 @@ extends Node2D
 ## resto. Un solo CanvasItem no se puede partir por la mitad, así que las capas
 ## quedan por z_index: suelo (-2), enemigo (-1), y todo lo demás en la vista (0).
 
-const C_MESA := Color("2A2A33")
-const C_CABINA := Color("14121A")
-const C_HUECO := Color("1C1A22")
+const C_MESA := Paleta.MESA
+const C_CABINA := Paleta.CABINA
+const C_HUECO := Paleta.HUECO
 
 var vista: VistaMesa
 var _tex_suelo: Texture2D
