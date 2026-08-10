@@ -741,7 +741,7 @@ func _prueba_agarre() -> void:
 	for _i in int(0.3 / DT):
 		m.avanzar(DT)
 	_comprobar("la pala llega arriba y se para",
-		absf(m.flipper_izq.omega) < m.p.flipper_agarre_omega)
+		absf(m.flipper_izq.omega) < m.p.flipper_omega_quieta)
 
 	# Bola apoyada encima de la pala levantada, a media longitud del eje.
 	var dir := Vector2(cos(m.flipper_izq.angulo), sin(m.flipper_izq.angulo))
@@ -755,6 +755,16 @@ func _prueba_agarre() -> void:
 		m.bola.viva and m.bola.velocidad() < 40.0,
 		"viva=%s a %.0f px/s" % [m.bola.viva, m.bola.velocidad()])
 
+	# Y se asienta EN LA CUNA, no donde cayó. Es la diferencia entre una bola
+	# que rueda hasta el hueco del eje —como en una mesa de verdad— y una bola
+	# a la que se le apaga la velocidad allí donde toque, que es lo que hacía
+	# el frenado a mano y lo que se veía como quedarse pegada.
+	var dir_izq := m.flipper_izq.punta() - m.p.flipper_eje_izq
+	var donde := (m.bola.pos - m.p.flipper_eje_izq).dot(dir_izq) \
+		/ dir_izq.length_squared()
+	_comprobar("y se asienta en la cuna del eje, no donde cayo",
+		donde < 0.45, "acabo a %.2f de la pala, y cayo a 0.75" % donde)
+
 	# Y soltar sigue lanzando: el agarre no puede matar el tacto del flipper.
 	var antes := m.bola.velocidad()
 	m.flipper_izq.pulsado = false
@@ -767,6 +777,36 @@ func _prueba_agarre() -> void:
 		maxima = maxf(maxima, m.bola.velocidad())
 	_comprobar("y soltar y volver a dar sigue lanzando",
 		maxima > antes + 300.0, "de %.0f a %.0f px/s" % [antes, maxima])
+	_prueba_no_se_queda_pegada()
+
+## La otra mitad, y la que se rompió una vez: una bola apoyada en una pala EN
+## REPOSO tiene que rodar y acabar yéndose. Una bola rueda, no se sostiene en
+## una cuesta, y el rozamiento de Coulomb sí puede sostenerla: por eso el
+## contacto sostenido va con rodadura y no con Coulomb. Si esta prueba falla,
+## `rodadura` se ha subido demasiado y la bola vuelve a soldarse a la pala.
+func _prueba_no_se_queda_pegada() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	for _i in int(0.3 / DT):
+		m.avanzar(DT)
+	# Posada quieta a media pala, sin nada de velocidad que la ayude.
+	var dir := Vector2(cos(m.flipper_izq.angulo), sin(m.flipper_izq.angulo))
+	var normal := Vector2(-dir.y, dir.x)
+	m.bola.pos = m.p.flipper_eje_izq + dir * (m.p.flipper_longitud * 0.55) \
+		+ normal * -(m.p.flipper_radio + m.p.radio_bola - 0.5)
+	m.bola.vel = Vector2.ZERO
+	var salio := -1.0
+	var t := 0.0
+	while t < 3.0 and salio < 0.0:
+		m.avanzar(DT)
+		t += DT
+		if m.bola.pos.y > m.p.flipper_eje_izq.y + 24.0 or not m.bola.viva:
+			salio = t
+	_comprobar("posada en una pala en reposo, la bola rueda y se va",
+		salio > 0.0, "sigue en la pala tras 3 s a %.1f px/s" % m.bola.velocidad())
+	_comprobar("y no tarda una eternidad en hacerlo",
+		salio > 0.0 and salio < 2.0, "tardo %.2f s" % salio)
 
 ## Los tres recorridos tienen que pagar cosas distintas, o son un tiro repetido.
 func _prueba_identidad_recorridos() -> void:

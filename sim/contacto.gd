@@ -11,6 +11,10 @@ var profundidad: float           # penetración en px
 var punto: Vector2               # punto de contacto sobre la superficie
 var velocidad_superficie: Vector2
 var restitucion: float
+## Coeficiente de rozamiento de Coulomb de la superficie. Es lo que frena a la
+## bola A LO LARGO del contacto: sin esto la bola resbala eternamente sobre
+## cualquier superficie, que es lo que obligaba a frenarla a mano.
+var friccion: float = 0.0
 var empuje: float                # impulso extra a lo largo de la normal (bumpers)
 var velocidad_minima: float      # umbral por debajo del cual el empuje no salta
 var tipo: int                    # Colisionador.Tipo
@@ -25,7 +29,9 @@ func _init(
 		p_empuje: float,
 		p_velocidad_minima: float,
 		p_tipo: int,
-		p_origen: Object) -> void:
+		p_origen: Object,
+		p_friccion: float = 0.0) -> void:
+	friccion = p_friccion
 	normal = p_normal
 	profundidad = p_profundidad
 	punto = p_punto

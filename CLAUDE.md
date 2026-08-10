@@ -73,6 +73,13 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **No edites `.gd` con `Set-Content -Encoding utf8` desde PowerShell**:
   corrompe los acentos por doble codificación (`restitución` →
   `restituciÃ³n`). Usa herramientas de fichero, no `-replace` en consola.
+- **Una bola rueda: no se sostiene en una cuesta.** El rozamiento de Coulomb
+  sí puede sostenerla, así que aplicárselo a una bola apoyada la suelda al
+  sitio. Por eso el contacto va en dos regímenes: por encima de
+  `velocidad_rebote_minima` es un impacto y lleva Coulomb; por debajo está
+  apoyada y solo lleva `rodadura`, que nunca puede vencer a la gravedad. Y lo
+  que sostiene la bola en la pala levantada es **la forma de la cuna, no el
+  rozamiento**: está medido que no depende de él.
 - **Regenerar un wav no basta: hay que reimportarlo.** Godot sirve la copia
   de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
   pruebas siguen oyendo el sonido viejo. Hay que lanzar

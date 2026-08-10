@@ -29,8 +29,12 @@ eso solo se sabe jugando. Hasta que Daniel lo diga, 3B no empieza.
   sintetizados por `sonidos.py`, banco de 14 voces, efectos de onda, polvo y
   chispas
 - **Control de la bola** slingshots sacados del barrido de la pala (era el
-  bug que impedía apuntar), flipper a 64, rebote a 0,10, agarre a 40 con
-  umbral de velocidad a 700
+  bug que impedía apuntar), flipper a 64
+- **Rozamiento de contacto** el solver solo resolvía la normal, así que la
+  bola resbalaba eternamente y había que frenarla a mano sobre la pala con un
+  amortiguado isótropo: eso es lo que la dejaba pegada. Ahora hay Coulomb en
+  los impactos y rodadura en el contacto sostenido, y la cuna la sostiene la
+  geometría
 - **Coherencia visual** `render/paleta.gd` como sitio único con los 33
   colores y alias por uso; prueba que impide colores inventados en `render/`
 - **Multiplicador audible** el arpegio pasa a triángulo (bumper y target son
@@ -50,9 +54,10 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 |---|---|---|
 | `ancho_outlane` | 21 | Dificultad. Suelo 18, techo ~26 |
 | `flipper_longitud` | 64 | Dificultad. Hueco central 47 px |
-| `flipper_rebote` | 0,10 | Si la bola botonea en la pala |
-| `flipper_agarre` | 40 | Si no se queda quieta, o si se queda pegada |
-| `flipper_agarre_velocidad` | 700 | Por encima de esto no agarra |
+| `flipper_rebote` | 0,25 | Cuánto revive la goma la bola que llega |
+| `rodadura` | 20 | **Techo, no suelo.** Subirlo vuelve a pegar la bola |
+| `friccion_flipper` | 0,30 | Cuánto desvía la goma la bola al rozarla |
+| `velocidad_rebote_minima` | 55 | Frontera entre impacto y bola apoyada |
 | `target_canto` | 8 | Cuánto sobresale el target al campo |
 | `reloj_carga` | 18 s | **El dial de 3A.** Carrera tensa o paseo. Suelo 15, techo 25 |
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
@@ -61,8 +66,10 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Que pruebe Daniel
 
-1. **Atrapar la bola.** ¿Se queda quieta con la pala levantada? ¿Da tiempo
-   a mirar, decidir y soltar?
+1. **Atrapar la bola, que es lo que estaba mal.** Con la pala levantada debe
+   RODAR hasta el hueco del eje y quedarse ahí (~0,6 s), no clavarse donde
+   toque. Y con la pala en reposo no debe quedarse nunca: rueda y se va.
+   Si sigue soldándose, baja `rodadura`; si no llega a asentarse, súbela.
 2. **¿Cada cuánto drena?** El objetivo es cada dos o tres bolas.
 3. **Los outlanes.** Deben castigar la bola descontrolada, no la controlada.
 4. **Los huecos del tablero en negro y el destello al pegar**, que es lo
@@ -110,6 +117,11 @@ perdido.
   eso alimentaba un bucle que mataba al enemigo sin que las palas
   participaran. Ahora baja a la pala izquierda, o sea que los dos carriles
   hacen lo mismo. Se le devolverá identidad al hacer `DISEÑO.md` §4.
+- **La bola no tiene giro.** No hay spin simulado, así que no hay efecto ni
+  bola que "muerda" en un ángulo. La rodadura es la aproximación barata a eso
+  y aguanta bien; si en algún momento se quiere una física que destaque de
+  verdad, el siguiente paso es momento angular en la bola, y es un cambio
+  gordo que toca el solver entero.
 - **La tabla de enemigos no está balanceada contra el reloj.** Con vidas de
   180 a 540 y ataques de 6 a 16, los de arriba caen antes del primer golpe
   de reloj y los de abajo pueden ser un muro. La tabla se rehace entera

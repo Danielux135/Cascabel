@@ -14,6 +14,9 @@ var eje: Vector2
 var longitud: float
 var radio: float
 var restitucion: float
+## Rozamiento de la goma de la pala. Es alto: es lo que sostiene la bola en la
+## cuna cuando la mantienes arriba, sin frenarla a mano.
+var friccion: float = 0.0
 var angulo_reposo: float      # radianes
 var angulo_activo: float
 var velocidad_giro: float     # rad/s
@@ -66,4 +69,4 @@ func consultar(pos: Vector2, _vel: Vector2, radio_bola: float, salida: Array) ->
 	var velocidad_superficie := Vector2(-r.y, r.x) * omega
 	salida.append(Contacto.new(
 		n, suma - dist, punto_contacto, velocidad_superficie,
-		restitucion, 0.0, 0.0, Colisionador.Tipo.FLIPPER, self))
+		restitucion, 0.0, 0.0, Colisionador.Tipo.FLIPPER, self, friccion))

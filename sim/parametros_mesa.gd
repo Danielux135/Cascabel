@@ -15,11 +15,13 @@ var velocidad_maxima: float = 1500.0
 
 # --- Flippers ---
 var flipper_velocidad_giro: float = 22.0    # rad/s
-## La pala no rebota, empuja: el rebote solo actúa cuando está quieta, y ahí lo
-## que hace falta es que la bola se quede, no que salte. Con 0,30 la bola
-## botaba encima de la pala y perdía el contacto, así que el agarre se
-## encendía y se apagaba y no había forma de asentarla para apuntar.
-var flipper_rebote: float = 0.10
+## La pala no rebota, empuja: el rebote solo actúa cuando está quieta. Estuvo en
+## 0,10 para tapar un problema que ya no existe —la bola botaba encima de la
+## pala y perdía el contacto, y sin contacto no había agarre—, pero eso lo
+## resuelve ahora `velocidad_rebote_minima`, que mata los microrebotes de raíz.
+## Con 0,10 la goma se sentía muerta: 0,25 es goma de verdad y la bola llega
+## viva a la pala.
+var flipper_rebote: float = 0.25
 ## Bajado de 78 a 64: era el dial de dificultad que quedaba pendiente. Con 78 el
 ## hueco central medía 22 px y con 64 mide 47, o sea que drenar por el medio
 ## deja de ser un objetivo diminuto.
@@ -70,20 +72,9 @@ var bumper_centro := Vector2(200.0, 805.0)
 ## suelo absoluto: por debajo no cabe la bola y el outlane deja de existir.
 var ancho_outlane: float = 21.0
 
-## (*) Atrapar la bola. Con el flipper levantado Y QUIETO (o sea, cuando ya ha
-## llegado arriba) y la bola apoyada encima, se frena hasta pararse en vez de
-## resbalar por la pala. Es lo que permite apuntar antes de soltar.
-## En movimiento no agarra: ahí lanza como siempre, que es lo que da el tacto.
-## Subido de 16 a 40: con 16 la bola seguía deslizando casi medio segundo por la
-## pala antes de pararse, y en ese medio segundo ya se había ido de la punta.
-## Con 40 se asienta en menos de 0,1 s y se queda donde cae.
-var flipper_agarre: float = 40.0            # frenado tangencial, 1/s
-## Subido de 300 a 700: con 300 el agarre no llegaba a encenderse casi nunca.
-## La bola tiene tope 1500 y baja por la mesa muy por encima de 300, así que
-## Daniel solo consiguió asentarla UNA vez en toda una tanda: la única en que
-## llegó lenta. El umbral venía de la mesa pequeña y aquí sobraba.
-var flipper_agarre_velocidad: float = 700.0 # por encima de esto no agarra
-var flipper_agarre_omega: float = 0.6       # rad/s; si la pala gira, no agarra
+## Umbral de "la pala está quieta", o sea que ya ha terminado de subir. No entra
+## en la física: solo lo usan las pruebas y la depuración.
+var flipper_omega_quieta: float = 0.6       # rad/s
 
 # --- Slingshots ---
 var slingshot_empuje: float = 700.0
@@ -135,6 +126,69 @@ var poste_velocidad_minima: float = 60.0    # (*)
 # --- Arreglo 2: solver ---
 var subpasos: int = 4                       # 1500 px/s a 120 Hz -> 3,1 px por subpaso
 var tolerancia_posicion: float = 0.5        # penetración que se deja sin corregir
+
+# --- Rozamiento de contacto (Coulomb) ---
+## El solver resolvía SOLO la normal, así que la bola resbalaba eternamente a lo
+## largo de cualquier superficie y había que frenarla a mano sobre la pala. Ese
+## frenado era isótropo —mataba también la componente normal— y por eso la bola
+## se quedaba literalmente pegada en vez de rodar.
+##
+## Ahora cada contacto aplica un impulso tangencial limitado a `friccion` veces
+## el impulso normal, que es el modelo de Coulomb de toda la vida. La bola se
+## asienta en la cuna de la pala porque la geometría y el rozamiento la
+## sostienen, no porque se le apague la velocidad.
+##
+## Estos tres números son EL dial del tacto de las palas. Uno cada vez.
+## Van bajos a propósito en todo lo que no sea la pala. La bola real RUEDA por
+## la mesa, y aquí no hay giro simulado: un rozamiento de deslizamiento
+## realista sobre una bola que no rueda frena muchísimo más de la cuenta. Con
+## 0,25 en las gomas, el racimo dejaba de encadenar y el carril de retorno
+## derecho ya no llegaba a la pala.
+var friccion_metal: float = 0.03            # paredes, arco, targets
+var friccion_goma: float = 0.12             # slingshots y postes
+## Cero, y a propósito. El bumper es la única superficie de la mesa cuyo trabajo
+## es que la bola SALGA disparada: cualquier arrastre en el toque se multiplica
+## por los seis o siete toques de una entrada al racimo y se lo come entero.
+var friccion_bumper: float = 0.0
+## La goma de la pala. Medido que la cuna NO depende de este número —la sostiene
+## la forma, no el rozamiento—, así que aquí manda el realismo: 0,30 es lo que
+## da la goma contra acero, y es lo que decide cuánto desvía la bola al rozarla.
+var friccion_flipper: float = 0.30
+
+## La frontera entre "esto es un impacto" y "esto es la bola apoyada". Por
+## debajo no hay rebote ni rozamiento de Coulomb: hay rodadura. Sin esta
+## frontera la bola apoyada da microrebotes contra la pala, pierde el contacto
+## y no hay forma de asentarla. Una bola real tampoco rebota a 3 cm/s.
+var velocidad_rebote_minima: float = 55.0
+
+## Resistencia a la rodadura, 1/s, para el contacto sostenido. Aquí NO vale el
+## Coulomb: el rozamiento estático puede sostener una caja en una cuesta, pero
+## una bola en una cuesta rueda siempre, y como no simulamos el giro, aplicar
+## Coulomb a una bola apoyada la suelda al sitio. Eso es exactamente lo que se
+## veía como "la bola se queda pegada".
+##
+## Así que apoyada solo se le pone un arrastre suave: la gravedad siempre gana y
+## la bola siempre acaba rodando. Lo que la sostiene en la cuna de la pala
+## levantada es la forma de la cuna, que es lo que la sostiene de verdad en una
+## mesa real.
+##
+## Medido: con 20 la bola se asienta en la cuna en 0,6 s y rueda y se va de una
+## pala en reposo en 1 s. Con 40 se asienta al instante pero vuelve a soldarse
+## —ya no baja de la pala en reposo—, y con 3 nunca llega a quedarse quieta en
+## la cuna. Es un techo, no un suelo: subirlo es volver al problema de antes.
+var rodadura: float = 20.0
+
+## Devuelve el rozamiento que le toca a cada superficie.
+func friccion_de(tipo: int) -> float:
+	match tipo:
+		Colisionador.Tipo.FLIPPER:
+			return friccion_flipper
+		Colisionador.Tipo.BUMPER:
+			return friccion_bumper
+		Colisionador.Tipo.SLINGSHOT, Colisionador.Tipo.POSTE:
+			return friccion_goma
+		_:
+			return friccion_metal
 
 # --- Arreglo 3: ball search ---
 var busqueda_velocidad: float = 60.0        # (*) por debajo de esto cuenta como parada

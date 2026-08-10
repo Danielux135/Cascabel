@@ -58,7 +58,6 @@ var cargando := false
 var _contactos: Array[Contacto] = []
 var _temporizador_busqueda: float = 0.0
 var _tocando_flipper_sostenido := false
-var _agarrando := false
 
 func _init(parametros: ParametrosMesa = null) -> void:
 	p = parametros if parametros != null else ParametrosMesa.new()
@@ -212,6 +211,14 @@ func _construir() -> void:
 	flipper_der = Flipper.new(
 		p.flipper_eje_der, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
+
+	# El rozamiento se reparte aquí, al final y en un solo sitio: cada superficie
+	# lo hereda de su tipo y así no hay que pasarlo por los treinta sitios en los
+	# que se crea un colisionador.
+	for c in colisionadores:
+		c.friccion = p.friccion_de(c.tipo)
+	flipper_izq.friccion = p.friccion_flipper
+	flipper_der.friccion = p.friccion_flipper
 
 func _construir_arco() -> void:
 	# Elipse centro (200,130), rx 180, ry 70. De (380,130) a (20,130) por arriba.
@@ -417,11 +424,7 @@ func _subpaso(h: float) -> void:
 	_limitar_velocidad()
 	bola.pos += bola.vel * h
 
-	_colisionar()
-	# Rozamiento de reposo sobre pala quieta: la bola se asienta en vez de
-	# resbalar, y se puede apuntar antes de soltar.
-	if _agarrando and bola.velocidad() < p.flipper_agarre_velocidad:
-		bola.vel *= exp(-p.flipper_agarre * h)
+	_colisionar(h)
 	_avanzar_giradores()
 	_comprobar_rampas()
 	_comprobar_platillos()
@@ -494,11 +497,10 @@ func _limitar_velocidad() -> void:
 	if v > p.velocidad_maxima:
 		bola.vel *= p.velocidad_maxima / v
 
-func _colisionar() -> void:
+func _colisionar(h: float) -> void:
 	# Se reinician ANTES de la salida temprana: si no, sin contactos se quedaban
 	# con el valor del subpaso anterior.
 	_tocando_flipper_sostenido = false
-	_agarrando = false
 	_contactos.clear()
 	for c in colisionadores:
 		c.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
@@ -516,10 +518,6 @@ func _colisionar() -> void:
 		var f := c.origen as Flipper
 		if f.pulsado:
 			_tocando_flipper_sostenido = true
-			# Agarre: la pala tiene que estar ARRIBA Y QUIETA (ya ha terminado
-			# de subir) y la bola apoyada ENCIMA, no golpeándola por debajo.
-			if absf(f.omega) < p.flipper_agarre_omega and c.normal.y < -0.2:
-				_agarrando = true
 
 	# --- ARREGLO 2: resolver POSICIÓN solo contra el contacto más profundo ---
 	# Corregir contra todos los contactos a la vez es lo que acuñaba la bola:
@@ -541,15 +539,60 @@ func _colisionar() -> void:
 			continue    # ya se separa: no dupliques el rebote en las juntas
 		var velocidad := -vn
 		var e := c.restitucion
+		# Por debajo del umbral no se rebota. Una bola apoyada llega al contacto
+		# con la velocidad que le acaba de dar la gravedad en un subpaso, y
+		# devolvérsela es lo que la hace zumbar encima de la pala en vez de
+		# quedarse. Los bumpers no entran: los suyos los decide `velocidad_minima`.
+		if c.empuje <= 0.0 and velocidad < p.velocidad_rebote_minima:
+			e = 0.0
 		var empuje := 0.0
 		if c.empuje > 0.0:
 			if velocidad >= c.velocidad_minima:
 				empuje = c.empuje
 			else:
 				e = p.rebote_pared   # por debajo del umbral el interruptor no salta
-		bola.vel += c.normal * (-(1.0 + e) * vn + empuje)
+		# Impulso normal, y con él el presupuesto de rozamiento. El empuje del
+		# bumper NO cuenta para ese presupuesto: es un actuador, no la carga que
+		# la bola hace contra la superficie, y contarlo frenaría en seco toda
+		# bola que roce un bumper.
+		var jn := -(1.0 + e) * vn
+		bola.vel += c.normal * (jn + empuje)
+		if velocidad >= p.velocidad_rebote_minima:
+			_aplicar_friccion(c, jn)
+		else:
+			_aplicar_rodadura(c, h)
 		_avisar(c, velocidad, empuje)
 	_limitar_velocidad()
+
+## Rozamiento de Coulomb: un impulso a lo largo de la superficie, en contra del
+## deslizamiento y limitado a `friccion` veces el impulso normal.
+##
+## Esto es lo que faltaba. Sin ello la bola solo sabía rebotar y resbalaba para
+## siempre a lo largo de cualquier cosa que tocara, y sostenerla sobre la pala
+## exigía apagarle la velocidad entera a mano. Ahora se sostiene sola: la cuna
+## de la pala levantada la sujeta porque el rozamiento vence a la pendiente,
+## igual que en una mesa de verdad.
+##
+## El impulso nunca puede invertir el deslizamiento, solo pararlo: por eso el
+## `minf`. Sin él, con rozamiento alto la bola saldría disparada hacia atrás.
+func _aplicar_friccion(c: Contacto, jn: float) -> void:
+	if c.friccion <= 0.0 or jn <= 0.0:
+		return
+	var v_rel := bola.vel - c.velocidad_superficie
+	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
+	var vt := tangente.length()
+	if vt < 1e-4:
+		return
+	bola.vel -= (tangente / vt) * minf(c.friccion * jn, vt)
+
+## Contacto sostenido: la bola no choca, rueda. Solo un arrastre suave a lo
+## largo de la superficie, que nunca puede sostenerla contra la gravedad.
+func _aplicar_rodadura(c: Contacto, h: float) -> void:
+	if p.rodadura <= 0.0:
+		return
+	var v_rel := bola.vel - c.velocidad_superficie
+	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
+	bola.vel -= tangente * (1.0 - exp(-p.rodadura * h))
 
 ## Los avisos son la fuente del daño del combate, así que tienen que salir UNA
 ## vez por golpe de verdad. Sin el filtro, una bola rodando apoyada en un bumper

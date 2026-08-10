@@ -12,6 +12,9 @@ var b: Vector2
 var radio: float
 var tipo: int
 var restitucion: float
+## Rozamiento de Coulomb. Lo pone la mesa por tipo de superficie al terminar de
+## construirse: el metal casi no agarra, la goma sí.
+var friccion: float = 0.0
 var empuje: float
 var velocidad_minima: float
 var activo := true
@@ -77,4 +80,4 @@ func consultar(pos: Vector2, vel: Vector2, radio_bola: float, salida: Array) -> 
 	var n := d / dist if dist > 1e-4 else _normal_degenerada
 	salida.append(Contacto.new(
 		n, suma - dist, pos - n * radio_bola, Vector2.ZERO,
-		restitucion, empuje, velocidad_minima, tipo, self))
+		restitucion, empuje, velocidad_minima, tipo, self, friccion))
