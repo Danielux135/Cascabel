@@ -46,5 +46,12 @@ var dano_girador: int = 1
 ## Completar la órbita entera y sacar la bola del platillo. Pagan bien porque
 ## las dos hay que buscarlas: la órbita pide un tiro fuerte y limpio, y el
 ## platillo está escondido bajo el arco.
+## Cada recorrido paga distinto, que es lo que los hace tres tiros y no uno
+## repetido tres veces:
+##   orbita  -> sube el multiplicador un tramo de golpe, y paga poco daño
+##   retorno -> te deja la bola en la otra pala; paga poco, el premio es poder
+##              encadenar
+##   canon   -> te suelta dentro del racimo de bumpers; este sí pega fuerte
 var dano_rampa: int = 10
+var dano_rampa_fuerte: int = 26
 var dano_platillo: int = 14

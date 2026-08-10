@@ -79,6 +79,14 @@ SONIDOS = {
         vibrato=(18.0, 0.9), filtro=3000, crush=5, vol=0.50,
     ),
 
+    # El cañón, el recorrido que suelta la bola dentro del racimo: golpe gordo
+    # y grave, para que se distinga de la salida de rampa normal.
+    "rampa_fuerte": dict(vol=0.6, mezcla=[
+        dict(onda="cuadrada", f0=180, f1=60, dur=0.42, caida=7.0,
+             filtro=2000, crush=4, vol=0.7),
+        dict(onda="ruido", dur=0.22, caida=16.0, filtro=3200, crush=5, vol=0.45),
+    ]),
+
     # --- Subir de multiplicador: arpegio ascendente. Es lo único alegre que
     # suena en la mesa, y a propósito: marca el momento que importa. ---
     "combo": dict(

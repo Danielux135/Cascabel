@@ -12,6 +12,12 @@ extends RefCounted
 ## gravedad 1750 y tope de 1500 px/s la bola no puede subir más de 643 px por
 ## sus propios medios, así que a la zona alta solo se llega enganchada aquí.
 
+## Qué paga completar este recorrido. La mesa dice QUÉ es cada rampa y
+## ParametrosCombate cuánto vale: geometría aquí, balance allí.
+enum Premio { DANO, DANO_FUERTE, MULTIPLICADOR }
+var premio: int = Premio.DANO
+var nombre := ""
+
 var puntos := PackedVector2Array()
 var largo: float = 0.0
 var entrada_radio: float = 18.0

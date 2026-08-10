@@ -115,9 +115,31 @@ func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
 	_golpear(p.dano_girador, punto, true)
 
-## La órbita paga al SALIR, no al entrar: el premio es completarla.
-func _al_salir_de_rampa(punto: Vector2, _indice: int) -> void:
-	_golpear(p.dano_rampa, punto, true)
+## Las rampas pagan al SALIR, no al entrar: el premio es completarlas. Y cada
+## una paga una cosa distinta, que es lo que las hace tres tiros de verdad.
+func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
+	match (mesa.rampas[indice] as Rampa).premio:
+		Rampa.Premio.MULTIPLICADOR:
+			_subir_tramo(punto)
+		Rampa.Premio.DANO_FUERTE:
+			_golpear(p.dano_rampa_fuerte, punto, true)
+		_:
+			_golpear(p.dano_rampa, punto, true)
+
+## Sube el multiplicador un tramo de golpe, sin tener que encadenar los golpes
+## que harían falta. Si ya está en el último, se queda donde está y solo paga
+## el daño.
+func _subir_tramo(punto: Vector2) -> void:
+	var antes := multiplicador()
+	for tramo in p.tramos_combo:
+		if int((tramo as Dictionary)["factor"]) > antes:
+			golpes = maxi(golpes, int((tramo as Dictionary)["golpes"]))
+			break
+	var ahora := multiplicador()
+	if ahora != antes:
+		combo_cambiado.emit(ahora, golpes)
+	# Sin sumar golpe: los golpes ya los ha puesto el salto de tramo.
+	_golpear(p.dano_rampa, punto, false)
 
 ## Y el platillo al escupir, que es donde está el golpe.
 func _al_salir_del_platillo(punto: Vector2, _indice: int) -> void:

@@ -19,6 +19,7 @@ const AJUSTES := {
 	"flipper":       {"db": -9.0, "tono": 0.06},
 	"rampa_entrada": {"db": -3.0, "tono": 0.02},
 	"rampa_salida":  {"db": -3.0, "tono": 0.02},
+	"rampa_fuerte":  {"db": -1.0, "tono": 0.03},
 	"platillo":      {"db": -2.0, "tono": 0.00},
 	"combo":         {"db": -2.0, "tono": 0.00},
 	"drenaje":       {"db": -2.0, "tono": 0.00},
@@ -42,7 +43,10 @@ func _ready() -> void:
 		add_child(v)
 		_voces.append(v)
 
-func reproducir(nombre: String) -> void:
+## `tono_extra` multiplica el tono por encima de la variación del sonido. Se
+## usa para que el arpegio del multiplicador suene más agudo cuanto más alto es
+## el tramo: el mismo sonido pero subiendo, que es lo que pide el oído.
+func reproducir(nombre: String, tono_extra: float = 1.0) -> void:
 	var stream: AudioStream = _streams.get(nombre)
 	if stream == null:
 		return
@@ -52,5 +56,6 @@ func reproducir(nombre: String) -> void:
 	v.stream = stream
 	v.volume_db = float(ajuste.get("db", 0.0))
 	var tono: float = float(ajuste.get("tono", 0.0))
-	v.pitch_scale = 1.0 if tono <= 0.0 else _rng.randf_range(1.0 - tono, 1.0 + tono)
+	var base := 1.0 if tono <= 0.0 else _rng.randf_range(1.0 - tono, 1.0 + tono)
+	v.pitch_scale = clampf(base * tono_extra, 0.2, 4.0)
 	v.play()

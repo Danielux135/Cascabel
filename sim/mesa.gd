@@ -58,6 +58,7 @@ var cargando := false
 var _contactos: Array[Contacto] = []
 var _temporizador_busqueda: float = 0.0
 var _tocando_flipper_sostenido := false
+var _agarrando := false
 
 func _init(parametros: ParametrosMesa = null) -> void:
 	p = parametros if parametros != null else ParametrosMesa.new()
@@ -74,7 +75,7 @@ func _construir() -> void:
 	_construir_arco()
 
 	# Paredes laterales del campo de juego.
-	_pared(_v(20, 130), _v(20, 480))
+	_pared(_v(20, 130), _v(20, 700))     # baja hasta el drenaje: es el outlane
 	_pared(_v(380, 130), _v(380, 660))   # exterior del carril lanzador
 
 	# --- Carril lanzador ---
@@ -83,7 +84,7 @@ func _construir() -> void:
 	_pared(_v(350, 300), _v(350, 440))
 	_pared(_v(350, 440), _v(355, 458))
 	_pared(_v(355, 458), _v(358, 470))
-	_pared(_v(358, 470), _v(358, 660))
+	_pared(_v(358, 470), _v(358, 700))   # ídem por la derecha
 	_pared(_v(358, 660), _v(380, 660))   # suelo del carril
 	# Puerta antirretorno. Inclinada a propósito: una bola que cae encima rueda
 	# hacia la izquierda y entra al campo en vez de quedarse parada en la repisa.
@@ -100,18 +101,21 @@ func _construir() -> void:
 	# No queda hueco: no hay dónde acuñarse. La bola sale por la boca del inlane
 	# (22 px libres entre el poste y la punta del slingshot) y cae sobre el
 	# flipper, que es lo que hace un inlane real.
-	_pared(_v(20, 480), _v(99, 584))          # retorno izquierdo
+	# La pared del carril de retorno ya no arranca pegada a la de fuera: se
+	# recorta por arriba y ese hueco es la BOCA DEL OUTLANE. Una bola que baja
+	# pegada a la pared se cuela por ahí y se pierde; una que viene más hacia
+	# dentro cae sobre la pared y baja por el retorno al flipper. Esa es la
+	# elección, y se decide arriba, por dónde venga la bola.
+	_pared(_en_x(_v(20, 480), _v(99, 584), 20.0 + p.ancho_outlane), _v(99, 584))
 	_slingshot(_v(75, 505), _v(128, 575))
 	_poste(_v(102, 596))
 
-	_pared(_v(355, 458), _v(301, 584))        # retorno derecho
+	_pared(_en_x(_v(355, 458), _v(301, 584), 358.0 - p.ancho_outlane), _v(301, 584))
 	_slingshot(_v(306, 512), _v(262, 582))
 	_poste(_v(298, 596))
 
-	# --- Bumpers ---
-	_bumper(_v(140, 225))
-	_bumper(_v(260, 225))
-	_bumper(_v(200, 165))
+	# --- Bumpers, en racimo apretado ---
+	_racimo_bumpers()
 
 	# --- Bancos de targets ---
 	# Pegados a las paredes pero sin sellarlas: quedan 23 px de carril por fuera
@@ -128,7 +132,8 @@ func _construir() -> void:
 	# Con gravedad 1750 y tope de 1500 px/s la bola no sube más de 643 px por su
 	# cuenta, así que los 660 px de arriba solo se recorren enganchada a esta
 	# curva. Es bidireccional, como las órbitas de verdad: entras por un lado y
-	# sales por el otro. Las bocas están a y=880: un lanzamiento al 88 % o más
+	# sales por el otro. Su premio es SUBIR EL MULTIPLICADOR de tramo: es el
+	# tiro largo, y lo que paga es que todo lo que venga después vale más. Las bocas están a y=880: un lanzamiento al 88 % o más
 	# llega con velocidad de sobra para engancharse y uno más flojo no. Ahí está
 	# la habilidad del tiro inicial.
 	_orbita()
@@ -141,21 +146,24 @@ func _construir() -> void:
 	# No son bidireccionales: se entra por su boca y punto. Una órbita se
 	# recorre en los dos sentidos, un carril de retorno no.
 
-	# Izquierda -> carril de retorno DERECHO, o sea que vuelve al flipper
-	# contrario. Es el tiro que cruza la mesa.
+	# Izquierda -> carril de retorno DERECHO, o sea que te deja la bola puesta
+	# en la otra pala. El premio es poder encadenar: paga poco de daño porque
+	# lo que da es la bola servida para el tiro siguiente.
 	_carril(PackedVector2Array([
 		Vector2(95, 790), Vector2(78, 690), Vector2(66, 560), Vector2(86, 430),
 		Vector2(140, 340), Vector2(215, 315), Vector2(290, 360),
 		Vector2(332, 470), Vector2(342, 620), Vector2(338, 780),
 		Vector2(334, 940), Vector2(330, 1085),
-	]))
+	]), "retorno", Rampa.Premio.DANO)
 
-	# Derecha -> cae en el racimo de bumpers, por el centro y desde arriba.
+	# Derecha -> cae en el racimo de bumpers, por el centro y desde arriba. Este
+	# es el de daño gordo: te suelta dentro del racimo, donde la bola rebota
+	# sola varias veces.
 	_carril(PackedVector2Array([
 		Vector2(305, 790), Vector2(322, 690), Vector2(334, 560), Vector2(314, 430),
 		Vector2(258, 342), Vector2(196, 312), Vector2(166, 380),
 		Vector2(166, 500), Vector2(184, 610), Vector2(200, 690),
-	]))
+	]), "canon", Rampa.Premio.DANO_FUERTE)
 
 	# --- Platillo, metido bajo el arco a la izquierda ---
 	# Hay que buscarlo: no está en el camino de la bola. Captura, pausa, y
@@ -196,6 +204,28 @@ func _bumper(centro: Vector2) -> Colisionador:
 	bumpers.append(centro)
 	return c
 
+## Triángulo equilátero con `bumper_hueco` px entre bordes. El lado sale del
+## hueco, así que tocar el parámetro reordena el racimo entero sin recolocar
+## nada a mano.
+##
+## DOS ARRIBA Y UNO ABAJO, y esto está medido, no elegido: con uno arriba la
+## bola que cae rebota en él y sale disparada hacia fuera, 1,4 golpes por
+## entrada. Con dos arriba se cuela entre ellos, pega en el de abajo y vuelve
+## hacia arriba: 3,7 golpes por entrada con el mismo hueco.
+func _racimo_bumpers() -> void:
+	var lado := p.bumper_hueco + p.bumper_radio * 2.0
+	var radio_racimo := lado / sqrt(3.0)          # del centro a cada vértice
+	for i in 3:
+		var ang := PI * 0.5 + float(i) * TAU / 3.0
+		_bumper(p.bumper_centro + Vector2(cos(ang), sin(ang)) * radio_racimo)
+
+## Punto del segmento a->b a una `x` dada. Para recortar la boca de los outlanes
+## con la anchura como parámetro, en vez de a ojo.
+func _en_x(a: Vector2, b: Vector2, x: float) -> Vector2:
+	if is_equal_approx(a.x, b.x):
+		return a
+	return a.lerp(b, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))
+
 func _banco_targets(desde: Vector2, hasta: Vector2, cantidad: int) -> void:
 	var indice := bancos.size()
 	var banco: Array[Colisionador] = []
@@ -223,14 +253,18 @@ func _orbita() -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
+	r.nombre = "orbita"
+	r.premio = Rampa.Premio.MULTIPLICADOR
 	rampas.append(r)
 
 ## Carril de retorno: como la órbita pero de un solo sentido.
-func _carril(control: PackedVector2Array) -> void:
+func _carril(control: PackedVector2Array, nombre: String, premio: int) -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
 	r.bidireccional = false
+	r.nombre = nombre
+	r.premio = premio
 	rampas.append(r)
 
 func _platillo(centro: Vector2, direccion: Vector2) -> void:
@@ -346,6 +380,10 @@ func _subpaso(h: float) -> void:
 	bola.pos += bola.vel * h
 
 	_colisionar()
+	# Rozamiento de reposo sobre pala quieta: la bola se asienta en vez de
+	# resbalar, y se puede apuntar antes de soltar.
+	if _agarrando and bola.velocidad() < p.flipper_agarre_velocidad:
+		bola.vel *= exp(-p.flipper_agarre * h)
 	_avanzar_giradores()
 	_comprobar_rampas()
 	_comprobar_platillos()
@@ -419,6 +457,10 @@ func _limitar_velocidad() -> void:
 		bola.vel *= p.velocidad_maxima / v
 
 func _colisionar() -> void:
+	# Se reinician ANTES de la salida temprana: si no, sin contactos se quedaban
+	# con el valor del subpaso anterior.
+	_tocando_flipper_sostenido = false
+	_agarrando = false
 	_contactos.clear()
 	for c in colisionadores:
 		c.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
@@ -427,13 +469,19 @@ func _colisionar() -> void:
 	if _contactos.is_empty():
 		return
 
-	_tocando_flipper_sostenido = false
 	var mas_profundo := _contactos[0]
 	for c in _contactos:
 		if c.profundidad > mas_profundo.profundidad:
 			mas_profundo = c
-		if c.origen is Flipper and (c.origen as Flipper).pulsado:
+		if not (c.origen is Flipper):
+			continue
+		var f := c.origen as Flipper
+		if f.pulsado:
 			_tocando_flipper_sostenido = true
+			# Agarre: la pala tiene que estar ARRIBA Y QUIETA (ya ha terminado
+			# de subir) y la bola apoyada ENCIMA, no golpeándola por debajo.
+			if absf(f.omega) < p.flipper_agarre_omega and c.normal.y < -0.2:
+				_agarrando = true
 
 	# --- ARREGLO 2: resolver POSICIÓN solo contra el contacto más profundo ---
 	# Corregir contra todos los contactos a la vez es lo que acuñaba la bola:

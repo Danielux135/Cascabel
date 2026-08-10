@@ -71,33 +71,35 @@ const CORREDOR_DRENAJE := Rect2(170, 1200, 60, 100)
 
 ## Adornos del suelo, puestos a mano.
 ##
-## Los de "zona muerta" están en sitios a los que la bola no puede llegar: bajo
-## los carriles de retorno, que quedan sellados por los postes de goma. Los del
-## final son campo abierto, que la bola cruza pero donde no se queda.
+## Los de abajo van en los outlanes y en la franja bajo los flippers; los del
+## final, en campo abierto arriba. Por todos pasa poco la bola, y la prueba lo
+## mide en vez de darlo por supuesto.
 ##
 ## Escalas de 1.0 o 0.5 y espejo en vez de giros libres: rotar pixelart en
 ## ángulos sueltos rompe la rejilla de píxeles y se nota.
-## `muerta` marca los que están en sitios a los que la bola NO PUEDE llegar.
-## No es una intención: está medido, esos ocho dan 0,00 % de ocupación en las
-## partidas aleatorias de tests/prueba_sim.gd, y la prueba lo exige.
+##
+## Antes ocho de estos estaban en zona muerta de verdad, con 0,00 % de
+## ocupación medida. Al abrir los OUTLANES esa zona dejó de ser muerta: es por
+## donde se pierde la bola ahora. Siguen valiendo de adorno de carril, y la
+## prueba pasó de exigir cero a exigir poco tráfico y medirlo.
 const ADORNOS := [
-	# zona muerta bajo el carril de retorno izquierdo
-	{"tex": "grieta",       "pos": Vector2(56, 1212),  "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "huesos",       "pos": Vector2(50, 1252),  "escala": 1.0, "espejo": true,  "muerta": true},
-	{"tex": "musgo",        "pos": Vector2(88, 1240),  "escala": 0.5, "espejo": false, "muerta": true},
-	# zona muerta bajo el carril de retorno derecho
-	{"tex": "baldosa_rota", "pos": Vector2(326, 1216), "escala": 1.0, "espejo": true,  "muerta": true},
-	{"tex": "mancha",       "pos": Vector2(324, 1251), "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "musgo",        "pos": Vector2(342, 1230), "escala": 0.5, "espejo": true,  "muerta": true},
+	# outlane izquierdo
+	{"tex": "grieta",       "pos": Vector2(56, 1212),  "escala": 1.0, "espejo": false},
+	{"tex": "huesos",       "pos": Vector2(50, 1252),  "escala": 1.0, "espejo": true},
+	{"tex": "musgo",        "pos": Vector2(88, 1240),  "escala": 0.5, "espejo": false},
+	# outlane derecho
+	{"tex": "baldosa_rota", "pos": Vector2(326, 1216), "escala": 1.0, "espejo": true},
+	{"tex": "mancha",       "pos": Vector2(324, 1251), "escala": 1.0, "espejo": false},
+	{"tex": "musgo",        "pos": Vector2(342, 1230), "escala": 0.5, "espejo": true},
 	# franja bajo los flippers, a los lados del corredor de drenaje
-	{"tex": "remaches",     "pos": Vector2(126, 1264), "escala": 1.0, "espejo": false, "muerta": true},
-	{"tex": "remaches",     "pos": Vector2(274, 1264), "escala": 1.0, "espejo": true,  "muerta": true},
+	{"tex": "remaches",     "pos": Vector2(126, 1264), "escala": 1.0, "espejo": false},
+	{"tex": "remaches",     "pos": Vector2(274, 1264), "escala": 1.0, "espejo": true},
 	# la rejilla, en el drenaje: aquí sí pasa la bola, y es el sitio que le toca
-	{"tex": "rejilla",      "pos": Vector2(200, 1250), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "rejilla",      "pos": Vector2(200, 1250), "escala": 1.0, "espejo": false},
 	# campo alto. La bola vive abajo, así que aquí arriba apenas pasa: 2,6 % y
 	# 0,5 % de los fotogramas. Sitios sacados del mapa de ocupación, no a ojo.
-	{"tex": "espiral",      "pos": Vector2(128, 900), "escala": 1.0, "espejo": false, "muerta": false},
-	{"tex": "sigilo",       "pos": Vector2(285, 730), "escala": 1.0, "espejo": false, "muerta": false},
+	{"tex": "espiral",      "pos": Vector2(128, 900), "escala": 1.0, "espejo": false},
+	{"tex": "sigilo",       "pos": Vector2(285, 730), "escala": 1.0, "espejo": false},
 ]
 
 ## Rectángulo que ocupa un adorno en la mesa, contando solo su parte opaca:
@@ -173,8 +175,7 @@ func _ready() -> void:
 	mesa.target_abatido.connect(_al_abatir_target)
 	mesa.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("rampa_entrada"))
-	mesa.rampa_salida.connect(func(_pt: Vector2, _i: int) -> void:
-		_sonido.reproducir("rampa_salida"))
+	mesa.rampa_salida.connect(_al_salir_de_rampa)
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
 	mesa.bola_drenada.connect(_al_drenar_bola)
@@ -339,6 +340,21 @@ func _bumper_mas_cercano(punto: Vector2) -> int:
 			mejor = i
 	return mejor
 
+## Cada recorrido suena distinto, igual que paga distinto. La órbita no suena
+## aquí: su premio es subir de tramo, y ya suena el arpegio del multiplicador.
+func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
+	var r: Rampa = mesa.rampas[indice]
+	match r.premio:
+		Rampa.Premio.DANO_FUERTE:
+			_sonido.reproducir("rampa_fuerte")
+			impactos.onda(punto, C_FUEGO, 1.4)
+			impactos.chispas(punto, Vector2.DOWN, C_FUEGO, 1.2)
+		Rampa.Premio.MULTIPLICADOR:
+			impactos.onda(punto, C_ORO_CLARO, 1.1)
+		_:
+			_sonido.reproducir("rampa_salida")
+			impactos.onda(punto, C_ORO, 0.7)
+
 func _al_girar_girador(_punto: Vector2, indice: int, fuerza: float) -> void:
 	var ratio := clampf(fuerza / mesa.p.velocidad_maxima, 0.2, 1.0)
 	_giro_velocidad[indice] = anim.girador_velocidad_maxima * ratio
@@ -366,8 +382,10 @@ func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 	_nodo_suelo.pulsar()
 	# `combo_cambiado` también salta al drenar, cuando cae a x1. Ahí no suena:
 	# el sonido de subir de tramo es un premio y sonaría a burla.
+	# Y sube de tono con el tramo: x2, x3 y x4 son el mismo arpegio cada vez
+	# más agudo, así que el oído sabe por dónde va sin mirar el número.
 	if golpes > 0:
-		_sonido.reproducir("combo")
+		_sonido.reproducir("combo", 1.0 + 0.12 * float(multiplicador - 2))
 	if multiplicador > 1:
 		_sacudir(anim.sacudida_dano)
 

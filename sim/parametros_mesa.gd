@@ -39,6 +39,28 @@ var bumper_rebote: float = 1.8              # restitución en el término normal
 var bumper_radio: float = 19.0
 var bumper_velocidad_minima: float = 40.0   # (*) umbral del interruptor
 
+## (*) Racimo en triángulo equilátero, con este hueco entre BORDES. Antes había
+## 82 px entre los dos de abajo y la bola pasaba por el medio sin tocar nada:
+## medido, 0,0 bumpers golpeados por bola lanzada. Con 24 la bola (18) entra
+## con holgura pero no pasa de largo, y al entrar rebota varias veces seguidas.
+var bumper_hueco: float = 24.0
+var bumper_centro := Vector2(200.0, 805.0)
+
+## (*) Outlanes: los dos carriles que van directos al drenaje, por fuera de los
+## carriles de retorno. Son la válvula de dificultad de la mesa: sin ellos solo
+## se pierde la bola por el hueco entre palas, que es un objetivo pequeño.
+## Es la anchura de la BOCA, medida en horizontal contra la pared de fuera. Por
+## debajo de 18 (el diámetro de la bola) el outlane deja de tragar.
+var ancho_outlane: float = 26.0
+
+## (*) Atrapar la bola. Con el flipper levantado Y QUIETO (o sea, cuando ya ha
+## llegado arriba) y la bola apoyada encima, se frena hasta pararse en vez de
+## resbalar por la pala. Es lo que permite apuntar antes de soltar.
+## En movimiento no agarra: ahí lanza como siempre, que es lo que da el tacto.
+var flipper_agarre: float = 16.0            # frenado tangencial, 1/s
+var flipper_agarre_velocidad: float = 300.0 # por encima de esto no agarra
+var flipper_agarre_omega: float = 0.6       # rad/s; si la pala gira, no agarra
+
 # --- Slingshots ---
 var slingshot_empuje: float = 700.0
 var slingshot_rebote: float = 0.55

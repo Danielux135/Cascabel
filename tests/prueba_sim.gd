@@ -31,6 +31,10 @@ func _initialize() -> void:
 	_prueba_rampas()
 	_prueba_sonido()
 	_prueba_impactos()
+	_prueba_racimo()
+	_prueba_outlanes()
+	_prueba_agarre()
+	_prueba_identidad_recorridos()
 
 	print("")
 	if _fallos == 0:
@@ -272,12 +276,14 @@ func _prueba_targets() -> void:
 ## Un bumper solo puede dar un aviso por golpe. Sin el filtro de `empuje`, una
 ## bola apoyada emitía uno por subpaso: 480 golpes por segundo de daño gratis.
 func _prueba_bumper_no_repite() -> void:
-	# El bumper izquierdo, no el de arriba: sobre el de arriba la bola rebota en
-	# el arco y vuelve a caer dentro de la ventana de medida, y ese segundo
-	# aviso es legítimo. Aquí el empuje de 620 se queda 24 px por debajo del
-	# arco, así que en 0,4 s no puede haber dos golpes.
-	var arriba := Vector2(140, 825)
+	# El bumper de más a la izquierda del racimo, sacado de la mesa y no escrito
+	# a mano: el racimo se recoloca solo desde `bumper_hueco` y una coordenada
+	# fija aquí se quedaría vieja al primer ajuste.
 	var m := _nueva_mesa()
+	var arriba: Vector2 = m.bumpers[0]
+	for b in m.bumpers:
+		if (b as Vector2).x < arriba.x:
+			arriba = b
 	m.nueva_bola()
 	m.bola.en_carril = false
 	m.bola.pos = arriba - Vector2(0, m.p.bumper_radio + m.p.radio_bola + 40.0)
@@ -476,7 +482,6 @@ func _prueba_adornos() -> void:
 	var en_corredor: Array[String] = []
 	var cajas: Array[Rect2] = []
 	var nombres: Array[String] = []
-	var muertas: Array[bool] = []
 	for adorno in VistaMesa.ADORNOS:
 		var ruta := "res://assets/mesa_deco/%s.png" % adorno["tex"]
 		if not ResourceLoader.exists(ruta):
@@ -485,7 +490,6 @@ func _prueba_adornos() -> void:
 		var caja := VistaMesa.caja_adorno(adorno, load(ruta))
 		cajas.append(caja)
 		nombres.append(str(adorno["tex"]))
-		muertas.append(bool(adorno["muerta"]))
 		if not VistaMesa.CAMPO.encloses(caja):
 			fuera.append("%s %s" % [adorno["tex"], str(caja)])
 		if adorno["tex"] != "rejilla" and VistaMesa.CORREDOR_DRENAJE.intersects(caja):
@@ -519,23 +523,181 @@ func _prueba_adornos() -> void:
 				if cajas[j].grow(m.p.radio_bola).has_point(m.bola.pos):
 					visitas[j] += 1
 
-	# Los de zona muerta tienen que dar cero clavado: si uno empieza a marcar
-	# algo es que se ha movido a donde la bola sí llega. Los de campo abierto
-	# solo tienen que quedarse por debajo del 3 %. La rejilla queda exenta:
-	# está en el drenaje a propósito y marca un 13 %.
-	var pisados: Array[String] = []
+	# Por ninguno puede pasar mucho la bola. La rejilla queda exenta: está en el
+	# drenaje a propósito y marca un 13 %.
 	var ruidosos: Array[String] = []
 	for j in cajas.size():
 		var pct := 100.0 * float(visitas[j]) / float(maxi(muestras, 1))
-		if muertas[j]:
-			if visitas[j] > 0:
-				pisados.append("%s %.2f%%" % [nombres[j], pct])
-		elif nombres[j] != "rejilla" and pct > 3.0:
+		print("      %-14s %.2f%%" % [nombres[j], pct])
+		if nombres[j] != "rejilla" and pct > 3.0:
 			ruidosos.append("%s %.2f%%" % [nombres[j], pct])
-	_comprobar("la bola no llega a los adornos de zona muerta (%d muestras)" % muestras,
-		pisados.is_empty(), str(pisados))
-	_comprobar("y por los de campo abierto apenas pasa",
+	_comprobar("por los adornos apenas pasa la bola (%d muestras)" % muestras,
 		ruidosos.is_empty(), str(ruidosos))
+
+## El racimo estaba tan abierto que la bola pasaba por el medio sin tocar nada:
+## medido, 0,0 bumpers por bola lanzada. Lo que hay que asegurar es el hueco y,
+## sobre todo, que al entrar rebote varias veces seguidas.
+func _prueba_racimo() -> void:
+	var m := _nueva_mesa()
+	_comprobar("el racimo son tres bumpers", m.bumpers.size() == 3)
+
+	var huecos: Array[float] = []
+	for i in m.bumpers.size():
+		for j in range(i + 1, m.bumpers.size()):
+			huecos.append((m.bumpers[i] as Vector2).distance_to(m.bumpers[j])
+				- m.p.bumper_radio * 2.0)
+	_comprobar("es un triangulo con el hueco que dice el parametro",
+		absf(huecos.min() - m.p.bumper_hueco) < 1.0
+		and absf(huecos.max() - m.p.bumper_hueco) < 1.0,
+		"huecos entre %.1f y %.1f, pedido %.1f"
+			% [huecos.min(), huecos.max(), m.p.bumper_hueco])
+	_comprobar("y la bola entra, que si no el racimo es una pared",
+		huecos.min() > m.p.radio_bola * 2.0,
+		"hueco %.1f px, bola %.1f" % [huecos.min(), m.p.radio_bola * 2.0])
+
+	# Lo que de verdad importa: entrar por el medio tiene que dar cadena.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	var total := 0
+	var intentos := 24
+	for _i in intentos:
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		# Entrando de verdad por el hueco de arriba, no rozando el racimo de
+		# refilón: con un cono ancho la mitad de las bolas ni entran, y lo que
+		# se quiere medir es qué pasa cuando SÍ entra.
+		m2.bola.pos = m2.p.bumper_centro + Vector2(rng.randf_range(-14, 14), -120)
+		m2.bola.vel = Vector2(rng.randf_range(-60, 60), 480)
+		var golpes := [0]
+		m2.bumper_golpeado.connect(func(_pt: Vector2, _f: float) -> void:
+			golpes[0] += 1)
+		for _j in int(2.5 / DT):
+			if not m2.bola.viva:
+				break
+			m2.avanzar(DT)
+		total += golpes[0]
+	var media := float(total) / float(intentos)
+	# Medido: 3,7 de media con hueco 24 y dos bumpers arriba. Con uno arriba
+	# eran 1,4. El umbral va en 3 para dejar margen sin perder el diente.
+	_comprobar("cayendo dentro del racimo, la bola encadena golpes",
+		media >= 3.0, "%.1f bumpers por entrada" % media)
+
+## Los outlanes son la válvula de dificultad: sin ellos solo se pierde la bola
+## por el hueco entre palas, que es un objetivo pequeño.
+func _prueba_outlanes() -> void:
+	var m := _nueva_mesa()
+	# La boca tiene que medir lo que dice el parámetro y tragar la bola.
+	_comprobar("la boca del outlane es mas ancha que la bola",
+		m.p.ancho_outlane > m.p.radio_bola * 2.0,
+		"boca %.0f px, bola %.0f" % [m.p.ancho_outlane, m.p.radio_bola * 2.0])
+
+	# Una bola que baja pegada a la pared de fuera se pierde por el outlane.
+	# Una que baja más hacia dentro cae en el carril de retorno y sobrevive.
+	for lado in [
+			{"nombre": "izquierdo", "pegada": 32.0, "dentro": 66.0},
+			{"nombre": "derecho", "pegada": 346.0, "dentro": 312.0}]:
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.bola.pos = Vector2(lado["pegada"], 1020)
+		m2.bola.vel = Vector2(0, 260)
+		var r := _simular(m2, 6.0)
+		_comprobar("pegada a la pared, el outlane %s se traga la bola" % lado["nombre"],
+			r["drenada"], "acabo en %s" % str(r["pos"].round()))
+
+		var m3 := _nueva_mesa()
+		m3.nueva_bola()
+		m3.bola.en_carril = false
+		m3.bola.pos = Vector2(lado["dentro"], 1020)
+		m3.bola.vel = Vector2(0, 260)
+		var toca_flipper := [false]
+		m3.flipper_golpeado.connect(func(_pt: Vector2, _f: float) -> void:
+			toca_flipper[0] = true)
+		for _i in int(3.0 / DT):
+			if not m3.bola.viva or toca_flipper[0]:
+				break
+			m3.avanzar(DT)
+		_comprobar("y por dentro baja al flipper por el retorno %s" % lado["nombre"],
+			toca_flipper[0], "no llego a la pala")
+
+## Atrapar la bola: con la pala arriba y quieta, la bola se asienta en vez de
+## resbalar. Es lo que permite apuntar antes de soltar.
+func _prueba_agarre() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.flipper_izq.pulsado = true
+	# Que la pala llegue arriba y se quede quieta.
+	for _i in int(0.3 / DT):
+		m.avanzar(DT)
+	_comprobar("la pala llega arriba y se para",
+		absf(m.flipper_izq.omega) < m.p.flipper_agarre_omega)
+
+	# Bola apoyada encima de la pala levantada, a media longitud del eje.
+	var dir := Vector2(cos(m.flipper_izq.angulo), sin(m.flipper_izq.angulo))
+	var normal := Vector2(-dir.y, dir.x)
+	m.bola.pos = m.p.flipper_eje_izq + dir * 42.0 \
+		+ normal * -(m.p.flipper_radio + m.p.radio_bola - 0.5)
+	m.bola.vel = dir * 150.0
+	for _i in int(1.2 / DT):
+		m.avanzar(DT)
+	_comprobar("con la pala arriba y quieta, la bola se asienta",
+		m.bola.viva and m.bola.velocidad() < 40.0,
+		"viva=%s a %.0f px/s" % [m.bola.viva, m.bola.velocidad()])
+
+	# Y soltar sigue lanzando: el agarre no puede matar el tacto del flipper.
+	var antes := m.bola.velocidad()
+	m.flipper_izq.pulsado = false
+	for _i in int(0.2 / DT):
+		m.avanzar(DT)
+	m.flipper_izq.pulsado = true
+	var maxima := 0.0
+	for _i in int(0.3 / DT):
+		m.avanzar(DT)
+		maxima = maxf(maxima, m.bola.velocidad())
+	_comprobar("y soltar y volver a dar sigue lanzando",
+		maxima > antes + 300.0, "de %.0f a %.0f px/s" % [antes, maxima])
+
+## Los tres recorridos tienen que pagar cosas distintas, o son un tiro repetido.
+func _prueba_identidad_recorridos() -> void:
+	var m := _nueva_mesa()
+	var premios := {}
+	var nombres: Array[String] = []
+	for r in m.rampas:
+		premios[r.premio] = true
+		nombres.append(r.nombre)
+	_comprobar("los tres recorridos pagan tres cosas distintas",
+		premios.size() == 3 and nombres.size() == 3,
+		"%d premios distintos en %s" % [premios.size(), str(nombres)])
+
+	# La órbita sube el multiplicador de tramo, sin encadenar golpes.
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c)
+	var indice_orbita := -1
+	var indice_fuerte := -1
+	for i in c.mesa.rampas.size():
+		var r: Rampa = c.mesa.rampas[i]
+		if r.premio == Rampa.Premio.MULTIPLICADOR:
+			indice_orbita = i
+		elif r.premio == Rampa.Premio.DANO_FUERTE:
+			indice_fuerte = i
+	c.mesa.rampa_salida.emit(Vector2(200, 900), indice_orbita)
+	_comprobar("completar la orbita sube el multiplicador de golpe",
+		c.multiplicador() == 2, "quedo en x%d con %d golpes"
+			% [c.multiplicador(), c.golpes])
+
+	# Y el cañón pega más que un carril normal.
+	var c2 := Combate.new()
+	c2.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c2)
+	var vida := c2.enemigo.vida
+	c2.mesa.rampa_salida.emit(Vector2(200, 900), indice_fuerte)
+	var golpe_fuerte := vida - c2.enemigo.vida
+	_comprobar("el canon pega mas que un carril normal",
+		golpe_fuerte > c2.p.dano_rampa,
+		"%d contra %d" % [golpe_fuerte, c2.p.dano_rampa])
 
 ## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
 ## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no
@@ -605,8 +767,8 @@ func _prueba_sonido() -> void:
 		var stream := load(ruta) as AudioStream
 		if stream == null or stream.get_length() <= 0.005:
 			vacios.append(str(nombre))
-	_comprobar("estan los nueve wav que pide el juego",
-		faltan.is_empty() and NodoSonido.AJUSTES.size() == 9,
+	_comprobar("esta el wav de todos los sonidos que pide el juego",
+		faltan.is_empty() and NodoSonido.AJUSTES.size() >= 10,
 		"faltan %s (hay %d ajustes)" % [str(faltan), NodoSonido.AJUSTES.size()])
 	_comprobar("y ninguno esta vacio", vacios.is_empty(), str(vacios))
 
