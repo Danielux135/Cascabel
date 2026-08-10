@@ -21,12 +21,18 @@ const AJUSTES := {
 	"rampa_salida":  {"db": -3.0, "tono": 0.02},
 	"rampa_fuerte":  {"db": -1.0, "tono": 0.03},
 	"platillo":      {"db": -2.0, "tono": 0.00},
-	"combo":         {"db": -2.0, "tono": 0.00},
+	"combo":         {"db":  1.0, "tono": 0.00},
 	"drenaje":       {"db": -2.0, "tono": 0.00},
 	"muerte":        {"db":  0.0, "tono": 0.00},
 }
 
+## Sonidos con reproductor propio, fuera de la rueda. El arpegio del
+## multiplicador dura medio segundo y en ese medio segundo caben catorce
+## golpes de racimo: en la rueda se lo llevaba por delante su propio banco.
+const PROPIOS := ["combo"]
+
 var _voces: Array[AudioStreamPlayer] = []
+var _propias: Dictionary = {}
 var _streams: Dictionary = {}
 var _siguiente: int = 0
 var _rng := RandomNumberGenerator.new()
@@ -42,6 +48,10 @@ func _ready() -> void:
 		var v := AudioStreamPlayer.new()
 		add_child(v)
 		_voces.append(v)
+	for nombre in PROPIOS:
+		var v := AudioStreamPlayer.new()
+		add_child(v)
+		_propias[nombre] = v
 
 ## `tono_extra` multiplica el tono por encima de la variación del sonido. Se
 ## usa para que el arpegio del multiplicador suene más agudo cuanto más alto es
@@ -51,8 +61,10 @@ func reproducir(nombre: String, tono_extra: float = 1.0) -> void:
 	if stream == null:
 		return
 	var ajuste: Dictionary = AJUSTES.get(nombre, {})
-	var v := _voces[_siguiente]
-	_siguiente = (_siguiente + 1) % _voces.size()
+	var v: AudioStreamPlayer = _propias.get(nombre)
+	if v == null:
+		v = _voces[_siguiente]
+		_siguiente = (_siguiente + 1) % _voces.size()
 	v.stream = stream
 	v.volume_db = float(ajuste.get("db", 0.0))
 	var tono: float = float(ajuste.get("tono", 0.0))

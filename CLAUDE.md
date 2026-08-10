@@ -9,9 +9,13 @@ operativo falso con estética de Windows XP.
 qué toca ahora. No empieces nada sin leerlo.
 
 `PLAN.md` tiene las fases con sus criterios de salida.
-`CONTEXTO.md` tiene la referencia densa: paleta, geometría de la mesa,
-parámetros de física validados, inventario de assets. **Ábrelo solo cuando
-necesites un dato concreto de ahí**, no por costumbre.
+`DISEÑO.md` tiene el diseño de la capa roguelike: el pilar, los ejes de
+build, los ganchos de reliquia. **Ábrelo antes de tocar reliquias, enemigos
+o estructura de run.**
+`CONTEXTO.md` tiene la referencia densa: paleta, assets, proporciones,
+estética. **Ábrelo solo para buscar un dato concreto**, no por costumbre, y
+no es fuente de verdad para parámetros ni geometría: esos viven en el
+código. Si contradice a este archivo, manda este archivo.
 
 ## Lo último de cada sesión
 
@@ -61,11 +65,31 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   caducidad arrastra miles en una partida larga.
 - **Cada rincón nuevo de la mesa es un sitio donde la bola se acuña.**
   Prueba cada zona nueva contra atascos y no toques el ball search.
+- **`Mesa.new()` copia los parámetros dentro de cada colisionador** en el
+  constructor. Cambiar `m.p.<lo_que_sea>` DESPUÉS de crear la mesa no hace
+  nada: el colisionador ya tiene su copia. Un barrido de parámetros escrito
+  así mide seis veces lo mismo. Para barrer hay que tocar
+  `parametros_mesa.gd` y volver a lanzar.
+- **No edites `.gd` con `Set-Content -Encoding utf8` desde PowerShell**:
+  corrompe los acentos por doble codificación (`restitución` →
+  `restituciÃ³n`). Usa herramientas de fichero, no `-replace` en consola.
+- **Regenerar un wav no basta: hay que reimportarlo.** Godot sirve la copia
+  de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
+  pruebas siguen oyendo el sonido viejo. Hay que lanzar
+  `Godot ... --headless --path C:\dev\tilt-os --import` antes de probar.
+- **Un cambio de recompensa puede romper la mesa sin romper la física.** El
+  cañón devolvía la bola al racimo de bumpers y alimentaba un bucle que
+  mataba al enemigo sin que las palas participaran nunca. Cuando cambies
+  dónde sale un recorrido, mira qué bucle acabas de crear.
 
 ## Cómo trabajar
 
 - **Una fase por sesión**, commit al cerrarla. Si en mitad aparece una idea
   buena de otra fase, se anota en `ESTADO.md` y se sigue.
+- **`ESTADO.md` no es un registro de cambios.** Al cerrar sesión, resume lo
+  tuyo en dos o tres líneas y borra el detalle de la sesión anterior. Lo que
+  merezca sobrevivir para siempre —una trampa, un invariante— va aquí, no
+  allí.
 - **Los criterios de salida se comprueban jugando, no leyendo el código.**
   Cuando algo dependa del tacto, exponlo como parámetro y pregunta. No
   decidas desde el código lo que solo se sabe con las manos.

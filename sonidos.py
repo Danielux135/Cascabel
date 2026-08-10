@@ -30,6 +30,8 @@ Vocabulario de parámetros (todos opcionales menos `dur`):
     vol         0..1
     mezcla      lista de capas, cada una con estos mismos parámetros
     notas       lista de frecuencias, para arpegios; usa dur_nota
+    dur_ultima  duración de la última nota del arpegio; por defecto, dur_nota
+    caida_ultima  caída de la última nota; por defecto, la de las demás
 """
 
 import argparse
@@ -88,10 +90,17 @@ SONIDOS = {
     ]),
 
     # --- Subir de multiplicador: arpegio ascendente. Es lo único alegre que
-    # suena en la mesa, y a propósito: marca el momento que importa. ---
+    # suena en la mesa, y a propósito: marca el momento que importa.
+    #
+    # Va en triángulo con un armónico, NO en cuadrada: bumper y target ya son
+    # cuadradas, y en mitad del racimo el arpegio se confundía con un golpe
+    # más. El timbre distinto es lo que lo hace destacar, más que el volumen.
+    # Cinco notas y la última sostenida: el oído necesita que el gesto termine
+    # arriba y se quede, o no registra que ha subido nada. ---
     "combo": dict(
-        onda="cuadrada", notas=[523, 659, 784, 1047], dur_nota=0.055,
-        caida=22, filtro=7000, crush=5, vol=0.40,
+        onda="triangulo", armonicos=[(2.0, 0.30)],
+        notas=[523, 659, 784, 1047, 1319], dur_nota=0.062, dur_ultima=0.30,
+        caida=13, caida_ultima=6, ataque=0.004, filtro=8000, crush=6, vol=0.52,
     ),
 
     # --- Perder la bola y matar al enemigo. Los dos largos, que son los dos
@@ -191,12 +200,20 @@ def sintetizar(par, semilla=0):
     rng = np.random.default_rng(semilla)
 
     if "notas" in par:
+        fuera = ("notas", "dur_nota", "dur_ultima", "caida_ultima")
         trozos = []
-        for f in par["notas"]:
-            sub = {k: v for k, v in par.items() if k not in ("notas", "dur_nota")}
+        ultima = len(par["notas"]) - 1
+        for i, f in enumerate(par["notas"]):
+            sub = {k: v for k, v in par.items() if k not in fuera}
             sub["f0"] = f
             sub["f1"] = f
             sub["dur"] = par["dur_nota"]
+            # La última nota es la que dice "has subido": se deja sonar más y
+            # cae más despacio, para que el arpegio aterrice en vez de cortarse.
+            if i == ultima:
+                sub["dur"] = par.get("dur_ultima", par["dur_nota"])
+                if "caida_ultima" in par:
+                    sub["caida"] = par["caida_ultima"]
             trozos.append(_capa(sub, rng))
         return np.concatenate(trozos)
 

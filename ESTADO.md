@@ -1,245 +1,98 @@
 # ESTADO.md
 
-Estado vivo del proyecto. Se lee al empezar la sesión y se actualiza al
-terminarla. Mantenlo corto: si crece más de una pantalla, sobra algo.
+Estado vivo. Se lee al empezar la sesión y se actualiza al terminarla.
 
-**Última actualización:** bloque 1 de control (pantalla completa, slingshots,
-flipper 64, agarre, outlanes)
+**Regla de tamaño:** esto no es un registro de cambios. Al cerrar sesión,
+resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
+Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
+pasa de una pantalla, sobra algo.
+
+**Última actualización:** cierre de la Fase 2
 
 ---
 
 ## Fase actual
 
-**Fase 2 — Sensación.** Cerrada salvo comprobación de Daniel.
+**Fase 2 — Sensación: cerrada.** Falta que Daniel valide el tacto jugando.
+Lo siguiente es la Fase 3, empezando por la identidad de los tiros.
 
 ## Hecho
 
-- **Fase 0:** física, flippers, bumpers, targets, combate con daño en vivo,
-  multiplicador de combo, vida del enemigo
-- **Fase 1:** 960×540 con escalado entero, mesa 400×1300, cámara vertical
-  con sus cuatro reglas, órbita bidireccional y dos carriles de retorno como
-  splines, platillo que captura y expulsa
-- **Fase 2:** hitstop, sacudida en píxeles enteros, girador con ocho
+- **Fase 0** física, flippers, bumpers, targets, daño en vivo, multiplicador
+  de combo, vida del enemigo
+- **Fase 1** 960×540 con escalado entero y pantalla completa, mesa 400×1300,
+  cámara vertical con sus cuatro reglas, órbita bidireccional y dos carriles
+  de retorno como splines, platillo que captura, outlanes
+- **Fase 2** hitstop, sacudida en píxeles enteros, girador con ocho
   rotaciones pregeneradas, respiración en pasos enteros, nueve sonidos
-  sintetizados por `sonidos.py`, banco de 14 voces, efectos de onda, polvo
-  y chispas
+  sintetizados por `sonidos.py`, banco de 14 voces, efectos de onda, polvo y
+  chispas
+- **Control de la bola** slingshots sacados del barrido de la pala (era el
+  bug que impedía apuntar), flipper a 64, rebote a 0,10, agarre a 40 con
+  umbral de velocidad a 700
+- **Coherencia visual** `render/paleta.gd` como sitio único con los 33
+  colores y alias por uso; prueba que impide colores inventados en `render/`
+- **Multiplicador audible** el arpegio pasa a triángulo (bumper y target son
+  cuadradas y se lo comían), cinco notas con la última sostenida, 548 ms,
+  +1 dB, reproductor propio fuera de la rueda de voces, y transposición por
+  tramo en intervalos musicales: x2 en su tono, x3 tercera menor, x4 quinta
 
-## Pendiente ahora mismo
+## Diales vivos
 
-Corrección de dificultad y control. La mesa se ha vuelto **demasiado
-fácil**: Daniel drena una vez cada diez combates, cuando debería drenar
-cada dos o tres bolas. Diagnóstico: las rampas son zonas de riesgo cero, y
-al medir contra las proporciones de una máquina real salen dos elementos
-mal dimensionados.
+Los números que se tocan para ajustar el tacto. Uno cada vez.
 
-1. **Racimo de bumpers.** Hay 82 px de aire entre ellos y la bola pasa sin
-   tocar. Juntarlos en triángulo con ~24 px entre bordes (la bola mide 18).
-2. **Outlanes.** No existen: solo se drena por el centro. Dos carriles a
-   los lados de los flippers con la anchura como parámetro. Es la válvula
-   de dificultad de la mesa.
-3. **Atrapar la bola.** Con el flipper levantado la bola debe asentarse y
-   quedar quieta para poder apuntar. Sin esto no se apunta, se cae en los
-   tiros de rebote.
-4. **Identidad de los tres recorridos.** Ahora los tres solo mueven la
-   bola. Recompensas y sonidos distintos.
-5. **Multiplicador audible** al subir de tramo.
+| Dial | Valor | Para qué |
+|---|---|---|
+| `ancho_outlane` | 21 | Dificultad. Suelo 18, techo ~26 |
+| `flipper_longitud` | 64 | Dificultad. Hueco central 47 px |
+| `flipper_rebote` | 0,10 | Si la bola botonea en la pala |
+| `flipper_agarre` | 40 | Si no se queda quieta, o si se queda pegada |
+| `flipper_agarre_velocidad` | 700 | Por encima de esto no agarra |
+| `target_canto` | 8 | Cuánto sobresale el target al campo |
 
-Los puntos 1 a 4 están cerrados y los dos diales de dificultad (outlanes y
-longitud del flipper) ya están puestos. Queda medir con las manos si la mesa
-castiga lo que tiene que castigar. Falta el punto 5.
+**Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
-## Hecho esta sesión (bloque 1: que se vea y se controle)
+## Que pruebe Daniel
 
-- **Pantalla completa por defecto.** La ventana de escritorio era 1908×960 y
-  con base 960×540 el escalado entero caía a ×1. `window/size/mode=3` y el
-  override de ventana en 1920×1080, que es ×2 exacto. Comprobado en las
-  pruebas de ajustes.
-- **Slingshots fuera del barrido de la pala.** Era el bug de verdad: la punta
-  baja de cada banda cruzaba el arco que barre el flipper, así que la bola
-  apoyada en la pala levantada tocaba el slingshot y salía disparada. Medido:
-  la bola quedaba 8,8 px DENTRO del slingshot. Movidos 20 px el izquierdo y
-  30 px el derecho, en perpendicular a la línea que describe la bola apoyada
-  en la pala arriba (la dirección que aleja sin estrechar el carril de
-  retorno). Ahora quedan 16 px de holgura. El derecho, además, recortado por
-  arriba: el carril de retorno izquierdo suelta la bola en (330,1085) y la
-  banda subida le pasaba a 8 px.
-- **Prueba nueva `_prueba_barrido_del_flipper`.** Pasea una bola de mentira
-  por encima de la pala en las 25 posiciones del recorrido y de 15 px del eje
-  a la punta, y comprueba que no toca ningún colisionador. Verificada al
-  revés: con los slingshots viejos falla en los dos lados.
-- **Boca del outlane desacoplada de su altura.** Se recortaba sobre la
-  diagonal de la pared, así que estrechar el outlane subía también su esquina
-  y pinzaba la entrada del carril de retorno. Ahora la boca es un tramo
-  horizontal a altura fija y `ancho_outlane` solo la mueve de lado.
-- **Diales de dificultad y tacto:** `flipper_longitud` 78 → **64** (el hueco
-  central pasa de 22 a 47 px), `ancho_outlane` 26 → **21**, `flipper_rebote`
-  0,30 → **0,10**, `flipper_agarre` 16 → **40**.
-- **La espiral del suelo, movida** de (128,900) a (285,895). No es capricho:
-  con la pala corta la bola drena antes, la muestra se acorta y la espiral
-  pasaba del 3 % que tolera `_prueba_adornos`. En el sitio nuevo marca 1,6 %.
-
-## Corrección tras la primera prueba de manos del bloque 1
-
-Daniel probó y salieron dos cosas, las dos con causa localizada:
-
-- **"La bola vive arriba y el monstruo muere antes de que las palas la
-  toquen."** La causa NO era física. Era la economía de la mesa: de los tres
-  recorridos, la órbita devolvía arriba y el **cañón acababa en (200,690)**,
-  o sea dentro del racimo de bumpers y arriba del todo. Y el cañón es el que
-  más daño paga (`DANO_FUERTE`). El bucle se alimentaba solo —cañón →
-  bumpers → rampa → cañón— pegando en cada vuelta, y el enemigo se moría sin
-  que las palas participaran nunca.
-  **El cañón ahora baja a la pala izquierda**, saliendo en (66,1020). Los dos
-  carriles quedan simétricos en función: cada uno sirve la bola a una pala
-  distinta. Pierde su identidad de "te mete en el racimo"; decisión de Daniel.
-  Descartado por el camino: `bumper_rebote` (1,8 → 1,0 rompe tres pruebas y
-  además el racimo no era el sitio donde se quedaba la bola). Sigue en 1,8.
-
-- **Vida de enemigos ×3** en `data/enemigos.json` (60-180 → 180-540). Una
-  bola buena hace 160 de daño, así que con la tabla vieja una sola bola
-  mataba a cualquiera. Parche declarado: la tabla se rehace en la Fase 3.
-
-- **Prueba nueva:** "los carriles de retorno dejan la bola al alcance de la
-  pala". Exige que al menos dos recorridos suelten por debajo de y=950, para
-  que el cañón no se vuelva a ir hacia arriba sin que nadie se entere.
-  La salida NO puede ser el espejo del otro carril: (70,1085) cae dentro de
-  un colisionador y lo cazó la prueba de bocas empotradas.
-- **"Solo una vez consiguió atrapar la bola; si va rápido, rebota."** No era
-  `flipper_rebote`. Era `flipper_agarre_velocidad`, que valía **300**: el
-  agarre se apagaba por encima de esa velocidad, y la bola baja muy por
-  encima de 300 (el tope son 1500). El umbral venía de la mesa pequeña.
-  Subido a **700**.
-
-**138/138 pruebas en verde.** Probado por Daniel: la bola ya baja y se juega
-con las palas. El combate sigue siendo corto, pero más largo que antes, y la
-vida de los enemigos se queda como está (×3).
-
-**Godot no estaba en el PATH**; está en `C:\Users\Daniel\Desktop\Godot` y ya
-queda apuntado en `CLAUDE.md` con el comando de la batería.
-
-### Trampa nueva, apuntada porque costará tiempo otra vez
-
-`Mesa.new()` **copia** los parámetros dentro de cada colisionador en el
-constructor (`_bumper`, `_slingshot`… en `mesa.gd:216-227`). Cambiar
-`m.p.bumper_rebote` DESPUÉS de crear la mesa no hace nada: el colisionador ya
-tiene su copia. Un barrido de parámetros escrito así mide seis veces lo
-mismo y da seis filas idénticas. Para barrer hay que tocar
-`parametros_mesa.gd` y volver a lanzar.
-
-Y al editar `.gd` desde PowerShell, **`Set-Content -Encoding utf8` corrompe
-los acentos** (doble codificación: `restitución` → `restituciÃ³n`). Editar
-con herramientas de fichero, no con `-replace` desde la consola.
-
-## Hecho en sesiones anteriores
-
-- **960×540.** `project.godot` y `ParametrosCamara`. Todo lo demás sale de
-  `ancho_visible`/`alto_visible`, así que no hubo nada más que tocar: el HUD
-  y el escritorio se recolocaron solos. El fondo del escritorio es 320×180,
-  o sea ×3 exacto: sigue sin romper píxeles. La mesa sigue en 400 unidades y
-  la física no se ha tocado.
-- **Targets: la forma, no el tamaño.** Lo de "los targets miden 60" era un
-  error de la nota anterior: ese 60 era el argumento `visible_px` de
-  `_dibujar_sprite_centrado`, o sea el tamaño del dibujo dentro del PNG de
-  64, no una medida de la mesa. Medido de verdad, el target ya media 30 px
-  de cara, que es justo lo de un drop target real (1,5" sobre una mesa de
-  20,25" = 400 unidades). Lo que estaba seis veces mal era el FONDO: era un
-  círculo de radio 13 que metía 26 px de cuerpo redondo en el campo, y por
-  eso se les daba de refilón. Ahora es una plancha:
-  `target_ancho = 30` (la cara, no se toca) y `target_canto = 8` (lo que
-  sobresale, este es el dial). El borde de fuera se queda clavado donde
-  estaba, así que el carril de detrás sigue midiendo 23 px y lo que se abre
-  son 18 px de campo por delante del banco.
-- El target pasa a dibujarse **por código**, como el flipper, porque el
-  canto es un dial vivo y el arte tiene que medir lo mismo que el
-  colisionador. `target_escudo.png` y `target_lapida.png` quedan sin usar en
-  `assets/mesa/`: vuelven cuando el número se quede quieto. Mientras tanto
-  los dos bancos se distinguen por color (oro el izquierdo, arcano el
-  derecho).
-
-## Hecho esta sesión (bloque 2: coherencia visual)
-
-- **`render/paleta.gd`, sitio único.** Los 33 colores de `CONTEXTO.md` (no 26
-  como decía esta nota) más una capa de alias por USO (`CABINA`, `GOMA`,
-  `FLIPPER_LINEA`…), que es lo que se escribe al dibujar. `vista_mesa`,
-  `nodo_hud`, `nodo_suelo` y `nodo_escritorio` repetían cada uno su bloque de
-  hex: cambiar un color eran cuatro sitios, y olvidarse de uno no rompía
-  nada, solo dejaba el color viejo. Ahora todos apuntan a `Paleta`.
-- **Los tres colores que sí estaban fuera de la paleta.** No eran "dorados,
-  rojos y lavandas" como decía la nota vieja —esos ya salían de la paleta—,
-  eran: `1C1A22` para los huecos del tablero (un intermedio inventado entre
-  el negro y el gris; pasa a `NEGRO`, que además es lo que se ve por un
-  agujero: el mueble) y dos blancos puros, el destello de daño y el borde de
-  disolución (pasan a `E4E6EC` y `E8814A`).
-- **El `Color.WHITE` de `vista_mesa.gd:534` se queda.** No es un color, es el
-  tinte neutro de `draw_texture_rect`; ponerle `E4E6EC` oscurecería el sprite
-  del bumper. Anotado ahí mismo para que no lo "arregle" nadie.
-- **La banda gris de la derecha.** El fondo se dibujaba sobre `ancho_visible`
-  (960 fijo), pero con `stretch/aspect="expand"` el viewport crece cuando la
-  pantalla no da 16:9 exacto, y el fondo no llegaba al borde. Ahora sale del
-  tamaño real del viewport, y la textura de 320×180 se sube por múltiplos
-  ENTEROS y se centra: lo que sobra se sale por los lados, que es justo donde
-  van las ventanas en la Fase 5. Se repinta al cambiar el tamaño de ventana.
-- **Prueba nueva `_prueba_paleta`:** que la paleta tenga los 33, que no haya
-  ningún `Color("...")` inventado en `render/` fuera de `paleta.gd`, y que
-  todos los alias por uso salgan de la paleta de verdad.
-
-**141/141 pruebas.** El juego arranca sin errores. Falta que Daniel mire si
-algún color ha cambiado a peor: lo único que cambia de aspecto son los huecos
-del tablero y el destello blanco al pegar.
+1. **Atrapar la bola.** ¿Se queda quieta con la pala levantada? ¿Da tiempo
+   a mirar, decidir y soltar?
+2. **¿Cada cuánto drena?** El objetivo es cada dos o tres bolas.
+3. **Los outlanes.** Deben castigar la bola descontrolada, no la controlada.
+4. **Los huecos del tablero en negro y el destello al pegar**, que es lo
+   único que cambió de color.
+5. **Que la banda gris de la derecha haya desaparecido** en pantalla
+   completa.
+6. **Subir de tramo, con el racimo sonando.** ¿Se oye que has subido sin
+   mirar el número? ¿Y se distingue x3 de x4 solo por el tono? Si tapa
+   demasiado los golpes, el dial es `db` de `combo` en `nodo_sonido.gd`.
 
 ## Siguiente
 
-- Que Daniel mire el bloque 2 (arriba: solo cambian huecos y destello).
-- Punto 5 pendiente de la tanda de dificultad: **multiplicador audible** al
-  subir de tramo.
-- Fase 3: el mapa del run.
+1. **Identidad de los tiros** (`DISEÑO.md` §4). Es el arranque real de la
+   Fase 3, antes que el mapa: sin tiros distintos no hay decisiones
+2. Mapa del run
 
-## Mediciones de referencia
+## Mediciones
 
 | Qué | Valor |
 |---|---|
 | Duración de bola, mesa pequeña | ~10 s |
-| Duración de bola, mesa grande | demasiado alta, casi no drena |
-| Objetivo | drenar cada 2-3 bolas |
+| Objetivo de drenaje | cada 2-3 bolas |
 | Daño de una bola buena | 160 con 13 golpes a ×3 |
+| Vida de enemigos | ×3 provisional (180-540) |
 
-La tabla de vida de enemigos se rehará entera en la Fase 3: ajustarla ahora
-es trabajo perdido.
+La tabla de vida se rehace entera en la Fase 3. Ajustarla ahora es trabajo
+perdido.
 
-## Que pruebe Daniel
+## Abierto
 
-Cinco cosas, y todas son de manos. Ninguna se decide leyendo el código.
-
-1. **Atrapar la bola.** Levantar la pala con la bola encima y ver si se
-   queda quieta para apuntar. Si todavía botonea, el dial es
-   `flipper_rebote` (0,10); si se queda pegada como con cola y ya no sale
-   bien al soltar, `flipper_agarre` (40).
-2. **Que el slingshot ya no dispare la bola atrapada.** Es lo que impedía
-   apuntar. Si sigue pasando en algún sitio, decir DÓNDE.
-3. **La pala de 64.** El hueco central pasa de 22 a 47 px, así que se drena
-   por el medio bastante más. Si ahora es demasiado, el dial es
-   `flipper_longitud`.
-4. **Los outlanes a 21.** Tienen que castigar la bola descontrolada, no la
-   controlada. Si ya no se cuela nunca, subirlo hacia 24; 18 es el suelo
-   (por debajo no cabe la bola).
-5. **Que la pantalla completa entre a ×2** y no se vea nada borroso ni a
-   tamaño de sello.
-
-Objetivo de la tanda: pasar de "drena una vez cada diez combates" a "drena
-cada dos o tres bolas". Si se pasa de castigo, el orden para aflojar es
-outlanes primero y flipper después, uno cada vez.
-
-## Abierto, sin resolver
-
-- Los dos carriles de retorno no miden lo mismo: el izquierdo tiene 34 px de
-  boca y el derecho 27, porque el carril lanzador le come sitio a la mitad
-  derecha de la mesa. Ya era así antes; ahora la diferencia se nota un poco
-  más. Si se acaba notando al jugar, hay que replantear el lado derecho
-  entero, no moverlo 3 px.
-
-- Enemigo fuera de pantalla al hacer scroll. Se resuelve en la Fase 5 con
-  el enemigo en su propia ventana.
-- Laterales del escritorio apagados al 66% como apaño provisional; en la
-  Fase 5 pasa a ser el estado "ventana de combate en primer plano".
-- Iconos de reliquia: hay versión de 64 y de 32 px. La de 32 es para el
-  escritorio, la de 64 para la pantalla de recompensa.
+- **Los dos carriles de retorno no miden lo mismo**: 34 px de boca el
+  izquierdo, 27 el derecho, porque el carril lanzador come sitio a la
+  derecha. Si se nota al jugar hay que replantear el lado derecho entero, no
+  moverlo 3 px.
+- **El cañón perdió su identidad.** Devolvía la bola al racimo de bumpers y
+  eso alimentaba un bucle que mataba al enemigo sin que las palas
+  participaran. Ahora baja a la pala izquierda, o sea que los dos carriles
+  hacen lo mismo. Se le devolverá identidad al hacer `DISEÑO.md` §4.
+- Enemigo fuera de pantalla al hacer scroll → Fase 5, ventana propia
+- Laterales del escritorio apagados al 66% como apaño → Fase 5

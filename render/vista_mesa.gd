@@ -383,9 +383,18 @@ func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 	# Y sube de tono con el tramo: x2, x3 y x4 son el mismo arpegio cada vez
 	# más agudo, así que el oído sabe por dónde va sin mirar el número.
 	if golpes > 0:
-		_sonido.reproducir("combo", 1.0 + 0.12 * float(multiplicador - 2))
+		_sonido.reproducir("combo", _tono_combo(multiplicador))
 	if multiplicador > 1:
 		_sacudir(anim.sacudida_dano)
+
+## Transposición del arpegio por tramo. Van en intervalos musicales, no en un
+## porcentaje fijo: un 12 % por tramo es medio semitono largo y el oído lo lee
+## como "el mismo sonido desafinado", no como "más alto". x2 suena en su tono,
+## x3 una tercera menor arriba, x4 una quinta.
+const TONO_COMBO := [1.0, 1.19, 1.50]
+
+func _tono_combo(multiplicador: int) -> float:
+	return TONO_COMBO[clampi(multiplicador - 2, 0, TONO_COMBO.size() - 1)]
 
 func _al_atacar_enemigo(_dano: int) -> void:
 	flash_jugador = 1.0

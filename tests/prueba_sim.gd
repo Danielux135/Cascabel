@@ -847,6 +847,30 @@ func _prueba_sonido() -> void:
 	_comprobar("los golpes que se repiten llevan variacion de tono",
 		sin_variacion.is_empty(), str(sin_variacion))
 
+	# El arpegio del multiplicador tiene que durar bastante más que un golpe:
+	# si dura lo mismo, en mitad del racimo pasa por un bumper más y subir de
+	# tramo no se nota. Y va fuera de la rueda de voces para que nada lo pise.
+	var combo := load(NodoSonido.RUTA % "combo") as AudioStream
+	var bumper := load(NodoSonido.RUTA % "bumper") as AudioStream
+	_comprobar("el arpegio del multiplicador dura mas que un golpe",
+		combo.get_length() > 3.0 * bumper.get_length(),
+		"combo %.3f s, bumper %.3f s" % [combo.get_length(), bumper.get_length()])
+	_comprobar("y suena mas fuerte que los golpes que lo rodean",
+		float((NodoSonido.AJUSTES["combo"] as Dictionary)["db"])
+			> float((NodoSonido.AJUSTES["bumper"] as Dictionary)["db"]))
+	_comprobar("el multiplicador tiene reproductor propio",
+		NodoSonido.PROPIOS.has("combo"), str(NodoSonido.PROPIOS))
+
+	# Y cada tramo suena más agudo que el anterior, con separación suficiente
+	# para leerse como otra nota y no como el mismo sonido desafinado.
+	var tonos: Array = VistaMesa.TONO_COMBO
+	var asciende := true
+	for i in range(1, tonos.size()):
+		if float(tonos[i]) < float(tonos[i - 1]) * 1.08:
+			asciende = false
+	_comprobar("cada tramo del multiplicador suena mas agudo que el anterior",
+		asciende and tonos.size() >= 3, str(tonos))
+
 ## El criterio de salida de la fase 1: la bola sube por una rampa, desaparece
 ## de vista, y sabes dónde va a salir. Aquí se comprueba que sale SIEMPRE por
 ## el mismo sitio, que tarda lo que tiene que tardar, y que no hay forma de que

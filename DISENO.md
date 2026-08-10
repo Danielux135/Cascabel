@@ -12,7 +12,7 @@ Este documento se cierra **antes** de construir la Fase 3.
 **La mesa es un menú de tiros.**
 
 Cada tiro de la mesa da algo distinto. Tu build decide cuáles te compensan.
-Los enemigos decidenter cuáles te dejan.
+Los enemigos deciden cuáles te dejan.
 
 Sin esto no hay juego: si todos los tiros dan lo mismo, el jugador no elige
 nada, solo sobrevive, y las reliquias se convierten en bonificaciones
@@ -61,7 +61,7 @@ Si alguna de las tres no tiene decisión, esa escala está rota.
 
 ---
 
-## 3. Los tiros de la mesa
+## 4. Los tiros de la mesa
 
 Cada uno con identidad propia. Este es el contenido que hace falta antes de
 tocar reliquias.
@@ -80,7 +80,7 @@ Lo fácil da poco y muchas veces; lo difícil da mucho de una vez.
 
 ---
 
-## 4. Los ejes de build
+## 5. Los ejes de build
 
 Cinco. Una partida buena empuja uno o dos, no los cinco.
 
@@ -101,11 +101,11 @@ grandes.
 
 ---
 
-## 5. Recursos
+## 6. Recursos
 
 | Recurso | Vive | Se pierde |
 |---|---|---|
-| **Vida** | Todo el run | Al drenar. No se cura sola entre combates |
+| **Vida** | Todo el run | Al drenar y cuando llega el reloj del enemigo. No se cura sola entre combates |
 | **Multiplicador** | Una bola | Al drenar |
 | **Chatarra** | Todo el run | Al gastarla en la tienda |
 | **Reliquias** | Todo el run | Nunca |
@@ -115,7 +115,7 @@ uno de estos.
 
 ---
 
-## 6. Ganchos de reliquia
+## 7. Ganchos de reliquia
 
 Las reliquias no se inventan una a una: se diseñan contra esta rejilla. Si
 una reliquia no encaja en ningún gancho, o sobra o falta un gancho.
@@ -135,7 +135,7 @@ ganchos distintos. Nada de quince variantes de "+2 de daño".
 
 ---
 
-## 7. Enemigos que cambian cómo juegas
+## 8. Enemigos que cambian cómo juegas
 
 Un enemigo con más vida no es un enemigo nuevo. Cada uno debe alterar qué
 tiro te compensa:
@@ -152,7 +152,7 @@ real de la partida.
 
 ---
 
-## 8. Estructura del run
+## 9. Estructura del run
 
 Tres actos. Doce a quince combates. Treinta a cuarenta minutos.
 
@@ -172,7 +172,7 @@ con mejorar. Ahí está la tensión del mapa.
 
 ---
 
-## 9. Lo que este juego NO es
+## 10. Lo que este juego NO es
 
 Cerca de la mitad del trabajo de diseño es decir que no.
 
@@ -194,7 +194,7 @@ Cerca de la mitad del trabajo de diseño es decir que no.
 
 ---
 
-## 10. Preguntas abiertas
+## 11. Preguntas abiertas
 
 Se responden jugando, no discutiendo. Pero hay que tenerlas a la vista:
 
