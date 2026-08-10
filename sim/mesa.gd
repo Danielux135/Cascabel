@@ -99,19 +99,35 @@ func _construir() -> void:
 	# de retorno que muere en un poste de goma, y el poste solapa con la cápsula
 	# del eje del flipper (11 + 8 = 19 px de radios contra 8,5 px de distancia).
 	# No queda hueco: no hay dónde acuñarse. La bola sale por la boca del inlane
-	# (22 px libres entre el poste y la punta del slingshot) y cae sobre el
+	# (30 px libres entre el poste y la punta del slingshot) y cae sobre el
 	# flipper, que es lo que hace un inlane real.
-	# La pared del carril de retorno ya no arranca pegada a la de fuera: se
-	# recorta por arriba y ese hueco es la BOCA DEL OUTLANE. Una bola que baja
-	# pegada a la pared se cuela por ahí y se pierde; una que viene más hacia
-	# dentro cae sobre la pared y baja por el retorno al flipper. Esa es la
-	# elección, y se decide arriba, por dónde venga la bola.
-	_pared(_en_x(_v(20, 480), _v(99, 584), 20.0 + p.ancho_outlane), _v(99, 584))
-	_slingshot(_v(75, 505), _v(128, 575))
+	# La pared del carril de retorno no arranca pegada a la de fuera: el hueco
+	# que deja por arriba es la BOCA DEL OUTLANE. Una bola que baja pegada a la
+	# pared se cuela por ahí y se pierde; una que viene más hacia dentro cae
+	# sobre la pared y baja por el retorno al flipper. Esa es la elección, y se
+	# decide arriba, por dónde venga la bola. La boca es un tramo HORIZONTAL a
+	# una altura fija y `ancho_outlane` solo la mueve de lado: cuando se
+	# recortaba sobre la diagonal, estrechar el outlane subía además su esquina
+	# y pinzaba la entrada del carril de retorno contra el slingshot.
+	#
+	# Los slingshots van SUBIDOS Y HACIA FUERA respecto de donde estaban. El
+	# bug: la punta baja de cada banda cruzaba el arco que barre la pala, así
+	# que la bola apoyada en la pala levantada tocaba el slingshot y salía
+	# disparada, y con eso no se puede ni atrapar ni apuntar. Movidos 20 px el
+	# izquierdo y 30 px el derecho, en perpendicular a la línea que describe la
+	# bola apoyada en la pala arriba: es la dirección que aleja sin estrechar el
+	# carril de retorno, que va casi paralelo a la banda.
+	# Lo comprueba `_prueba_barrido_del_flipper`.
+	_pared(_v(20.0 + p.ancho_outlane, 514), _v(99, 584))
+	_slingshot(_v(64, 488), _v(117, 558))
 	_poste(_v(102, 596))
 
-	_pared(_en_x(_v(355, 458), _v(301, 584), 358.0 - p.ancho_outlane), _v(301, 584))
-	_slingshot(_v(306, 512), _v(262, 582))
+	_pared(_v(358.0 - p.ancho_outlane, 512), _v(301, 584))
+	# El derecho, además, se recorta por arriba: el carril de retorno izquierdo
+	# suelta la bola en (330,1085), justo en la boca de este inlane, y la banda
+	# subida le pasaba a 8 px. Recortada arriba le pasa a 14 y la punta de abajo
+	# —que es la que tenía que alejarse del flipper— se queda donde estaba.
+	_slingshot(_v(318, 492), _v(278, 556))
 	_poste(_v(298, 596))
 
 	# --- Bumpers, en racimo apretado ---
@@ -224,13 +240,6 @@ func _racimo_bumpers() -> void:
 	for i in 3:
 		var ang := PI * 0.5 + float(i) * TAU / 3.0
 		_bumper(p.bumper_centro + Vector2(cos(ang), sin(ang)) * radio_racimo)
-
-## Punto del segmento a->b a una `x` dada. Para recortar la boca de los outlanes
-## con la anchura como parámetro, en vez de a ojo.
-func _en_x(a: Vector2, b: Vector2, x: float) -> Vector2:
-	if is_equal_approx(a.x, b.x):
-		return a
-	return a.lerp(b, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))
 
 ## Cada target es una PLANCHA, no un bolo: una cápsula tumbada a lo largo de la
 ## línea del banco (o sea, paralela a la pared), de `target_ancho` de cara y

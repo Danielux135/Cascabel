@@ -15,8 +15,15 @@ var velocidad_maxima: float = 1500.0
 
 # --- Flippers ---
 var flipper_velocidad_giro: float = 22.0    # rad/s
-var flipper_rebote: float = 0.30
-var flipper_longitud: float = 78.0
+## La pala no rebota, empuja: el rebote solo actúa cuando está quieta, y ahí lo
+## que hace falta es que la bola se quede, no que salte. Con 0,30 la bola
+## botaba encima de la pala y perdía el contacto, así que el agarre se
+## encendía y se apagaba y no había forma de asentarla para apuntar.
+var flipper_rebote: float = 0.10
+## Bajado de 78 a 64: era el dial de dificultad que quedaba pendiente. Con 78 el
+## hueco central medía 22 px y con 64 mide 47, o sea que drenar por el medio
+## deja de ser un objetivo diminuto.
+var flipper_longitud: float = 64.0
 var flipper_radio: float = 8.0
 var flipper_reposo_izq: float = 28.0        # grados, Y hacia abajo
 var flipper_activo_izq: float = -32.0       # recorrido de 60°
@@ -51,13 +58,20 @@ var bumper_centro := Vector2(200.0, 805.0)
 ## se pierde la bola por el hueco entre palas, que es un objetivo pequeño.
 ## Es la anchura de la BOCA, medida en horizontal contra la pared de fuera. Por
 ## debajo de 18 (el diámetro de la bola) el outlane deja de tragar.
-var ancho_outlane: float = 26.0
+## Con 26 entraba demasiado fácil: en la boca quedaban 8 px de margen para el
+## centro de la bola y cualquier bajada por el lado se colaba. Con 21 quedan 3
+## y hay que venir pegado a la pared de fuera, o sea descontrolado. 18 es el
+## suelo absoluto: por debajo no cabe la bola y el outlane deja de existir.
+var ancho_outlane: float = 21.0
 
 ## (*) Atrapar la bola. Con el flipper levantado Y QUIETO (o sea, cuando ya ha
 ## llegado arriba) y la bola apoyada encima, se frena hasta pararse en vez de
 ## resbalar por la pala. Es lo que permite apuntar antes de soltar.
 ## En movimiento no agarra: ahí lanza como siempre, que es lo que da el tacto.
-var flipper_agarre: float = 16.0            # frenado tangencial, 1/s
+## Subido de 16 a 40: con 16 la bola seguía deslizando casi medio segundo por la
+## pala antes de pararse, y en ese medio segundo ya se había ido de la punta.
+## Con 40 se asienta en menos de 0,1 s y se queda donde cae.
+var flipper_agarre: float = 40.0            # frenado tangencial, 1/s
 var flipper_agarre_velocidad: float = 300.0 # por encima de esto no agarra
 var flipper_agarre_omega: float = 0.6       # rad/s; si la pala gira, no agarra
 

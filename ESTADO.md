@@ -3,7 +3,8 @@
 Estado vivo del proyecto. Se lee al empezar la sesión y se actualiza al
 terminarla. Mantenlo corto: si crece más de una pantalla, sobra algo.
 
-**Última actualización:** subida a 960x540
+**Última actualización:** bloque 1 de control (pantalla completa, slingshots,
+flipper 64, agarre, outlanes)
 
 ---
 
@@ -43,10 +44,41 @@ mal dimensionados.
    bola. Recompensas y sonidos distintos.
 5. **Multiplicador audible** al subir de tramo.
 
-**Orden de los diales de dificultad:** outlanes primero, luego bajar el
-flipper de 78 a 64. Uno cada vez, o no se sabrá cuál hizo qué.
+Los puntos 1 a 4 están cerrados y los dos diales de dificultad (outlanes y
+longitud del flipper) ya están puestos. Queda medir con las manos si la mesa
+castiga lo que tiene que castigar. Falta el punto 5.
 
-## Hecho esta sesión
+## Hecho esta sesión (bloque 1: que se vea y se controle)
+
+- **Pantalla completa por defecto.** La ventana de escritorio era 1908×960 y
+  con base 960×540 el escalado entero caía a ×1. `window/size/mode=3` y el
+  override de ventana en 1920×1080, que es ×2 exacto. Comprobado en las
+  pruebas de ajustes.
+- **Slingshots fuera del barrido de la pala.** Era el bug de verdad: la punta
+  baja de cada banda cruzaba el arco que barre el flipper, así que la bola
+  apoyada en la pala levantada tocaba el slingshot y salía disparada. Medido:
+  la bola quedaba 8,8 px DENTRO del slingshot. Movidos 20 px el izquierdo y
+  30 px el derecho, en perpendicular a la línea que describe la bola apoyada
+  en la pala arriba (la dirección que aleja sin estrechar el carril de
+  retorno). Ahora quedan 16 px de holgura. El derecho, además, recortado por
+  arriba: el carril de retorno izquierdo suelta la bola en (330,1085) y la
+  banda subida le pasaba a 8 px.
+- **Prueba nueva `_prueba_barrido_del_flipper`.** Pasea una bola de mentira
+  por encima de la pala en las 25 posiciones del recorrido y de 15 px del eje
+  a la punta, y comprueba que no toca ningún colisionador. Verificada al
+  revés: con los slingshots viejos falla en los dos lados.
+- **Boca del outlane desacoplada de su altura.** Se recortaba sobre la
+  diagonal de la pared, así que estrechar el outlane subía también su esquina
+  y pinzaba la entrada del carril de retorno. Ahora la boca es un tramo
+  horizontal a altura fija y `ancho_outlane` solo la mueve de lado.
+- **Diales de dificultad y tacto:** `flipper_longitud` 78 → **64** (el hueco
+  central pasa de 22 a 47 px), `ancho_outlane` 26 → **21**, `flipper_rebote`
+  0,30 → **0,10**, `flipper_agarre` 16 → **40**.
+- **La espiral del suelo, movida** de (128,900) a (285,895). No es capricho:
+  con la pala corta la bola drena antes, la muestra se acorta y la espiral
+  pasaba del 3 % que tolera `_prueba_adornos`. En el sitio nuevo marca 1,6 %.
+
+## Hecho en sesiones anteriores
 
 - **960×540.** `project.godot` y `ParametrosCamara`. Todo lo demás sale de
   `ancho_visible`/`alto_visible`, así que no hubo nada más que tocar: el HUD
@@ -74,7 +106,12 @@ flipper de 78 a 64. Uno cada vez, o no se sabrá cuál hizo qué.
 
 ## Siguiente
 
-- Bajar el flipper de 78 a 64, después de probar los outlanes.
+- **Bloque 2, coherencia visual.** Solo cuando Daniel dé el visto bueno al
+  bloque 1. Todo lo que se dibuja por código (postes, slingshots, paredes,
+  targets, carriles, HUD) tiene que salir de la paleta de 26 colores de
+  `CONTEXTO.md`, centralizada en un único sitio. Ahora hay dorados, rojos
+  puros y lavandas que no están en la paleta. Y el fondo del escritorio no
+  cubre todo el ancho: queda una banda gris a la derecha.
 - Fase 3: el mapa del run.
 
 ## Mediciones de referencia
@@ -91,15 +128,34 @@ es trabajo perdido.
 
 ## Que pruebe Daniel
 
-1. **Que la mesa se lea bien con la vista nueva.** Con 540 px de alto la
-   bola cae más centrada que antes: `adelanto = 110` la dejaba a 70 px del
-   borde de arriba y ahora la deja a 160. Se ve más mesa por delante, pero
-   si se nota que la cámara "va sobrada", el dial es `adelanto`.
-2. **Que ya no se dé de refilón a los targets.** Pasar por delante del
-   banco sin querer tocarlo. Si sigue enganchando, bajar `target_canto`; si
-   ahora cuesta darles a propósito, subirlo.
+Cinco cosas, y todas son de manos. Ninguna se decide leyendo el código.
+
+1. **Atrapar la bola.** Levantar la pala con la bola encima y ver si se
+   queda quieta para apuntar. Si todavía botonea, el dial es
+   `flipper_rebote` (0,10); si se queda pegada como con cola y ya no sale
+   bien al soltar, `flipper_agarre` (40).
+2. **Que el slingshot ya no dispare la bola atrapada.** Es lo que impedía
+   apuntar. Si sigue pasando en algún sitio, decir DÓNDE.
+3. **La pala de 64.** El hueco central pasa de 22 a 47 px, así que se drena
+   por el medio bastante más. Si ahora es demasiado, el dial es
+   `flipper_longitud`.
+4. **Los outlanes a 21.** Tienen que castigar la bola descontrolada, no la
+   controlada. Si ya no se cuela nunca, subirlo hacia 24; 18 es el suelo
+   (por debajo no cabe la bola).
+5. **Que la pantalla completa entre a ×2** y no se vea nada borroso ni a
+   tamaño de sello.
+
+Objetivo de la tanda: pasar de "drena una vez cada diez combates" a "drena
+cada dos o tres bolas". Si se pasa de castigo, el orden para aflojar es
+outlanes primero y flipper después, uno cada vez.
 
 ## Abierto, sin resolver
+
+- Los dos carriles de retorno no miden lo mismo: el izquierdo tiene 34 px de
+  boca y el derecho 27, porque el carril lanzador le come sitio a la mitad
+  derecha de la mesa. Ya era así antes; ahora la diferencia se nota un poco
+  más. Si se acaba notando al jugar, hay que replantear el lado derecho
+  entero, no moverlo 3 px.
 
 - Enemigo fuera de pantalla al hacer scroll. Se resuelve en la Fase 5 con
   el enemigo en su propia ventana.

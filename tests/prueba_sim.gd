@@ -16,6 +16,7 @@ var _pruebas: int = 0
 func _initialize() -> void:
 	_prueba_ajustes()
 	_prueba_geometria_sellada()
+	_prueba_barrido_del_flipper()
 	_prueba_no_se_escapa()
 	_prueba_sin_atasco_en_el_inlane()
 	_prueba_flipper_empuja()
@@ -107,6 +108,13 @@ func _prueba_ajustes() -> void:
 	_comprobar("viewport 960x540",
 		ProjectSettings.get_setting("display/window/size/viewport_width") == 960
 		and ProjectSettings.get_setting("display/window/size/viewport_height") == 540)
+	# Con escalado entero la ventana tiene que caber en un múltiplo exacto: a
+	# 1908x960 caía a x1 y el juego se veía a tamaño de sello.
+	_comprobar("arranca en pantalla completa",
+		ProjectSettings.get_setting("display/window/size/mode") == 3)
+	_comprobar("ventana de prueba 1920x1080 (x2 exacto)",
+		ProjectSettings.get_setting("display/window/size/window_width_override") == 1920
+		and ProjectSettings.get_setting("display/window/size/window_height_override") == 1080)
 
 ## El arreglo 1 depende de que no quede ningún hueco por el que quepa la bola
 ## entre el final del carril de retorno, el poste y el eje del flipper.
@@ -130,6 +138,46 @@ func _prueba_geometria_sellada() -> void:
 	var hueco_central := punta_izq.distance_to(punta_der) - m.p.flipper_radio * 2.0
 	_comprobar("el desague central deja pasar la bola",
 		hueco_central > d, "hueco %.2f px, bola %.1f px" % [hueco_central, d])
+
+## Nada puede meterse dentro del arco que barre la pala. Si un colisionador cae
+## ahí, la bola apoyada en la pala levantada lo toca y sale disparada, y
+## entonces no se puede ni atrapar ni apuntar: el juego se queda en tiros de
+## rebote. Se comprueba paseando una bola de mentira por encima de la pala en
+## todas sus posiciones y mirando que no toque nada.
+func _prueba_barrido_del_flipper() -> void:
+	var m := _nueva_mesa()
+	# La bola apoyada tiene el centro a esta distancia del eje de la cápsula.
+	var separacion: float = m.p.flipper_radio + m.p.radio_bola
+	# Se empieza a 15 px del eje: más adentro está el poste de goma, que SOLAPA
+	# con el eje a propósito para sellar el hueco del inlane (ver
+	# `_prueba_geometria_sellada`). Ahí no cabe la bola de todas formas.
+	var desde := 15.0
+	var pasos := 24
+	for lado in [{"n": "izquierdo", "f": m.flipper_izq}, {"n": "derecho", "f": m.flipper_der}]:
+		var f: Flipper = lado["f"]
+		var peor := INF
+		var culpable := ""
+		var donde := Vector2.ZERO
+		for i in pasos + 1:
+			var ang: float = lerpf(f.angulo_reposo, f.angulo_activo, float(i) / float(pasos))
+			var dir := Vector2(cos(ang), sin(ang))
+			# La perpendicular por la que se apoya la bola es la de arriba.
+			var arriba := Vector2(dir.y, -dir.x)
+			if arriba.y > 0.0:
+				arriba = -arriba
+			var d := desde
+			while d <= f.longitud:
+				var centro: Vector2 = f.eje + dir * d + arriba * separacion
+				for c in m.colisionadores:
+					var hueco: float = c.punto_mas_cercano(centro).distance_to(centro) \
+						- c.radio - m.p.radio_bola
+					if hueco < peor:
+						peor = hueco
+						culpable = Colisionador.Tipo.keys()[c.tipo]
+						donde = centro
+				d += 2.0
+		_comprobar("nada se mete en el barrido del flipper %s" % lado["n"],
+			peor > 0.0, "%s a %.2f px, con la bola en %s" % [culpable, peor, str(donde.round())])
 
 ## Nada de tunelar por las juntas del arco teselado ni por las esquinas.
 func _prueba_no_se_escapa() -> void:

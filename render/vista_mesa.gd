@@ -101,7 +101,7 @@ const ADORNOS := [
 	{"tex": "rejilla",      "pos": Vector2(200, 1250), "escala": 1.0, "espejo": false},
 	# campo alto. La bola vive abajo, así que aquí arriba apenas pasa: 2,6 % y
 	# 0,5 % de los fotogramas. Sitios sacados del mapa de ocupación, no a ojo.
-	{"tex": "espiral",      "pos": Vector2(128, 900), "escala": 1.0, "espejo": false},
+	{"tex": "espiral",      "pos": Vector2(285, 895), "escala": 1.0, "espejo": false},
 	{"tex": "sigilo",       "pos": Vector2(285, 730), "escala": 1.0, "espejo": false},
 ]
 
