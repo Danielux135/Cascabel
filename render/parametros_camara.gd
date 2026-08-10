@@ -4,9 +4,12 @@ extends RefCounted
 ## Las cuatro reglas de la cámara vertical de PLAN.md, con sus números.
 ## La 3 (píxeles enteros) no está aquí porque no es negociable: va en el código.
 
-## Ventana base 640x360, escalado por enteros: x2 = 720p, x3 = 1080p, x4 = 1440p.
-var ancho_visible: float = 640.0
-var alto_visible: float = 360.0
+## Ventana base 960x540, escalado por enteros: x2 = 1080p, x4 = 4K.
+## Se ve el 41 % de la mesa (antes el 28 %) y quedan 560 px de escritorio a los
+## lados, que es el sitio donde la fase 5 pone las ventanas. La mesa sigue
+## midiendo 400 unidades de ancho: la física no cambia nada.
+var ancho_visible: float = 960.0
+var alto_visible: float = 540.0
 
 ## REGLA 1 — nunca persigue a una bola que cae: se adelanta.
 ## Cuántos píxeles mira POR DEBAJO de la bola mientras desciende. Con esto la

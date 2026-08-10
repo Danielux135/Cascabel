@@ -5,8 +5,8 @@ extends Node2D
 ##
 ## OJO: esto NO es la cáscara de TILT OS. No hay ventanas de XP, ni barra de
 ## tareas, ni mapa, ni reliquias. Solo la mesa, un enemigo y el bucle de un
-## combate hasta que uno de los dos muera. Las paredes y los flippers se dibujan
-## por código; bumpers, postes, targets, bola y enemigo van con sprite.
+## combate hasta que uno de los dos muera. Las paredes, los flippers y los
+## targets se dibujan por código; bumpers, postes, bola y enemigo van con sprite.
 
 # Paleta cerrada (CONTEXTO.md).
 const C_CABINA      := Color("14121A")
@@ -57,7 +57,10 @@ const GROSOR_BORDE_FLIPPER := 1.5
 ## con posar el borde inferior del marco en el suelo.
 const ENEMIGO_CENTRO_X := 200.0
 const ENEMIGO_SUELO_Y := 758.0
-const ALTO_TARGET := 30.0
+## El target no lleva sprite: se dibuja del tamaño exacto del colisionador, que
+## sale de `target_ancho` y `target_canto`. Esto es solo lo que se enciende de su
+## cara, en píxeles.
+const GROSOR_CARA_TARGET := 2.0
 
 ## El campo de juego de verdad: la mesa validada, con su suelo de piedra.
 const CAMPO := Rect2(20, 660, 360, 620)
@@ -146,7 +149,6 @@ var _numeros: Array[Dictionary] = []
 var _tex_bola: Texture2D
 var _tex_poste: Texture2D
 var _tex_bumper: Texture2D
-var _tex_target: Array[Texture2D] = []
 var _tex_enemigo: Texture2D
 var _fuente: Font
 
@@ -158,10 +160,6 @@ func _ready() -> void:
 	_tex_bola = load("res://assets/mesa/bola.png")
 	_tex_poste = load("res://assets/mesa/poste_goma.png")
 	_tex_bumper = load("res://assets/mesa/bumper_gargola.png")
-	_tex_target = [
-		load("res://assets/mesa/target_escudo.png"),
-		load("res://assets/mesa/target_lapida.png"),
-	]
 	_tex_girador = Girador.generar(load("res://assets/mesa/girador.png"),
 		anim.girador_fotogramas, TAMANO_GIRADOR)
 
@@ -482,11 +480,14 @@ func _dibujar_paredes() -> void:
 func _dibujar_objetos() -> void:
 	for c in mesa.targets:
 		if c.activo:
-			_dibujar_sprite_centrado(_tex_target[c.banco % _tex_target.size()],
-				c.a, ALTO_TARGET, 60.0)
+			_dibujar_target(c)
 		else:
-			# Abatido: se ve la ranura por la que ha bajado.
-			draw_rect(Rect2(c.a.x - 11, c.a.y + 8, 22, 3), C_CABINA)
+			# Abatido: se ve la ranura por la que ha bajado. La ranura es la
+			# huella de la plancha, así que mide lo mismo que ella.
+			var centro := c.centro()
+			draw_rect(Rect2(centro.x - mesa.p.target_canto * 0.5,
+				centro.y - mesa.p.target_ancho * 0.5,
+				mesa.p.target_canto, mesa.p.target_ancho), C_CABINA)
 	_dibujar_giradores()
 	_dibujar_bumpers()
 	# Los postes van ANTES que los flippers: solapan con la cápsula del eje (es
@@ -496,6 +497,28 @@ func _dibujar_objetos() -> void:
 		_dibujar_sprite_centrado(_tex_poste, centro, mesa.p.poste_radio * 2.0, 60.0)
 	_dibujar_flipper(mesa.flipper_izq)
 	_dibujar_flipper(mesa.flipper_der)
+
+## El target va por código, no con sprite, por la misma razón que el flipper:
+## `target_canto` es un dial que todavía se está ajustando y el arte tiene que
+## medir exactamente lo que mide el colisionador. Cuando el número se quede
+## quieto se puede volver a los sprites de escudo y lápida.
+##
+## Se dibuja la huella de la plancha y se le enciende la cara que mira al campo,
+## que es la única que la bola puede golpear. El color separa los dos bancos:
+## era lo que hacían el escudo y la lápida.
+func _dibujar_target(c: Colisionador) -> void:
+	var centro := c.centro().round()
+	var canto := roundf(mesa.p.target_canto)
+	var cara := roundf(mesa.p.target_ancho)
+	var esquina := Vector2(centro.x - canto * 0.5, centro.y - cara * 0.5).round()
+	draw_rect(Rect2(esquina, Vector2(canto, cara)), C_CABINA)
+	draw_rect(Rect2(esquina + Vector2.ONE, Vector2(canto - 2.0, cara - 2.0)), C_MESA_BAJA)
+	# La cara encendida, en el lado que mira al centro de la mesa.
+	var hacia_dentro := signf(Mesa.ANCHO * 0.5 - centro.x)
+	var x_cara := esquina.x + canto - GROSOR_CARA_TARGET if hacia_dentro > 0.0 else esquina.x
+	var col: Color = C_ORO_CLARO if c.banco % 2 == 0 else C_ARCANO
+	draw_rect(Rect2(Vector2(x_cara, esquina.y + 1.0),
+		Vector2(GROSOR_CARA_TARGET, cara - 2.0)), col)
 
 ## El bumper crece un número ENTERO de píxeles al golpearlo y se enciende.
 ## Crecer con una escala continua sobre un sprite de 38 px deja el borde

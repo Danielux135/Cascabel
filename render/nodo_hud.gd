@@ -4,7 +4,7 @@ extends CanvasLayer
 ## El HUD, en capa fija: con la cámara vertical, si se dibujara en el mundo se
 ## iría con el scroll.
 ##
-## Todo va dentro de la franja de la mesa (x 120..520 en pantalla) para que se
+## Todo va dentro de la franja de la mesa (x 280..680 en pantalla) para que se
 ## lea como parte del juego y no invada el escritorio de los lados.
 
 const C_CABINA      := Color("14121A")

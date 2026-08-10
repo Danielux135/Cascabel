@@ -49,6 +49,10 @@ func _recalcular() -> void:
 	if d.length_squared() > 1e-8:
 		_normal_degenerada = Vector2(-d.y, d.x).normalized()
 
+## El centro de la cápsula. Con a == b es `a`, así que vale para todos.
+func centro() -> Vector2:
+	return (a + b) * 0.5
+
 func punto_mas_cercano(p: Vector2) -> Vector2:
 	var d := b - a
 	var l2 := d.length_squared()

@@ -102,11 +102,11 @@ func _prueba_ajustes() -> void:
 		ProjectSettings.get_setting("rendering/textures/canvas_textures/default_texture_filter") == 0)
 	_comprobar("stretch/scale_mode = integer",
 		ProjectSettings.get_setting("display/window/stretch/scale_mode") == "integer")
-	# 640x360 con escalado entero: x2 = 720p, x3 = 1080p, x4 = 1440p. La mesa
-	# sigue midiendo 400 de ancho y los ~240 que sobran son el escritorio.
-	_comprobar("viewport 640x360",
-		ProjectSettings.get_setting("display/window/size/viewport_width") == 640
-		and ProjectSettings.get_setting("display/window/size/viewport_height") == 360)
+	# 960x540 con escalado entero: x2 = 1080p, x4 = 4K. La mesa sigue midiendo
+	# 400 de ancho y los 560 que sobran son el escritorio de la fase 5.
+	_comprobar("viewport 960x540",
+		ProjectSettings.get_setting("display/window/size/viewport_width") == 960
+		and ProjectSettings.get_setting("display/window/size/viewport_height") == 540)
 
 ## El arreglo 1 depende de que no quede ningún hueco por el que quepa la bola
 ## entre el final del carril de retorno, el poste y el eje del flipper.
@@ -243,19 +243,35 @@ func _prueba_targets() -> void:
 		m.bancos.size() == 2 and m.targets.size() == 6,
 		"%d bancos, %d targets" % [m.bancos.size(), m.targets.size()])
 
+	# El target es una PLANCHA, no un bolo: la cápsula mide `target_ancho` de
+	# punta a punta y solo `target_canto` de fondo. Con el círculo de radio 13 de
+	# antes metía 26 px de cuerpo redondo en el campo y rebotaba de refilón.
+	for c in m.targets:
+		var largo: float = c.a.distance_to(c.b) + c.radio * 2.0
+		_comprobar("el target mide la cara que dice el parametro",
+			is_equal_approx(largo, m.p.target_ancho),
+			"cara de %.1f px, parametro %.1f" % [largo, m.p.target_ancho])
+		_comprobar("y sobresale menos que el radio de la bola",
+			c.radio * 2.0 < m.p.radio_bola, "canto de %.1f px" % (c.radio * 2.0))
+
 	# Los targets no pueden sellar el carril lateral: con el banco en pie se
-	# tiene que poder seguir bajando al inlane.
+	# tiene que poder seguir bajando al inlane. Ese carril va por FUERA y no
+	# depende del canto: al adelgazar la plancha se abre campo por delante del
+	# banco, no por detrás.
 	for datos in [{"banco": 0, "pared_x": 20.0}, {"banco": 1, "pared_x": 350.0}]:
 		var c: Colisionador = m.bancos[datos["banco"]][0]
-		var carril: float = absf(c.a.x - (datos["pared_x"] as float)) \
-			- m.p.target_radio - m.p.radio_bola * 2.0
-		_comprobar("queda carril entre el banco %d y la pared" % datos["banco"],
-			carril > 2.0, "solo %.1f px libres" % carril)
+		var carril: float = absf(c.centro().x - (datos["pared_x"] as float)) \
+			- m.p.target_canto * 0.5
+		_comprobar("el carril del banco %d sigue midiendo 23 px" % datos["banco"],
+			is_equal_approx(carril, 23.0), "mide %.1f px" % carril)
+		_comprobar("y por el carril del banco %d pasa la bola" % datos["banco"],
+			carril - m.p.radio_bola * 2.0 > 2.0,
+			"solo %.1f px libres" % (carril - m.p.radio_bola * 2.0))
 
 	# Y entre target y target NO tiene que caber, o se acuñaría.
 	var banco: Array = m.bancos[0]
-	var hueco: float = (banco[0] as Colisionador).a.distance_to((banco[1] as Colisionador).a) \
-		- m.p.target_radio * 2.0
+	var hueco: float = (banco[0] as Colisionador).centro().distance_to(
+		(banco[1] as Colisionador).centro()) - m.p.target_ancho
 	_comprobar("entre dos targets no cabe la bola",
 		hueco < m.p.radio_bola * 2.0, "hueco %.1f px" % hueco)
 

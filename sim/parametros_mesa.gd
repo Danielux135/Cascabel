@@ -70,7 +70,17 @@ var slingshot_velocidad_minima: float = 90.0  # (*) umbral del interruptor
 # No venían del prototipo: la geometría de CONTEXTO no los colocaba. Van en dos
 # bancos de tres, pegados a las paredes laterales pero dejando 23 px de carril
 # libre por fuera para que se pueda seguir bajando al inlane con el banco en pie.
-var target_radio: float = 13.0
+## La cara, medida A LO LARGO de la pared. Contra una máquina real: la mesa mide
+## 20,25" y aquí son 400 unidades, o sea 19,75 px por pulgada; un drop target de
+## 1,5" de cara toca a 30 px. Este número ya estaba bien y no se toca.
+var target_ancho: float = 30.0
+## Lo que SOBRESALE hacia el campo, y este es el dial de verdad. Antes el target
+## era un círculo de radio 13: metía 26 px de cuerpo redondo dentro del campo y
+## las bolas que pasaban rozando salían rebotadas por el hombro. Un drop target
+## de verdad es una plancha; 8 px es lo que se ve de su cara desde arriba.
+## El borde de FUERA se queda donde estaba (23 px de carril contra la pared), así
+## que bajar esto abre campo por delante del banco, no por detrás.
+var target_canto: float = 8.0
 var target_rebote: float = 0.45
 var target_velocidad_minima: float = 30.0
 ## Al abatir el banco entero se vuelve a levantar, pero con retardo: si se

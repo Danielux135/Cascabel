@@ -120,9 +120,15 @@ func _construir() -> void:
 	# --- Bancos de targets ---
 	# Pegados a las paredes pero sin sellarlas: quedan 23 px de carril por fuera
 	# (la bola mide 18) para poder seguir bajando al inlane con el banco en pie.
-	# Entre target y target solo quedan 14 px, así que por ahí no se cuela.
-	_banco_targets(_v(56, 320), _v(56, 400), 3)
-	_banco_targets(_v(314, 320), _v(314, 400), 3)
+	# Entre target y target quedan 10 px, así que por ahí no se cuela.
+	#
+	# La x sale de la pared + los 23 px de carril + medio canto: pared 20 -> 47,
+	# pared 350 -> 323. Así el borde de fuera se queda clavado en 43 y 327 pase
+	# lo que pase con `target_canto`, y el carril de detrás no se mueve nunca.
+	_banco_targets(_v(20.0 + 23.0 + p.target_canto * 0.5, 320),
+		_v(20.0 + 23.0 + p.target_canto * 0.5, 400), 3)
+	_banco_targets(_v(350.0 - 23.0 - p.target_canto * 0.5, 320),
+		_v(350.0 - 23.0 - p.target_canto * 0.5, 400), 3)
 
 	# --- Giradores, en mitad de cada carril de retorno ---
 	_girador(_v(87, 545))
@@ -226,13 +232,22 @@ func _en_x(a: Vector2, b: Vector2, x: float) -> Vector2:
 		return a
 	return a.lerp(b, clampf((x - a.x) / (b.x - a.x), 0.0, 1.0))
 
+## Cada target es una PLANCHA, no un bolo: una cápsula tumbada a lo largo de la
+## línea del banco (o sea, paralela a la pared), de `target_ancho` de cara y
+## `target_canto` de fondo. Con un círculo, la bola que pasaba rozando se iba
+## rebotada por el hombro redondo; con la cara plana o le das o no le das.
 func _banco_targets(desde: Vector2, hasta: Vector2, cantidad: int) -> void:
 	var indice := bancos.size()
 	var banco: Array[Colisionador] = []
+	var canto := p.target_canto * 0.5
+	# El segmento es la cara menos los dos casquetes, para que la cápsula entera
+	# mida `target_ancho`.
+	var media_cara := maxf(p.target_ancho * 0.5 - canto, 0.0)
+	var eje := (hasta - desde).normalized() * media_cara
 	for i in cantidad:
 		var t := float(i) / float(cantidad - 1) if cantidad > 1 else 0.0
 		var centro := desde.lerp(hasta, t)
-		var c := Colisionador.new(centro, centro, p.target_radio,
+		var c := Colisionador.new(centro - eje, centro + eje, canto,
 			Colisionador.Tipo.TARGET, p.target_rebote, 0.0, p.target_velocidad_minima)
 		c.banco = indice
 		colisionadores.append(c)
@@ -296,12 +311,12 @@ func reiniciar_targets() -> void:
 func centro_banco(indice: int) -> Vector2:
 	var suma := Vector2.ZERO
 	for c in bancos[indice]:
-		suma += c.a
+		suma += c.centro()
 	return suma / float(bancos[indice].size())
 
 func _abatir(c: Colisionador) -> void:
 	c.activo = false
-	target_abatido.emit(c.a, c.banco)
+	target_abatido.emit(c.centro(), c.banco)
 	for otro in bancos[c.banco]:
 		if otro.activo:
 			return
