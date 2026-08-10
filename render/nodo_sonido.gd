@@ -16,6 +16,7 @@ const VOCES := 14
 const AJUSTES := {
 	"bumper":        {"db": -3.0, "tono": 0.10},
 	"target":        {"db": -4.0, "tono": 0.08},
+	"banco":         {"db": -1.0, "tono": 0.00},
 	"flipper":       {"db": -9.0, "tono": 0.06},
 	"rampa_entrada": {"db": -3.0, "tono": 0.02},
 	"rampa_salida":  {"db": -3.0, "tono": 0.02},
@@ -23,6 +24,7 @@ const AJUSTES := {
 	"platillo":      {"db": -2.0, "tono": 0.00},
 	"combo":         {"db":  1.0, "tono": 0.00},
 	"reloj":         {"db": -4.0, "tono": 0.00},
+	"atrasar":       {"db": -1.0, "tono": 0.00},
 	"ataque":        {"db":  0.0, "tono": 0.00},
 	"drenaje":       {"db": -2.0, "tono": 0.00},
 	"muerte":        {"db":  0.0, "tono": 0.00},
@@ -34,7 +36,7 @@ const AJUSTES := {
 ##
 ## El reloj y su golpe van igual, y por el mismo motivo: los tres son
 ## información, no adorno, y los tres suenan justo cuando hay más ruido.
-const PROPIOS := ["combo", "reloj", "ataque"]
+const PROPIOS := ["combo", "reloj", "ataque", "atrasar"]
 
 var _voces: Array[AudioStreamPlayer] = []
 var _propias: Dictionary = {}

@@ -848,6 +848,70 @@ func _prueba_identidad_recorridos() -> void:
 		golpe_fuerte > c2.p.dano_rampa,
 		"%d contra %d" % [golpe_fuerte, c2.p.dano_rampa])
 
+	_prueba_canon_escupe(m)
+	_prueba_platillo_atrasa_reloj()
+
+## El cañón no deja la bola puesta: la escupe CRUZADA Y RÁPIDA hacia la pala
+## contraria. Es lo que paga el golpe gordo, y lo que lo distingue del carril de
+## retorno, que sí te la deja servida. Si esta prueba falla, el cañón ha vuelto
+## a ser un segundo carril de retorno.
+func _prueba_canon_escupe(m: Mesa) -> void:
+	var indice := -1
+	for i in m.rampas.size():
+		if (m.rampas[i] as Rampa).premio == Rampa.Premio.DANO_FUERTE:
+			indice = i
+	var r: Rampa = m.rampas[indice]
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.bola.rampa = indice
+	m.bola.rampa_sentido = 1
+	m.bola.rampa_velocidad = 900.0
+	m.bola.rampa_distancia = r.largo - 1.0
+
+	var v_salida := 0.0
+	var alcanzo_derecha := false
+	var t := 0.0
+	while m.bola.viva and t < 4.0:
+		m.avanzar(DT)
+		t += DT
+		if m.bola.rampa >= 0:
+			continue
+		if v_salida == 0.0:
+			v_salida = m.bola.velocidad()
+		if m.bola.pos.distance_to(m.p.flipper_eje_der) < 75.0:
+			alcanzo_derecha = true
+	_comprobar("el canon escupe la bola rapida, no posada",
+		v_salida > 700.0, "salio a %.0f px/s de 900 de entrada" % v_salida)
+	_comprobar("y cruzada hacia la pala contraria",
+		alcanzo_derecha, "no llego a la pala derecha")
+
+## El platillo paga en TIEMPO, no en daño: es el único tiro que da algo que no
+## es pegar, y es lo que hace que la mesa tenga una decisión de verdad cuando
+## vas justo de vida.
+func _prueba_platillo_atrasa_reloj() -> void:
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c)
+	_avanzar_combate(c, c.p.reloj_carga * 0.6)
+	var antes := c.carga_reloj
+	var ganado := [0.0]
+	c.reloj_atrasado.connect(func(s: float) -> void: ganado[0] = s)
+	c.mesa.platillo_expulsado.emit(Vector2(70, 170), 0)
+	_comprobar("sacar la bola del platillo atrasa el reloj",
+		c.carga_reloj < antes - 0.3,
+		"de %.2f a %.2f" % [antes, c.carga_reloj])
+	_comprobar("y avisa de cuantos segundos se han ganado",
+		ganado[0] > 4.0, "%.1f s" % ganado[0])
+	_comprobar("pero paga menos dano que el canon",
+		c.p.dano_platillo < c.p.dano_rampa_fuerte,
+		"%d contra %d" % [c.p.dano_platillo, c.p.dano_rampa_fuerte])
+
+	# Y no puede dejar el reloj en negativo ni pasarse de rosca.
+	c.carga_reloj = 0.1
+	c.mesa.platillo_expulsado.emit(Vector2(70, 170), 0)
+	_comprobar("y nunca deja el reloj por debajo de cero",
+		c.carga_reloj == 0.0, "quedo en %.2f" % c.carga_reloj)
+
 ## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
 ## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no
 ## caduca, una partida larga acaba arrastrando miles de partículas.

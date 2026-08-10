@@ -7,15 +7,16 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** Fase 2 cerrada y 3A construida
+**Última actualización:** 3A y 3B construidas, las dos sin validar
 
 ---
 
 ## Fase actual
 
-**Fase 3A — El reloj del enemigo: construido, sin validar.** El criterio de
-salida ("un combate se siente como una carrera") depende de `reloj_carga` y
-eso solo se sabe jugando. Hasta que Daniel lo diga, 3B no empieza.
+**Fase 3, 3A y 3B construidas y SIN VALIDAR.** Las dos tienen criterio de
+salida que solo se comprueba jugando —que el combate se sienta como una
+carrera, y que Daniel vaya a por un tiro concreto en vez de caer en él de
+rebote— y ninguna se ha jugado todavía. 3C no debería empezar antes de eso.
 
 ## Hecho
 
@@ -45,6 +46,10 @@ eso solo se sabe jugando. Hasta que Daniel lo diga, 3B no empieza.
   para la bola, avisa 3-2-1 por pantalla y por sonido, y no se rearma al
   drenar. El contraataque por drenaje baja a la mitad para que la presión no
   se duplique. Dos sonidos nuevos: el tic y el golpe
+- **Fase 3B** los seis tiros pagan seis cosas: el cañón escupe la bola cruzada
+  y rápida a la pala contraria (el pago grande se paga con un retorno difícil)
+  y el platillo atrasa el reloj, que es el único tiro que no paga en daño.
+  Cerrar un banco ya suena distinto de abatir un target
 
 ## Diales vivos
 
@@ -61,6 +66,8 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `target_canto` | 8 | Cuánto sobresale el target al campo |
 | `reloj_carga` | 18 s | **El dial de 3A.** Carrera tensa o paseo. Suelo 15, techo 25 |
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
+| `platillo_atrasa_reloj` | 0,35 | ~6 s. Si el platillo no compensa buscarlo, súbelo |
+| `dano_rampa_fuerte` | 26 | Lo que paga el cañón por ese retorno difícil |
 
 **Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
@@ -86,13 +93,21 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 8. **Que el golpe del reloj no se lea como injusto.** Llega en mitad de la
    bola y no para nada, a propósito. Si sorprende, el aviso de 3-2-1 es
    corto: `reloj_aviso`.
+9. **El cañón, que es el criterio de salida de 3B.** Te escupe la bola
+   cruzada y rápida a la pala derecha. ¿La cazas si vas atento y la pierdes
+   si no? Si es imposible de cazar siempre, el tiro no vale lo que paga.
+10. **El platillo.** ¿Compensa buscarlo por los ~6 s que quita del reloj, o
+    prefieres siempre el cañón? Si nunca lo eliges, sube
+    `platillo_atrasa_reloj`.
+11. **A ciegas, sin mirar la pantalla:** ¿sabes qué acabas de conseguir solo
+    por el sonido? Racimo, target, banco cerrado, órbita, retorno, cañón y
+    platillo tienen sonido propio. Si dos se confunden, dime cuáles.
 
 ## Siguiente
 
-1. Ajustar `reloj_carga` con lo que diga Daniel y **cerrar 3A**
-2. **3B, identidad de los tiros** (`DISEÑO.md` §4). Quedan el cañón y el
-   platillo; el platillo ya puede pagar algo que no sea daño, porque el
-   reloj existe: frenarlo, retrasarlo o robarle carga
+1. Ajustar con lo que diga Daniel y **cerrar 3A y 3B**
+2. **Rehacer la tabla de enemigos**, que ya toca: los tiros pagan cosas
+   distintas y el reloj existe, o sea que ya hay contra qué balancear
 3. **3C, mapa del run**
 
 ## Mediciones
@@ -113,10 +128,6 @@ perdido.
   izquierdo, 27 el derecho, porque el carril lanzador come sitio a la
   derecha. Si se nota al jugar hay que replantear el lado derecho entero, no
   moverlo 3 px.
-- **El cañón perdió su identidad.** Devolvía la bola al racimo de bumpers y
-  eso alimentaba un bucle que mataba al enemigo sin que las palas
-  participaran. Ahora baja a la pala izquierda, o sea que los dos carriles
-  hacen lo mismo. Se le devolverá identidad al hacer `DISEÑO.md` §4.
 - **La bola no tiene giro.** No hay spin simulado, así que no hay efecto ni
   bola que "muerda" en un ángulo. La rodadura es la aproximación barata a eso
   y aguanta bien; si en algún momento se quiere una física que destaque de

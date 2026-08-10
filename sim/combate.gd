@@ -20,6 +20,9 @@ signal enemigo_ataca(dano: int)
 ## El reloj entra en la cuenta atrás. `segundos` va 3, 2, 1 y salta una sola vez
 ## por número: el aviso es para que el golpe no llegue de la nada.
 signal reloj_avisa(segundos: int)
+## El platillo le ha quitado carga al reloj. `segundos` es lo que ha ganado el
+## jugador, para poder enseñárselo.
+signal reloj_atrasado(segundos: float)
 signal bola_servida()
 signal combate_terminado(victoria: bool)
 
@@ -179,8 +182,20 @@ func _subir_tramo(punto: Vector2) -> void:
 	# Sin sumar golpe: los golpes ya los ha puesto el salto de tramo.
 	_golpear(p.dano_rampa, punto, false)
 
-## Y el platillo al escupir, que es donde está el golpe.
+## Y el platillo al escupir, que es donde está el golpe. Pero su premio de
+## verdad no es el golpe: es atrasar el reloj. Es el único tiro que paga en algo
+## que no es daño, y hace falta que lo haya para que la mesa tenga decisiones y
+## no solo números.
 func _al_salir_del_platillo(punto: Vector2, _indice: int) -> void:
+	if not _en_juego():
+		return
+	var antes := carga_reloj
+	carga_reloj = maxf(carga_reloj - p.platillo_atrasa_reloj, 0.0)
+	# Si el aviso ya había saltado y el robo lo saca de la cuenta atrás, se
+	# rearma: si no, la próxima cuenta atrás llegaría sin avisar.
+	if reloj_restante() > p.reloj_aviso:
+		_aviso_dado = -1
+	reloj_atrasado.emit((antes - carga_reloj) * p.reloj_carga)
 	_golpear(p.dano_platillo, punto, true)
 
 # ------------------------------------------------------------- resolución

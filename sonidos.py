@@ -120,6 +120,25 @@ SONIDOS = {
         dict(onda="ruido", dur=0.20, caida=13.0, filtro=2200, crush=4, vol=0.55),
     ]),
 
+    # Cerrar un banco de targets entero. Tiene que distinguirse del target
+    # suelto, que es lo que suena tres veces justo antes: mismo material, pero
+    # dos notas y el doble de largo. Es un remate, no un golpe.
+    "banco": dict(
+        onda="cuadrada", notas=[740, 1109], dur_nota=0.075, dur_ultima=0.16,
+        caida=18, caida_ultima=11, filtro=7000, crush=5, vol=0.44,
+    ),
+
+    # El platillo atrasando el reloj. Baja de tono a propósito: el arpegio del
+    # multiplicador sube porque ganas algo, y este baja porque lo que se mueve
+    # hacia atrás es el reloj. Suave y sin crush, para que no se confunda con
+    # el drenaje, que es lo único parecido que suena y significa lo contrario.
+    "atrasar": dict(
+        onda="triangulo", armonicos=[(2.0, 0.18)],
+        notas=[880, 740, 622, 523], dur_nota=0.075, dur_ultima=0.34,
+        caida=9, caida_ultima=5, ataque=0.010, vibrato=(7.0, 0.5),
+        filtro=5000, vol=0.46,
+    ),
+
     # --- Perder la bola y matar al enemigo. Los dos largos, que son los dos
     # momentos en los que el juego se para a decirte algo. ---
     "drenaje": dict(

@@ -171,6 +171,7 @@ func _ready() -> void:
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
 	mesa.target_abatido.connect(_al_abatir_target)
+	mesa.banco_completado.connect(_al_completar_banco)
 	mesa.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("rampa_entrada"))
 	mesa.rampa_salida.connect(_al_salir_de_rampa)
@@ -181,6 +182,7 @@ func _ready() -> void:
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
 	combate.reloj_avisa.connect(_al_avisar_reloj)
+	combate.reloj_atrasado.connect(_al_atrasar_reloj)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
 	_giro.resize(mesa.giradores.size())
@@ -365,6 +367,15 @@ func _al_golpear_slingshot(punto: Vector2, _fuerza: float) -> void:
 func _al_golpear_poste(punto: Vector2, _fuerza: float) -> void:
 	impactos.onda(punto, C_GOMA_LUZ, 0.42)
 
+## Cerrar el banco entero es un premio y sonaba igual que abatir el tercer
+## target, o sea que no se notaba. Con el criterio de la fase 3B —distinguir por
+## el oído qué acabas de conseguir— eso es un tiro sin identidad.
+func _al_completar_banco(punto: Vector2, _banco: int) -> void:
+	_sonido.reproducir("banco")
+	impactos.onda(punto, C_ORO_CLARO, 1.2)
+	impactos.chispas(punto, Vector2(signf(Mesa.ANCHO * 0.5 - punto.x), -0.35),
+		C_ORO_CLARO, 1.4)
+
 func _al_buscar_bola(punto: Vector2) -> void:
 	impactos.onda(punto, C_ARCANO, 1.3)
 	_sacudir(anim.sacudida_ataque)
@@ -408,6 +419,17 @@ func _al_atacar_enemigo(_dano: int) -> void:
 ## tic tres veces y lo que cambia es la urgencia, no la información.
 func _al_avisar_reloj(segundos: int) -> void:
 	_sonido.reproducir("reloj", 1.0 + 0.18 * float(3 - segundos))
+
+## El platillo atrasando el reloj. El número sale donde estaba el platillo, no
+## sobre el enemigo: lo que acabas de ganar es tiempo, y el tiempo se ha ganado
+## ahí abajo.
+func _al_atrasar_reloj(segundos: float) -> void:
+	_sonido.reproducir("atrasar")
+	var centro := mesa.platillos[0].centro if not mesa.platillos.is_empty() \
+		else Vector2(Mesa.ANCHO * 0.5, 200.0)
+	_numeros.append({"pos": centro, "t": 1.1,
+		"texto": "+%.0f s" % segundos, "col": C_ARCANO})
+	impactos.onda(centro, C_ARCANO, 1.6)
 
 func _al_terminar_combate(victoria: bool) -> void:
 	if victoria:

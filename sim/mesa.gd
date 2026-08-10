@@ -177,27 +177,28 @@ func _construir() -> void:
 		Vector2(334, 940), Vector2(330, 1085),
 	]), "retorno", Rampa.Premio.DANO)
 
-	# Derecha -> baja a la pala IZQUIERDA. Es el espejo del de arriba: cada
-	# carril sirve la bola a una pala distinta, y por eso hay que elegir a cuál
-	# tiras según de dónde vengas.
+	# EL CAÑÓN. El golpe gordo de un solo impacto, y el tiro que se paga caro:
+	# no te deja la bola puesta, te la escupe CRUZADA Y RÁPIDA hacia la pala
+	# contraria. Quien controla la caza y vuelve a tirar; quien no, la pierde.
 	#
-	# ANTES acababa en (200,690), o sea DENTRO del racimo de bumpers y arriba
-	# del todo. Entre eso y la órbita (que también devuelve arriba), dos de los
-	# tres recorridos te dejaban la bola en la mitad de arriba, y como el cañón
-	# es el que más daño paga, el bucle se alimentaba solo: cañón -> bumpers ->
-	# rampa -> cañón, pegando todo el rato. El enemigo se moría sin que las
-	# palas llegaran a tocar la bola nunca. Medido a mano por Daniel.
+	# Dos versiones anteriores, las dos malas por el mismo motivo de fondo —
+	# dónde suelta un recorrido decide qué bucle existe:
 	#
-	# La salida NO puede ser el espejo de (330,1085): ese lado tiene otra
-	# geometría y (70,1085) cae dentro de un colisionador (lo cazó la prueba
-	# "ninguna boca ni salida cae dentro de un colisionador"). Va en (66,1020),
-	# que es justo el punto que la prueba de outlanes usa como "por dentro" y
-	# del que ya está comprobado que baja hasta la pala sin acuñarse.
+	# 1. Acababa en (200,690), DENTRO del racimo. Como es el que más daño paga,
+	#    el bucle se alimentaba solo: cañón -> bumpers -> rampa -> cañón. El
+	#    enemigo se moría sin que las palas tocaran la bola nunca.
+	# 2. Acababa en (66,1020), el inlane izquierdo. Ahí no había bucle, pero
+	#    tampoco tiro: bajaba posada a la pala igual que el carril de retorno,
+	#    o sea que los dos recorridos hacían lo mismo.
+	#
+	# Ahora sale por el centro-izquierda apuntando abajo y a la derecha, así que
+	# la bola cruza el campo bajo a toda velocidad. El bucle que crea SÍ vale:
+	# exige cazarla en cada vuelta.
 	_carril(PackedVector2Array([
 		Vector2(305, 790), Vector2(322, 690), Vector2(334, 560), Vector2(314, 430),
 		Vector2(258, 342), Vector2(190, 312), Vector2(120, 350),
 		Vector2(78, 440), Vector2(62, 580), Vector2(60, 750),
-		Vector2(62, 880), Vector2(66, 1020),
+		Vector2(64, 860), Vector2(100, 940), Vector2(160, 985),
 	]), "canon", Rampa.Premio.DANO_FUERTE)
 
 	# --- Platillo, metido bajo el arco a la izquierda ---

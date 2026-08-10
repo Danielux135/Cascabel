@@ -71,10 +71,22 @@ var dano_girador: int = 1
 ## platillo está escondido bajo el arco.
 ## Cada recorrido paga distinto, que es lo que los hace tres tiros y no uno
 ## repetido tres veces:
-##   orbita  -> sube el multiplicador un tramo de golpe, y paga poco daño
-##   retorno -> te deja la bola en la otra pala; paga poco, el premio es poder
-##              encadenar
-##   canon   -> te suelta dentro del racimo de bumpers; este sí pega fuerte
+##   orbita   -> sube el multiplicador un tramo de golpe, y paga poco daño
+##   retorno  -> te deja la bola en la otra pala; paga poco, el premio es poder
+##               encadenar
+##   canon    -> el golpe gordo de un solo impacto, y te escupe la bola cruzada
+##               y rápida a la pala contraria: el pago grande se paga con un
+##               retorno difícil
+##   platillo -> atrasa el reloj del enemigo. Es el único tiro que paga en algo
+##               que no es daño, y por eso es el que cambia cómo juegas: cuando
+##               vas justo de vida dejas de ir a por daño y vas a por tiempo
 var dano_rampa: int = 10
 var dano_rampa_fuerte: int = 26
-var dano_platillo: int = 14
+## Baja de 14 a 8 a propósito: si el platillo pagara además el mejor daño, el
+## robo de reloj sería un extra y no una decisión. Lo que da es tiempo.
+var dano_platillo: int = 8
+
+## Cuánta carga del reloj le quita sacar la bola del platillo, en fracción.
+## Con 0,35 y un reloj de 18 s son unos 6 s regalados: se nota de verdad, que
+## es lo que hace que merezca la pena buscar un tiro escondido.
+var platillo_atrasa_reloj: float = 0.35
