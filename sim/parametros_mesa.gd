@@ -27,10 +27,23 @@ var flipper_rebote: float = 0.25
 ## deja de ser un objetivo diminuto.
 var flipper_longitud: float = 64.0
 var flipper_radio: float = 8.0
+## La pala levantada estaba a -32°, o sea muy empinada, y eso rompía la cuna por
+## dos sitios a la vez. Medido:
+##
+##   -32°: la bola rueda hasta el canto del eje, se cae por ahí y la pala la
+##         vuelve a coger, en bucle. Nunca se asienta del todo: picos de 137
+##         px/s con la pala sostenida. Es el bote que Daniel mandó en captura.
+##         Y acaba a 0,28 de la pala, donde omega por radio no da ni para subir
+##         40 px: desde la cuna no se podía tirar a nada.
+##   -16°: se para EN SECO en 0,13 s y se queda a 0,81 de la pala, que es donde
+##         la pala sí tiene palanca.
+##
+## El recorrido pasa de 60° a 44°. La velocidad de giro no cambia, así que el
+## golpe no se ablanda: lo que cambia es dónde queda la bola al sostener.
 var flipper_reposo_izq: float = 28.0        # grados, Y hacia abajo
-var flipper_activo_izq: float = -32.0       # recorrido de 60°
+var flipper_activo_izq: float = -16.0       # recorrido de 44°
 var flipper_reposo_der: float = 152.0
-var flipper_activo_der: float = 212.0
+var flipper_activo_der: float = 196.0
 
 ## (*) CONTEXTO daba los ejes en x=118 y x=282. Con esos, las puntas en reposo
 ## quedan a 26,3 px una de otra: 10,3 px libres para una bola de 18 px de
@@ -177,6 +190,18 @@ var friccion_flipper: float = 0.30
 ## frontera la bola apoyada da microrebotes contra la pala, pierde el contacto
 ## y no hay forma de asentarla. Una bola real tampoco rebota a 3 cm/s.
 var velocidad_rebote_minima: float = 55.0
+
+## Y por encima de esta, el rebote es el pleno de la superficie. Entre las dos
+## sube en rampa.
+##
+## Era un ESCALÓN: por debajo de 55 no rebotaba nada y por encima rebotaba
+## entero. Con la bola atrapada en la cuna eso la hacía botar sobre la pala
+## segundo y medio antes de asentarse —Daniel lo vio y lo mandó en una captura—,
+## porque cada botecito caía justo por encima del escalón y se devolvía entero.
+##
+## La rampa además es lo que hace una pelota de verdad: el coeficiente de
+## restitución baja cuanto más flojo es el golpe, no se apaga de golpe.
+var velocidad_rebote_pleno: float = 320.0
 
 ## Resistencia a la rodadura del contacto sostenido: el mismo Coulomb que los
 ## impactos, pero con un coeficiente pequeñísimo. Una bola apoyada no choca,

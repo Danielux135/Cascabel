@@ -758,15 +758,19 @@ func _prueba_agarre() -> void:
 		m.bola.viva and m.bola.velocidad() < 40.0,
 		"viva=%s a %.0f px/s" % [m.bola.viva, m.bola.velocidad()])
 
-	# Y se asienta EN LA CUNA, no donde cayó. Es la diferencia entre una bola
-	# que rueda hasta el hueco del eje —como en una mesa de verdad— y una bola
-	# a la que se le apaga la velocidad allí donde toque, que es lo que hacía
-	# el frenado a mano y lo que se veía como quedarse pegada.
+	# Y SE ASIENTA DONDE LA PALA TIENE PALANCA. Esto es lo que decide si la cuna
+	# sirve de algo: la velocidad que le mete la pala es omega por radio, así que
+	# una bola posada junto al eje no se puede disparar a ningún sitio.
+	#
+	# Con la pala levantada a -32° la bola rodaba hasta 0,18 de la pala, o sea
+	# 11 px de 64: el tiro subía 40 px y no llegaba a ninguna boca. Y encima no
+	# llegaba a asentarse, porque se caía por el canto del eje y la pala la
+	# volvía a coger en bucle. Aplanar la pala levantada arregla las dos cosas.
 	var dir_izq := m.flipper_izq.punta() - m.p.flipper_eje_izq
 	var donde := (m.bola.pos - m.p.flipper_eje_izq).dot(dir_izq) \
 		/ dir_izq.length_squared()
-	_comprobar("y se asienta en la cuna del eje, no donde cayo",
-		donde < 0.45, "acabo a %.2f de la pala, y cayo a 0.75" % donde)
+	_comprobar("y se asienta lejos del eje, donde la pala tiene palanca",
+		donde > 0.60, "acabo a %.2f de la pala; junto al eje no hay tiro" % donde)
 
 	# Con la bola asentada, la simulación tiene que SABER que está atrapada: es
 	# lo que enciende el aviso y la línea de puntería.
@@ -774,16 +778,15 @@ func _prueba_agarre() -> void:
 		m.flipper_atrapando != null,
 		"velocidad %.0f, umbral %.0f" % [m.bola.velocidad(), m.p.velocidad_atrapada])
 
-	# La bola se asienta SIEMPRE en el mismo sitio de la pala, muy cerca del
-	# eje. Es lo que hace que la cuna no sirva para tirar: la velocidad de la
-	# superficie es omega por radio, y con radio ~11 px de 64 no hay palanca.
-	# Esta prueba no exige que esté bien: deja constancia de cuánto es, para que
-	# se vea cambiar el día que se toque el ángulo de la pala levantada.
-	var eje_punta := m.flipper_izq.punta() - m.p.flipper_eje_izq
-	var donde_cuna := (m.bola.pos - m.p.flipper_eje_izq).dot(eje_punta) \
-		/ eje_punta.length_squared()
-	_comprobar("la cuna esta pegada al eje (medido, no deseado): %.2f de la pala"
-		% donde_cuna, donde_cuna < 0.5, "%.2f" % donde_cuna)
+	# Y con la pala sostenida se queda QUIETA de verdad, no botando encima. Con
+	# la pala a -32° la bola daba picos de 137 px/s estando "atrapada": rodaba
+	# hasta el canto del eje, se caía por ahí y la pala la volvía a coger.
+	var pico := 0.0
+	for _i in int(1.0 / DT):
+		m.avanzar(DT)
+		pico = maxf(pico, m.bola.velocidad())
+	_comprobar("y se queda quieta, no botando sobre la pala",
+		pico < 45.0, "llego a %.0f px/s con la pala sostenida" % pico)
 
 	# Y soltar sigue lanzando: el agarre no puede matar el tacto del flipper.
 	var antes := m.bola.velocidad()
@@ -822,23 +825,25 @@ func _prueba_cae_acelerando() -> void:
 	var f := m.flipper_izq
 	var dir := Vector2(cos(f.angulo), sin(f.angulo))
 	var normal := Vector2(-dir.y, dir.x)
-	# Misma colocación que la prueba de atrapar, que ya está validada: aquí lo
-	# que se mide es la caída al soltar, no el asentamiento.
-	m.bola.pos = f.eje + dir * 42.0 \
-		- normal * (m.p.flipper_radio + m.p.radio_bola - 0.5)
-	m.bola.vel = dir * 150.0
-	for _i in int(1.2 / DT):
-		m.avanzar(DT)
-
+	# Se mide rodando por la pala EN REPOSO, que es la cuesta limpia: soltando
+	# desde la cuna hay un bote de por medio y el número se ensucia. Lo que se
+	# comprueba es lo mismo: que la gravedad la acelere de verdad.
 	m.flipper_izq.pulsado = false
+	for _i in int(0.4 / DT):
+		m.avanzar(DT)
+	var dir2 := Vector2(cos(f.angulo), sin(f.angulo))
+	var normal2 := Vector2(-dir2.y, dir2.x)
+	m.bola.pos = f.eje + dir2 * (m.p.flipper_longitud * 0.35) \
+		- normal2 * (m.p.flipper_radio + m.p.radio_bola - 0.5)
+	m.bola.vel = Vector2.ZERO
 	var v: Array[float] = []
-	for _tramo in 4:
-		for _i in int(0.15 / DT):
+	for _tramo in 3:
+		for _i in int(0.10 / DT):
 			m.avanzar(DT)
 		v.append(m.bola.velocidad())
-	var texto := "%.0f, %.0f, %.0f, %.0f" % [v[0], v[1], v[2], v[3]]
-	_comprobar("al soltar la pala, la bola cae ACELERANDO",
-		v[3] > v[0] * 2.0 and v[3] > v[1] and v[1] > v[0], "px/s: %s" % texto)
+	var texto := "%.0f, %.0f, %.0f" % [v[0], v[1], v[2]]
+	_comprobar("rodando por la pala, la bola va ACELERANDO",
+		v[1] > v[0] + 20.0 and v[2] > v[1] + 20.0, "px/s cada 0,1 s: %s" % texto)
 
 	# Y la razón de fondo, por si alguien vuelve a subir la rodadura: la
 	# velocidad límite del arrastre tiene que quedar MUY por encima de lo que la

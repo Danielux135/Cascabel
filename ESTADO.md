@@ -145,34 +145,33 @@ perdido.
 
 ## Lo que bloquea el pilar
 
-**Desde la cuna no se puede tirar a nada, y por eso no hay decisiones.**
-`DISEÑO.md` §1 dice que la mesa es un menú de tiros. Medido:
+**Desde la cuna todavía no se llega a ninguna boca.** `DISEÑO.md` §1 dice
+que la mesa es un menú de tiros, y el tiro repetible se queda corto.
 
-| Qué | Medida |
-|---|---|
-| Dónde se asienta la bola en la pala levantada | **0,18** de la pala (11 px del eje) |
-| Velocidad del disparo desde ahí | ~290 px/s |
-| Cuánto sube | 40 px (de y=1200 a y=1160) |
-| Qué toca | **nada** |
-| Boca más baja de un recorrido | y=985 |
+Medio arreglado ya: la pala levantada estaba a −32°, tan empinada que la
+bola rodaba hasta el canto del eje, se caía por ahí y la pala la volvía a
+coger en bucle. Con −16° se para en seco y se queda con palanca:
 
-La causa es geométrica: la pala levantada va a −32°, o sea cuesta arriba
-hacia la punta, así que la bola rueda hasta el eje. Y la velocidad de la
-superficie es ω×r: con r = 11 px de 64 no hay palanca. La cuna es una
-posición de descanso, no de tiro.
+| | antes (−32°) | ahora (−16°) |
+|---|---|---|
+| Se posa en | 0,18 de la pala | **0,53** |
+| Quieta con la pala sostenida | no, picos de 137 px/s | **sí, 0 px/s** |
+| El tiro sube a | y=1160 | **y=1032** |
+| A | 290 px/s | **758 px/s** |
 
-Barrido de lo que sí funcionaría (medido, sin decidir nada):
+Falta el último tramo: las bocas donde se ENTRA están a y=790 (retorno y
+cañón) y y=880/935 (órbita). Aplanar más la pala ya no da nada (a −4° se
+posa igual, en 0,55). Lo único que lo cierra es la velocidad de giro:
 
-| Cambio | Se posa en | Sube a | Toca |
-|---|---|---|---|
-| pala arriba a −12° | 0,28 | y=1162 | nada |
-| pala arriba a −6° | 0,41 | y=1107 | nada |
-| **pala arriba a 0°** | 0,55 | **y=878** | target |
-| **velocidad de giro 22 → 55** | 0,18 | **y=979** | target |
+| `flipper_velocidad_giro` | El tiro sube a | Toca |
+|---|---|---|
+| 22 (ahora) | y=1032 | nada |
+| 26 | y=977 | nada |
+| **30** | **y=787** | target |
 
-Los dos cambian el tacto de las palas y el hueco central, así que los tiene
-que sentir Daniel. Y ojo: ni siquiera esos llegan a las bocas de los
-recorridos, solo a los targets. Puede que además haya que bajar alguna boca.
+**Pero eso acelera TODOS los golpes**, y Daniel ya dijo que la bola va muy
+rápida. O se sube y se compensa en otro sitio, o se bajan las bocas hacia la
+bola. Es decisión suya y se prueba jugando.
 
 ## Abierto
 

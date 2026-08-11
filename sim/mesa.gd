@@ -570,12 +570,16 @@ func _colisionar(h: float) -> void:
 			continue    # ya se separa: no dupliques el rebote en las juntas
 		var velocidad := -vn
 		var e := c.restitucion
-		# Por debajo del umbral no se rebota. Una bola apoyada llega al contacto
-		# con la velocidad que le acaba de dar la gravedad en un subpaso, y
-		# devolvérsela es lo que la hace zumbar encima de la pala en vez de
-		# quedarse. Los bumpers no entran: los suyos los decide `velocidad_minima`.
-		if c.empuje <= 0.0 and velocidad < p.velocidad_rebote_minima:
-			e = 0.0
+		# El rebote sube en rampa con la fuerza del golpe: nulo por debajo de
+		# `velocidad_rebote_minima`, pleno a partir de `velocidad_rebote_pleno`.
+		# Una bola apoyada llega al contacto con la velocidad que le acaba de dar
+		# la gravedad en un subpaso, y devolvérsela es lo que la hace botar
+		# encima de la pala en vez de quedarse.
+		# Los bumpers no entran: los suyos los decide `velocidad_minima`.
+		if c.empuje <= 0.0:
+			e *= clampf((velocidad - p.velocidad_rebote_minima)
+				/ maxf(p.velocidad_rebote_pleno - p.velocidad_rebote_minima, 1.0),
+				0.0, 1.0)
 		var empuje := 0.0
 		if c.empuje > 0.0:
 			if velocidad >= c.velocidad_minima:
