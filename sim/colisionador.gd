@@ -23,6 +23,16 @@ var activo := true
 ## y va bajando. Desde abajo (subiendo por el carril) no está.
 var una_direccion := false
 
+## Por qué cara empuja. Unitaria, o cero si empuja por todas (los bumpers y los
+## postes son redondos: no tienen espalda).
+##
+## Un slingshot SÍ tiene espalda, y en una máquina real la goma solo mira al
+## campo. Aquí empujaba por los dos lados, y como va casi paralelo a la banda
+## del outlane, una bola metida en ese pasillo recibía un patadón contra la
+## pared, volvía, y otro patadón: se quedaba encerrada rebotando segundos.
+## Medido: hasta 4,1 s a 340 px/s. Daniel lo mandó en una captura.
+var cara := Vector2.ZERO
+
 ## Solo para targets: a qué banco pertenece. -1 si no es un target.
 var banco: int = -1
 
@@ -78,6 +88,10 @@ func consultar(pos: Vector2, vel: Vector2, radio_bola: float, salida: Array) -> 
 	if dist >= suma:
 		return
 	var n := d / dist if dist > 1e-4 else _normal_degenerada
+	# Por la espalda no empuja, pero sigue siendo goma: rebota igual.
+	var e := empuje
+	if cara != Vector2.ZERO and n.dot(cara) < 0.25:
+		e = 0.0
 	salida.append(Contacto.new(
 		n, suma - dist, pos - n * radio_bola, Vector2.ZERO,
-		restitucion, empuje, velocidad_minima, tipo, self, friccion))
+		restitucion, e, velocidad_minima, tipo, self, friccion))

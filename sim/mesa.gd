@@ -246,6 +246,14 @@ func _pared(a: Vector2, b: Vector2) -> Colisionador:
 func _slingshot(a: Vector2, b: Vector2) -> Colisionador:
 	var c := Colisionador.new(a, b, 0.0, Colisionador.Tipo.SLINGSHOT,
 		p.slingshot_rebote, p.slingshot_empuje, p.slingshot_velocidad_minima)
+	# La goma mira al campo, y el campo es hacia el centro de la mesa. De las
+	# dos perpendiculares se coge la que apunta hacia allí; por la espalda, que
+	# es la que da a la banda del outlane, rebota pero no patea.
+	var d := (b - a).normalized()
+	var perp := Vector2(-d.y, d.x)
+	if signf(perp.x) != signf(ANCHO * 0.5 - (a + b).x * 0.5):
+		perp = -perp
+	c.cara = perp
 	colisionadores.append(c)
 	return c
 

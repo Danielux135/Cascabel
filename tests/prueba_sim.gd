@@ -34,6 +34,8 @@ func _initialize() -> void:
 	_prueba_sonido()
 	_prueba_impactos()
 	_prueba_racimo()
+	_prueba_sin_rebote_encerrado()
+	_prueba_slingshot_tiene_espalda()
 	_prueba_outlanes()
 	_prueba_agarre()
 	_prueba_identidad_recorridos()
@@ -1292,6 +1294,80 @@ func _prueba_apertura() -> void:
 					% [sentido, velocidad, m2.bola.pos.x])
 	_comprobar("salir de la orbita deja la bola en una pala, no en el desague",
 		fallos.is_empty(), str(fallos))
+
+## La bola no puede quedarse ENCERRADA rebotando. Es distinto de un atasco: en
+## un atasco se para y el ball search la saca; aquí va a toda velocidad en un
+## palmo de mesa, así que el ball search no salta y el jugador mira sin poder
+## hacer nada.
+##
+## Pasaba en el pasillo entre la banda del outlane y el slingshot, que van casi
+## paralelos: el slingshot empujaba también por su espalda, o sea que le pegaba
+## un patadón contra la pared, la bola volvía, y otro patadón. Medido: hasta
+## 4,1 s a 340 px/s. Lo vio Daniel jugando y lo mandó en una captura.
+##
+## La prueba no busca ese sitio: barre la mesa entera, porque el próximo rincón
+## así no va a estar donde uno lo busque.
+func _prueba_sin_rebote_encerrado() -> void:
+	var peor := 0.0
+	var donde := Vector2.ZERO
+	for tirada in 60:
+		var m := _nueva_mesa()
+		m.rng.seed = tirada + 1
+		m.nueva_bola()
+		m.bola.en_carril = false
+		m.bola.pos = Vector2(60.0 + 280.0 * (float(tirada % 10) / 9.0), 700.0)
+		var ang := -PI * (0.15 + 0.7 * (float(tirada / 10) / 5.0))
+		m.bola.vel = Vector2(cos(ang), sin(ang)) * 900.0
+		var t := 0.0
+		var ancla := m.bola.pos
+		var desde := 0.0
+		while m.bola.viva and t < 25.0:
+			m.avanzar(DT)
+			t += DT
+			if m.bola.pos.distance_to(ancla) > 45.0 or m.bola.velocidad() < 250.0:
+				ancla = m.bola.pos
+				desde = t
+				continue
+			if t - desde > peor:
+				peor = t - desde
+				donde = ancla
+	_comprobar("la bola no se queda encerrada rebotando en ningun rincon",
+		peor < 1.5, "%.1f s dando vueltas en 45 px alrededor de (%.0f,%.0f)"
+			% [peor, donde.x, donde.y])
+
+## Y la razón de fondo: un slingshot tiene espalda. Empuja hacia el campo, y por
+## detrás solo rebota. Si vuelve a empujar por los dos lados, cualquier pasillo
+## paralelo a él se convierte en una trampa.
+func _prueba_slingshot_tiene_espalda() -> void:
+	var m := _nueva_mesa()
+	var sling: Colisionador = null
+	for c in m.colisionadores:
+		if c.tipo == Colisionador.Tipo.SLINGSHOT and c.centro().x < 200.0:
+			sling = c
+	_comprobar("el slingshot sabe cual es su cara buena",
+		sling != null and sling.cara != Vector2.ZERO)
+	if sling == null:
+		return
+	# Y esa cara mira al campo, no a la banda.
+	_comprobar("y esa cara mira al centro de la mesa",
+		sling.cara.x > 0.0, "cara %s" % str(sling.cara))
+
+	var salida := {}
+	for lado in [1.0, -1.0]:
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.bola.pos = sling.centro() + sling.cara * lado * 30.0
+		m2.bola.vel = -sling.cara * lado * 500.0
+		var v := 0.0
+		for _i in int(0.25 / DT):
+			m2.avanzar(DT)
+			v = maxf(v, m2.bola.velocidad())
+		salida[lado] = v
+	_comprobar("de frente patea la bola",
+		float(salida[1.0]) > 800.0, "salio a %.0f px/s de 500" % salida[1.0])
+	_comprobar("y por la espalda solo rebota, no patea",
+		float(salida[-1.0]) < 600.0, "salio a %.0f px/s de 500" % salida[-1.0])
 
 ## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
 ## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no

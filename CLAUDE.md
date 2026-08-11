@@ -67,6 +67,13 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   caducidad arrastra miles en una partida larga.
 - **Cada rincón nuevo de la mesa es un sitio donde la bola se acuña.**
   Prueba cada zona nueva contra atascos y no toques el ball search.
+- **Quedarse encerrada rebotando NO es un atasco, y el ball search no la
+  saca.** En un atasco la bola se para; encerrada va a toda velocidad en un
+  palmo de mesa, así que el ball search nunca salta y el jugador mira sin
+  poder hacer nada. Pasa allí donde algo que EMPUJA quede casi paralelo a una
+  pared: el slingshot empujaba también por su espalda y el pasillo del outlane
+  se convertía en una trampa de 4 segundos. **Cualquier cosa con `empuje`
+  tiene cara** (`Colisionador.cara`): por detrás rebota, pero no patea.
 - **Que la bola drene no significa que el juego funcione.** La órbita soltaba
   la bola pegada a la banda izquierda y se iba por el outlane sin acercarse a
   una pala: la apertura de TODAS las bolas era perderla sin jugar, y la
