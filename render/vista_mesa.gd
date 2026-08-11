@@ -153,6 +153,9 @@ var _giro: Array[float] = []
 var _giro_velocidad: Array[float] = []
 var _flash_bumper: Array[float] = []
 var _numeros: Array[Dictionary] = []
+## Cuántas veces se ha atrapado la bola en esta partida. Solo para dejar de dar
+## la pista una vez que se ve que ya la sabes.
+var _veces_atrapada: int = 0
 
 var _tex_bola: Texture2D
 var _tex_poste: Texture2D
@@ -186,6 +189,7 @@ func _ready() -> void:
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
 	mesa.bola_drenada.connect(_al_drenar_bola)
+	mesa.atrape_cambiado.connect(_al_cambiar_atrape)
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
@@ -428,6 +432,18 @@ func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 	impactos.chispas(punto, Vector2(signf(Mesa.ANCHO * 0.5 - punto.x), -0.35),
 		C_ORO_CLARO, 1.4)
 
+## Atrapar la bola es la técnica con la que se elige un tiro, y no se anunciaba
+## de ninguna manera: Daniel jugó una tanda entera dándole a las palas "a ver
+## qué pasa" porque nada le decía que podía parar la bola y apuntar.
+##
+## El aviso es deliberadamente pequeño —un clic y una línea— porque no es un
+## premio: es "ya la tienes, mira la mesa". Y no le da ninguna habilidad al
+## gesto de mantener el flipper, que es invariante: enseña lo que ya pasaba.
+func _al_cambiar_atrape(atrapada: bool) -> void:
+	if atrapada:
+		_sonido.reproducir("atrapar")
+		_veces_atrapada += 1
+
 func _al_buscar_bola(punto: Vector2) -> void:
 	impactos.onda(punto, C_ARCANO, 1.3)
 	_sacudir(anim.sacudida_ataque)
@@ -519,10 +535,24 @@ func _draw() -> void:
 	_dibujar_objetos()
 	impactos.dibujar(self)
 	_dibujar_bola()
+	_dibujar_atrape()
 	_dibujar_numeros()
 	_dibujar_lanzador()
 	if _depuracion:
 		_dibujar_depuracion()
+
+## Que se vea que la bola está parada y es tuya. Un anillo y ya.
+##
+## AQUÍ HABÍA UNA LÍNEA DE PUNTERÍA Y SE QUITÓ, porque mentía: predecía la
+## dirección con ω × r en el punto de contacto y la bola salía a 101° de ahí.
+## Y aunque no mintiera, no diría nada: está medido que la bola se asienta
+## SIEMPRE en el mismo punto de la pala, así que la línea sería idéntica cada
+## vez. Una ayuda que enseña siempre lo mismo no ayuda a elegir nada.
+func _dibujar_atrape() -> void:
+	if mesa.flipper_atrapando == null or not mesa.bola.viva:
+		return
+	draw_circle(mesa.bola.pos, mesa.p.radio_bola + 4.0, Color(C_ORO_CLARO, 0.55),
+		false, 1.0)
 
 ## El medidor de carga del lanzador va pegado al carril, en el mundo: es parte
 ## de la mesa, no del HUD.

@@ -73,8 +73,14 @@ var bumper_centro := Vector2(200.0, 805.0)
 var ancho_outlane: float = 21.0
 
 ## Umbral de "la pala está quieta", o sea que ya ha terminado de subir. No entra
-## en la física: solo lo usan las pruebas y la depuración.
+## en la física: lo usan el aviso de bola atrapada, las pruebas y la depuración.
 var flipper_omega_quieta: float = 0.6       # rad/s
+
+## Por debajo de esto, con la pala arriba y quieta, la bola cuenta como
+## ATRAPADA. Tampoco entra en la física: es cuándo se avisa de que ya puedes
+## apuntar. Atrapar la bola es la técnica con la que se elige un tiro, y Daniel
+## jugó una tanda entera sin saber que estaba ahí.
+var velocidad_atrapada: float = 60.0
 
 ## El cañón cruza el campo hacia la pala contraria, y salía a la misma velocidad
 ## con la que entraba: ~900 px/s. Medido, eso deja menos de 150 ms para llegar a

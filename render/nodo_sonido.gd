@@ -17,6 +17,7 @@ const AJUSTES := {
 	"bumper":        {"db": -3.0, "tono": 0.10},
 	"target":        {"db": -4.0, "tono": 0.08},
 	"banco":         {"db": -1.0, "tono": 0.00},
+	"atrapar":       {"db": -7.0, "tono": 0.00},
 	"flipper":       {"db": -9.0, "tono": 0.06},
 	"rampa_entrada": {"db": -3.0, "tono": 0.02},
 	"rampa_salida":  {"db": -3.0, "tono": 0.02},

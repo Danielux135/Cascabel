@@ -768,6 +768,23 @@ func _prueba_agarre() -> void:
 	_comprobar("y se asienta en la cuna del eje, no donde cayo",
 		donde < 0.45, "acabo a %.2f de la pala, y cayo a 0.75" % donde)
 
+	# Con la bola asentada, la simulación tiene que SABER que está atrapada: es
+	# lo que enciende el aviso y la línea de puntería.
+	_comprobar("la mesa sabe que la bola esta atrapada",
+		m.flipper_atrapando != null,
+		"velocidad %.0f, umbral %.0f" % [m.bola.velocidad(), m.p.velocidad_atrapada])
+
+	# La bola se asienta SIEMPRE en el mismo sitio de la pala, muy cerca del
+	# eje. Es lo que hace que la cuna no sirva para tirar: la velocidad de la
+	# superficie es omega por radio, y con radio ~11 px de 64 no hay palanca.
+	# Esta prueba no exige que esté bien: deja constancia de cuánto es, para que
+	# se vea cambiar el día que se toque el ángulo de la pala levantada.
+	var eje_punta := m.flipper_izq.punta() - m.p.flipper_eje_izq
+	var donde_cuna := (m.bola.pos - m.p.flipper_eje_izq).dot(eje_punta) \
+		/ eje_punta.length_squared()
+	_comprobar("la cuna esta pegada al eje (medido, no deseado): %.2f de la pala"
+		% donde_cuna, donde_cuna < 0.5, "%.2f" % donde_cuna)
+
 	# Y soltar sigue lanzando: el agarre no puede matar el tacto del flipper.
 	var antes := m.bola.velocidad()
 	m.flipper_izq.pulsado = false

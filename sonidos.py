@@ -120,6 +120,14 @@ SONIDOS = {
         dict(onda="ruido", dur=0.20, caida=13.0, filtro=2200, crush=4, vol=0.55),
     ]),
 
+    # La bola asentándose en la cuna de la pala. Es el sonido más pequeño del
+    # juego a propósito: no es un premio, es un aviso de "ya la tienes, mira la
+    # mesa y elige". Si sonara a premio, competiría con el arpegio y el banco.
+    "atrapar": dict(
+        onda="triangulo", f0=330, f1=250, dur=0.06, caida=48,
+        ruido=0.04, filtro=3200, crush=6, vol=0.30,
+    ),
+
     # Cerrar un banco de targets entero. Tiene que distinguirse del target
     # suelto, que es lo que suena tres veces justo antes: mismo material, pero
     # dos notas y el doble de largo. Es un remate, no un golpe.

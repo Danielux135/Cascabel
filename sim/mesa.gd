@@ -19,6 +19,9 @@ signal rampa_entrada(punto: Vector2, indice: int)
 signal rampa_salida(punto: Vector2, indice: int)
 signal platillo_capturado(punto: Vector2, indice: int)
 signal platillo_expulsado(punto: Vector2, indice: int)
+## La bola acaba de quedarse atrapada en la cuna de una pala, o de salir de
+## ella. Es el momento en el que el jugador puede mirar la mesa y elegir tiro.
+signal atrape_cambiado(atrapada: bool)
 
 const ANCHO := 400.0
 const ALTO := 1300.0
@@ -58,6 +61,11 @@ var cargando := false
 var _contactos: Array[Contacto] = []
 var _temporizador_busqueda: float = 0.0
 var _tocando_flipper_sostenido := false
+## La pala que tiene la bola atrapada en su cuna ahora mismo, o null. Es estado
+## de la simulación, no de la vista: hace falta para poder avisar de que la bola
+## está atrapada, que es LA técnica con la que se elige un tiro.
+var flipper_atrapando: Flipper = null
+var _atrapada_antes := false
 
 func _init(parametros: ParametrosMesa = null) -> void:
 	p = parametros if parametros != null else ParametrosMesa.new()
@@ -438,6 +446,9 @@ func _subpaso(h: float) -> void:
 	bola.pos += bola.vel * h
 
 	_colisionar(h)
+	if (flipper_atrapando != null) != _atrapada_antes:
+		_atrapada_antes = flipper_atrapando != null
+		atrape_cambiado.emit(_atrapada_antes)
 	_avanzar_giradores()
 	_comprobar_rampas()
 	_comprobar_platillos()
@@ -515,6 +526,7 @@ func _colisionar(h: float) -> void:
 	# Se reinician ANTES de la salida temprana: si no, sin contactos se quedaban
 	# con el valor del subpaso anterior.
 	_tocando_flipper_sostenido = false
+	flipper_atrapando = null
 	_contactos.clear()
 	for c in colisionadores:
 		c.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
@@ -532,6 +544,11 @@ func _colisionar(h: float) -> void:
 		var f := c.origen as Flipper
 		if f.pulsado:
 			_tocando_flipper_sostenido = true
+			# Atrapada: la pala ya ha terminado de subir y la bola está posada
+			# y quieta encima. Es el momento en el que se puede apuntar.
+			if absf(f.omega) < p.flipper_omega_quieta \
+					and bola.velocidad() < p.velocidad_atrapada:
+				flipper_atrapando = f
 
 	# --- ARREGLO 2: resolver POSICIÓN solo contra el contacto más profundo ---
 	# Corregir contra todos los contactos a la vez es lo que acuñaba la bola:

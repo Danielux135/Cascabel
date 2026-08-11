@@ -143,6 +143,37 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 La tabla de vida se rehace entera en la Fase 3. Ajustarla ahora es trabajo
 perdido.
 
+## Lo que bloquea el pilar
+
+**Desde la cuna no se puede tirar a nada, y por eso no hay decisiones.**
+`DISEÑO.md` §1 dice que la mesa es un menú de tiros. Medido:
+
+| Qué | Medida |
+|---|---|
+| Dónde se asienta la bola en la pala levantada | **0,18** de la pala (11 px del eje) |
+| Velocidad del disparo desde ahí | ~290 px/s |
+| Cuánto sube | 40 px (de y=1200 a y=1160) |
+| Qué toca | **nada** |
+| Boca más baja de un recorrido | y=985 |
+
+La causa es geométrica: la pala levantada va a −32°, o sea cuesta arriba
+hacia la punta, así que la bola rueda hasta el eje. Y la velocidad de la
+superficie es ω×r: con r = 11 px de 64 no hay palanca. La cuna es una
+posición de descanso, no de tiro.
+
+Barrido de lo que sí funcionaría (medido, sin decidir nada):
+
+| Cambio | Se posa en | Sube a | Toca |
+|---|---|---|---|
+| pala arriba a −12° | 0,28 | y=1162 | nada |
+| pala arriba a −6° | 0,41 | y=1107 | nada |
+| **pala arriba a 0°** | 0,55 | **y=878** | target |
+| **velocidad de giro 22 → 55** | 0,18 | **y=979** | target |
+
+Los dos cambian el tacto de las palas y el hueco central, así que los tiene
+que sentir Daniel. Y ojo: ni siquiera esos llegan a las bocas de los
+recorridos, solo a los targets. Puede que además haya que bajar alguna boca.
+
 ## Abierto
 
 - **Los dos carriles de retorno no miden lo mismo**: 34 px de boca el

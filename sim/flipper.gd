@@ -53,6 +53,24 @@ func avanzar(dt: float) -> void:
 func punta() -> Vector2:
 	return eje + Vector2(cos(angulo), sin(angulo)) * longitud
 
+## Hacia dónde saldría disparada una bola apoyada aquí si soltases y volvieses a
+## dar. Es la MISMA cuenta que hace el solver —la velocidad de la superficie en
+## el punto de contacto, ω × r— con la ω que tendría la pala subiendo. O sea que
+## no es una aproximación para dibujar: es la dirección de verdad.
+##
+## Sirve para enseñar la cuna. No le da ninguna habilidad al gesto de mantener
+## el flipper, que es invariante: solo enseña lo que ya iba a pasar.
+func direccion_de_disparo(pos_bola: Vector2) -> Vector2:
+	var d := punta() - eje
+	var t := clampf((pos_bola - eje).dot(d) / d.length_squared(), 0.0, 1.0)
+	var contacto := eje + d * t
+	var r := contacto - eje
+	if r.length_squared() < 1e-6:
+		return Vector2.UP
+	# El sentido del barrido al subir: del ángulo de reposo al activo.
+	var sentido := signf(angulo_activo - angulo_reposo)
+	return Vector2(-r.y, r.x).normalized() * sentido
+
 func consultar(pos: Vector2, _vel: Vector2, radio_bola: float, salida: Array) -> void:
 	var d := punta() - eje
 	var t := clampf((pos - eje).dot(d) / d.length_squared(), 0.0, 1.0)

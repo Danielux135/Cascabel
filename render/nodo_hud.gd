@@ -15,6 +15,9 @@ const C_TEXTO       := Paleta.TEXTO
 const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
 const C_VERDE       := Paleta.VERDE
 
+## Atrapes tras los cuales se deja de dar la pista de cómo atrapar.
+const VECES_PARA_APRENDER := 3
+
 var vista: VistaMesa
 var _p: ParametrosCamara
 var _fuente: Font
@@ -109,6 +112,13 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 			if combate.reloj_restante() <= combate.p.reloj_aviso:
 				texto = "ATAQUE EN %d" % int(ceil(combate.reloj_restante()))
 				col = C_ORO_CLARO
+			elif mesa.flipper_atrapando != null:
+				texto = "BOLA ATRAPADA"
+				col = C_TEXTO_TENUE
+			# AQUÍ IBA LA PISTA de "mantén A o D para atrapar y apuntar", y se
+			# quitó: está medido que desde la cuna el tiro sube 40 px y no llega
+			# a ninguna boca. Enseñar una técnica que no sirve es peor que no
+			# enseñar nada. Vuelve cuando la cuna dispare de verdad.
 		Combate.Fase.DRENADA:
 			texto = "BOLA PERDIDA  ·  COMBO A x1"
 			col = C_TEXTO_TENUE
