@@ -76,6 +76,17 @@ var ancho_outlane: float = 21.0
 ## en la física: solo lo usan las pruebas y la depuración.
 var flipper_omega_quieta: float = 0.6       # rad/s
 
+## El cañón cruza el campo hacia la pala contraria, y salía a la misma velocidad
+## con la que entraba: ~900 px/s. Medido, eso deja menos de 150 ms para llegar a
+## la pala, y un humano reacciona en 250: no era un tiro difícil, era un tiro
+## imposible, o sea perder la bola con pasos extra. Sale más lento, pero sigue
+## cruzado: lo que se paga es la posición, no la velocidad.
+## Medido por barrido: a 1,0 la bola llega a la pala en 0 o en 875 ms según con
+## qué rebote, o sea que no se puede jugar. A 0,5 llega entre 267 y 325 ms
+## entrando a 700, 900 o 1100, que es el único tramo por encima del umbral
+## humano en TODO el rango. A 0,6 todavía se pierde entrando fuerte.
+var canon_factor_salida: float = 0.50
+
 # --- Slingshots ---
 var slingshot_empuje: float = 700.0
 var slingshot_rebote: float = 0.55

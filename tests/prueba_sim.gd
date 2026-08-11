@@ -872,21 +872,31 @@ func _prueba_canon_escupe(m: Mesa) -> void:
 	m.bola.rampa_distancia = r.largo - 1.0
 
 	var v_salida := 0.0
-	var alcanzo_derecha := false
+	var t_salida := -1.0
+	var t_pala := -1.0
 	var t := 0.0
 	while m.bola.viva and t < 4.0:
 		m.avanzar(DT)
 		t += DT
 		if m.bola.rampa >= 0:
 			continue
-		if v_salida == 0.0:
+		if t_salida < 0.0:
+			t_salida = t
 			v_salida = m.bola.velocidad()
-		if m.bola.pos.distance_to(m.p.flipper_eje_der) < 75.0:
-			alcanzo_derecha = true
-	_comprobar("el canon escupe la bola rapida, no posada",
-		v_salida > 700.0, "salio a %.0f px/s de 900 de entrada" % v_salida)
+		if t_pala < 0.0 and m.bola.pos.distance_to(m.p.flipper_eje_der) < 75.0:
+			t_pala = t
+	_comprobar("el canon escupe la bola, no la posa",
+		v_salida > 250.0, "salio a %.0f px/s" % v_salida)
 	_comprobar("y cruzada hacia la pala contraria",
-		alcanzo_derecha, "no llego a la pala derecha")
+		t_pala > 0.0, "no llego a la pala derecha")
+
+	# LA PRUEBA QUE ESTABA MAL ESCRITA: exigía que saliera RÁPIDA, y eso es
+	# justo lo que hacía el tiro imposible. Un humano reacciona en 250 ms; si la
+	# bola llega antes, el premio del cañón es perder la bola con pasos extra.
+	# Lo que hay que exigir no es velocidad, es que dé tiempo a jugarla.
+	_comprobar("y con tiempo humano para cazarla (>250 ms)",
+		t_pala > 0.0 and (t_pala - t_salida) > 0.25,
+		"solo %.0f ms" % ((t_pala - t_salida) * 1000.0))
 
 ## El platillo paga en TIEMPO, no en daño: es el único tiro que da algo que no
 ## es pegar, y es lo que hace que la mesa tenga una decisión de verdad cuando

@@ -535,14 +535,40 @@ func _dibujar_lanzador() -> void:
 
 ## La órbita es una curva, no paredes, así que se dibuja como lo que es: un
 ## carril elevado. La bola se pinta después, encima, porque va por arriba.
+## Qué paga cada recorrido, escrito en su boca. `DISEÑO.md` §1 dice que la mesa
+## es un menú de tiros, y un menú sin los platos escritos no es un menú: Daniel
+## jugó una tanda entera sin llegar a saber qué era el platillo.
+const ETIQUETA_RAMPA := {
+	Rampa.Premio.MULTIPLICADOR: "MULTIPLICADOR",
+	Rampa.Premio.DANO_FUERTE: "CANON  DANO x2",
+	Rampa.Premio.DANO: "OTRA PALA",
+}
+
 func _dibujar_rampas() -> void:
 	for r in mesa.rampas:
 		draw_polyline(r.puntos, Color(C_CABINA, 0.85), 15.0)
 		draw_polyline(r.puntos, Color(C_MESA_BAJA, 0.9), 11.0)
 		draw_polyline(r.puntos, Color(C_PARED, 0.55), 1.0)
+		var bocas := [r.puntos[0]] if not r.bidireccional \
+			else [r.puntos[0], r.puntos[r.puntos.size() - 1]]
 		for extremo in [r.puntos[0], r.puntos[r.puntos.size() - 1]]:
 			draw_circle(extremo, r.entrada_radio, Color(C_ORO, 0.30))
 			draw_circle(extremo, r.entrada_radio, C_ORO, false, 1.0)
+		for boca in bocas:
+			_etiqueta(boca, str(ETIQUETA_RAMPA.get(r.premio, "")))
+
+## Rótulo pequeño y apagado junto a una boca. Va tenue a propósito: tiene que
+## poder leerse entre bola y bola, no competir con la bola.
+func _etiqueta(donde: Vector2, texto: String) -> void:
+	if texto == "":
+		return
+	var ancho := _fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	var x := clampf(donde.x - ancho * 0.5, 24.0, Mesa.ANCHO - ancho - 24.0)
+	draw_string(_fuente, Vector2(x, donde.y - r_separacion()), texto,
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(C_TEXTO_TENUE, 0.85))
+
+func r_separacion() -> float:
+	return 22.0
 
 func _dibujar_platillos() -> void:
 	for pl in mesa.platillos:
@@ -550,6 +576,9 @@ func _dibujar_platillos() -> void:
 		draw_circle(pl.centro, pl.radio, C_CABINA)
 		draw_line(pl.centro, pl.centro + pl.direccion * (pl.radio + 8.0),
 			Color(C_ORO, 0.5), 1.0)
+		# El platillo es el tiro que paga en tiempo, y era el único que no se
+		# anunciaba. Sin esto no existe como decisión.
+		_etiqueta(pl.centro + Vector2(0, pl.radio + 34.0), "ATRASA EL RELOJ")
 
 ## Los carriles de retorno del arreglo 1, sombreados para que se lean.
 func _dibujar_inlanes() -> void:

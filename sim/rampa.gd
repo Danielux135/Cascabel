@@ -27,6 +27,13 @@ var velocidad_minima: float = 500.0
 ## Una órbita se recorre en los dos sentidos, como las de verdad.
 var bidireccional := true
 
+## Con cuánta de la velocidad de entrada sale la bola al terminar el recorrido.
+## A 1,0 sale como entró. Existe porque un recorrido puede tener que devolver la
+## bola MÁS LENTA de lo que entró para que se pueda jugar: el cañón salía a 900
+## px/s cruzando el campo y Daniel no llegaba a cazarla nunca, así que su premio
+## era en la práctica perder la bola.
+var factor_salida: float = 1.0
+
 var _acumulado := PackedFloat32Array()
 
 func _init(control: PackedVector2Array, resolucion: int = 14) -> void:

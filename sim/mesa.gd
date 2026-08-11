@@ -199,7 +199,7 @@ func _construir() -> void:
 		Vector2(258, 342), Vector2(190, 312), Vector2(120, 350),
 		Vector2(78, 440), Vector2(62, 580), Vector2(60, 750),
 		Vector2(64, 860), Vector2(100, 940), Vector2(160, 985),
-	]), "canon", Rampa.Premio.DANO_FUERTE)
+	]), "canon", Rampa.Premio.DANO_FUERTE, p.canon_factor_salida)
 
 	# --- Platillo, metido bajo el arco a la izquierda ---
 	# Hay que buscarlo: no está en el camino de la bola. Captura, pausa, y
@@ -314,13 +314,15 @@ func _orbita() -> void:
 	rampas.append(r)
 
 ## Carril de retorno: como la órbita pero de un solo sentido.
-func _carril(control: PackedVector2Array, nombre: String, premio: int) -> void:
+func _carril(control: PackedVector2Array, nombre: String, premio: int,
+		factor_salida: float = 1.0) -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
 	r.bidireccional = false
 	r.nombre = nombre
 	r.premio = premio
+	r.factor_salida = factor_salida
 	rampas.append(r)
 
 func _platillo(centro: Vector2, direccion: Vector2) -> void:
@@ -457,7 +459,8 @@ func _avanzar_rampa(h: float) -> void:
 	var d := clampf(bola.rampa_distancia, 0.0, r.largo)
 	var indice := bola.rampa
 	bola.pos = r.punto_en(d)
-	bola.vel = r.tangente_en(d) * float(bola.rampa_sentido) * bola.rampa_velocidad
+	bola.vel = r.tangente_en(d) * float(bola.rampa_sentido) \
+		* bola.rampa_velocidad * r.factor_salida
 	bola.rampa = -1
 	rampa_salida.emit(bola.pos, indice)
 
