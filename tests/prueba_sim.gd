@@ -804,6 +804,61 @@ func _prueba_agarre() -> void:
 		maxima > antes + 300.0, "de %.0f a %.0f px/s" % [antes, maxima])
 	_prueba_no_se_queda_pegada()
 	_prueba_cae_acelerando()
+	_prueba_la_cuna_alcanza()
+
+## EL PILAR, medido: `DISEÑO.md` §1 dice que la mesa es un menú de tiros, y el
+## único tiro repetible que hay es el de la bola atrapada en la cuna. Si ese
+## tiro no llega a la altura de las bocas, no hay menú: le das a las palas y que
+## sea lo que Dios quiera, que es literalmente lo que reportó Daniel.
+##
+## Con la pala a 22 rad/s el tiro subía a y=1032 y las bocas están a y=790 (el
+## retorno y el cañón) y y=880/935 (la órbita). No llegaba a ninguna. Con 30
+## sube a y=787.
+##
+## Se mide la ALTURA, no qué toca: adónde apunta exactamente depende de la
+## geometría de cada boca y eso se ajusta jugando; lo que no es negociable es
+## que la bola tenga fuerza para llegar arriba.
+func _prueba_la_cuna_alcanza() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	var f := m.flipper_izq
+	f.pulsado = true
+	for _i in int(0.35 / DT):
+		m.avanzar(DT)
+	var dir := Vector2(cos(f.angulo), sin(f.angulo))
+	var normal := Vector2(-dir.y, dir.x)
+	m.bola.pos = f.eje + dir * (m.p.flipper_longitud * 0.55) \
+		- normal * (m.p.flipper_radio + m.p.radio_bola - 0.5)
+	m.bola.vel = Vector2.ZERO
+	for _i in int(1.2 / DT):
+		m.avanzar(DT)
+	_comprobar("la bola llega a atraparse para el tiro",
+		m.flipper_atrapando != null, "%.0f px/s" % m.bola.velocidad())
+
+	var toco := [false]
+	m.target_abatido.connect(func(_p: Vector2, _b: int) -> void: toco[0] = true)
+	m.bumper_golpeado.connect(func(_p: Vector2, _x: float) -> void: toco[0] = true)
+	m.rampa_entrada.connect(func(_p: Vector2, _i: int) -> void: toco[0] = true)
+	m.platillo_capturado.connect(func(_p: Vector2, _i: int) -> void: toco[0] = true)
+
+	f.pulsado = false
+	for _i in int(0.12 / DT):
+		m.avanzar(DT)
+	f.pulsado = true
+	var t := 0.0
+	var alto := 9999.0
+	while m.bola.viva and t < 6.0:
+		m.avanzar(DT)
+		t += DT
+		alto = minf(alto, m.bola.pos.y)
+
+	# La boca más baja donde se ENTRA está en y=935 (la órbita por la izquierda).
+	# Llegar ahí es el mínimo para que el tiro sirva de algo.
+	_comprobar("el tiro desde la cuna llega a la altura de las bocas",
+		alto < 935.0, "solo subio a y=%.0f; la boca mas baja esta en y=935" % alto)
+	_comprobar("y toca algo por el camino, no se pierde en vacio",
+		toco[0], "no toco nada")
 
 ## Al soltar la pala con la bola atrapada, la bola tiene que ir BAJANDO CADA VEZ
 ## MÁS RÁPIDO. Lo cazó Daniel jugando: bajaba a velocidad constante.

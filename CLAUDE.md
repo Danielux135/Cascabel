@@ -107,7 +107,10 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   la pala la vuelve a coger: parece que bota contra la goma, y encima queda
   sin palanca, porque la velocidad que le mete la pala es ω×r. Si la bola no
   se asienta o el tiro desde la cuna no llega, mira `flipper_activo_*` antes
-  que el rozamiento.
+  que el rozamiento. Y el alcance de ese tiro lo da
+  `flipper_velocidad_giro`: subirlo NO acelera el juego —está medido que la
+  ventana de reacción y la duración de bola no se mueven, porque las fija la
+  gravedad al caer— solo alarga lo que tú tiras.
 - **Regenerar un wav no basta: hay que reimportarlo.** Godot sirve la copia
   de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
   pruebas siguen oyendo el sonido viejo. Hay que lanzar

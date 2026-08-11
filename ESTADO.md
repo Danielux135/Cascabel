@@ -64,6 +64,8 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 |---|---|---|
 | `ancho_outlane` | 21 | Dificultad. Suelo 18, techo ~26 |
 | `flipper_longitud` | 64 | Dificultad. Hueco central 47 px |
+| `flipper_velocidad_giro` | 30 | Lo lejos que llega tu tiro. Suelo 26: por debajo la cuna no alcanza |
+| `flipper_activo_izq/der` | −16° / 196° | Dónde se posa la bola atrapada. Más empinado = sin palanca |
 | `flipper_rebote` | 0,25 | Cuánto revive la goma la bola que llega |
 | `rodadura` | 4 | Techo. Subirlo aplana la caída; bajarlo no asienta la cuna |
 | `friccion_flipper` | 0,30 | Cuánto desvía la goma la bola al rozarla |
@@ -81,10 +83,14 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Que pruebe Daniel
 
-0. **La apertura, antes que nada.** Lanza a tope diez veces seguidas sin tocar
-   nada más. La bola tiene que dar la vuelta por la órbita y **caerte en la
-   pala izquierda**. Si vuelve a irse por el outlane izquierdo, la boca de la
-   órbita se ha vuelto a quedar corta.
+0. **El tiro desde la cuna, que es lo último que se ha tocado.** Atrapa la
+   bola, suéltala y vuelve a dar. Con la pala izquierda debe llegar arriba y
+   alcanzar el banco de targets. Dos cosas que mirar: si el golpe se siente
+   demasiado fuerte ahora (`flipper_velocidad_giro`, de 22 a 30), y si la
+   pala derecha se queda corta —está medido que llega a y=903 sin tocar nada.
+0b. **La apertura.** Lanza a tope diez veces seguidas sin tocar nada más. La
+   bola tiene que dar la vuelta por la órbita y **caerte en la pala
+   izquierda**. Si vuelve a irse por el outlane, la boca se ha quedado corta.
 1. **Atrapar la bola, que es lo que estaba mal.** Con la pala levantada debe
    RODAR hasta el hueco del eje y quedarse ahí (~0,6 s), no clavarse donde
    toque. Y con la pala en reposo no debe quedarse nunca: rueda y se va.
@@ -143,35 +149,36 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 La tabla de vida se rehace entera en la Fase 3. Ajustarla ahora es trabajo
 perdido.
 
-## Lo que bloquea el pilar
+## El pilar: la cuna ya alcanza
 
-**Desde la cuna todavía no se llega a ninguna boca.** `DISEÑO.md` §1 dice
-que la mesa es un menú de tiros, y el tiro repetible se queda corto.
+`DISEÑO.md` §1 dice que la mesa es un menú de tiros, y el único tiro
+repetible que hay es el de la bola atrapada en la cuna. Estaba roto por dos
+sitios y los dos están cerrados. Queda como referencia de dónde se toca:
 
-Medio arreglado ya: la pala levantada estaba a −32°, tan empinada que la
-bola rodaba hasta el canto del eje, se caía por ahí y la pala la volvía a
-coger en bucle. Con −16° se para en seco y se queda con palanca:
-
-| | antes (−32°) | ahora (−16°) |
+| | roto | ahora |
 |---|---|---|
-| Se posa en | 0,18 de la pala | **0,53** |
-| Quieta con la pala sostenida | no, picos de 137 px/s | **sí, 0 px/s** |
-| El tiro sube a | y=1160 | **y=1032** |
-| A | 290 px/s | **758 px/s** |
+| Pala levantada | −32° | **−16°** |
+| La bola se posa en | 0,18 de la pala | **0,53** |
+| Quieta con la pala sostenida | no, picos de 137 px/s | **sí** |
+| `flipper_velocidad_giro` | 22 | **30** |
+| El tiro sube a | y=1160 | **y=787** |
+| A | 290 px/s | **1292 px/s** |
+| Y toca | nada | **el banco de targets** |
 
-Falta el último tramo: las bocas donde se ENTRA están a y=790 (retorno y
-cañón) y y=880/935 (órbita). Aplanar más la pala ya no da nada (a −4° se
-posa igual, en 0,55). Lo único que lo cierra es la velocidad de giro:
+**Por qué la pala más rápida no acelera el juego**, que era el miedo: está
+medido que la ventana de reacción se queda en 150 ms y la duración de bola
+en 3,4 s, iguales que antes. Esa ventana la fija la gravedad mientras la
+bola CAE; la pala solo decide lo lejos que llega lo que tú tiras.
 
-| `flipper_velocidad_giro` | El tiro sube a | Toca |
-|---|---|---|
-| 22 (ahora) | y=1032 | nada |
-| 26 | y=977 | nada |
-| **30** | **y=787** | target |
+Y el cañón sigue siendo cazable con la pala nueva: para entrar en su boca
+(y=790) la bola llega ya frenada a 500-650 px/s, así que sale a 250-325 y
+da 283-342 ms. Por encima de 1200 de entrada se pasaría, pero esa entrada
+no se alcanza: la boca está demasiado alta para llegar rápido.
 
-**Pero eso acelera TODOS los golpes**, y Daniel ya dijo que la bola va muy
-rápida. O se sube y se compensa en otro sitio, o se bajan las bocas hacia la
-bola. Es decisión suya y se prueba jugando.
+**Lo que sigue sin estar:** la pala izquierda alcanza el banco de targets y
+la derecha se queda en y=903 sin tocar nada. O sea que hay UN tiro de cuna
+útil, no dos. Alinear cada boca con la línea de tiro de su pala es trabajo
+de geometría fina y se hace jugando, no midiendo.
 
 ## Abierto
 

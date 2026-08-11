@@ -14,7 +14,18 @@ var rozamiento: float = 0.20          # v *= exp(-rozamiento * dt)
 var velocidad_maxima: float = 1500.0
 
 # --- Flippers ---
-var flipper_velocidad_giro: float = 22.0    # rad/s
+## Subida de 22 a 30 para cerrar el alcance del tiro desde la cuna, que es lo
+## que hacía que la mesa no fuese un menú de tiros: la velocidad que la pala le
+## mete a la bola es ω×r, y con 22 el tiro subía a y=1032 mientras las bocas
+## están a y=790 (retorno y cañón) y y=880/935 (órbita). No llegaba a ninguna.
+## Con 30 sube a y=787 y alcanza el banco de targets.
+##
+## Daba miedo que acelerase el juego entero —Daniel se quejó de que la bola va
+## muy rápida—, pero está MEDIDO que no: la ventana de reacción se queda en 150
+## ms y la duración de bola en 3,4 s, iguales que con 22. Tiene sentido: esa
+## ventana la fija la gravedad mientras la bola cae, no la fuerza de la pala.
+## Lo que cambia es lo lejos que llega lo que TÚ tiras.
+var flipper_velocidad_giro: float = 30.0    # rad/s
 ## La pala no rebota, empuja: el rebote solo actúa cuando está quieta. Estuvo en
 ## 0,10 para tapar un problema que ya no existe —la bola botaba encima de la
 ## pala y perdía el contacto, y sin contacto no había agarre—, pero eso lo
