@@ -108,3 +108,13 @@ const METAL_LUZ     := BLANCO
 const TEXTO       := GRIS_5
 const TEXTO_TENUE := GRIS_3
 const DESTELLO    := BLANCO      # el blanco de la paleta, NO el blanco puro
+
+# --- El mapa del run ---
+const MAPA_FONDO     := TIERRA_1   # más cálido que el mueble: no es la mesa
+const MAPA_RAMA      := GRIS_2     # las líneas entre nodos
+const MAPA_RAMA_VIVA := ORO        # las ramas que puedes tomar ahora
+const NODO_COMBATE   := GRIS_4
+const NODO_ELITE     := ROJO_LUZ
+const NODO_DESCANSO  := VERDE
+const NODO_JEFE      := ARCANO
+const NODO_HECHO     := GRIS_2     # por donde ya has pasado

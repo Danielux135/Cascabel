@@ -61,9 +61,12 @@ func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	mesa.platillo_expulsado.connect(_al_salir_del_platillo)
 	mesa.bola_drenada.connect(_al_drenar)
 
-func iniciar(el_enemigo: Enemigo) -> void:
+## `vida_inicial` a -1 arranca a tope, que es lo que quiere el banco de pruebas.
+## Dentro de un run se le pasa la vida que traiga el jugador: no se cura entre
+## combates, y eso es lo que hace que el mapa tenga decisiones.
+func iniciar(el_enemigo: Enemigo, vida_inicial: int = -1) -> void:
 	enemigo = el_enemigo
-	vida_jugador = p.vida_jugador
+	vida_jugador = p.vida_jugador if vida_inicial < 0 else vida_inicial
 	golpes = 0
 	dano_de_la_bola = 0
 	ultimo_ataque = 0

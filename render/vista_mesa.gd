@@ -126,8 +126,16 @@ var camara: CamaraMesa
 
 const TAMANO_GIRADOR := 32
 
+var run: Run
+var _pantalla_mapa: NodoPantallaMapa
+## Con el mapa delante la simulación no corre y las palas no responden: el
+## combate está congelado esperando, no jugándose de fondo.
+var _en_mapa := false
+## Combate resuelto, esperando que el jugador confirme para volver al mapa. Sin
+## esto la pantalla de victoria duraría un fotograma.
+var _esperando_confirmacion := false
+
 var _catalogo: Array = []
-var _indice_enemigo: int = 0
 var _depuracion := false
 var _sacudida: float = 0.0
 var _tiempo: float = 0.0
@@ -206,20 +214,55 @@ func _ready() -> void:
 	if _catalogo.is_empty():
 		push_error("Sin enemigos en data/enemigos.json")
 		return
-	_empezar_combate(0)
+	_nuevo_run()
 
-# ------------------------------------------------------------------- juego
+# ------------------------------------------------------------------- el run
 
-func _empezar_combate(indice: int) -> void:
-	_indice_enemigo = clampi(indice, 0, _catalogo.size() - 1)
-	_tex_enemigo = load(str((_catalogo[_indice_enemigo] as Dictionary)["sprite"]))
-	combate.iniciar(Enemigo.new(_catalogo[_indice_enemigo]))
+func _nuevo_run() -> void:
+	run = Run.new(ParametrosRun.new(), combate.p, _catalogo)
+	if _pantalla_mapa != null:
+		_pantalla_mapa.queue_free()
+	_pantalla_mapa = NodoPantallaMapa.new(run, cam)
+	add_child(_pantalla_mapa)
+	_volver_al_mapa()
+
+func _volver_al_mapa() -> void:
+	_en_mapa = true
+	_esperando_confirmacion = false
+	_pantalla_mapa.visible = true
+
+## Entra en el nodo marcado del mapa. Un descanso se resuelve solo y te devuelve
+## al mapa; un combate baja a la mesa con la vida que traigas.
+func _entrar_en_nodo() -> void:
+	var nodo := _pantalla_mapa.confirmar()
+	if nodo == null:
+		return
+	if not nodo.es_combate():
+		_sonido.reproducir("atrasar")
+		return
+	_en_mapa = false
+	_pantalla_mapa.visible = false
+	_empezar_combate(nodo)
+
+func _empezar_combate(nodo: NodoMapa) -> void:
+	_tex_enemigo = load(str(nodo.enemigo.get("sprite", "")))
+	# La vida del run entra tal cual: no se cura entre combates, y eso es lo
+	# que hace que elegir rama importe.
+	combate.iniciar(Enemigo.new(nodo.enemigo), run.vida)
 	_nodo_enemigo.suelo = Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y)
 	_nodo_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
 	impactos.limpiar()
 	_numeros.clear()
 
+## Cierra el combate contra el run y vuelve al mapa. La vida que quede es la que
+## sigues teniendo: es el único sitio donde se traspasa.
+func _cerrar_combate() -> void:
+	run.resolver_combate(combate.fase == Combate.Fase.VICTORIA, combate.vida_jugador)
+	_volver_al_mapa()
+
 func _physics_process(delta: float) -> void:
+	if _en_mapa:
+		return
 	mesa.flipper_izq.pulsado = Input.is_physical_key_pressed(KEY_A) \
 		or Input.is_physical_key_pressed(KEY_LEFT) \
 		or Input.is_physical_key_pressed(KEY_SHIFT)
@@ -295,13 +338,22 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 		return
 	match tecla.physical_keycode:
 		KEY_R:
-			_empezar_combate(_indice_enemigo)
-		KEY_N:
-			_empezar_combate((_indice_enemigo + 1) % _catalogo.size())
+			_nuevo_run()
 		KEY_F1:
 			_depuracion = not _depuracion
 		KEY_ESCAPE:
 			get_tree().quit()
+		KEY_LEFT, KEY_A:
+			if _en_mapa:
+				_pantalla_mapa.mover(-1)
+		KEY_RIGHT, KEY_D:
+			if _en_mapa:
+				_pantalla_mapa.mover(1)
+		KEY_ENTER, KEY_KP_ENTER:
+			if _en_mapa:
+				_entrar_en_nodo()
+			elif _esperando_confirmacion:
+				_cerrar_combate()
 
 func _al_golpear_bumper(punto: Vector2, fuerza: float) -> void:
 	_sonido.reproducir("bumper")
@@ -432,6 +484,7 @@ func _al_atrasar_reloj(segundos: float) -> void:
 	impactos.onda(centro, C_ARCANO, 1.6)
 
 func _al_terminar_combate(victoria: bool) -> void:
+	_esperando_confirmacion = true
 	if victoria:
 		_sonido.reproducir("muerte")
 		_nodo_enemigo.morir()

@@ -36,6 +36,8 @@ func _initialize() -> void:
 	_prueba_outlanes()
 	_prueba_agarre()
 	_prueba_identidad_recorridos()
+	_prueba_mapa()
+	_prueba_run()
 	_prueba_paleta()
 
 	print("")
@@ -911,6 +913,227 @@ func _prueba_platillo_atrasa_reloj() -> void:
 	c.mesa.platillo_expulsado.emit(Vector2(70, 170), 0)
 	_comprobar("y nunca deja el reloj por debajo de cero",
 		c.carga_reloj == 0.0, "quedo en %.2f" % c.carga_reloj)
+
+## El mapa del run. Lo que hay que blindar de un mapa generado no es que salga
+## bonito, sino que sea RECORRIBLE: sin nodos huérfanos, sin ramas que se ven y
+## no se pueden tomar, y con un jefe cerrando cada acto.
+func _prueba_mapa() -> void:
+	var catalogo := CatalogoEnemigos.cargar()
+	var huerfanos := 0
+	var sin_salida := 0
+	var jefes := 0
+	var descansos := 0
+	var anchos_uno := 0
+	# Cien mapas con semillas distintas: un mapa generado hay que probarlo
+	# muchas veces, porque el caso que rompe sale una de cada treinta.
+	for s in range(1, 101):
+		var m := Mapa.new(ParametrosRun.new(), catalogo, s)
+		for i in m.alto():
+			var f: Array = m.fila(i)
+			if f.is_empty():
+				anchos_uno += 1
+			for n in f:
+				var nodo := n as NodoMapa
+				if nodo.tipo == NodoMapa.Tipo.JEFE:
+					jefes += 1
+				elif nodo.tipo == NodoMapa.Tipo.DESCANSO:
+					descansos += 1
+				if i < m.alto() - 1 and nodo.salidas.is_empty():
+					sin_salida += 1
+				for c in nodo.salidas:
+					if c < 0 or c >= (m.fila(i + 1) as Array).size():
+						sin_salida += 1
+			if i == 0:
+				continue
+			for c in f.size():
+				var alcanzable := false
+				for n in m.fila(i - 1):
+					if (n as NodoMapa).salidas.has(c):
+						alcanzable = true
+				if not alcanzable:
+					huerfanos += 1
+	_comprobar("ningun nodo del mapa queda inalcanzable",
+		huerfanos == 0, "%d huerfanos en 100 mapas" % huerfanos)
+	_comprobar("y ningun nodo se queda sin salida valida",
+		sin_salida == 0, "%d fallos" % sin_salida)
+	_comprobar("no hay filas vacias", anchos_uno == 0)
+	var pr := ParametrosRun.new()
+	_comprobar("hay un jefe por acto",
+		jefes == 100 * pr.actos, "%d jefes en 100 mapas" % jefes)
+	_comprobar("y descansos, pero no en todos los actos de todos los mapas",
+		descansos > 0 and descansos < 100 * pr.actos,
+		"%d descansos" % descansos)
+
+	# El enemigo de cada nodo se decide AL GENERAR, no al llegar: hay que poder
+	# mirar el camino y elegir sabiendo lo que viene.
+	var m2 := Mapa.new(ParametrosRun.new(), catalogo, 7)
+	var sin_enemigo := 0
+	var jefe_flojo := 0
+	for i in m2.alto():
+		for n in m2.fila(i):
+			var nodo := n as NodoMapa
+			if not nodo.es_combate():
+				continue
+			if nodo.enemigo.is_empty() or int(nodo.enemigo.get("vida", 0)) <= 0:
+				sin_enemigo += 1
+	for a in ParametrosRun.new().actos:
+		var f_jefe: Array = m2.fila((a + 1) * (ParametrosRun.new().filas_por_acto + 1) - 1)
+		var vida_jefe := int((f_jefe[0] as NodoMapa).enemigo.get("vida", 0))
+		var vida_normal := 0
+		for n in m2.fila((a + 1) * (ParametrosRun.new().filas_por_acto + 1) - 2):
+			vida_normal = maxi(vida_normal, int((n as NodoMapa).enemigo.get("vida", 0)))
+		if vida_jefe <= 0:
+			jefe_flojo += 1
+	_comprobar("todo nodo de combate trae su enemigo ya decidido",
+		sin_enemigo == 0, "%d nodos sin enemigo" % sin_enemigo)
+	_comprobar("y el jefe de cada acto tiene vida propia",
+		jefe_flojo == 0, "%d jefes sin vida" % jefe_flojo)
+
+## El run: la vida NO se cura entre combates. Es lo que separa un run de una
+## lista de combates, y el criterio de salida de la fase 3C depende de ello.
+func _prueba_run() -> void:
+	var catalogo := CatalogoEnemigos.cargar()
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo, 11)
+	_comprobar("el run arranca fuera del mapa y con la vida a tope",
+		r.fila == -1 and r.vida == r.vida_maxima and r.vida > 0)
+	_comprobar("y puede entrar por cualquier nodo de la primera fila",
+		r.opciones().size() == (r.mapa.fila(0) as Array).size())
+
+	_comprobar("no se puede saltar a una rama que no sale de aqui",
+		r.elegir(99) == null)
+
+	var primero := r.elegir(r.opciones()[0])
+	_comprobar("entrar en un nodo de combate abre el combate",
+		primero != null and primero.es_combate()
+			and r.fase == Run.Fase.EN_COMBATE, "tipo %s" % NodoMapa.nombre_de(
+				primero.tipo if primero != null else -1))
+
+	# Ganar con 20 de vida deja el run con 20: lo que te dejas, te lo debes.
+	r.resolver_combate(true, 20)
+	_comprobar("la vida NO se cura al ganar un combate",
+		r.vida == 20, "quedo con %d" % r.vida)
+	_comprobar("y el run sigue, eligiendo rama",
+		r.fase == Run.Fase.ELIGIENDO and not r.opciones().is_empty())
+
+	# Solo se puede ir a donde lleva el nodo en el que estás.
+	var validas := r.opciones()
+	var invalida := -1
+	for c in range((r.mapa.fila(r.fila + 1) as Array).size()):
+		if not validas.has(c):
+			invalida = c
+	if invalida >= 0:
+		_comprobar("las ramas que no salen de tu nodo no se pueden tomar",
+			r.elegir(invalida) == null)
+	else:
+		_comprobar("las ramas que no salen de tu nodo no se pueden tomar",
+			true, "esta fila conectaba con todas")
+
+	_prueba_run_descanso(catalogo)
+	_prueba_run_derrota(catalogo)
+	_prueba_run_victoria(catalogo)
+	_prueba_pantalla_mapa(catalogo)
+
+## La pantalla del mapa sin dibujar nada: lo que puede romperse aquí es la
+## elección, no el dibujo. Marcar una rama y entrar por otra sería el fallo.
+func _prueba_pantalla_mapa(catalogo: Array) -> void:
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo, 13)
+	var pantalla := NodoPantallaMapa.new(r, ParametrosCamara.new())
+	get_root().add_child(pantalla)
+
+	var opciones := r.opciones()
+	pantalla.seleccion = 0
+	pantalla.mover(1)
+	_comprobar("mover la seleccion no se sale de las opciones",
+		pantalla.seleccion >= 0 and pantalla.seleccion < opciones.size(),
+		"seleccion %d de %d" % [pantalla.seleccion, opciones.size()])
+	pantalla.mover(-1)
+	pantalla.mover(-1)
+	_comprobar("y da la vuelta por los dos lados",
+		pantalla.seleccion == opciones.size() - 1, "%d" % pantalla.seleccion)
+
+	pantalla.seleccion = 0
+	var esperado: int = opciones[0]
+	var entrado := pantalla.confirmar()
+	_comprobar("entrar mete en el nodo que estaba marcado",
+		entrado != null and r.columna == esperado and r.fila == 0,
+		"entro en (%d,%d), se esperaba columna %d" % [r.fila, r.columna, esperado])
+	_comprobar("el acto visible es el del nodo en el que estas",
+		pantalla.acto_visible() == 0, "%d" % pantalla.acto_visible())
+
+	# Todos los tipos tienen letra y color propios, o el mapa no se lee.
+	var letras := {}
+	var colores := {}
+	for tipo in [NodoMapa.Tipo.COMBATE, NodoMapa.Tipo.ELITE,
+			NodoMapa.Tipo.DESCANSO, NodoMapa.Tipo.JEFE]:
+		letras[NodoPantallaMapa.letra_de(tipo)] = true
+		colores[NodoPantallaMapa.color_de(tipo)] = true
+	_comprobar("cada tipo de nodo tiene letra y color propios",
+		letras.size() == 4 and colores.size() == 4,
+		"%d letras, %d colores" % [letras.size(), colores.size()])
+
+	pantalla.queue_free()
+
+func _prueba_run_descanso(catalogo: Array) -> void:
+	# Se busca un descanso recorriendo el mapa, y se comprueba que cura algo
+	# pero no del todo: si curara entero, descansar sería siempre lo correcto.
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo, 3)
+	var curado := [-1]
+	r.descansado.connect(func(c: int) -> void: curado[0] = c)
+	var encontrado := false
+	var vueltas := 0
+	while not r.terminada() and vueltas < 40:
+		vueltas += 1
+		var opciones := r.opciones()
+		if opciones.is_empty():
+			break
+		# Se elige siempre la rama que lleve a un descanso si la hay.
+		var destino: int = opciones[0]
+		for c in opciones:
+			if (r.mapa.nodo(r.fila + 1, c) as NodoMapa).tipo == NodoMapa.Tipo.DESCANSO:
+				destino = c
+		var n := r.elegir(destino)
+		if n == null:
+			break
+		if n.tipo == NodoMapa.Tipo.DESCANSO:
+			encontrado = true
+			break
+		r.resolver_combate(true, 10)
+	_comprobar("descansar cura, pero no del todo",
+		not encontrado or (curado[0] > 0 and r.vida < r.vida_maxima),
+		"curo %d y quedo en %d/%d" % [curado[0], r.vida, r.vida_maxima])
+
+func _prueba_run_derrota(catalogo: Array) -> void:
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo, 5)
+	var aviso := [2]
+	r.run_terminada.connect(func(v: bool) -> void: aviso[0] = 1 if v else 0)
+	r.elegir(r.opciones()[0])
+	r.resolver_combate(false, 0)
+	_comprobar("perder un combate acaba el run",
+		r.terminada() and not r.victoria and aviso[0] == 0)
+	_comprobar("y despues ya no se puede elegir nada",
+		r.opciones().is_empty() and r.elegir(0) == null)
+
+func _prueba_run_victoria(catalogo: Array) -> void:
+	# Recorrer el mapa entero ganándolo todo tiene que acabar en victoria de run.
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo, 9)
+	var combates := 0
+	var vueltas := 0
+	while not r.terminada() and vueltas < 100:
+		vueltas += 1
+		var opciones := r.opciones()
+		if opciones.is_empty():
+			break
+		var n := r.elegir(opciones[0])
+		if n == null:
+			break
+		if n.es_combate():
+			combates += 1
+			r.resolver_combate(true, r.vida)
+	_comprobar("ganarlo todo termina el run en victoria",
+		r.terminada() and r.victoria, "acabo en fila %d de %d"
+			% [r.fila, r.mapa.alto()])
+	_comprobar("y el camino son los doce a quince combates de DISENO.md",
+		combates >= 12 and combates <= 15, "%d combates" % combates)
 
 ## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
 ## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no

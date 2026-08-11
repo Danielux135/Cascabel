@@ -7,16 +7,17 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** 3A y 3B construidas, las dos sin validar
+**Última actualización:** Fase 3 entera construida, nada validado
 
 ---
 
 ## Fase actual
 
-**Fase 3, 3A y 3B construidas y SIN VALIDAR.** Las dos tienen criterio de
-salida que solo se comprueba jugando —que el combate se sienta como una
-carrera, y que Daniel vaya a por un tiro concreto en vez de caer en él de
-rebote— y ninguna se ha jugado todavía. 3C no debería empezar antes de eso.
+**Fase 3 construida entera (3A, 3B y 3C) y SIN VALIDAR NADA.** Las tres
+tienen criterio de salida que solo se comprueba jugando: que el combate se
+sienta como una carrera, que vayas a por un tiro concreto en vez de caer en
+él de rebote, y que puedas perder en el cuarto combate y querer repetir. No
+se ha jugado ninguna. Antes de la Fase 4 hay que sentarse a jugar.
 
 ## Hecho
 
@@ -50,6 +51,10 @@ rebote— y ninguna se ha jugado todavía. 3C no debería empezar antes de eso.
   y rápida a la pala contraria (el pago grande se paga con un retorno difícil)
   y el platillo atrasa el reloj, que es el único tiro que no paga en daño.
   Cerrar un banco ya suena distinto de abatir un target
+- **Fase 3C** mapa del run generado: tres actos, ramas, un jefe cerrando cada
+  acto, descanso en la penúltima fila, y la vida que NO se cura entre
+  combates, que es lo que hace que elegir rama importe. Pantalla de mapa
+  propia con la vida y lo que hay en cada rama; derrota y victoria de run
 
 ## Diales vivos
 
@@ -68,6 +73,9 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
 | `platillo_atrasa_reloj` | 0,35 | ~6 s. Si el platillo no compensa buscarlo, súbelo |
 | `dano_rampa_fuerte` | 26 | Lo que paga el cañón por ese retorno difícil |
+| `curacion_descanso` | 0,30 | Si descansar es siempre obvio, bájalo |
+| `filas_por_acto` | 4 | Largo del run. 4 y 3 actos = 12-15 combates |
+| `factor_vida_elite` | 1,35 | Cuánto más duro es un élite |
 
 **Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
@@ -102,13 +110,22 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 11. **A ciegas, sin mirar la pantalla:** ¿sabes qué acabas de conseguir solo
     por el sonido? Racimo, target, banco cerrado, órbita, retorno, cañón y
     platillo tienen sonido propio. Si dos se confunden, dime cuáles.
+12. **El mapa, que es el criterio de salida de 3C.** Pierde a propósito por el
+    cuarto nodo: ¿te apetece darle a R? Si no, el problema no es el mapa, es
+    que el combate todavía no engancha.
+13. **¿La vida aguanta un acto?** Si mueres siempre en el acto I, o el reloj
+    aprieta demasiado o los enemigos tienen mal la vida. Dime en qué nodo
+    mueres y con cuánta vida llegabas.
+14. **¿Eliges rama de verdad?** Si siempre coges la misma sin mirar, o las
+    ramas no se diferencian lo bastante o falta información en el mapa.
 
 ## Siguiente
 
-1. Ajustar con lo que diga Daniel y **cerrar 3A y 3B**
+1. **Jugar y cerrar la Fase 3 entera.** Nada de esto está validado
 2. **Rehacer la tabla de enemigos**, que ya toca: los tiros pagan cosas
-   distintas y el reloj existe, o sea que ya hay contra qué balancear
-3. **3C, mapa del run**
+   distintas, el reloj existe y el mapa reparte enemigos por acto, o sea que
+   por fin hay contra qué balancear
+3. **Fase 4, reliquias.** Quince, cubriendo los cinco ejes y seis ganchos
 
 ## Mediciones
 
@@ -128,6 +145,16 @@ perdido.
   izquierdo, 27 el derecho, porque el carril lanzador come sitio a la
   derecha. Si se nota al jugar hay que replantear el lado derecho entero, no
   moverlo 3 px.
+- **Del mapa faltan tienda y evento** (`DISEÑO.md` §9). No están porque la
+  tienda necesita chatarra y reliquias: Fase 4 y Fase 6. Meterlos ahora como
+  nodos vacíos sería acumular sistemas a medias.
+- **Los jefes son de mentira.** Ahora un jefe es el enemigo más duro del acto
+  con 1,8× de vida y "mayor" en el nombre. Eso NO cumple `DISEÑO.md` §8: un
+  enemigo con más vida no es un enemigo nuevo. Los jefes de verdad, con sus
+  fases y los sprites de `assets/jefes/`, son Fase 6.
+- **Sin reliquias, el descanso no compite con nada.** `DISEÑO.md` §9 dice que
+  la tensión está en elegir entre curarte y mejorar; hasta la Fase 4 solo
+  existe curarte, así que ese nodo todavía no decide nada.
 - **La bola no tiene giro.** No hay spin simulado, así que no hay efecto ni
   bola que "muerda" en un ángulo. La rodadura es la aproximación barata a eso
   y aguanta bien; si en algún momento se quiere una física que destaque de

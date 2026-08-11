@@ -38,7 +38,9 @@ Batería de pruebas, sin abrir ventana:
 Decisiones cerradas. No las reabras sin que Daniel lo pida.
 
 - **Mesas diseñadas a mano, nunca procedurales.** Lo que varía entre
-  partidas son reliquias, enemigos y modificadores, no la geometría.
+  partidas son reliquias, enemigos y modificadores, no la geometría. **El
+  mapa del run sí se genera**, y no lo contradice: lo que no puede generarse
+  es la geometría, porque cada ángulo condiciona todos los rebotes.
 - **Mantener el flipper sigue siendo mantener el flipper.** Es una técnica
   de juego. No se le asigna ninguna habilidad a ese gesto.
 - **Las rampas son curvas, no física simulada.** La bola se desengancha,

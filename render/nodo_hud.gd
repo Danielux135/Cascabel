@@ -78,7 +78,7 @@ func _dibujar() -> void:
 	_dibujar_mensaje(combate, mesa, d)
 
 	_texto(Vector2(d + 12, _p.alto_visible - 8),
-		"A/D flippers  ESPACIO lanzar  R reiniciar  N otro enemigo  F1 colisiones",
+		"A/D flippers  ESPACIO lanzar  R otro run  F1 colisiones",
 		8, C_TEXTO_TENUE)
 
 ## El reloj del enemigo, pegado al fondo de la franja y a todo lo ancho. Va ahí
@@ -127,5 +127,5 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 	var y := _p.alto_visible * 0.5
 	_texto(Vector2(d, y), texto, 14, col, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
 	if combate.terminado():
-		_texto(Vector2(d, y + 20), "R para repetir  ·  N para otro enemigo",
+		_texto(Vector2(d, y + 20), "ENTER para volver al mapa",
 			9, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
