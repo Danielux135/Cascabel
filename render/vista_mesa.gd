@@ -766,6 +766,3 @@ func _dibujar_depuracion() -> void:
 	if mesa.bola.viva:
 		draw_circle(mesa.bola.pos, mesa.p.radio_bola, C_ORO, false, 1.0)
 		draw_line(mesa.bola.pos, mesa.bola.pos + mesa.bola.vel * 0.08, C_ORO, 1.0)
-
-
-

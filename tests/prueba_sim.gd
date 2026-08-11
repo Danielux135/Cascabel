@@ -798,6 +798,55 @@ func _prueba_agarre() -> void:
 	_comprobar("y soltar y volver a dar sigue lanzando",
 		maxima > antes + 300.0, "de %.0f a %.0f px/s" % [antes, maxima])
 	_prueba_no_se_queda_pegada()
+	_prueba_cae_acelerando()
+
+## Al soltar la pala con la bola atrapada, la bola tiene que ir BAJANDO CADA VEZ
+## MÁS RÁPIDO. Lo cazó Daniel jugando: bajaba a velocidad constante.
+##
+## La causa era el modelo: el arrastre de rodadura iba proporcional a la
+## velocidad, y eso le pone velocidad límite (gravedad·sen(cuesta)/rodadura).
+## Con rodadura 20 esa límite salía a 41 px/s, o sea que la bola alcanzaba su
+## tope en cuanto empezaba a moverse y de ahí no pasaba. Se ve falso al instante
+## porque una bola con peso no hace eso.
+##
+## La prueba mide lo que se ve, no el parámetro: velocidad cada 0,15 s tras
+## soltar. Si se aplana, es que la límite ha vuelto a caer dentro del rango que
+## la bola alcanza en una pala.
+func _prueba_cae_acelerando() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.flipper_izq.pulsado = true
+	for _i in int(0.35 / DT):
+		m.avanzar(DT)
+	var f := m.flipper_izq
+	var dir := Vector2(cos(f.angulo), sin(f.angulo))
+	var normal := Vector2(-dir.y, dir.x)
+	# Misma colocación que la prueba de atrapar, que ya está validada: aquí lo
+	# que se mide es la caída al soltar, no el asentamiento.
+	m.bola.pos = f.eje + dir * 42.0 \
+		- normal * (m.p.flipper_radio + m.p.radio_bola - 0.5)
+	m.bola.vel = dir * 150.0
+	for _i in int(1.2 / DT):
+		m.avanzar(DT)
+
+	m.flipper_izq.pulsado = false
+	var v: Array[float] = []
+	for _tramo in 4:
+		for _i in int(0.15 / DT):
+			m.avanzar(DT)
+		v.append(m.bola.velocidad())
+	var texto := "%.0f, %.0f, %.0f, %.0f" % [v[0], v[1], v[2], v[3]]
+	_comprobar("al soltar la pala, la bola cae ACELERANDO",
+		v[3] > v[0] * 2.0 and v[3] > v[1] and v[1] > v[0], "px/s: %s" % texto)
+
+	# Y la razón de fondo, por si alguien vuelve a subir la rodadura: la
+	# velocidad límite del arrastre tiene que quedar MUY por encima de lo que la
+	# bola alcanza rodando por una pala, o vuelve a verse plana.
+	var cuesta := sin(deg_to_rad(m.p.flipper_reposo_izq))
+	var limite := m.p.gravedad * cuesta / maxf(m.p.rodadura, 0.001)
+	_comprobar("la velocidad limite de la rodadura queda fuera de rango",
+		limite > 150.0, "limite %.0f px/s con rodadura %.1f" % [limite, m.p.rodadura])
 
 ## La otra mitad, y la que se rompió una vez: una bola apoyada en una pala EN
 ## REPOSO tiene que rodar y acabar yéndose. Una bola rueda, no se sostiene en

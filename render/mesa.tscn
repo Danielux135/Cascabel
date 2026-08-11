@@ -1,6 +1,6 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3 uid="uid://sec1svvt80hl"]
 
-[ext_resource type="Script" path="res://render/vista_mesa.gd" id="1_vista"]
+[ext_resource type="Script" uid="uid://lecf4b7514le" path="res://render/vista_mesa.gd" id="1_vista"]
 
-[node name="Mesa" type="Node2D"]
+[node name="Mesa" type="Node2D" unique_id=1595070406]
 script = ExtResource("1_vista")

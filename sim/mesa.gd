@@ -589,9 +589,11 @@ func _colisionar(h: float) -> void:
 		var jn := -(1.0 + e) * vn
 		bola.vel += c.normal * (jn + empuje)
 		if velocidad >= p.velocidad_rebote_minima:
-			_aplicar_friccion(c, jn)
+			_aplicar_friccion(c, jn, c.friccion)      # es un choque
+		elif bola.velocidad() <= p.velocidad_rodando:
+			_aplicar_friccion(c, jn, c.friccion)      # casi parada: que se pare
 		else:
-			_aplicar_rodadura(c, h)
+			_aplicar_rodadura(c, h)                   # rodando
 		_avisar(c, velocidad, empuje)
 	_limitar_velocidad()
 
@@ -606,24 +608,28 @@ func _colisionar(h: float) -> void:
 ##
 ## El impulso nunca puede invertir el deslizamiento, solo pararlo: por eso el
 ## `minf`. Sin él, con rozamiento alto la bola saldría disparada hacia atrás.
-func _aplicar_friccion(c: Contacto, jn: float) -> void:
-	if c.friccion <= 0.0 or jn <= 0.0:
-		return
-	var v_rel := bola.vel - c.velocidad_superficie
-	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
-	var vt := tangente.length()
-	if vt < 1e-4:
-		return
-	bola.vel -= (tangente / vt) * minf(c.friccion * jn, vt)
-
-## Contacto sostenido: la bola no choca, rueda. Solo un arrastre suave a lo
-## largo de la superficie, que nunca puede sostenerla contra la gravedad.
+## Rodando: arrastre suave a lo largo de la superficie. Deja una velocidad
+## límite de `gravedad·sen(cuesta)/rodadura`, y ESE es el número que hay que
+## vigilar: con rodadura 20 la límite en la pala salía a 41 px/s, o sea que al
+## soltar la pala la bola bajaba a velocidad constante en vez de acelerar, y se
+## veía falso. Con la rodadura floja la límite se va a varios cientos de px/s,
+## que la bola no alcanza en los 60 px de una pala: baja acelerando de verdad.
 func _aplicar_rodadura(c: Contacto, h: float) -> void:
 	if p.rodadura <= 0.0:
 		return
 	var v_rel := bola.vel - c.velocidad_superficie
 	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
 	bola.vel -= tangente * (1.0 - exp(-p.rodadura * h))
+
+func _aplicar_friccion(c: Contacto, jn: float, mu: float) -> void:
+	if mu <= 0.0 or jn <= 0.0:
+		return
+	var v_rel := bola.vel - c.velocidad_superficie
+	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
+	var vt := tangente.length()
+	if vt < 1e-4:
+		return
+	bola.vel -= (tangente / vt) * minf(mu * jn, vt)
 
 ## Los avisos son la fuente del daño del combate, así que tienen que salir UNA
 ## vez por golpe de verdad. Sin el filtro, una bola rodando apoyada en un bumper

@@ -65,7 +65,7 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `ancho_outlane` | 21 | Dificultad. Suelo 18, techo ~26 |
 | `flipper_longitud` | 64 | Dificultad. Hueco central 47 px |
 | `flipper_rebote` | 0,25 | Cuánto revive la goma la bola que llega |
-| `rodadura` | 20 | **Techo, no suelo.** Subirlo vuelve a pegar la bola |
+| `rodadura` | 4 | Techo. Subirlo aplana la caída; bajarlo no asienta la cuna |
 | `friccion_flipper` | 0,30 | Cuánto desvía la goma la bola al rozarla |
 | `velocidad_rebote_minima` | 55 | Frontera entre impacto y bola apoyada |
 | `target_canto` | 8 | Cuánto sobresale el target al campo |

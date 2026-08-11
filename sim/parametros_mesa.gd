@@ -178,22 +178,32 @@ var friccion_flipper: float = 0.30
 ## y no hay forma de asentarla. Una bola real tampoco rebota a 3 cm/s.
 var velocidad_rebote_minima: float = 55.0
 
-## Resistencia a la rodadura, 1/s, para el contacto sostenido. Aquí NO vale el
-## Coulomb: el rozamiento estático puede sostener una caja en una cuesta, pero
-## una bola en una cuesta rueda siempre, y como no simulamos el giro, aplicar
-## Coulomb a una bola apoyada la suelda al sitio. Eso es exactamente lo que se
-## veía como "la bola se queda pegada".
+## Resistencia a la rodadura del contacto sostenido: el mismo Coulomb que los
+## impactos, pero con un coeficiente pequeñísimo. Una bola apoyada no choca,
+## rueda, y rodar cuesta poquísimo.
 ##
-## Así que apoyada solo se le pone un arrastre suave: la gravedad siempre gana y
-## la bola siempre acaba rodando. Lo que la sostiene en la cuna de la pala
-## levantada es la forma de la cuna, que es lo que la sostiene de verdad en una
-## mesa real.
+## ESTUVO MAL: era un arrastre proporcional a la velocidad (`v *= exp(-k·h)`), y
+## eso le pone VELOCIDAD LÍMITE a la bola. Con 20 la terminal en la pala en
+## reposo salía a 41 px/s, o sea que al soltar la pala la bola bajaba a
+## velocidad constante en vez de acelerar. Daniel lo vio jugando: "por físicas
+## debería ir bajando cada vez más rápido". Un arrastre lineal no puede dar eso;
+## un rozamiento de Coulomb sí, porque es una fuerza fija y la gravedad le gana
+## siempre que la cuesta pase de `rodadura`.
 ##
-## Medido: con 20 la bola se asienta en la cuna en 0,6 s y rueda y se va de una
-## pala en reposo en 1 s. Con 40 se asienta al instante pero vuelve a soldarse
-## —ya no baja de la pala en reposo—, y con 3 nunca llega a quedarse quieta en
-## la cuna. Es un techo, no un suelo: subirlo es volver al problema de antes.
-var rodadura: float = 20.0
+## Medido, soltando la pala tras atrapar, en px/s cada 0,15 s:
+##   rodadura 20 -> 45, 39, 40, 40   (plana: la velocidad límite, se ve falso)
+##   rodadura  4 -> 52, 115, 152, 172 (acelera, y la cuna se asienta a 11 px/s)
+##   rodadura  2 -> acelera igual, pero la cuna ya no se asienta (71 px/s)
+var rodadura: float = 4.0
+
+## La frontera entre "va rodando" y "se está asentando". Por encima, la bola
+## solo lleva rodadura y por eso acelera cuesta abajo; por debajo, vuelve el
+## Coulomb de la superficie y se para del todo en vez de reptar.
+##
+## Es un apaño con una causa concreta: no simulamos el giro de la bola. Con
+## momento angular esto saldría solo, porque la energía se iría al giro y
+## volvería, en vez de tener que decidir a mano cuándo frenar.
+var velocidad_rodando: float = 30.0
 
 ## Devuelve el rozamiento que le toca a cada superficie.
 func friccion_de(tipo: int) -> float:

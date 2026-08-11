@@ -88,6 +88,13 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   apoyada y solo lleva `rodadura`, que nunca puede vencer a la gravedad. Y lo
   que sostiene la bola en la pala levantada es **la forma de la cuna, no el
   rozamiento**: está medido que no depende de él.
+- **Un frenado proporcional a la velocidad le pone VELOCIDAD LÍMITE a la
+  bola.** `rodadura` es de esos: la límite vale
+  `gravedad·sen(cuesta)/rodadura`, y si cae dentro del rango que la bola
+  alcanza de verdad, la bola baja a velocidad constante y se ve falsa al
+  instante —una bola con peso acelera—. Con `rodadura` a 20 la límite en la
+  pala salía a 41 px/s y Daniel lo cazó jugando. Cualquier frenado que se
+  escriba así se juzga por su velocidad límite, no por lo bien que amortigua.
 - **Regenerar un wav no basta: hay que reimportarlo.** Godot sirve la copia
   de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
   pruebas siguen oyendo el sonido viejo. Hay que lanzar
