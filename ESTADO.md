@@ -81,6 +81,10 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Que pruebe Daniel
 
+0. **La apertura, antes que nada.** Lanza a tope diez veces seguidas sin tocar
+   nada más. La bola tiene que dar la vuelta por la órbita y **caerte en la
+   pala izquierda**. Si vuelve a irse por el outlane izquierdo, la boca de la
+   órbita se ha vuelto a quedar corta.
 1. **Atrapar la bola, que es lo que estaba mal.** Con la pala levantada debe
    RODAR hasta el hueco del eje y quedarse ahí (~0,6 s), no clavarse donde
    toque. Y con la pala en reposo no debe quedarse nunca: rueda y se va.
@@ -145,6 +149,15 @@ perdido.
   izquierdo, 27 el derecho, porque el carril lanzador come sitio a la
   derecha. Si se nota al jugar hay que replantear el lado derecho entero, no
   moverlo 3 px.
+- **Un lanzamiento flojo (por debajo del ~78 %) no hace nada:** la bola no
+  llega a salir del carril, cae otra vez dentro y se queda ahí hasta que
+  vuelves a tirar. No se pierde nada, pero tampoco es una opción: el
+  "lanzamiento flojo" no existe como jugada, solo como tiro fallido.
+- **Con la órbita arreglada, todo lanzamiento a tope regala un tramo de
+  multiplicador.** Engancha siempre por encima del 80 % de carga, y ahora
+  además conservas la bola, así que cada bola empieza gratis en ×2. Antes
+  quedaba tapado porque perdías la bola justo después. ¿Es el *skill shot* que
+  quieres, o el tramo debería costar algo? Es decisión de Daniel.
 - **Del mapa faltan tienda y evento** (`DISEÑO.md` §9). No están porque la
   tienda necesita chatarra y reliquias: Fase 4 y Fase 6. Meterlos ahora como
   nodos vacíos sería acumular sistemas a medias.

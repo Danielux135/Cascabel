@@ -67,6 +67,12 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   caducidad arrastra miles en una partida larga.
 - **Cada rincón nuevo de la mesa es un sitio donde la bola se acuña.**
   Prueba cada zona nueva contra atascos y no toques el ball search.
+- **Que la bola drene no significa que el juego funcione.** La órbita soltaba
+  la bola pegada a la banda izquierda y se iba por el outlane sin acercarse a
+  una pala: la apertura de TODAS las bolas era perderla sin jugar, y la
+  batería entera pasaba, porque medía que la bola no se sale, no se atasca y
+  acaba drenando. Drenaba de maravilla. **Toda salida de recorrido tiene que
+  probarse contra "¿llega a una pala?", no contra "¿acaba drenando?".**
 - **`Mesa.new()` copia los parámetros dentro de cada colisionador** en el
   constructor. Cambiar `m.p.<lo_que_sea>` DESPUÉS de crear la mesa no hace
   nada: el colisionador ya tiene su copia. Un barrido de parámetros escrito

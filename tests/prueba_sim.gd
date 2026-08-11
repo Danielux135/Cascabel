@@ -22,6 +22,7 @@ func _initialize() -> void:
 	_prueba_flipper_empuja()
 	_prueba_ball_search()
 	_prueba_lanzador()
+	_prueba_apertura()
 	_prueba_targets()
 	_prueba_combate()
 	_prueba_escena_principal()
@@ -1134,6 +1135,82 @@ func _prueba_run_victoria(catalogo: Array) -> void:
 			% [r.fila, r.mapa.alto()])
 	_comprobar("y el camino son los doce a quince combates de DISENO.md",
 		combates >= 12 and combates <= 15, "%d combates" % combates)
+
+## LA PRUEBA QUE FALTABA, y por eso el fallo llegó a manos de Daniel: la
+## batería entera pasaba mientras el juego era injugable.
+##
+## Un lanzamiento a tope engancha la órbita SIEMPRE, y la órbita salía por
+## (44,880), pegada a la pared izquierda y bajando casi vertical: la bola daba
+## tres rebotes contra la banda y se iba por el outlane izquierdo sin acercarse
+## a una pala. O sea que la apertura de TODAS las bolas era perderla sin jugar.
+##
+## Ninguna prueba lo veía porque todas miraban que la bola no se saliera, no se
+## atascara y acabara drenando, y eso lo cumplía: drenaba de maravilla. Lo que
+## no había era nadie comprobando que la bola llegue a donde se juega.
+func _prueba_apertura() -> void:
+	var malas: Array[String] = []
+	for i in 5:
+		var carga := 0.80 + 0.05 * float(i)
+		var m := _nueva_mesa()
+		m.nueva_bola()
+		var t_carga := 0.0
+		while t_carga < m.p.tiempo_carga_lanzador * carga:
+			m.cargar_lanzador(DT)
+			t_carga += DT
+		m.soltar_lanzador()
+		var t := 0.0
+		var llego := false
+		var salio := false
+		while m.bola.viva and t < 30.0:
+			m.avanzar(DT)
+			t += DT
+			if m.bola.en_carril:
+				continue
+			salio = true
+			if m.bola.pos.distance_to(m.p.flipper_eje_izq) < 80.0 \
+					or m.bola.pos.distance_to(m.p.flipper_eje_der) < 80.0:
+				llego = true
+				break
+		if salio and not llego:
+			malas.append("%.0f%% muere en x=%.0f" % [carga * 100.0, m.bola.pos.x])
+	_comprobar("una bola lanzada llega a una pala, no al desague",
+		malas.is_empty(), str(malas))
+
+	# Y lo mismo por los dos sentidos de la órbita y a varias velocidades: la
+	# regla no es dónde está la boca —los dos lados de la mesa tienen geometría
+	# distinta y medirlo por simetría da un falso positivo— sino que después de
+	# salir la bola llegue a una pala. Completar la órbita es el tiro difícil de
+	# la mesa: acabar en el desagüe por haberlo clavado no se sostiene.
+	var fallos: Array[String] = []
+	for sentido in [1, -1]:
+		for velocidad in [600.0, 800.0, 1000.0]:
+			var m2 := _nueva_mesa()
+			var orbita := -1
+			for i in m2.rampas.size():
+				if (m2.rampas[i] as Rampa).nombre == "orbita":
+					orbita = i
+			var r: Rampa = m2.rampas[orbita]
+			m2.nueva_bola()
+			m2.bola.en_carril = false
+			m2.bola.rampa = orbita
+			m2.bola.rampa_sentido = sentido
+			m2.bola.rampa_velocidad = velocidad
+			m2.bola.rampa_distancia = (r.largo - 1.0) if sentido > 0 else 1.0
+			var t := 0.0
+			var llego := false
+			while m2.bola.viva and t < 30.0 and not llego:
+				m2.avanzar(DT)
+				t += DT
+				if m2.bola.rampa >= 0:
+					continue
+				if m2.bola.pos.distance_to(m2.p.flipper_eje_izq) < 80.0 \
+						or m2.bola.pos.distance_to(m2.p.flipper_eje_der) < 80.0:
+					llego = true
+			if not llego:
+				fallos.append("sentido %d a %.0f muere en x=%.0f"
+					% [sentido, velocidad, m2.bola.pos.x])
+	_comprobar("salir de la orbita deja la bola en una pala, no en el desague",
+		fallos.is_empty(), str(fallos))
 
 ## Onda, polvo y chispas. Lo que hay que asegurar de un sistema de partículas
 ## no es que se vea bonito —eso se mira— sino que se apague solo: si algo no

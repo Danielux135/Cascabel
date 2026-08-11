@@ -289,9 +289,19 @@ func _banco_targets(desde: Vector2, hasta: Vector2, cantidad: int) -> void:
 
 func _orbita() -> void:
 	# En absoluto: la órbita cruza la mesa entera, no es de la zona baja.
+	# LA BOCA IZQUIERDA NO PUEDE ESTAR PEGADA A LA PARED. Estuvo en (44,880), y
+	# como la curva llega ahí bajando casi vertical, la bola salía a 650 px/s
+	# rozando la banda, daba tres rebotes cortos y se iba por el outlane
+	# izquierdo. Un lanzamiento a tope engancha la órbita SIEMPRE, así que eso
+	# era la apertura de todas las bolas: tirar y perderla sin jugar.
+	#
+	# Ahora la curva baja más y se mete hacia dentro, así que la bola sale
+	# apuntando abajo y a la derecha y aterriza sobre la pala izquierda. La boca
+	# DERECHA se queda donde estaba: es por donde engancha el lanzamiento, y el
+	# carril lanzador sube por x=369, o sea que moverla rompería la apertura.
 	var control := PackedVector2Array([
-		Vector2(44, 880),                                    # boca izquierda
-		Vector2(38, 740), Vector2(40, 560), Vector2(70, 400),
+		Vector2(80, 935),                                    # boca izquierda
+		Vector2(52, 850), Vector2(38, 740), Vector2(40, 560), Vector2(70, 400),
 		Vector2(130, 305), Vector2(200, 275), Vector2(270, 305),
 		Vector2(330, 400), Vector2(360, 560), Vector2(362, 740),
 		Vector2(356, 880),                                   # boca derecha
