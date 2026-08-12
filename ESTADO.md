@@ -7,17 +7,35 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** Fase 3 jugada; 3A y 3B pasan, 3C a medias
+**Última actualización:** Fase 3 cerrada; tabla de enemigos rehecha con medida
 
 ---
 
 ## Fase actual
 
-**Fase 3 jugada por fin.** Daniel confirma el pilar (la cuna apunta, llega y
-gusta), el reloj como carrera y el cañón cazable con esfuerzo, que son los
-criterios de 3A y 3B: **cerrados**. El de 3C pasa a medias —al perder sí
-apetece repetir, pero por el combate, no por el mapa— y queda pendiente de
-una pantalla de mapa mejor.
+**Fase 3 cerrada entera.** Daniel confirmó jugando el pilar (la cuna apunta,
+llega y gusta), el reloj como carrera y el cañón cazable con esfuerzo; el mapa
+nuevo lo dio por bueno. Y encima se rehizo la tabla de enemigos, que era el
+punto 2 de "Siguiente".
+
+**Lo gordo de la sesión fue el balance, y hubo que construir herramienta.**
+`tests/medir_balance.gd` monta combates con el `Combate` real y tres perfiles
+de jugador, y barre configuraciones enteras. Sin eso no había forma: la tabla
+ya se había hecho a ojo dos veces y las dos se llevó el run por delante.
+
+Lo que encontró, en orden:
+
+1. El coste de un combate es `bolas × drenaje + relojes × ataque`, o sea que
+   **cobrar por tiempo se paga al cuadrado**: jugar peor pega menos, por eso
+   tarda más, por eso le cobran más veces.
+2. **Escalar la vida de los enemigos no arregla eso**, porque divide el coste
+   de todos los perfiles por igual y la brecha entre ellos no se mueve. Medido
+   y descartado.
+3. Aplanar el multiplicador tampoco: cierra la brecha de 20× a 8,4× pero baja
+   tanto el daño que se alargan los combates y muere hasta el jugador bueno.
+4. La causa real era **un escalón más gordo que lo que medía**: con el reloj en
+   18 s, los combates del jugador bueno caían por debajo del umbral y NO comían
+   ningún golpe. Partir el reloj en dos lo arregló.
 
 Las dos pegas que salió a pedir Daniel resultaron ser **la misma avería, dos
 veces: información que estaba y no se leía.** Ninguna necesitó tocar la
@@ -87,10 +105,12 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `friccion_flipper` | 0,30 | Cuánto desvía la goma la bola al rozarla |
 | `velocidad_rebote_minima` | 55 | Frontera entre impacto y bola apoyada |
 | `target_canto` | 8 | Cuánto sobresale el target al campo |
-| `reloj_carga` | 18 s | **El dial de 3A.** Carrera tensa o paseo. Suelo 15, techo 25 |
+| `reloj_carga` | **9 s** | **El dial de 3A, y hay que volver a probarlo con las manos.** Pega el doble de veces la mitad de fuerte |
+| `reloj_aviso` | 2 s | Tiene que caber holgado dentro de la carga |
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
-| `platillo_atrasa_reloj` | 0,35 | ~6 s. Si el platillo no compensa buscarlo, súbelo |
-| `dano_rampa_fuerte` | 26 | Lo que paga el cañón por ese retorno difícil |
+| `platillo_atrasa_reloj` | 0,35 | Se mide en fracción de barra, no en segundos: ahora son ~3 s |
+| `dano_rampa_fuerte` | 78 | Lo que paga el cañón por ese retorno difícil |
+| `vida_jugador` | 180 | Escala ×3 para que los ataques tengan resolución |
 | `curacion_descanso` | 0,30 | Si descansar es siempre obvio, bájalo |
 | `filas_por_acto` | 4 | Largo del run. 4 y 3 actos = 12-15 combates |
 | `factor_vida_elite` | 1,35 | Cuánto más duro es un élite |
@@ -112,6 +132,14 @@ B. **La franja de arriba creció de 58 a 70 px** para que el reloj tenga su
    fila con etiqueta. ¿Come mesa? ¿Tapa algo de la parte de arriba?
 C. **La pista de atrapar** sale las tres primeras veces. ¿Sobra, o llega
    tarde?
+E. **EL RELOJ DE 9 SEGUNDOS, que es lo único importante de probar.** Está
+   medido que la presión por segundo no cambia, pero eso no dice cómo se
+   siente: ahora es presión continua en vez de un mazazo cada 18 s. ¿Sigue
+   siendo una carrera o se ha vuelto ruido de fondo? Y el aviso de 2 s, ¿avisa
+   o agobia? Si falla, el dial es `reloj_carga`.
+F. **¿Aguantas el run?** Está medido que un jugador medio acaba 2 de cada 5.
+   Si mueres siempre, dime en qué acto: la fila `1.20 / 0.85` del barrido da
+   los mismos resultados con combates más largos.
 D. **El mapa nuevo, que es lo que cierra 3C.** ¿Ahora eliges rama de verdad,
    mirando quién hay y con cuánta vida llegas? Mira sobre todo: si los nodos
    a 24 px se distinguen unos de otros, si la ficha de 118 px de alto come
@@ -154,12 +182,11 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 
 ## Siguiente
 
-1. **Jugar el HUD del reloj y el mapa nuevo, y cerrar 3C.** Es lo único que
-   queda de la Fase 3
-2. **Rehacer la tabla de enemigos**, que ya toca: los tiros pagan cosas
-   distintas, el reloj existe y el mapa reparte enemigos por acto, o sea que
-   por fin hay contra qué balancear
-3. **Fase 4, reliquias.** Quince, cubriendo los cinco ejes y seis ganchos
+1. **Jugar el reloj de 9 s.** Es lo único de la sesión que ninguna medida
+   puede validar, y es el dial que ya habías aprobado con las manos a 18
+2. **Fase 4, reliquias.** Quince, cubriendo los cinco ejes y seis ganchos. Con
+   ellas el descanso por fin compite con algo y el run deja de ser solo
+   desgaste, que era la queja de Daniel al empezar la sesión
 
 ## Mediciones
 
@@ -167,11 +194,13 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 |---|---|
 | Duración de bola, mesa pequeña | ~10 s |
 | Objetivo de drenaje | cada 2-3 bolas |
-| Daño de una bola buena | 160 con 13 golpes a ×3 |
-| Vida de enemigos | ×3 provisional (180-540) |
+| Daño por bola: malo / normal / bueno | 42 / 312 / 840 |
+| Brecha entre jugar mal y jugar bien | 20× (8,4× sin multiplicador) |
+| Vida de enemigos | 225-660, salida del barrido |
+| Runs acabados: malo / normal / bueno | 0/5 · 2/5 · 5/5 |
 
-La tabla de vida se rehace entera en la Fase 3. Ajustarla ahora es trabajo
-perdido.
+Todo esto sale de `tests/medir_balance.gd`. **Antes de tocar un número de
+balance, lánzalo**: la tabla ya se hizo dos veces a ojo y las dos salió mal.
 
 ## El pilar: la cuna ya alcanza
 
@@ -239,11 +268,18 @@ de geometría fina y se hace jugando, no midiendo.
   y aguanta bien; si en algún momento se quiere una física que destaque de
   verdad, el siguiente paso es momento angular en la bola, y es un cambio
   gordo que toca el solver entero.
-- **La tabla de enemigos no está balanceada contra el reloj.** Con vidas de
-  180 a 540 y ataques de 6 a 16, los de arriba caen antes del primer golpe
-  de reloj y los de abajo pueden ser un muro. La tabla se rehace entera
-  después de 3B, cuando los tiros paguen cosas distintas: ajustarla ahora es
-  trabajo perdido otra vez.
+- **Al jugador bueno no le pasa nada en los actos I y II.** Seis de nueve
+  enemigos le hacen cero. El reloj fino le quitó el escondite, pero al aflojar
+  la dificultad los combates se acortaron a 7-14 s y la mayoría vuelven a caer
+  por debajo de los 9 s de carga: **el problema del escalón reaparece a cada
+  escala nueva**, porque aflojar acorta los combates y acortarlos vuelve a
+  esconder al bueno. Si se quiere que note algo pronto, el camino es enemigos
+  con MÁS vida y MENOS ataque (fila `1.20 / 0.85` del barrido), no seguir
+  bajando números.
+- **Los perfiles del medidor son una aproximación.** Un perfil describe lo que
+  produce una bola, no juega con las palas: no hay física dentro. Sirve para la
+  economía del combate, que es lo que se estaba midiendo, pero no dice nada de
+  si un tiro es cazable ni de cómo se siente nada.
 - Enemigo fuera de pantalla al hacer scroll → Fase 5, panel propio
 - Laterales del escritorio apagados al 66% como apaño → Fase 5
 - **El juego pasa a llamarse Cascabel** (`DISEÑO.md` rev. 4). Cambiados los

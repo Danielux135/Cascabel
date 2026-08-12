@@ -38,6 +38,10 @@ Batería de pruebas, sin abrir ventana:
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+Medida de balance (no es una prueba: no falla, imprime tablas):
+
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
+
 ## Invariantes
 
 Decisiones cerradas. No las reabras sin que Daniel lo pida.
@@ -139,6 +143,35 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   platillo compensa?" se contestó "prefiero el cañón" cuando en realidad era
   "no sabía que hacía nada". Si una pregunta de la lista depende de que el
   jugador haya entendido algo, verifica primero que lo entendió.
+- **El balance no se toca sin medir: hay una herramienta.**
+  `tests/medir_balance.gd` monta combates con el `Combate` de verdad y tres
+  perfiles de jugador, y barre configuraciones enteras. La tabla de enemigos se
+  rehízo dos veces a ojo antes de existir, y las dos se llevó por delante el
+  run. **Antes de tocar vidas, ataques o el reloj, lánzala.**
+- **Un castigo que cobra por tiempo se paga al cuadrado si juegas mal.** El
+  coste de un combate resultó ser `bolas × drenaje + relojes × ataque`, y las
+  bolas son `vida del enemigo ÷ daño por bola`. O sea que jugar peor pega
+  menos, y por eso tarda más, y por eso le cobran más veces. Está medido que el
+  daño por bola varía 19 veces entre jugar mal y jugar bien, y que de esas 19
+  solo 2,6 son el multiplicador de combo: las otras 8,4 son cuánto aguantas la
+  bola viva, que ES la habilidad y no se puede tocar sin quitar el juego.
+- **Un umbral más grueso que lo que pretende medir reparte por redondeo, no
+  por habilidad.** Con el reloj cargando en 18 s, un combate de jugador bueno
+  duraba 9-19 s y NO comía ningún golpe; uno normal duraba 22-29 s y comía uno.
+  La diferencia de castigo entre los dos era de cero a uno —una razón
+  infinita— por un escalón demasiado gordo. Eso hacía además que bajar la vida
+  de los enemigos SEPARARA a los perfiles: metía los combates del bueno por
+  debajo del umbral y se los regalaba enteros. **Si un mando no responde como
+  debería, mira si hay un escalón antes de mirar los números.** Ojo, que la
+  tensión sigue viva: aflojar acorta los combates, y acortarlos vuelve a
+  esconder al jugador bueno bajo el umbral.
+- **Un número escrito a mano en una prueba mide la escala, no lo que dice.**
+  Al triplicar la escala de daño fallaron tres pruebas que no tenían nada roto:
+  un enemigo con `vida: 5` dejó de necesitar tres bumpers, y un `ganado > 4.0`
+  segundos venía de cuando el reloj cargaba en 18. Igual pasó con el criterio
+  del barrido, escrito en puntos sobre una vida de 60: al pasar a 180 dejó de
+  marcar ni una fila buena. **Las pruebas y los criterios se escriben contra
+  los parámetros, no contra constantes.**
 - **Un cambio de recompensa puede romper la mesa sin romper la física.** El
   cañón devolvía la bola al racimo de bumpers y alimentaba un bucle que
   mataba al enemigo sin que las palas participaran nunca. Cuando cambies

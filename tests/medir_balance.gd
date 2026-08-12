@@ -381,8 +381,8 @@ const FINURAS_RELOJ := [1, 2]
 func _barrido(catalogo: Array) -> void:
 	var semillas := [SEMILLAS[0], SEMILLAS[1], SEMILLAS[2]]
 	print("── barrido: escala de vida × finura del reloj ─────────────")
-	print("  objetivo: normal acaba justo, bueno con holgura (%d-%d de vida)"
-		% [int(VIDA_BUENO_MIN), int(VIDA_BUENO_MAX)])
+	print("  objetivo: normal acaba justo, bueno con holgura (le queda el %d-%d%%)"
+		% [int(VIDA_BUENO_MIN * 100.0), int(VIDA_BUENO_MAX * 100.0)])
 	print("")
 	print("  %5s %5s %6s  %-24s %-20s" % [
 		"vida", "atq", "reloj", "normal", "bueno"])
