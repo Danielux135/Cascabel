@@ -14,6 +14,7 @@ const C_GOMA_LUZ    := Paleta.GOMA_LUZ
 const C_TEXTO       := Paleta.TEXTO
 const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
 const C_VERDE       := Paleta.VERDE
+const C_ARCANO      := Paleta.ARCANO
 
 ## Atrapes tras los cuales se deja de dar la pista de cómo atrapar.
 const VECES_PARA_APRENDER := 3
@@ -57,7 +58,7 @@ func _dibujar() -> void:
 	var d := _izq
 
 	# Franja de arriba: enemigo y jugador, sobre el ancho de la mesa.
-	_lienzo.draw_rect(Rect2(d, 0, Mesa.ANCHO, 58), Color(C_CABINA, 0.82))
+	_lienzo.draw_rect(Rect2(d, 0, Mesa.ANCHO, 70), Color(C_CABINA, 0.82))
 
 	var e := combate.enemigo
 	if e != null:
@@ -90,13 +91,30 @@ func _dibujar() -> void:
 ##
 ## En la cuenta atrás parpadea. El parpadeo va por tramos enteros de tiempo, no
 ## por seno, para que no haya medio píxel de color a medio camino.
+##
+## La barra va ETIQUETADA y con los segundos escritos SIEMPRE, no solo en los
+## últimos tres. Una barra pelada no se lee como un reloj: sin el número, el
+## jugador solo se entera de que existe cuando ya le está pegando, y entonces
+## nada de lo que haga en la mesa parece relacionado con ella.
 func _dibujar_reloj(combate: Combate, d: float) -> void:
-	var avisando := combate.reloj_restante() <= combate.p.reloj_aviso
+	var restante := combate.reloj_restante()
+	var avisando := restante <= combate.p.reloj_aviso
 	var col := C_GOMA_LUZ
 	if avisando:
-		var parpadeo := int(combate.reloj_restante() * 6.0) % 2 == 0
+		var parpadeo := int(restante * 6.0) % 2 == 0
 		col = C_ORO_CLARO if parpadeo else C_GOMA_LUZ
-	_barra(Rect2(d + 12, 49, Mesa.ANCHO - 24, 6), combate.carga_reloj, col)
+	# El platillo acaba de robarle tiempo al reloj: se enciende la barra, que es
+	# el contador del que habla el "+N s" que ha salido abajo en la mesa.
+	if vista.flash_reloj > 0.0:
+		col = C_ARCANO
+
+	_texto(Vector2(d + 12, 66), "ATAQUE EN %ds" % int(ceil(restante)), 9,
+		C_ORO_CLARO if avisando else C_TEXTO_TENUE)
+	_barra(Rect2(d + 96, 60, Mesa.ANCHO - 108, 6), combate.carga_reloj, col)
+
+	if vista.flash_reloj > 0.0:
+		_texto(Vector2(d, 56), "+%.0f s" % vista.ultimo_atraso, 9, C_ARCANO,
+			HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
 
 func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 	var texto := ""
@@ -113,12 +131,17 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 				texto = "ATAQUE EN %d" % int(ceil(combate.reloj_restante()))
 				col = C_ORO_CLARO
 			elif mesa.flipper_atrapando != null:
-				texto = "BOLA ATRAPADA"
+				texto = "BOLA ATRAPADA  ·  SUELTA PARA TIRAR"
 				col = C_TEXTO_TENUE
-			# AQUÍ IBA LA PISTA de "mantén A o D para atrapar y apuntar", y se
-			# quitó: está medido que desde la cuna el tiro sube 40 px y no llega
-			# a ninguna boca. Enseñar una técnica que no sirve es peor que no
-			# enseñar nada. Vuelve cuando la cuna dispare de verdad.
+			elif vista.veces_atrapada < VECES_PARA_APRENDER:
+				texto = "MANTÉN A o D PARA ATRAPAR Y APUNTAR"
+				col = C_TEXTO_TENUE
+			# La pista de atrapar VOLVIÓ, y el porqué importa: se
+			# quitó cuando el tiro de la cuna subía 40 px y no llegaba
+			# a ninguna boca: enseñar una técnica que no sirve es peor que no
+			# enseñar nada. Ahora la cuna alcanza el banco de targets: la
+				# técnica existe, así que se cuenta. Se calla a las tres
+				# atrapadas, que quien ya sabe no necesita que se lo repitan.
 		Combate.Fase.DRENADA:
 			texto = "BOLA PERDIDA  ·  COMBO A x1"
 			col = C_TEXTO_TENUE

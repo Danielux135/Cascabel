@@ -23,9 +23,17 @@ const C_ORO_CLARO  := Paleta.ORO_CLARO
 const C_VERDE      := Paleta.VERDE
 const C_GOMA_LUZ   := Paleta.GOMA_LUZ
 
-const RADIO := 11.0
+const RADIO := 20.0
 const MARGEN_ARRIBA := 96.0
-const MARGEN_ABAJO := 56.0
+## Deja sitio abajo para la ficha del nodo marcado.
+const MARGEN_ABAJO := 150.0
+
+## Lado del retrato dentro de un nodo del mapa, y dentro de la ficha. Los
+## sprites son de 96 (128 los jefes), así que 24 y 96 son divisiones ENTERAS:
+## cualquier otro tamaño escala en fracciones y el pixelart hierve.
+const RETRATO_NODO := 24.0
+const RETRATO_FICHA := 96.0
+const ALTO_FICHA := 118.0
 
 static func color_de(tipo: int) -> Color:
 	match tipo:
@@ -49,6 +57,29 @@ var _fuente: Font
 var _lienzo: Node2D
 ## Cuál de las opciones está marcada. Índice dentro de `run.opciones()`.
 var seleccion: int = 0
+## Texturas de enemigo por ruta. El mapa se redibuja cada fotograma, así que
+## cargar aquí sería cargar sesenta veces por segundo.
+var _texturas: Dictionary = {}
+
+## El retrato del enemigo de un nodo, o null si no tiene. Un nodo sin sprite no
+## es un error: el descanso no tiene enemigo.
+func _retrato(nodo: NodoMapa) -> Texture2D:
+	if nodo == null or nodo.enemigo.is_empty():
+		return null
+	var ruta := str(nodo.enemigo.get("sprite", ""))
+	if ruta == "":
+		return null
+	if not _texturas.has(ruta):
+		_texturas[ruta] = load(ruta) as Texture2D if ResourceLoader.exists(ruta) else null
+	return _texturas[ruta] as Texture2D
+
+## Dibuja un retrato encajado en un cuadrado de `lado`, centrado en `centro`.
+## El lado tiene que dividir al tamaño del sprite: ver RETRATO_NODO.
+func _dibujar_retrato(tex: Texture2D, centro: Vector2, lado: float) -> void:
+	if tex == null:
+		return
+	var esquina := Vector2(round(centro.x - lado * 0.5), round(centro.y - lado * 0.5))
+	_lienzo.draw_texture_rect(tex, Rect2(esquina, Vector2(lado, lado)), false)
 
 func _init(el_run: Run, parametros: ParametrosCamara) -> void:
 	run = el_run
@@ -58,6 +89,9 @@ func _init(el_run: Run, parametros: ParametrosCamara) -> void:
 func _ready() -> void:
 	_fuente = ThemeDB.fallback_font
 	_lienzo = Node2D.new()
+	# Sin esto los retratos salen suavizados al escalarlos y desentonan con
+	# todo lo demás, que es pixelart.
+	_lienzo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_lienzo.draw.connect(_dibujar)
 	add_child(_lienzo)
 
@@ -118,6 +152,7 @@ func _dibujar() -> void:
 	_dibujar_ramas(filas, opciones)
 	_dibujar_nodos(filas, opciones)
 	_dibujar_cabecera()
+	_dibujar_ficha(opciones)
 	_dibujar_pie(opciones)
 	if run.terminada():
 		_dibujar_final()
@@ -169,11 +204,21 @@ func _dibujar_nodos(filas: Array[int], opciones: Array[int]) -> void:
 			var col := C_HECHO if pasado else color_de(nodo.tipo)
 
 			_lienzo.draw_circle(centro, RADIO, Color(C_CABINA, 0.85))
-			_lienzo.draw_circle(centro, RADIO, col, false, 2.0)
 			if aqui or abierto:
 				_lienzo.draw_circle(centro, RADIO - 3.0, Color(col, 0.35))
-			_lienzo.draw_string(_fuente, centro + Vector2(-4, 4),
-				letra_de(nodo.tipo), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+
+			# El retrato manda: se reconoce a la Gárgola de un vistazo mucho
+			# antes de leer "Gárgola". La letra se queda como respaldo para el
+			# descanso, que no tiene enemigo, y para un sprite que falte.
+			var tex := _retrato(nodo)
+			if tex != null and not pasado:
+				_dibujar_retrato(tex, centro, RETRATO_NODO)
+			else:
+				_lienzo.draw_string(_fuente, centro + Vector2(-4, 4),
+					letra_de(nodo.tipo), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+			# El anillo va DESPUÉS del retrato: es el que dice el tipo, y con el
+			# sprite encima se perdía justo en los nodos que más importan.
+			_lienzo.draw_circle(centro, RADIO, col, false, 2.0)
 
 			# El marcador de lo que vas a elegir: un anillo por fuera. Sin esto
 			# no se sabe cuál de las ramas abiertas está marcada.
@@ -184,19 +229,83 @@ func _dibujar_nodos(filas: Array[int], opciones: Array[int]) -> void:
 			if aqui:
 				_lienzo.draw_circle(centro, RADIO + 5.0, C_TEXTO, false, 1.0)
 
-			# Lo que hay dentro, para poder decidir antes de meterte.
-			if nodo.es_combate() and not nodo.enemigo.is_empty() and not pasado:
-				_lienzo.draw_string(_fuente, centro + Vector2(RADIO + 8, 1),
-					"%s  %d pv" % [str(nodo.enemigo.get("nombre", "?")),
-						int(nodo.enemigo.get("vida", 0))],
-					HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-					C_TEXTO if abierto else C_TEXTO_TENUE)
-			elif nodo.tipo == NodoMapa.Tipo.DESCANSO and not pasado:
-				_lienzo.draw_string(_fuente, centro + Vector2(RADIO + 8, 1),
-					"descanso  +%d pv" % int(round(
-						float(run.vida_maxima) * run.p.curacion_descanso)),
-					HORIZONTAL_ALIGNMENT_LEFT, -1, 9,
-					C_TEXTO if abierto else C_TEXTO_TENUE)
+			# AQUÍ IBA el "nombre + N pv" pegado a cada nodo. La información
+			# estaba y era correcta, pero escrita a 9 px al lado de TODOS los
+			# nodos a la vez, así que se leía como ruido: Daniel jugó un run
+			# entero sin usarla y pidió "saber qué enemigo hay". No faltaba
+			# dato, faltaba jerarquía. Ahora sale grande abajo, y SOLO del
+			# nodo marcado.
+
+## El nodo que tienes marcado ahora mismo, o null si no hay nada que elegir.
+func nodo_marcado(opciones: Array[int]) -> NodoMapa:
+	if opciones.is_empty():
+		return null
+	var siguiente := run.fila + 1
+	if siguiente >= run.mapa.alto():
+		return null
+	return run.mapa.nodo(siguiente, opciones[clampi(seleccion, 0, opciones.size() - 1)])
+
+## La ficha del nodo marcado: retrato grande, nombre, tipo y números.
+##
+## Existe porque el mapa TENÍA todos estos datos repartidos en textitos de 9 px
+## por toda la pantalla y no se leía ninguno. Un dato por nodo multiplicado por
+## doce nodos no informa, satura. Aquí sale uno solo, el que estás a punto de
+## elegir, y del tamaño que merece la única decisión de la pantalla.
+##
+## NO hay línea de recompensa a propósito: hasta la Fase 4 ganar un combate no
+## da nada, y una fila vacía o un "próximamente" sería prometer lo que no hay.
+## Cuando existan chatarra y reliquias, la fila entra debajo de los números.
+func _dibujar_ficha(opciones: Array[int]) -> void:
+	var base := _p.alto_visible - ALTO_FICHA
+	_lienzo.draw_rect(Rect2(0, base, _p.ancho_visible, ALTO_FICHA),
+		Color(C_CABINA, 0.94))
+	var nodo := nodo_marcado(opciones)
+	if nodo == null:
+		return
+
+	var col := color_de(nodo.tipo)
+	# Una línea del color del tipo cruzando la ficha: ata el nodo de arriba con
+	# su ficha sin tener que leer nada.
+	_lienzo.draw_rect(Rect2(0, base, _p.ancho_visible, 2.0), col)
+
+	var centro_retrato := Vector2(24 + RETRATO_FICHA * 0.5, base + 10 + RETRATO_FICHA * 0.5)
+	var tex := _retrato(nodo)
+	if tex != null:
+		_dibujar_retrato(tex, centro_retrato, RETRATO_FICHA)
+	else:
+		_lienzo.draw_string(_fuente, centro_retrato + Vector2(-14, 16),
+			letra_de(nodo.tipo), HORIZONTAL_ALIGNMENT_LEFT, -1, 44, col)
+
+	var x := 24.0 + RETRATO_FICHA + 24.0
+	_lienzo.draw_string(_fuente, Vector2(x, base + 34),
+		NodoMapa.nombre_de(nodo.tipo), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, col)
+
+	if nodo.es_combate() and not nodo.enemigo.is_empty():
+		_lienzo.draw_string(_fuente, Vector2(x, base + 64),
+			str(nodo.enemigo.get("nombre", "?")),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, C_TEXTO)
+		# Vida y ataque juntos: son las dos cifras que deciden si esta rama te
+		# la puedes permitir con la vida que traes.
+		_lienzo.draw_string(_fuente, Vector2(x, base + 92),
+			"%d pv  ·  pega %d por golpe de reloj" % [
+				int(nodo.enemigo.get("vida", 0)),
+				int(nodo.enemigo.get("ataque", 0))],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, C_ORO_CLARO)
+	elif nodo.tipo == NodoMapa.Tipo.DESCANSO:
+		var cura := int(round(float(run.vida_maxima) * run.p.curacion_descanso))
+		_lienzo.draw_string(_fuente, Vector2(x, base + 64), "Descanso",
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, C_TEXTO)
+		_lienzo.draw_string(_fuente, Vector2(x, base + 92),
+			"recuperas %d pv  ·  te quedarías en %d/%d" % [
+				cura, mini(run.vida + cura, run.vida_maxima), run.vida_maxima],
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, C_VERDE)
+
+	# Cuántas ramas hay, para que se vea que esto es UNA de varias.
+	if opciones.size() > 1:
+		_lienzo.draw_string(_fuente, Vector2(0, base + 34),
+			"rama %d de %d" % [
+				clampi(seleccion, 0, opciones.size() - 1) + 1, opciones.size()],
+			HORIZONTAL_ALIGNMENT_RIGHT, _p.ancho_visible - 24, 11, C_TEXTO_TENUE)
 
 func _dibujar_cabecera() -> void:
 	_lienzo.draw_rect(Rect2(0, 0, _p.ancho_visible, 62), Color(C_CABINA, 0.9))
@@ -223,5 +332,7 @@ func _dibujar_pie(opciones: Array[int]) -> void:
 	var texto := "IZQUIERDA/DERECHA elegir rama  ·  ENTER entrar  ·  R reiniciar el run"
 	if opciones.is_empty():
 		texto = "R para empezar otro run"
-	_lienzo.draw_string(_fuente, Vector2(24, _p.alto_visible - 18), texto,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO_TENUE)
+	# Justo ENCIMA de la ficha, no al borde de la pantalla: abajo ya no hay
+	# sitio libre, ahí está el retrato.
+	_lienzo.draw_string(_fuente, Vector2(24, _p.alto_visible - ALTO_FICHA - 10),
+		texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO_TENUE)

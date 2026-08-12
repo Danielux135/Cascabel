@@ -1,14 +1,16 @@
 {
-  "_comentario": "Vida x3 respecto de la primera pasada. Motivo: ESTADO.md mide que una bola buena hace 160 de dano, y con las vidas viejas (60-180) una sola bola mataba a cualquiera; el enemigo se moria antes de que la bola llegara siquiera a las palas. Con x3 hacen falta dos o tres bolas. Es un parche declarado: la tabla se rehace entera en la Fase 3. Ver sim/parametros_combate.gd.",
+  "_comentario": "Tabla salida de tests/medir_balance.gd, no de tantear. Fila elegida del barrido: vida 0,50 x ataque 0,80 x reloj partido en dos. En esa fila un jugador 'normal' acaba 2 de cada 3 runs y uno 'bueno' acaba siempre con ~40 de 60 de vida, que es el objetivo. Los numeros de aqui son esa fila llevada a la escala x3 de sim/parametros_combate.gd. El orden IMPORTA: sim/mapa.gd parte el catalogo en tercios y cada tercio es un acto, asi que los tres primeros son el acto I, los tres siguientes el II y los tres ultimos el III; hay una prueba que lo vigila. El ataque ya NO se cobra de una tacada: con el reloj en 9 s el enemigo pega el doble de veces la mitad de fuerte, y por eso estos ataques valen la mitad de lo que parecerian.",
   "enemigos": [
-    { "id": "rata",                "nombre": "Rata",               "vida": 180, "ataque": 6,  "sprite": "res://assets/enemigos/rata.png" },
-    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 225, "ataque": 5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
-    { "id": "goblin_carroniero",   "nombre": "Goblin carronero",   "vida": 255, "ataque": 8,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
-    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 285, "ataque": 16, "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
-    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 300, "ataque": 10, "sprite": "res://assets/enemigos/esqueleto.png" },
-    { "id": "cultista",            "nombre": "Cultista",           "vida": 330, "ataque": 13, "sprite": "res://assets/enemigos/cultista.png" },
-    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 390, "ataque": 14, "sprite": "res://assets/enemigos/goblin_bruto.png" },
-    { "id": "armadura_vacia",      "nombre": "Armadura vacia",     "vida": 480, "ataque": 12, "sprite": "res://assets/enemigos/armadura_vacia.png" },
-    { "id": "gargola",             "nombre": "Gargola",            "vida": 540, "ataque": 15, "sprite": "res://assets/enemigos/gargola.png" }
+    { "id": "rata",                "nombre": "Rata",               "vida": 225, "ataque": 6,  "sprite": "res://assets/enemigos/rata.png" },
+    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 285, "ataque": 7,  "sprite": "res://assets/enemigos/limo_moneda.png" },
+    { "id": "goblin_carroniero",   "nombre": "Goblin carronero",   "vida": 345, "ataque": 7,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
+
+    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 405, "ataque": 10, "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
+    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 435, "ataque": 8,  "sprite": "res://assets/enemigos/esqueleto.png" },
+    { "id": "cultista",            "nombre": "Cultista",           "vida": 465, "ataque": 8,  "sprite": "res://assets/enemigos/cultista.png" },
+
+    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 570, "ataque": 11, "sprite": "res://assets/enemigos/goblin_bruto.png" },
+    { "id": "armadura_vacia",      "nombre": "Armadura vacia",     "vida": 615, "ataque": 12, "sprite": "res://assets/enemigos/armadura_vacia.png" },
+    { "id": "gargola",             "nombre": "Gargola",            "vida": 660, "ataque": 13, "sprite": "res://assets/enemigos/gargola.png" }
   ]
 }

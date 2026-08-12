@@ -525,13 +525,30 @@ func _prueba_combo() -> void:
 	_en_juego(c2)
 	_golpear(c2, 4)
 	var tras_cuatro := c2.enemigo.vida
-	_golpear(c2, 1)
+	# El quinto golpe se mide con un TARGET, no con otro bumper: el
+	# multiplicador ya no se aplica al relleno. Lo que sigue comprobándose es lo
+	# mismo de antes —que el tramo entra en el quinto golpe— pero medido donde
+	# el multiplicador existe. Ver `escala` en Combate._golpear.
+	c2.mesa.target_abatido.emit(Vector2(200, 800), 0)
 	_comprobar("el quinto golpe ya vale x2",
-		tras_cuatro - c2.enemigo.vida == c2.p.dano_bumper * 2,
+		tras_cuatro - c2.enemigo.vida == c2.p.dano_target * 2,
 		"quito %d" % (tras_cuatro - c2.enemigo.vida))
 	_comprobar("los cuatro primeros valieron x1",
 		c2.p.vida_jugador > 0 and (100000 - tras_cuatro) == c2.p.dano_bumper * 4,
 		"quitaron %d" % (100000 - tras_cuatro))
+
+	# Y la otra mitad de la regla: un bumper con el combo alto sigue pagando su
+	# daño pelado. Sin esto, quitarle el `escala` a un bumper por accidente no
+	# rompería ninguna prueba.
+	var c2b := Combate.new()
+	c2b.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c2b)
+	_golpear(c2b, 12)
+	var alto := c2b.enemigo.vida
+	_golpear(c2b, 1)
+	_comprobar("un bumper NO cobra del multiplicador, ni con el combo alto",
+		c2b.multiplicador() >= 3 and alto - c2b.enemigo.vida == c2b.p.dano_bumper,
+		"x%d, quito %d" % [c2b.multiplicador(), alto - c2b.enemigo.vida])
 
 	# Completar un banco da daño pero no es un golpe: si contara, el target que
 	# lo cierra sumaría dos veces al combo.
@@ -546,7 +563,12 @@ func _prueba_combo() -> void:
 
 func _prueba_victoria() -> void:
 	var c := Combate.new()
-	c.iniciar(Enemigo.new({"nombre": "Debil", "vida": 5, "ataque": 99}))
+	# La vida sale de los parámetros: con `vida: 5` escrito a mano, subir la
+	# escala de daño hizo que UN bumper ya lo matara, y la prueba dejó de medir
+	# lo que dice medir —que tras la victoria los golpes no cuentan— para pasar
+	# a medir la escala. Tres bumpers a x1 tienen que matarlo exactamente.
+	c.iniciar(Enemigo.new({
+		"nombre": "Debil", "vida": c.p.dano_bumper * 3, "ataque": 99}))
 	_en_juego(c)
 	_golpear(c, 3)
 	_comprobar("matar al enemigo da la victoria en el acto, sin drenar",
@@ -586,6 +608,31 @@ func _prueba_catalogo() -> void:
 			faltan.append(e.id + " (stats)")
 	_comprobar("todos los enemigos tienen sprite y stats validos",
 		faltan.is_empty(), str(faltan))
+
+	# El orden del catálogo NO es decorativo: sim/mapa.gd lo parte en tercios y
+	# cada tercio es un acto. Si alguien reordena la lista, el acto I se puede
+	# llevar a la Gárgola sin que falle nada más. Ver data/enemigos.json.
+	var desordenados: Array[String] = []
+	for i in range(1, lista.size()):
+		var antes := Enemigo.new(lista[i - 1])
+		var ahora := Enemigo.new(lista[i])
+		if ahora.vida_maxima < antes.vida_maxima:
+			desordenados.append("%s tras %s" % [ahora.id, antes.id])
+	_comprobar("el catalogo va de menos a mas vida, que es lo que reparte los actos",
+		desordenados.is_empty(), str(desordenados))
+
+	# El golpe de reloj cobra el ataque ENTERO de una vez. Medido en
+	# tests/medir_balance.gd: con 60 de vida, pasar de un quinto de la barra por
+	# golpe hace que el ataque pese mas que la vida y la tabla deje de ordenarse
+	# por dificultad.
+	var pc := ParametrosCombate.new()
+	var brutos: Array[String] = []
+	for datos in lista:
+		var e := Enemigo.new(datos)
+		if float(e.ataque) > float(pc.vida_jugador) * 0.2:
+			brutos.append("%s pega %d" % [e.id, e.ataque])
+	_comprobar("ningun ataque pasa de un quinto de la vida del jugador",
+		brutos.is_empty(), str(brutos))
 
 ## Los adornos del suelo están colocados a mano, que es justo lo que se
 ## descoloca sin avisar. Aquí se comprueba que caben en el campo, que solo la
@@ -1041,8 +1088,14 @@ func _prueba_platillo_atrasa_reloj() -> void:
 	_comprobar("sacar la bola del platillo atrasa el reloj",
 		c.carga_reloj < antes - 0.3,
 		"de %.2f a %.2f" % [antes, c.carga_reloj])
+	# Contra los PARÁMETROS, no contra un 4 escrito a mano. El 4 venía de cuando
+	# el reloj cargaba en 18 s: al partirlo en 9 los segundos ganados pasaron a
+	# ~3 y la prueba empezó a fallar sin que nada estuviera roto. Lo que hay que
+	# comprobar es que se avisa de lo que de verdad se ha robado.
+	var esperado := c.p.platillo_atrasa_reloj * c.p.reloj_carga
 	_comprobar("y avisa de cuantos segundos se han ganado",
-		ganado[0] > 4.0, "%.1f s" % ganado[0])
+		absf(ganado[0] - esperado) < 0.2,
+		"%.1f s, se esperaban %.1f" % [ganado[0], esperado])
 	_comprobar("pero paga menos dano que el canon",
 		c.p.dano_platillo < c.p.dano_rampa_fuerte,
 		"%d contra %d" % [c.p.dano_platillo, c.p.dano_rampa_fuerte])
@@ -1189,6 +1242,25 @@ func _prueba_pantalla_mapa(catalogo: Array) -> void:
 	pantalla.mover(-1)
 	_comprobar("y da la vuelta por los dos lados",
 		pantalla.seleccion == opciones.size() - 1, "%d" % pantalla.seleccion)
+
+	# La ficha tiene que describir el nodo en el que vas a ENTRAR. Si enseña uno
+	# y te mete en otro, el mapa miente y elegir rama deja de significar nada:
+	# es el fallo más caro que puede tener esta pantalla, porque no se nota
+	# hasta que ya estás dentro del combate equivocado.
+	for i in opciones.size():
+		pantalla.seleccion = i
+		var ficha := pantalla.nodo_marcado(opciones)
+		_comprobar("la ficha describe la rama marcada (%d)" % i,
+			ficha != null and ficha.columna == opciones[i] and ficha.fila == r.fila + 1,
+			"ficha en columna %s, marcada %d" % [
+				"null" if ficha == null else str(ficha.columna), opciones[i]])
+
+	# Todo enemigo del catálogo tiene que traer un sprite que exista, o el
+	# retrato de la ficha sale vacío justo en el nodo que estás mirando.
+	for e in catalogo:
+		var ruta := str((e as Dictionary).get("sprite", ""))
+		_comprobar("el enemigo %s tiene retrato" % str((e as Dictionary).get("id", "?")),
+			ruta != "" and ResourceLoader.exists(ruta), "sprite '%s'" % ruta)
 
 	pantalla.seleccion = 0
 	var esperado: int = opciones[0]

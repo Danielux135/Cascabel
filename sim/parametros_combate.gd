@@ -10,7 +10,17 @@ extends RefCounted
 ## cada golpe siguiente valga más.
 
 # --- Jugador ---
-var vida_jugador: int = 60
+## TODA la escala de daño de este archivo está multiplicada por 3 respecto de la
+## primera versión (la vida eran 60, el bumper 2, el target 6...). No cambia
+## NADA del equilibrio: es resolución.
+##
+## El motivo: con el reloj partido en dos, el ataque de un enemigo baja a la
+## mitad, y en la escala vieja los nueve enemigos se quedaban en 2/2/2/3/3/3/
+## 4/4/4. Tres valores distintos para nueve enemigos, con la Calavera perdiendo
+## su identidad de pegar fuerte. El redondeo a entero estaba decidiendo el
+## balance en vez del diseño. Con ×3 hay sitio para que cada enemigo tenga su
+## número.
+var vida_jugador: int = 180
 
 # --- Daño base de cada golpe, antes del multiplicador ---
 ## OJO: estos valores están a la MITAD de los que había con el modelo anterior
@@ -18,11 +28,11 @@ var vida_jugador: int = 60
 ## tres el daño total de una partida; con la mitad, una bola normal de 8 golpes
 ## hace ~24 y una muy buena de 25 golpes hace ~136, que es el rango en el que
 ## estaban los enemigos de data/enemigos.json (60-180 de vida).
-var dano_bumper: int = 2
-var dano_target: int = 6
+var dano_bumper: int = 6
+var dano_target: int = 18
 ## Abatir los tres targets de un banco. Premia apuntar en vez de dar tumbos.
 ## No cuenta como golpe para el combo: es una bonificación, no un impacto.
-var dano_banco: int = 12
+var dano_banco: int = 36
 
 # --- Multiplicador de combo ---
 ## Tramos: a partir de `golpes` golpes seguidos sin drenar, el daño se
@@ -47,15 +57,46 @@ var tramos_combo: Array = [
 ## `data/enemigos.json` (6 a 16) eso son 18-48 de los 60 de vida, más lo que
 ## cueste drenar. Menos de 15 y los enemigos de abajo de la tabla son un muro;
 ## más de 25 y el reloj deja de presionar.
-var reloj_carga: float = 18.0
+## BAJA DE 18 A 9, y el ataque de los enemigos baja a la mitad con él, así que
+## la presión POR SEGUNDO no se mueve. Lo que cambia es el tamaño del escalón, y
+## el escalón era el fallo de fondo del balance:
+##
+## Un combate de jugador bueno duraba 9-19 s y uno normal 22-29 s. Con la carga
+## en 18 s, el bueno caía por debajo del umbral y NO comía ningún golpe, y el
+## normal lo cruzaba siempre y comía uno. La diferencia de castigo entre los dos
+## era de cero a uno —una razón infinita— por un grano más grueso que la
+## diferencia de habilidad que pretendía medir. Eso es también lo que hacía que
+## bajar la vida de los enemigos separase a los perfiles en vez de acercarlos:
+## metía los combates del bueno por debajo del umbral y se los regalaba enteros.
+##
+## Medido en `tests/medir_balance.gd`. Con 9 s el enemigo pega el doble de veces
+## la mitad de fuerte, nadie se libra por redondeo, y el combate se siente MÁS
+## carrera, no menos: en vez de un mazazo cada 18 s hay presión continua.
+var reloj_carga: float = 9.0
 ## Últimos segundos en los que el reloj avisa, por pantalla y por sonido. Sin
-## aviso el golpe llega de la nada y se lee como injusto.
-var reloj_aviso: float = 3.0
+## aviso el golpe llega de la nada y se lee como injusto. Baja a 2 porque tiene
+## que caber holgado dentro de la carga: con 3 sobre 9 estaría avisando un
+## tercio del tiempo y el aviso dejaría de significar nada.
+var reloj_aviso: float = 2.0
 
 ## Cuánto pesa el contraataque por drenaje frente al del reloj. Drenar sigue
 ## costando vida —es invariante— pero ya no es la única presión, así que si
-## pegara lo mismo que antes la presión se habría duplicado de golpe. A la
-## mitad, drenar es el tropiezo que describe `DISEÑO.md` §2 y no la catástrofe.
+## pegara lo mismo que antes la presión se habría duplicado de golpe.
+##
+## Baja de 0,5 a 0,2 con medida delante (`tests/medir_balance.gd`). El motivo:
+## el coste de un combate resultó ser, casi entero, BOLAS × COSTE DE DRENAR, y
+## el número de bolas es vida del enemigo entre daño por bola. Como el daño por
+## bola varía unas 19 veces entre jugar mal y jugar bien —el multiplicador de
+## combo y el número de golpes se multiplican entre sí—, este factor amplificaba
+## esa diferencia en vez de amortiguarla: un jugador flojo comía 34 drenajes
+## contra la Gárgola y uno bueno cuatro. A 0,2 el drenaje sigue doliendo pero
+## deja de ser lo que decide el run, y quien decide vuelve a ser el reloj, que
+## es lo que `DISEÑO.md` §2 quiere.
+##
+## Y vuelve a 0,5 al partir el reloj en dos: el ataque de los enemigos bajó a la
+## mitad con esa misma partida, así que este factor sube otro tanto para dejar
+## el coste de DRENAR exactamente donde estaba. El número cambia; lo que cuesta
+## drenar, no.
 var factor_ataque_drenaje: float = 0.5
 
 # --- Ritmo de la resolución al drenar ---
@@ -64,7 +105,7 @@ var pausa_ataque: float = 0.9    # enseñando el contraataque
 
 ## El girador: la bola lo atraviesa y lo hace girar. Cuenta como golpe, igual
 ## que un bumper, pero pega menos porque es mucho más fácil de encadenar.
-var dano_girador: int = 1
+var dano_girador: int = 3
 
 ## Completar la órbita entera y sacar la bola del platillo. Pagan bien porque
 ## las dos hay que buscarlas: la órbita pide un tiro fuerte y limpio, y el
@@ -80,13 +121,18 @@ var dano_girador: int = 1
 ##   platillo -> atrasa el reloj del enemigo. Es el único tiro que paga en algo
 ##               que no es daño, y por eso es el que cambia cómo juegas: cuando
 ##               vas justo de vida dejas de ir a por daño y vas a por tiempo
-var dano_rampa: int = 10
-var dano_rampa_fuerte: int = 26
+var dano_rampa: int = 30
+var dano_rampa_fuerte: int = 78
 ## Baja de 14 a 8 a propósito: si el platillo pagara además el mejor daño, el
 ## robo de reloj sería un extra y no una decisión. Lo que da es tiempo.
-var dano_platillo: int = 8
+var dano_platillo: int = 24
 
 ## Cuánta carga del reloj le quita sacar la bola del platillo, en fracción.
 ## Con 0,35 y un reloj de 18 s son unos 6 s regalados: se nota de verdad, que
 ## es lo que hace que merezca la pena buscar un tiro escondido.
+##
+## Con el reloj en 9 s, 0,35 son ~3 s en vez de ~6. Se queda igual A PROPÓSITO:
+## lo que importa no son los segundos sino la fracción de barra, que es lo que
+## el jugador ve. Si se subiera para "recuperar los 6 segundos", el platillo
+## pasaría a robar dos tercios de la barra y sería el tiro obligatorio.
 var platillo_atrasa_reloj: float = 0.35

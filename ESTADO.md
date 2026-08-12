@@ -7,17 +7,33 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** Fase 3 entera construida, nada validado
+**Última actualización:** Fase 3 jugada; 3A y 3B pasan, 3C a medias
 
 ---
 
 ## Fase actual
 
-**Fase 3 construida entera (3A, 3B y 3C) y SIN VALIDAR NADA.** Las tres
-tienen criterio de salida que solo se comprueba jugando: que el combate se
-sienta como una carrera, que vayas a por un tiro concreto en vez de caer en
-él de rebote, y que puedas perder en el cuarto combate y querer repetir. No
-se ha jugado ninguna. Antes de la Fase 4 hay que sentarse a jugar.
+**Fase 3 jugada por fin.** Daniel confirma el pilar (la cuna apunta, llega y
+gusta), el reloj como carrera y el cañón cazable con esfuerzo, que son los
+criterios de 3A y 3B: **cerrados**. El de 3C pasa a medias —al perder sí
+apetece repetir, pero por el combate, no por el mapa— y queda pendiente de
+una pantalla de mapa mejor.
+
+Las dos pegas que salió a pedir Daniel resultaron ser **la misma avería, dos
+veces: información que estaba y no se leía.** Ninguna necesitó tocar la
+simulación.
+
+1. **El platillo** ya devolvía ~6 s de reloj y él hizo un run entero sin
+   enterarse: el "+6 s" salía abajo en el platillo y la barra del reloj
+   estaba arriba y sin etiquetar. Ahora la barra dice "ATAQUE EN Ns"
+   siempre, y al robar tiempo se enciende en arcano con el "+N s" al lado.
+   De paso vuelve la pista de atrapar, quitada cuando la cuna no alcanzaba.
+2. **El mapa** ya decía enemigo, vida y tipo de nodo, en textitos de 9 px
+   junto a los doce nodos a la vez. Ahora cada nodo es el **retrato del
+   enemigo** (los sprites ya estaban en `assets/enemigos/`) y abajo hay una
+   **ficha grande solo del nodo marcado**: retrato a 96, tipo, nombre, pv y
+   lo que pega. Sin línea de recompensa, porque hasta la Fase 4 ganar no da
+   nada y prometerlo sería mentir.
 
 ## Hecho
 
@@ -83,11 +99,28 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Que pruebe Daniel
 
-0. **El tiro desde la cuna, que es lo último que se ha tocado.** Atrapa la
-   bola, suéltala y vuelve a dar. Con la pala izquierda debe llegar arriba y
-   alcanzar el banco de targets. Dos cosas que mirar: si el golpe se siente
-   demasiado fuerte ahora (`flipper_velocidad_giro`, de 22 a 30), y si la
-   pala derecha se queda corta —está medido que llega a y=903 sin tocar nada.
+**Primero, la batería** (no se ha lanzado desde los cambios del HUD; el
+sandbox no llega a Godot, solo al repo):
+
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
+
+A. **El platillo, que es lo único que cambió.** Métele la bola. ¿Ves ahora
+   que lo que te devuelve es tiempo, y de qué contador? Si sigue sin
+   quedar claro, el siguiente paso NO es subir el dial: es enseñarlo la
+   primera vez, con un cartel durante los 0,9 s de captura.
+B. **La franja de arriba creció de 58 a 70 px** para que el reloj tenga su
+   fila con etiqueta. ¿Come mesa? ¿Tapa algo de la parte de arriba?
+C. **La pista de atrapar** sale las tres primeras veces. ¿Sobra, o llega
+   tarde?
+D. **El mapa nuevo, que es lo que cierra 3C.** ¿Ahora eliges rama de verdad,
+   mirando quién hay y con cuánta vida llegas? Mira sobre todo: si los nodos
+   a 24 px se distinguen unos de otros, si la ficha de 118 px de alto come
+   demasiado sitio a las ramas, y si echas de menos ver la ficha de un nodo
+   que NO sea el marcado.
+
+Lo de abajo es lo que sigue sin comprobar (lo ya contestado se ha borrado:
+cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
+
 0b. **La apertura.** Lanza a tope diez veces seguidas sin tocar nada más. La
    bola tiene que dar la vuelta por la órbita y **caerte en la pala
    izquierda**. Si vuelve a irse por el outlane, la boca se ha quedado corta.
@@ -95,8 +128,6 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
    RODAR hasta el hueco del eje y quedarse ahí (~0,6 s), no clavarse donde
    toque. Y con la pala en reposo no debe quedarse nunca: rueda y se va.
    Si sigue soldándose, baja `rodadura`; si no llega a asentarse, súbela.
-2. **¿Cada cuánto drena?** El objetivo es cada dos o tres bolas.
-3. **Los outlanes.** Deben castigar la bola descontrolada, no la controlada.
 4. **Los huecos del tablero en negro y el destello al pegar**, que es lo
    único que cambió de color.
 5. **Que la banda gris de la derecha haya desaparecido** en pantalla
@@ -104,25 +135,17 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 6. **Subir de tramo, con el racimo sonando.** ¿Se oye que has subido sin
    mirar el número? ¿Y se distingue x3 de x4 solo por el tono? Si tapa
    demasiado los golpes, el dial es `db` de `combo` en `nodo_sonido.gd`.
-7. **El reloj, que es el criterio de salida de 3A.** ¿El combate se siente
-   como una carrera? Contra la Rata y contra la Gárgola, que son los dos
-   extremos de la tabla (N cambia de enemigo). Un jugador bueno debe ganar
-   con vida de sobra y uno malo quedarse sin vida.
 8. **Que el golpe del reloj no se lea como injusto.** Llega en mitad de la
    bola y no para nada, a propósito. Si sorprende, el aviso de 3-2-1 es
    corto: `reloj_aviso`.
-9. **El cañón, que es el criterio de salida de 3B.** Te escupe la bola
-   cruzada y rápida a la pala derecha. ¿La cazas si vas atento y la pierdes
-   si no? Si es imposible de cazar siempre, el tiro no vale lo que paga.
-10. **El platillo.** ¿Compensa buscarlo por los ~6 s que quita del reloj, o
-    prefieres siempre el cañón? Si nunca lo eliges, sube
-    `platillo_atrasa_reloj`.
+10. **El platillo, ahora que se ve lo que hace.** ¿Compensa buscarlo por los
+    ~6 s, o prefieres siempre el cañón? Si nunca lo eliges, sube
+    `platillo_atrasa_reloj`. **Ojo: esta pregunta no valía antes**, porque no
+    se sabía que daba tiempo. Es la primera vez que se puede contestar.
 11. **A ciegas, sin mirar la pantalla:** ¿sabes qué acabas de conseguir solo
     por el sonido? Racimo, target, banco cerrado, órbita, retorno, cañón y
     platillo tienen sonido propio. Si dos se confunden, dime cuáles.
-12. **El mapa, que es el criterio de salida de 3C.** Pierde a propósito por el
-    cuarto nodo: ¿te apetece darle a R? Si no, el problema no es el mapa, es
-    que el combate todavía no engancha.
+12. → ahora es el punto D de arriba.
 13. **¿La vida aguanta un acto?** Si mueres siempre en el acto I, o el reloj
     aprieta demasiado o los enemigos tienen mal la vida. Dime en qué nodo
     mueres y con cuánta vida llegabas.
@@ -131,7 +154,8 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Siguiente
 
-1. **Jugar y cerrar la Fase 3 entera.** Nada de esto está validado
+1. **Jugar el HUD del reloj y el mapa nuevo, y cerrar 3C.** Es lo único que
+   queda de la Fase 3
 2. **Rehacer la tabla de enemigos**, que ya toca: los tiros pagan cosas
    distintas, el reloj existe y el mapa reparte enemigos por acto, o sea que
    por fin hay contra qué balancear
@@ -198,6 +222,11 @@ de geometría fina y se hace jugando, no midiendo.
 - **Del mapa faltan tienda y evento** (`DISEÑO.md` §9). No están porque la
   tienda necesita chatarra y reliquias: Fase 4 y Fase 6. Meterlos ahora como
   nodos vacíos sería acumular sistemas a medias.
+- **En el mapa, el nodo de jefe enseña el retrato del enemigo normal** del
+  que sale, porque un jefe sigue siendo "el enemigo más duro del acto con más
+  vida". Los tres sprites de `assets/jefes/` NO se usan a propósito: enseñar
+  un golem y meterte contra una "Rata mayor" sería el mapa mintiendo. Se
+  conectan cuando los jefes sean enemigos de verdad, en Fase 6.
 - **Los jefes son de mentira.** Ahora un jefe es el enemigo más duro del acto
   con 1,8× de vida y "mayor" en el nombre. Eso NO cumple `DISEÑO.md` §8: un
   enemigo con más vida no es un enemigo nuevo. Los jefes de verdad, con sus

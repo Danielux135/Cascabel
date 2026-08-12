@@ -126,6 +126,19 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
   pruebas siguen oyendo el sonido viejo. Hay que lanzar
   `Godot ... --headless --path C:\dev\tilt-os --import` antes de probar.
+- **Un sistema que el jugador no ve no existe, y se diagnostica como si
+  faltara.** El platillo devolvía 6 s de reloj, con sonido, onda y un "+6 s"
+  flotante, y Daniel jugó un run entero pidiendo "algo para parar el tiempo".
+  El fallo era que la causa salía ABAJO, en el platillo, y el contador estaba
+  ARRIBA y sin etiquetar: nada ataba una cosa a la otra. **Antes de construir
+  lo que el jugador pide, comprueba si ya está y no se ve** —si lo construyes,
+  acabas con el sistema duplicado y sigues sin que se entienda. Y la regla que
+  sale de ahí: **un efecto se muestra donde se MIDE, no solo donde se
+  produce.**
+- **Una pregunta sobre un sistema invisible no tiene respuesta válida.** "¿El
+  platillo compensa?" se contestó "prefiero el cañón" cuando en realidad era
+  "no sabía que hacía nada". Si una pregunta de la lista depende de que el
+  jugador haya entendido algo, verifica primero que lo entendió.
 - **Un cambio de recompensa puede romper la mesa sin romper la física.** El
   cañón devolvía la bola al racimo de bumpers y alimentaba un bucle que
   mataba al enemigo sin que las palas participaran nunca. Cuando cambies

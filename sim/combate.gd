@@ -132,7 +132,15 @@ func _en_juego() -> bool:
 ## `suma_golpe` distingue un impacto de una bonificación: completar un banco da
 ## daño pero no es un golpe, y contarlo inflaría el combo por partida doble con
 ## el target que lo cierra.
-func _golpear(base: int, punto: Vector2, suma_golpe: bool) -> void:
+##
+## `escala` dice si a este golpe le toca el multiplicador. NO le toca al relleno
+## —bumpers y giradores—, y sí a todo lo que hay que buscar: targets, bancos,
+## rampas y platillo. Está medido en `tests/medir_balance.gd` por qué: el
+## multiplicador se aplicaba también a lo que sale solo, así que dar tumbos por
+## el racimo con el combo alto pagaba como apuntar. El relleno sigue SUBIENDO el
+## combo —aguantar la bola sigue siendo lo que lo sube, que es el pilar— pero ya
+## no cobra de él.
+func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true) -> void:
 	if not _en_juego():
 		return
 	if suma_golpe:
@@ -141,14 +149,14 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool) -> void:
 		var ahora := multiplicador()
 		if ahora != antes:
 			combo_cambiado.emit(ahora, golpes)
-	var dano := base * multiplicador()
+	var dano := base * (multiplicador() if escala else 1)
 	dano_de_la_bola += enemigo.recibir(dano)
 	dano_infligido.emit(dano, multiplicador(), punto)
 	if not enemigo.vivo():
 		_ganar()
 
 func _al_golpear_bumper(punto: Vector2, _fuerza: float) -> void:
-	_golpear(p.dano_bumper, punto, true)
+	_golpear(p.dano_bumper, punto, true, false)
 
 func _al_abatir_target(punto: Vector2, _banco: int) -> void:
 	_golpear(p.dano_target, punto, true)
@@ -157,7 +165,7 @@ func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 	_golpear(p.dano_banco, punto, false)
 
 func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
-	_golpear(p.dano_girador, punto, true)
+	_golpear(p.dano_girador, punto, true, false)
 
 ## Las rampas pagan al SALIR, no al entrar: el premio es completarlas. Y cada
 ## una paga una cosa distinta, que es lo que las hace tres tiros de verdad.

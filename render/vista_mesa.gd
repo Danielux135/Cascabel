@@ -141,6 +141,14 @@ var _sacudida: float = 0.0
 var _tiempo: float = 0.0
 var flash_enemigo: float = 0.0
 var flash_jugador: float = 0.0
+## El platillo acaba de devolver tiempo. Enciende la BARRA DEL RELOJ, que está
+## arriba, mientras el número sale abajo en el platillo: sin esto el "+6 s"
+## flota en mitad de la mesa sin decir de qué contador habla, y está visto que
+## un jugador puede hacer un run entero sin enterarse de que el platillo da
+## tiempo. La causa se ve donde pasa; el efecto, donde se mide.
+var flash_reloj: float = 0.0
+## Segundos que devolvió el último platillo, para escribirlos junto a la barra.
+var ultimo_atraso: float = 0.0
 var _hitstop: float = 0.0
 var _rng := RandomNumberGenerator.new()
 var _flipper_izq_antes := false
@@ -155,7 +163,7 @@ var _flash_bumper: Array[float] = []
 var _numeros: Array[Dictionary] = []
 ## Cuántas veces se ha atrapado la bola en esta partida. Solo para dejar de dar
 ## la pista una vez que se ve que ya la sabes.
-var _veces_atrapada: int = 0
+var veces_atrapada: int = 0
 
 var _tex_bola: Texture2D
 var _tex_poste: Texture2D
@@ -310,6 +318,9 @@ func _process(delta: float) -> void:
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
 	flash_jugador = maxf(flash_jugador - delta * 2.2, 0.0)
+	# Más lento que los otros dos a propósito: este no es un golpe, es una
+	# lectura, y hay que darle tiempo al ojo a subir del platillo a la barra.
+	flash_reloj = maxf(flash_reloj - delta * 0.7, 0.0)
 	# La sacudida va en el offset de la CÁMARA, y SIEMPRE en píxeles enteros:
 	# moviendo el nodo de la mesa no se vería, porque la cámara es hija suya y
 	# se movería con él; y a medio píxel, con filtro nearest y escalado entero,
@@ -442,7 +453,7 @@ func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 func _al_cambiar_atrape(atrapada: bool) -> void:
 	if atrapada:
 		_sonido.reproducir("atrapar")
-		_veces_atrapada += 1
+		veces_atrapada += 1
 
 func _al_buscar_bola(punto: Vector2) -> void:
 	impactos.onda(punto, C_ARCANO, 1.3)
@@ -493,6 +504,8 @@ func _al_avisar_reloj(segundos: int) -> void:
 ## ahí abajo.
 func _al_atrasar_reloj(segundos: float) -> void:
 	_sonido.reproducir("atrasar")
+	flash_reloj = 1.0
+	ultimo_atraso = segundos
 	var centro := mesa.platillos[0].centro if not mesa.platillos.is_empty() \
 		else Vector2(Mesa.ANCHO * 0.5, 200.0)
 	_numeros.append({"pos": centro, "t": 1.1,
