@@ -8,10 +8,6 @@ listo para el juego.
 
 Uso:
     python3 procesar.py entrada.png --rejilla 3x3 --tam 64 --salida assets/
-
-Lo de assets/shell/ (la cascara de TILT OS) NO lleva la paleta de la mazmorra:
-si hay que procesarlo, es con --sin-cuantizar. Sin esa opcion el script se
-niega, para que un reprocesado en bloque no lo destroce.
 """
 
 import argparse
@@ -46,12 +42,6 @@ PALETA = np.array([[int(h[i:i+2], 16) for i in (0, 2, 4)] for h in PALETA_HEX],
 
 FONDO = np.array([243, 16, 233], dtype=np.float32)   # magenta real del generador
 TOL_FONDO = 95.0
-
-# Carpetas cuyo contenido NO lleva la paleta de la mazmorra y no se debe
-# cuantizar. La cascara de TILT OS es Windows XP de 2002: sus azules y sus
-# grises no estan en PALETA_HEX y pasarlos por aqui los destrozaria. Si algun
-# dia hay que procesar algo de aqui, es con --sin-cuantizar.
-SIN_PALETA = ("assets/shell", "assets\\shell")
 
 
 # ------------------------------------------------------------------- color
@@ -133,8 +123,7 @@ def desflecar(rgb, objeto):
     return salida
 
 
-def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False,
-                   cuantizar_paleta=True):
+def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False):
     fondo = mascara_fondo(rgb)
     objeto = ~fondo
     if not objeto.any():
@@ -160,7 +149,7 @@ def procesar_celda(rgb, tam, margen=2, escala=None, al_suelo=False,
 
     a = np.array(lienzo)
     alfa = a[..., 3] > 128            # umbral: sin bordes semitransparentes
-    color = cuantizar(a[..., :3], alfa) if cuantizar_paleta else a[..., :3]
+    color = cuantizar(a[..., :3], alfa)
     salida = np.dstack([color, (alfa * 255).astype(np.uint8)])
     salida[~alfa] = 0
     return Image.fromarray(salida, "RGBA")
@@ -207,26 +196,17 @@ def main():
     p.add_argument("--prefijo", default="sprite")
     p.add_argument("--columnas", type=int, default=3,
                    help="solo para maquetar la vista previa")
+    p.add_argument("--tira", type=int, default=0, metavar="N",
+                   help="tira de animacion de N fotogramas: corta en rejilla "
+                        "fija, NO por silueta, para que no se desplacen")
+    p.add_argument("--filas", type=int, default=1,
+                   help="filas de la tira (varias tiras apiladas)")
     p.add_argument("--conjunto", action="store_true",
                    help="misma escala para toda la hoja y pies alineados: "
                         "conserva los tamanos relativos entre sprites")
     p.add_argument("--nombres", default=None,
                    help="nombres separados por coma, en orden de lectura")
-    p.add_argument("--sin-cuantizar", action="store_true",
-                   dest="sin_cuantizar",
-                   help="no forzar la paleta cerrada: para lo que no es de la "
-                        "mazmorra, como la cascara de TILT OS")
     args = p.parse_args()
-
-    # Red de seguridad para el dia en que se reprocese todo de golpe: lo que
-    # esta bajo assets/shell/ no lleva la paleta de la mazmorra.
-    ruta = args.entrada.replace("\\", "/")
-    destino = args.salida.replace("\\", "/")
-    if not args.sin_cuantizar and any(
-            c.replace("\\", "/") in ruta or c.replace("\\", "/") in destino
-            for c in SIN_PALETA):
-        p.error("esto es de la cascara de TILT OS y no lleva la paleta de la "
-                "mazmorra: repite con --sin-cuantizar")
 
     im = Image.open(args.entrada).convert("RGB")
     a = np.array(im)
@@ -236,6 +216,16 @@ def main():
 
     nombres = args.nombres.split(",") if args.nombres else None
     os.makedirs(args.salida, exist_ok=True)
+
+    if args.tira:
+        W, H = im.size
+        cols, filas = args.tira, args.filas
+        cajas = []
+        for f in range(filas):
+            for c in range(cols):
+                cajas.append((f*H//filas, (f+1)*H//filas,
+                              c*W//cols, (c+1)*W//cols, None))
+        print(f"  tira: {cols}x{filas} en rejilla fija (sin recorte por silueta)")
 
     escala = None
     if args.conjunto and cajas:
@@ -247,13 +237,15 @@ def main():
     for i, (y0, y1, x0, x1, ids) in enumerate(cajas):
         recorte = a[y0:y1, x0:x1].copy()
         # borrar lo que pertenezca a otro sprite y caiga dentro de esta caja
-        propio = np.isin(etiquetas[y0:y1, x0:x1], list(ids))
+        if ids is None:
+            propio = np.ones((y1-y0, x1-x0), bool)
+        else:
+            propio = np.isin(etiquetas[y0:y1, x0:x1], list(ids))
         ajeno = objeto[y0:y1, x0:x1] & ~propio
         recorte[ajeno] = FONDO.astype(np.uint8)
 
         sp = procesar_celda(recorte, args.tam, escala=escala,
-                            al_suelo=args.conjunto,
-                            cuantizar_paleta=not args.sin_cuantizar)
+                            al_suelo=args.conjunto)
         if sp is None:
             continue
         nombre = nombres[i].strip() if nombres and i < len(nombres) \

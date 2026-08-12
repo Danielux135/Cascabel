@@ -1,13 +1,13 @@
 class_name NodoEscritorio
 extends CanvasLayer
 
-## El escritorio de TILT OS detrás de la mesa, en una capa fija que no se mueve
-## con la cámara.
+## El escritorio del sistema operativo detrás de la mesa, en una capa fija que
+## no se mueve con la cámara.
 ##
 ## OJO: esto NO es la cáscara. Es solo el fondo, para que los 560 px que sobran
 ## a los lados de la mesa no sean un vacío negro mientras se ajusta la cámara.
-## Ventanas, barra de tareas y botón Inicio son la fase 5, y esos 560 px (280
-## por lado) son justo el sitio donde van.
+## Los paneles enmarcados, la barra de tareas y el botón Inicio son la fase 5, y
+## esos 560 px (280 por lado) son justo el sitio donde van.
 ##
 ## El fondo es 320x180 y la ventana 960x540: exactamente x3, así que se dibuja
 ## con escalado entero y no se rompe ningún píxel. Y no se cuantiza a la paleta

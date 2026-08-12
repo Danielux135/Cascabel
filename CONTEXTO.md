@@ -1,4 +1,4 @@
-# CONTEXTO.md — TILT OS
+# CONTEXTO.md — CASCABEL
 
 Referencia densa. **No se lee entero**: se abre para buscar un dato
 concreto. El estado del proyecto está en `ESTADO.md`, las decisiones vivas
@@ -13,30 +13,36 @@ en `CLAUDE.md`, el diseño en `DISEÑO.md`, las fases en `PLAN.md`.
 
 ## La estética
 
-**TILT OS**: aspecto de Windows XP de 2002. La mesa vive dentro de una
-ventana de ese escritorio.
+El juego se llama **Cascabel**. La **cáscara** es un sistema operativo falso
+con aspecto de Windows XP de 2002: la mesa vive dentro de un panel de ese
+escritorio. Da el marco visual, no el nombre.
 
-**Dos capas con reglas opuestas:**
+**Todo va en pixelart, cáscara incluida:**
 
 | Capa | Qué es | Cómo se hace |
 |---|---|---|
-| Cáscara | Ventanas, barra de tareas, botones, tooltips | **Por código.** Degradados, biselados, resolución nativa |
+| Cáscara | Paneles, barra de tareas, botones, tooltips | **Sprites pixelart**, con marcos de nueve trozos que se estiran a cualquier tamaño |
 | Contenido | Enemigos, reliquias, objetos de mesa, bola | Sprites pixelart, píxeles duros |
 
-Es deliberado: parece un juego pixelado corriendo dentro de un sistema que
-no lo es. **No dibujes la cáscara con sprites** y no le apliques filtro
-nearest.
+Misma rejilla y misma paleta para las dos. **La versión anterior —cáscara
+dibujada por código con degradados y biselados en resolución nativa— queda
+descartada**: era más cara y peleaba con el arte.
+
+**No hay gestor de ventanas.** Los paneles están en posiciones fijas y solo
+parecen ventanas: no se arrastran, no se redimensionan, no hay foco, ni
+orden de apilado, ni minimizar.
 
 Cada elemento del sistema hace trabajo de juego, no decora:
 
 - Reliquias = iconos del escritorio
 - Descripciones = tooltips amarillos
-- Mapa del run = ventana de explorador de carpetas
-- Combate = una ventana
-- Multibola = varias ventanas abiertas
-- Derrota = pantalla azul TILT con volcado de error
+- Mapa del run = panel de explorador de carpetas
+- Combate = un panel
+- El reloj del enemigo = un diálogo de progreso cuyo botón de cerrar no cierra
+- Multibola = varios paneles abiertos
+- Derrota = pantalla azul **TILT** con volcado de error
 - Menú principal = botón Inicio
-- Eventos = ventanas emergentes que no se pueden cerrar
+- Eventos = avisos emergentes que no se pueden cerrar
 
 **Aviso legal:** nada de assets reales de Microsoft. Ni Bliss, ni el logo,
 ni las texturas de Luna, ni los iconos. Reconocible sí, calcado no.
@@ -73,6 +79,9 @@ assets/
   mesa_deco/     9 adornos de suelo
   shell/         fondo_escritorio 320×180, paleta propia
 ```
+
+De la cáscara solo existe el fondo. **Los marcos de nueve trozos, la barra de
+tareas, los botones y los tooltips están por hacer**: son la Fase 5.
 
 `flipper_izq.png` es el derecho reflejado por código.
 
@@ -141,7 +150,7 @@ está a 64 a propósito.
 ```
 sim/       física y reglas, sin dependencias del motor
 render/    dibujado y escenas
-ui/        la cáscara de TILT OS
+ui/        la cáscara: paneles fijos del sistema operativo falso
 data/      reliquias, enemigos, mesas en JSON
 assets/    sprites procesados
 tests/     prueba_sim.gd

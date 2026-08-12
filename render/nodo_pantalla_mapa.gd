@@ -3,7 +3,7 @@ extends CanvasLayer
 
 ## La pantalla del mapa del run.
 ##
-## OJO: esto NO es la cáscara de TILT OS. El mapa como explorador de carpetas de
+## OJO: esto NO es la cáscara del sistema operativo. El mapa como explorador de carpetas de
 ## Windows XP es Fase 5. Esto es lo mínimo para que el mapa se pueda JUGAR: ver
 ## las ramas, ver qué hay en cada una, elegir y que la vida que traes se vea.
 ##

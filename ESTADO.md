@@ -1,4 +1,4 @@
-# ESTADO.md
+# ESTADO.md — CASCABEL
 
 Estado vivo. Se lee al empezar la sesión y se actualiza al terminarla.
 
@@ -215,5 +215,11 @@ de geometría fina y se hace jugando, no midiendo.
   de reloj y los de abajo pueden ser un muro. La tabla se rehace entera
   después de 3B, cuando los tiros paguen cosas distintas: ajustarla ahora es
   trabajo perdido otra vez.
-- Enemigo fuera de pantalla al hacer scroll → Fase 5, ventana propia
+- Enemigo fuera de pantalla al hacer scroll → Fase 5, panel propio
 - Laterales del escritorio apagados al 66% como apaño → Fase 5
+- **El juego pasa a llamarse Cascabel** (`DISEÑO.md` rev. 4). Cambiados los
+  documentos, `project.godot` y los comentarios del código; las rutas y el
+  nombre del repo siguen siendo `tilt-os` a propósito. La cáscara del
+  sistema operativo se queda como marco visual, ahora en pixelart con marcos
+  de nueve trozos y sin gestor de ventanas: la Fase 5 está reescrita con eso.
+  **De la cáscara no hay ningún asset todavía salvo el fondo.**

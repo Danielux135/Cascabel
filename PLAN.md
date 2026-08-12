@@ -1,4 +1,4 @@
-# PLAN.md — TILT OS
+# PLAN.md — CASCABEL
 
 Hoja de ruta. Cada fase tiene un **criterio de salida**: hasta que no se
 cumpla, no se pasa a la siguiente. La regla evita el fallo clásico de
@@ -6,6 +6,11 @@ acumular sistemas a medias sobre un núcleo que aún no divierte.
 
 *Revisión 2: la mesa grande y la pantalla completa se adelantan, porque
 ajustar la sensación sobre una mesa que se va a rehacer es trabajo perdido.*
+
+*Revisión 3: el juego se llama **Cascabel**. El sistema operativo falso
+sigue siendo la cáscara, pero ya no da nombre al juego. La Fase 5 se
+reescribe entera: la cáscara pasa a pixelart con marcos de nueve trozos y
+sin gestor de ventanas.*
 
 ---
 
@@ -25,7 +30,7 @@ combo, vida del enemigo. Suelo y adornos. Animaciones básicas.
 - La mesa mantiene **400 de ancho** (la física está ajustada a esa anchura
   y el hueco entre palas depende de ella)
 - El alto crece a **1200-1400**
-- Los ~240 px sobrantes a los lados son el escritorio de TILT OS
+- Los ~240 px sobrantes a los lados son el escritorio de la cáscara
 
 ### Cámara vertical
 
@@ -150,21 +155,67 @@ como partidas distintas.
 
 ---
 
-## Fase 5 — La cáscara TILT OS
+## Fase 5 — La cáscara
 
-Ahora el juego se mete dentro del sistema operativo, y de paso se llena la
-pantalla.
+Ahora el juego se mete dentro del sistema operativo falso, y de paso se
+llena la pantalla.
+
+*Reescrita: la cáscara ya no se dibuja por código. Va en pixelart, con
+marcos de nueve trozos, y sin gestor de ventanas. Eso cambia el trabajo de
+sitio: lo que hacía falta era código de interfaz, y ahora hacen falta
+**assets** y **un renderizador de nueve trozos**.*
+
+### Por qué el cambio
+
+Dibujar degradados y biselados por código en resolución nativa era más caro
+que dibujarlos una vez, y encima peleaba con el arte: un marco suave
+alrededor de píxeles duros no se lee como el mismo juego. Y el gestor de
+ventanas —arrastrar, redimensionar, foco, orden de apilado, minimizar— era
+la parte más cara de todas y no aporta nada: nadie va a querer mover el mapa
+a otra esquina.
+
+### El renderizador de nueve trozos
+
+La pieza técnica de la fase, y es pequeña. Un marco es un PNG dividido en
+nueve regiones: cuatro esquinas que no se estiran, cuatro bordes que se
+repiten en un eje y un centro que se repite en los dos.
+
+- **Se repite (*tile*), no se estira.** Estirar un pixelart lo destruye.
+- **Los tamaños de panel son múltiplos de la unidad de repetición**, o el
+  último trozo sale cortado.
+- **Todo en píxeles enteros de la base 640×360**, como el resto.
+- Un solo renderizador sirve para paneles, botones, barra de tareas,
+  tooltips y cuadros de diálogo: solo cambia el atlas.
+
+### Los assets que hacen falta
+
+Se procesan con `procesar.py` como todo lo demás, y llevan la paleta del
+proyecto.
+
+- Marco de panel: normal y activo
+- Barra de título con su tira de botones (que no hacen nada, son decorado)
+- Botones: reposo, encima, pulsado
+- Marco de tooltip amarillo
+- Barra de tareas y botón Inicio
+- Barra de progreso, para el reloj del enemigo
+- Fondo de la pantalla azul de TILT
+
+### Qué se monta con eso
+
+Paneles fijos, cada uno en su sitio, que parecen ventanas y no se mueven:
 
 - Escritorio, fondo, barra de tareas, botón Inicio
-- La mesa vive en una ventana; el resto son otras ventanas
+- La mesa en el panel central; el resto alrededor
 - Reliquias como iconos del escritorio con tooltip amarillo
-- Enemigo en su propia ventana, mapa como explorador de carpetas
-- Derrota como pantalla azul TILT con volcado de error
+- Enemigo en su panel, con su reloj como diálogo de progreso
+- Mapa como panel de explorador de carpetas
+- Derrota como pantalla azul **TILT** con volcado de error
 
-Todo por código. Nada de sprites de interfaz.
+Arrastra dos apaños de la Fase 1 que se resuelven aquí: el HUD que tapa la
+bola en lo alto de la órbita y los laterales del escritorio apagados a mano.
 
 **Criterio de salida:** quien vea una captura entiende la broma sin que se
-la expliquen.
+la expliquen, y la cáscara y la mesa se leen como el mismo juego.
 
 ---
 
@@ -211,6 +262,9 @@ Reabrirlas cuesta más de lo que aportan.
 - **El daño se aplica al golpear, no al drenar.**
 - **No hay cuenta de bolas.** Hay vida, y drenar te cuesta vida.
 - **Las rampas son curvas, no física simulada.**
+- **La cáscara va en pixelart con marcos de nueve trozos**, no dibujada por
+  código.
+- **No hay gestor de ventanas.** Paneles fijos que parecen ventanas.
 - **Escalado por enteros siempre.**
 
 ---

@@ -1,7 +1,12 @@
-# TILT OS
+# CASCABEL
 
 Pinball roguelike en Godot 4.7, GDScript. La mesa vive dentro de un sistema
-operativo falso con estética de Windows XP.
+operativo falso con estética de Windows XP, que es la **cáscara**: el marco
+visual, no el nombre del juego. El juego se llama **Cascabel**.
+
+Las carpetas del repo siguen llamándose `tilt-os` a propósito: el nombre de
+la ruta no se toca. Y **TILT sigue siendo la pantalla de derrota**, que es
+término de pinball real.
 
 ## Lo primero de cada sesión
 
@@ -50,6 +55,12 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **Los enemigos normales viven fuera del campo de juego.**
 - **La bola es el bloque de stats del jugador, solo en efectos.** Nunca en
   tamaño ni masa: descuadra el hueco entre palas.
+- **La cáscara va en PIXELART, con marcos de nueve trozos.** Misma rejilla y
+  misma paleta que el resto. Se acabó dibujarla por código con degradados y
+  biselados en resolución nativa: era más cara y peleaba con el arte.
+- **No hay gestor de ventanas.** La cáscara son paneles enmarcados en
+  posiciones fijas que PARECEN ventanas. Nada de arrastrar, redimensionar,
+  foco, orden de apilado ni minimizar.
 - **Escalado por enteros siempre.**
 
 ## Trampas que ya nos han costado tiempo

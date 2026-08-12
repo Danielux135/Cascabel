@@ -3,8 +3,8 @@ extends Node2D
 
 ## Banco de pruebas del combate. Dibuja la simulación y la deja jugar.
 ##
-## OJO: esto NO es la cáscara de TILT OS. No hay ventanas de XP, ni barra de
-## tareas, ni mapa, ni reliquias. Solo la mesa, un enemigo y el bucle de un
+## OJO: esto NO es la cáscara del sistema operativo. No hay paneles enmarcados,
+## ni barra de tareas, ni mapa, ni reliquias. Solo la mesa, un enemigo y el bucle de un
 ## combate hasta que uno de los dos muera. Las paredes, los flippers y los
 ## targets se dibujan por código; bumpers, postes, bola y enemigo van con sprite.
 

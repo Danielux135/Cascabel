@@ -1,9 +1,12 @@
-# DISEÑO.md — TILT OS
+# DISEÑO.md — CASCABEL
 
 Diseño de la capa roguelike. La capa de sensación —física, geometría,
 *juice*— no se diseña aquí: se descubre jugando y vive en `PLAN.md`.
 
-Este documento se cierra **antes** de construir la Fase 3.
+*Revisión 4: el juego se llama **Cascabel**. Un cascabel es una esfera con
+algo vivo dentro que suena al moverse: es literalmente el personaje. Entra
+la estructura de tres capas, y la cáscara de sistema operativo vuelve, pero
+en pixelart y sin gestor de ventanas.*
 
 ---
 
@@ -11,195 +14,276 @@ Este documento se cierra **antes** de construir la Fase 3.
 
 **La mesa es un menú de tiros.**
 
-Cada tiro de la mesa da algo distinto. Tu build decide cuáles te compensan.
-Los enemigos deciden cuáles te dejan.
+Cada tiro da algo distinto. Tu build decide cuáles te compensan. Los
+enemigos deciden cuáles te dejan.
 
-Sin esto no hay juego: si todos los tiros dan lo mismo, el jugador no elige
-nada, solo sobrevive, y las reliquias se convierten en bonificaciones
-pasivas que no cambian cómo juegas.
-
-Todo lo que venga después se juzga contra este pilar. Una mecánica que no
-haga que un tiro sea más o menos deseable que otro, sobra.
+Si todos los tiros dan lo mismo, el jugador no elige nada, solo sobrevive, y
+las reliquias se vuelven bonificaciones pasivas. Toda mecánica se juzga
+contra esto: si no hace que un tiro sea más o menos deseable que otro, sobra.
 
 ---
 
 ## 2. El skill se recompensa
 
-**Aguantar la bola es lo mejor que puede hacer el jugador.** Un pinball
-premia a quien controla; que esto sea un roguelike no significa morir a
-todas horas.
+**Aguantar la bola es lo mejor que puede hacer el jugador.**
 
-Pero eso obliga a mover la presión fuera del drenaje. Si drenar fuese la
-única amenaza, el jugador bueno sería invulnerable.
+Por eso la presión no vive en el drenaje. **El enemigo ataca por reloj**: un
+contador visible que carga mientras juegas y pega cuando llega, drenes o no.
 
-**El enemigo ataca por reloj.** Tiene un contador visible que carga
-mientras juegas y pega cuando llega, drenes o no.
-
-- Aguantar la bola sigue siendo lo mejor: es tiempo pegando
+- Aguantar sigue siendo lo mejor: es tiempo pegando
 - Pero no es gratis: el reloj corre igual
-- El combate es una carrera: ¿le matas antes de que te desgaste?
-- Drenar deja de ser catastrófico y pasa a ser un tropiezo: pierdes el
-  multiplicador y le regalas un golpe
+- El combate es una carrera
+- Drenar es un tropiezo, no una catástrofe: pierdes el multiplicador y le
+  regalas un golpe
 
-Un jugador excelente gana con vida de sobra. Uno mediano llega justo. Uno
-malo se queda sin vida. **El skill se paga en margen, no en inmortalidad.**
-
-Corolario: la duración de bola no se acorta artificialmente. Quince
-segundos o noventa, lo que salga del control del jugador.
+Un jugador excelente gana con vida de sobra. Uno malo se queda sin vida.
+**El skill se paga en margen, no en inmortalidad.**
 
 ---
 
-## 3. Los tres relojes
+## 3. La premisa
+
+**No es un modo historia.** Es un marco que se cuenta por mensajes de error,
+archivos de registro abribles en el escritorio y el sistema degradándose
+acto a acto. Cero cinemáticas, cero diálogo, cero coste.
+
+Alguien intentó convertir una máquina de pinball en un juego de rol y no lo
+terminó. Dejó la mazmorra a medio programar sobre el cableado de la máquina
+y se fue. El sistema lleva desde entonces intentando ejecutar un juego que
+no existe del todo.
+
+**El jugador es un error de ese intento.** El programa necesitaba un
+protagonista y no llegó a tener uno, así que el gestor de excepciones cogió
+lo primero vivo que encontró y lo selló dentro de lo único que la máquina
+sabe manejar: una bola. En el registro aparece como `cascabel.exe`. Nadie le
+puso ese nombre; es el nombre del archivo.
+
+**Las palas son la única parte real.** Son hardware atornillado a la máquina.
+La mazmorra es software, los monstruos son procesos, el botín son fragmentos
+de código sin usar. Por eso las palas son lo único que se controla de verdad
+y por eso mejorarlas importa.
+
+**Drenar no es morir: es que el sistema captura el fallo y reinicia el
+nivel.** Por eso se repite, y por eso se conservan los desbloqueos: son
+piezas rescatadas de la memoria antes de que el reinicio las borre.
+
+**Perder del todo es TILT**, que es a la vez lo que hacen las máquinas de
+pinball cuando alguien las empuja y una pantalla de fallo del sistema.
+
+Cada pieza del diseño ya decidido encaja aquí sin forzarla: el bucle
+roguelike es un reinicio de proceso, los desbloqueos son carroñeo, y la
+cáscara es la máquina intentando gestionar un proceso que no puede matar.
+
+---
+
+## 4. El personaje y la cáscara
+
+**La bola es una criatura, no un objeto.** Eso da a quién mejorar, de quién
+tirar en las reliquias y a qué ponerle skins. La criatura no habla nunca.
+
+**Se dibuja en dos capas: la cáscara rueda, la criatura no.** Como una bola
+de hámster. La cáscara gira con ocho o doce rotaciones pregeneradas por
+código y ajustadas a rejilla, elegidas según la distancia recorrida; la
+criatura se queda derecha, se aplasta al chocar y mira hacia donde va.
+
+Un ciclo de rodadura con fotogramas NO sirve: la bola cambia de dirección
+constantemente y un ciclo solo vale para un sentido. Y las cáscaras se
+dibujan sin arriba ni abajo —sin pies, sin asa— porque van a rotar.
+
+**La mazmorra corre dentro de un sistema operativo viejo.** No se explica ni
+se justifica; es el marco visual. Cada elemento del sistema hace trabajo de
+juego, no decora:
+
+- Reliquias = iconos del escritorio, con tooltip
+- Mapa del run = ventana de explorador
+- Combate = una ventana
+- El reloj del enemigo = un diálogo de progreso cuyo botón de cerrar no
+  cierra, y cuyo "tiempo restante" puede mentir como mentían los de verdad
+- Derrota = pantalla azul de **TILT**, que además es término de pinball real
+- Multibola = varias ventanas abiertas
+
+**Toda la cáscara va en pixelart**, misma rejilla y misma paleta que el
+resto. Se construye con marcos de nueve trozos que se estiran a cualquier
+tamaño. La versión anterior —degradados y biselados dibujados por código en
+resolución nativa— queda descartada: era más cara y peleaba con el arte.
+
+**Aviso legal:** nada de assets reales de Microsoft. Ni Bliss, ni el logo,
+ni Luna, ni los iconos. Reconocible sí, calcado no.
+
+---
+
+## 5. Las tres capas
+
+Cada sistema modifica una capa. Amontonarlos en la misma es lo que hace que
+un juego se sienta desordenado.
+
+| Capa | Cuándo | Qué eliges |
+|---|---|---|
+| **Preparación** | Antes del run | Bola, flippers, mesa |
+| **Progresión** | Durante el run | Reliquias, chatarra, tienda |
+| **Desbloqueo** | Entre runs | Bolas, flippers, mesas, skins |
+
+### Preparación: tres elecciones que definen el run
+
+- **La bola** — tu personaje. Efectos propios: fuego encadena, piedra pega
+  concentrado, hielo ralentiza el reloj del enemigo.
+- **Los flippers** — tus manos. Alcance, potencia, ángulo de la cuna. Unos
+  cortos y rápidos juegan distinto de unos largos y lentos.
+- **La mesa** — el terreno. Gravedad, rebote, velocidad.
+
+**La mesa se elige antes, nunca a mitad.** Elegir gravedad baja es elegir
+otro juego y adaptarte; que una reliquia te la cambie en el combate siete es
+castigarte por haber aprendido a jugar. Las reliquias modifican efectos y
+números, **jamás la física base**.
+
+### Desbloqueo: lo que cazas no sirve para este run
+
+**Los monstruos de la zona alta sueltan material de desbloqueo, no poder de
+run.**
+
+Esa es la pieza que sostiene todo lo demás:
+
+- **No rompe la escasez.** Farmear no te hace ganar esta partida, así que la
+  tienda y las reliquias siguen siendo decisiones.
+- **Da una decisión que casi ningún roguelike tiene explícita:** ¿juego para
+  ganar este run, o para desbloquear cosas? Subir cuesta tiempo de reloj, o
+  sea vida.
+- **Y le da sentido a la zona alta**, que hasta ahora era un pasillo.
+
+El modo dura un tiempo limitado y **el reloj del enemigo sigue corriendo
+mientras estás arriba**. Sin eso, cazar sería gratis.
+
+Las skins salen de aquí y no afectan a nada: son la recompensa de coleccionar.
+
+---
+
+## 6. Los tres relojes
 
 | Escala | Duración | Qué decides |
 |---|---|---|
 | **La bola** | ~15 s | Qué tiro intentas ahora |
-| **El combate** | 1-2 min | Cómo repartes riesgo: ir a por el tiro grande o acumular seguro |
+| **El combate** | 1-2 min | Ir a por el tiro grande o acumular seguro |
 | **El run** | 30-40 min | Qué build montas y qué camino tomas |
-
-Si alguna de las tres no tiene decisión, esa escala está rota.
 
 ---
 
-## 4. Los tiros de la mesa
-
-Cada uno con identidad propia. Este es el contenido que hace falta antes de
-tocar reliquias.
+## 7. Los tiros de la mesa
 
 | Tiro | Dificultad | Qué da |
 |---|---|---|
-| Racimo de bumpers | Fácil, casi accidental | Multiplicador. Muchos golpes pequeños |
-| Banco de targets | Media | Daño plano. Se agota y se resetea |
-| Órbita | Difícil, pide tiro limpio | Salto de multiplicador de golpe |
-| Carril izquierdo | Media | Daño grande de un solo impacto |
-| Carril derecho | Media | Devuelve la bola a la pala: encadenar |
-| Platillo | Difícil, hay que buscarlo | Recurso o efecto especial |
+| Racimo de bumpers | Fácil | Multiplicador, muchos golpes pequeños |
+| Banco de targets | Media | Daño plano, se agota y se resetea |
+| Órbita | Difícil | Salto de multiplicador de golpe |
+| Cañón | Media | Daño grande, retorno difícil |
+| Carril de retorno | Media | Devuelve la bola a la pala: encadenar |
+| Platillo | Difícil | Atrasa el reloj del enemigo |
+| Umbral alto | Difícil | Abre el modo de caza |
 
-**La regla:** cuanto más difícil el tiro, más concentrada la recompensa.
-Lo fácil da poco y muchas veces; lo difícil da mucho de una vez.
+**Cuanto más difícil el tiro, más concentrada la recompensa.**
 
----
+### Varían en acceso, no solo en premio
 
-## 5. Los ejes de build
+| Tipo | Cómo se aborda |
+|---|---|
+| Arco vertical | Tiro de frente hacia arriba |
+| Carril pegado a pared | Se roza de refilón subiendo |
+| Agujero en el suelo | Caes dentro, no lo apuntas |
+| Boca alta | Solo llega un tiro muy limpio |
 
-Cinco. Una partida buena empuja uno o dos, no los cinco.
+**La bola se dibuja detrás de la boca al entrar**, o no se lee como agujero.
 
-1. **Combo.** El multiplicador escala más y más rápido. Frágil: drenar
-   duele muchísimo. Premia al que controla la bola.
-2. **Golpe único.** Un tiro concreto hace un daño enorme. Ignoras el resto
-   de la mesa y pescas ese tiro una y otra vez.
-3. **Supervivencia.** Protección de outlanes, vida extra, curación. Juegas
-   a agotar al enemigo sin arriesgar.
-4. **Escalado.** Te haces más fuerte a lo largo del run en vez de dentro de
-   la bola. Débil al principio, brutal al final.
-5. **Caos.** Multibola, bolas extra, efectos aleatorios. Pierdes control a
-   cambio de volumen.
-
-**Prueba de que el diseño funciona:** dos partidas con ejes distintos deben
-sentirse como juegos distintos, no como el mismo juego con números más
-grandes.
+**La regla de los bucles:** uno que exige control del jugador en cada vuelta
+es bueno; uno que se sostiene solo está roto.
 
 ---
 
-## 6. Recursos
+## 8. Los ejes de build
+
+1. **Combo** — el multiplicador escala más. Frágil: drenar duele.
+2. **Golpe único** — un tiro pega enorme. Pescas ese tiro una y otra vez.
+3. **Supervivencia** — protección de outlanes, vida, curación.
+4. **Escalado** — más fuerte a lo largo del run que dentro de la bola.
+5. **Caos** — multibola, bolas extra, aleatoriedad.
+
+**Prueba:** dos partidas con ejes distintos deben sentirse como juegos
+distintos, no como el mismo con números más grandes.
+
+---
+
+## 9. Recursos
 
 | Recurso | Vive | Se pierde |
 |---|---|---|
-| **Vida** | Todo el run | Al drenar y cuando llega el reloj del enemigo. No se cura sola entre combates |
+| **Vida** | El run | Al drenar y al llegar el reloj. No se cura sola |
 | **Multiplicador** | Una bola | Al drenar |
-| **Chatarra** | Todo el run | Al gastarla en la tienda |
-| **Reliquias** | Todo el run | Nunca |
-
-Solo cuatro. Si aparece un quinto, hay que justificar por qué no puede ser
-uno de estos.
+| **Chatarra** | El run | En la tienda |
+| **Reliquias** | El run | Nunca |
+| **Material de caza** | Para siempre | Al gastarlo en desbloqueos |
 
 ---
 
-## 7. Ganchos de reliquia
+## 10. Ganchos de reliquia
 
-Las reliquias no se inventan una a una: se diseñan contra esta rejilla. Si
-una reliquia no encaja en ningún gancho, o sobra o falta un gancho.
+Las reliquias se diseñan contra esta rejilla, no una a una.
 
-- Al golpear un **bumper**
-- Al golpear un **target** / al agotar un banco
-- Al completar un **recorrido concreto**
-- Al **subir de tramo** de multiplicador
-- Al **empezar** la bola
-- Al **drenar**
-- Al **matar** un enemigo
-- Al **entrar en combate**
-- **Pasivos condicionales** (si el multiplicador ≥ ×3, si la vida < 50%…)
+Al golpear un bumper · al golpear un target o agotar un banco · al completar
+un recorrido concreto · al subir de tramo · al empezar la bola · al drenar ·
+al matar · al entrar en combate · al cazar en la zona alta · pasivos
+condicionales.
 
-Las quince primeras reliquias deben cubrir los cinco ejes y al menos seis
-ganchos distintos. Nada de quince variantes de "+2 de daño".
+Las quince primeras cubren los cinco ejes y al menos seis ganchos. Nada de
+quince variantes de "+2 de daño".
 
 ---
 
-## 8. Enemigos que cambian cómo juegas
+## 11. Enemigos que cambian cómo juegas
 
-Un enemigo con más vida no es un enemigo nuevo. Cada uno debe alterar qué
-tiro te compensa:
+Uno con más vida no es un enemigo nuevo. Cada uno altera qué tiro compensa:
 
 - **Bloquea un recorrido** hasta que le pegas por otro sitio
-- **Se cura** si no le tocas en N segundos: prohíbe jugar a lo seguro
-- **Refleja** si repites el mismo tiro dos veces seguidas: obliga a variar
-- **Ataca por tiempo** además de por drenaje: prohíbe acumular sin pegar
+- **Se cura** si no le tocas en N segundos: prohíbe jugar seguro
+- **Refleja** si repites tiro: obliga a variar
 - **Blindaje** que solo rompe el daño concentrado: mata al build de combo
-- **Castiga el multiplicador alto**: obliga a gastarlo en vez de guardarlo
-
-Cada uno es una respuesta directa a un eje de build. Ahí nace la variedad
-real de la partida.
+- **Castiga el multiplicador alto**: obliga a gastarlo
+- **Acelera su reloj** cuando subes a cazar: castiga farmear
 
 ---
 
-## 9. Estructura del run
+## 12. Estructura del run
 
-Tres actos. Doce a quince combates. Treinta a cuarenta minutos.
+Tres actos, doce a quince combates, treinta a cuarenta minutos.
 
 ```
 Acto I    combate → combate → élite → tienda → combate → JEFE
 Acto II   igual, con enemigos que responden a los ejes
-Acto III  igual, más corto y más duro
+Acto III  más corto y más duro
 ```
 
-**Nodos:** combate, élite, tienda, descanso, evento, jefe.
-
-**Decisiones del run:** qué rama tomas en el mapa, cuál de tres reliquias
-eliges, qué compras, si descansas o mejoras.
-
-La vida no se cura entre combates. El descanso es la única cura, y compite
-con mejorar. Ahí está la tensión del mapa.
+La vida no se cura entre combates. El descanso es la única cura y compite
+con mejorar.
 
 ---
 
-## 10. Lo que este juego NO es
+## 13. Lo que este juego NO es
 
-Cerca de la mitad del trabajo de diseño es decir que no.
-
-- **No es un simulador de pinball.** No hay tabla de puntuaciones, ni
-  modos multibola de máquina real, ni misiones de mesa.
-- **No hay mesas procedurales.** Tres mesas hechas a mano, como biomas.
-- **No hay meta-progresión hasta que el run sea divertido sin ella.**
-- **No hay modo historia.** Escribir, guionizar, arte de personajes y una
-  segunda estructura de progresión es de lo más caro que existe y no
-  mejora el núcleo. **La narrativa va en la cáscara**, que sale gratis:
-  mensajes de error que cambian según la profundidad, archivos de registro
-  abribles en el escritorio, correos sin leer del operador de la máquina, y
-  el sistema degradándose acto a acto — más ventanas rotas, más avisos, el
-  fondo corrompiéndose. Atmósfera sin deuda.
-- **Sí hay dificultades acumulables**, estilo Slay the Spire: más vida
-  enemiga, reloj más rápido, outlanes más anchos. Se desbloquean ganando.
-  Es el sitio para recompensar al que domina el juego. Fase 7.
+- **No es un simulador de pinball.** Ni tabla de puntuaciones ni misiones de
+  mesa.
+- **No hay mesas procedurales.** Tres o cuatro a mano, como biomas.
+- **No hay modo historia.** La criatura no habla. Ambientación por arte y
+  por enemigos, no por guion.
+- **No hay gestor de ventanas.** La cáscara son paneles enmarcados en
+  posiciones fijas que parecen ventanas. Nada de arrastrar, redimensionar,
+  foco, orden de apilado ni minimizar. Esa era la parte cara y no aporta
+  nada: nadie va a querer mover el mapa a otra esquina.
 - **No hay más de un jugador.**
+- **La meta-progresión no se toca hasta que el run sea divertido sin ella.**
 
 ---
 
-## 11. Preguntas abiertas
+## 14. Preguntas abiertas
 
-Se responden jugando, no discutiendo. Pero hay que tenerlas a la vista:
-
-- ¿Cuánto debe durar la carga del reloj del enemigo? Es el dial que decide
-  si el combate es una carrera tensa o un paseo. Se calibra jugando.
-- ¿El jugador debería poder elegir la mesa, o va ligada al acto?
-- ¿La chatarra se gana por daño, por tiro difícil o por combate ganado?
-  Lo que premies es lo que la gente jugará.
+- ¿Cuánto dura la carga del reloj? Es el dial entre carrera y paseo.
+- ¿La chatarra se gana por daño, por tiro difícil o por combate ganado? Lo
+  que premies es lo que la gente jugará.
+- ¿Cuántas bolas, flippers y mesas al empezar? Pocas y distintas antes que
+  muchas parecidas.
