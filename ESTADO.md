@@ -7,51 +7,48 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** Fase 3 cerrada; tabla de enemigos rehecha con medida
+**Última actualización:** arte de IA de la cáscara integrado (ventana, título,
+barra de tareas, Inicio, botones, iconos), con el fallo del magenta sin
+transparentar ya cerrado.
 
 ---
 
 ## Fase actual
 
-**Fase 3 cerrada entera.** Daniel confirmó jugando el pilar (la cuna apunta,
-llega y gusta), el reloj como carrera y el cañón cazable con esfuerzo; el mapa
-nuevo lo dio por bueno. Y encima se rehizo la tabla de enemigos, que era el
-punto 2 de "Siguiente".
+**Fase 5, tercera pasada: cáscara con arte de verdad.** Nada se ha ejecutado
+todavía: el sandbox no llega a Godot, así que todo lo de abajo es sin probar.
 
-**Lo gordo de la sesión fue el balance, y hubo que construir herramienta.**
-`tests/medir_balance.gd` monta combates con el `Combate` real y tres perfiles
-de jugador, y barre configuraciones enteras. Sin eso no había forma: la tabla
-ya se había hecho a ojo dos veces y las dos se llevó el run por delante.
+**La fuente y los marcos son nuestros y se generan por código** (`fuente.py`,
+igual que `sonidos.py` genera los sonidos). Eso ya cerró dos fallos de
+sesiones anteriores: la fuente de reserva de Godot sin acentos, y los marcos
+recortados por silueta que no cuadraban entre sí. Detalle en `CLAUDE.md`.
 
-Lo que encontró, en orden:
+**El cuadre en portátiles con pantalla no-16:9 tenía causa de código:**
+`stretch/aspect = expand` hace crecer el viewport, y `ParametrosCamara` seguía
+clavado en 960×540 mientras la cáscara medía el viewport real —dos sistemas de
+coordenadas para la misma pantalla—. `VistaMesa._medir_pantalla()` los
+sincroniza ahora en un solo sitio. **Sin confirmar por Daniel todavía.**
 
-1. El coste de un combate es `bolas × drenaje + relojes × ataque`, o sea que
-   **cobrar por tiempo se paga al cuadrado**: jugar peor pega menos, por eso
-   tarda más, por eso le cobran más veces.
-2. **Escalar la vida de los enemigos no arregla eso**, porque divide el coste
-   de todos los perfiles por igual y la brecha entre ellos no se mueve. Medido
-   y descartado.
-3. Aplanar el multiplicador tampoco: cierra la brecha de 20× a 8,4× pero baja
-   tanto el daño que se alargan los combates y muere hasta el jugador bueno.
-4. La causa real era **un escalón más gordo que lo que medía**: con el reloj en
-   18 s, los combates del jugador bueno caían por debajo del umbral y NO comían
-   ningún golpe. Partir el reloj en dos lo arregló.
+**El arte de IA de la cáscara ya está recortado e integrado esta sesión:**
+ventana, barra de título y barra de tareas (de las hojas que generó Daniel
+con `assets/prompts_cascara.md`, validadas con un mosaico de prueba antes de
+tocar el repo), botón Inicio con el cascabel de logo, botones min/max/cerrar,
+nueve iconos decorativos, y tres fondos que cambian por acto. Un primer
+recorte dejó el fondo magenta sin volver transparente —motas rosas en las
+esquinas y detrás de los iconos, que Daniel cazó a la primera jugada— y ya
+está arreglado. Los iconos decorativos están en la banda izquierda, colgando
+desde abajo para no chocar con las reliquias (arriba). El reloj de la barra de
+tareas tiene ya su propia bandeja hundida, aunque el sprite de esa bandeja
+sigue siendo un `draw_rect` de apaño.
 
-Las dos pegas que salió a pedir Daniel resultaron ser **la misma avería, dos
-veces: información que estaba y no se leía.** Ninguna necesitó tocar la
-simulación.
-
-1. **El platillo** ya devolvía ~6 s de reloj y él hizo un run entero sin
-   enterarse: el "+6 s" salía abajo en el platillo y la barra del reloj
-   estaba arriba y sin etiquetar. Ahora la barra dice "ATAQUE EN Ns"
-   siempre, y al robar tiempo se enciende en arcano con el "+N s" al lado.
-   De paso vuelve la pista de atrapar, quitada cuando la cuna no alcanzaba.
-2. **El mapa** ya decía enemigo, vida y tipo de nodo, en textitos de 9 px
-   junto a los doce nodos a la vez. Ahora cada nodo es el **retrato del
-   enemigo** (los sprites ya estaban en `assets/enemigos/`) y abajo hay una
-   **ficha grande solo del nodo marcado**: retrato a 96, tipo, nombre, pv y
-   lo que pega. Sin línea de recompensa, porque hasta la Fase 4 ganar no da
-   nada y prometerlo sería mentir.
+**Sin conectar todavía, aunque ya están recortados:** cursor, barra de
+progreso del reloj enemigo, marco de diálogo, tooltip nuevo —
+`assets/ui/cursor`, `assets/ui/progreso`, `assets/ui/dialogo`,
+`assets/ui/tooltip`. Y una segunda tanda de prompts, pedida por Daniel y
+todavía sin generar: fondos que se "buguean" en variantes por acto (no una
+imagen fija, sino dos o tres fallos distintos que se sortean) y piezas
+pequeñas de bandeja de sistema (sprite del reloj, separador, altavoz, icono de
+sin-red) — sección 2 de `assets/prompts_cascara.md`.
 
 ## Hecho
 
@@ -85,6 +82,12 @@ simulación.
   y rápida a la pala contraria (el pago grande se paga con un retorno difícil)
   y el platillo atrasa el reloj, que es el único tiro que no paga en daño.
   Cerrar un banco ya suena distinto de abatir un target
+- **Fase 3** (cerrada la sesión anterior, confirmada jugando) reloj del enemigo,
+  identidad de los seis tiros, mapa del run, y la tabla de enemigos rehecha con
+  `tests/medir_balance.gd`. Lo que salió de ahí y hay que recordar: el coste de
+  un combate es `bolas × drenaje + relojes × ataque`, escalar vida no cierra la
+  brecha entre jugadores, y la causa real era un escalón de reloj más gordo que
+  la diferencia que pretendía medir
 - **Fase 3C** mapa del run generado: tres actos, ramas, un jefe cerrando cada
   acto, descanso en la penúltima fila, y la vida que NO se cura entre
   combates, que es lo que hace que elegir rama importe. Pantalla de mapa
@@ -105,46 +108,76 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `friccion_flipper` | 0,30 | Cuánto desvía la goma la bola al rozarla |
 | `velocidad_rebote_minima` | 55 | Frontera entre impacto y bola apoyada |
 | `target_canto` | 8 | Cuánto sobresale el target al campo |
-| `reloj_carga` | **9 s** | **El dial de 3A, y hay que volver a probarlo con las manos.** Pega el doble de veces la mitad de fuerte |
-| `reloj_aviso` | 2 s | Tiene que caber holgado dentro de la carga |
+| `reloj_carga` | 9 s | Solo de reserva: ahora cada enemigo trae el suyo en `data/enemigos.json` |
+| `reloj_aviso` | 1,5 s | Tiene que caber holgado dentro de la carga: los relojes empiezan en 6 s |
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
 | `platillo_atrasa_reloj` | 0,35 | Se mide en fracción de barra, no en segundos: ahora son ~3 s |
 | `dano_rampa_fuerte` | 78 | Lo que paga el cañón por ese retorno difícil |
-| `vida_jugador` | 180 | Escala ×3 para que los ataques tengan resolución |
 | `curacion_descanso` | 0,30 | Si descansar es siempre obvio, bájalo |
 | `filas_por_acto` | 4 | Largo del run. 4 y 3 actos = 12-15 combates |
-| `factor_vida_elite` | 1,35 | Cuánto más duro es un élite |
+| `factor_vida_elite` | 1,25 | Cuánto más duro es un élite |
+| `casillas_ruleta` | 8 | Lo que se ve girando. Solo la primera es el premio |
+| `repeticiones_ruleta` | 1 | Con 0 la build se decide a suertes; con 2+ vuelve a ser un menú |
+| `vida_jugador` | **1080** | ×6 por resolución al alargar los combates |
+| `reloj` (por enemigo) | 6-10 s | El dial de cuánto APRIETA cada uno, aparte de cuánto dura |
+| vida de enemigo | 1250-3220 | **Aritmética, no medida.** El dial de cuánto DURA el combate |
+| `prob_critico` | 0,06 | Cuántos críticos salen. Las reliquias lo suben |
+| `factor_critico` | 2,0 | Por cuánto multiplica un crítico |
+| `golpes_tramo_extra` | 12 | Lo que pide el tramo que añade una reliquia. Menos y el x5 sale regalado |
 
 **Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
 ## Que pruebe Daniel
 
-**Primero, la batería** (no se ha lanzado desde los cambios del HUD; el
-sandbox no llega a Godot, solo al repo):
+**Primero la batería, que nada de esto se ha ejecutado:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-A. **El platillo, que es lo único que cambió.** Métele la bola. ¿Ves ahora
-   que lo que te devuelve es tiempo, y de qué contador? Si sigue sin
-   quedar claro, el siguiente paso NO es subir el dial: es enseñarlo la
-   primera vez, con un cartel durante los 0,9 s de captura.
-B. **La franja de arriba creció de 58 a 70 px** para que el reloj tenga su
-   fila con etiqueta. ¿Come mesa? ¿Tapa algo de la parte de arriba?
-C. **La pista de atrapar** sale las tres primeras veces. ¿Sobra, o llega
-   tarde?
-E. **EL RELOJ DE 9 SEGUNDOS, que es lo único importante de probar.** Está
-   medido que la presión por segundo no cambia, pero eso no dice cómo se
-   siente: ahora es presión continua en vez de un mazazo cada 18 s. ¿Sigue
-   siendo una carrera o se ha vuelto ruido de fondo? Y el aviso de 2 s, ¿avisa
-   o agobia? Si falla, el dial es `reloj_carga`.
-F. **¿Aguantas el run?** Está medido que un jugador medio acaba 2 de cada 5.
-   Si mueres siempre, dime en qué acto: la fila `1.20 / 0.85` del barrido da
-   los mismos resultados con combates más largos.
-D. **El mapa nuevo, que es lo que cierra 3C.** ¿Ahora eliges rama de verdad,
-   mirando quién hay y con cuánta vida llegas? Mira sobre todo: si los nodos
-   a 24 px se distinguen unos de otros, si la ficha de 118 px de alto come
-   demasiado sitio a las ramas, y si echas de menos ver la ficha de un nodo
-   que NO sea el marcado.
+**Y luego juega un run y DIME DOS NÚMEROS.** Al acabar (ganes o pierdas) la
+pantalla enseña *tu daño por bola* y *tu combate medio*. Con esos dos la tabla
+de enemigos se escribe exacta, sin modelos y sin volver a fallar. Es lo más
+útil que puedes darme ahora mismo, más que cualquier impresión.
+
+A. **LAS MISIONES, que es lo nuevo y lo que hay que juzgar.** ¿La tele te dice
+   con claridad qué toca? ¿Te descubres yendo a por un tiro concreto porque lo
+   pide la misión? Si te da igual lo que ponga y sigues dando tumbos, la misión
+   no está hecha para leerse mientras juegas y hay que agrandarla o simplificarla.
+B. **¿Las casillas de progreso se leen de reojo?** Son la fila de cuadraditos de
+   abajo de la tele. Un "2/3" en letra pequeña no se lee persiguiendo una bola;
+   la apuesta es que tres cuadraditos sí.
+C. **La ruleta a mitad de combate.** Ahora la bola se queda congelada donde
+   estaba y luego sigue. ¿Desorienta al reanudar, o se agradece la pausa? Es lo
+   que pediste y es lo que menos claro tengo.
+D. **Las misiones "sin drenar".** Al perder la bola sale "MISIÓN PERDIDA". ¿Se
+   entiende que era por eso, o parece un castigo de la nada?
+E. **¿Sigues muriendo pronto?** Si sí, dime en qué combate y con cuánta vida
+   llegabas, y con los dos números de arriba lo dejo cuadrado.
+F. **¿Se hacen largos los combates ahora que hay misión dentro?** Esa es la
+   apuesta entera de la sesión.
+G. **Los números de daño.** ¿Se leen sin dejar de mirar la bola? ¿El tamaño
+   distingue de verdad un bumper de un cañón? Si saturan la pantalla, el dial es
+   el rango 10-22 px de `_numero_de_dano` en `render/vista_mesa.gd`.
+I. **LA FUENTE, que es lo de esta sesión.** ¿Se lee bien a 8 px? Es la parte
+   que más puede fallar: una fuente de 5×7 es legible o no lo es, y eso no lo
+   dice ninguna prueba. Si alguna letra se confunde con otra, dime cuáles: se
+   arreglan en `fuente.py`, que las tiene escritas como dibujos de texto.
+I2. **La cáscara con los marcos nuevos.** Ahora la mesa es una ventana con barra
+   de título y un marco de 8 px, en vez de 47 px de piedra descuadrada. ¿Se
+   entiende la broma de un vistazo? Ese es el criterio de salida de la fase.
+J. **Los iconos de reliquia, pasando el ratón por encima.** ¿El tooltip llega a
+   tiempo y dice algo útil? Y lo importante: **¿se ve encenderse y apagarse un
+   icono condicional** cuando cruzas su umbral en mitad de un combate?
+K. **La pantalla de TILT.** ¿Da ganas de volver a intentarlo? Ahí salen los dos
+   números que necesito.
+L. **EL ARTE NUEVO DE LA CÁSCARA, que es lo de esta sesión.** Ventana, barra de
+   título, barra de tareas, botón Inicio, iconos del escritorio. ¿Ahora sí
+   parece un sistema operativo, y sin motas rosas en ninguna esquina? Y el
+   pendiente de siempre: ¿la ventana del pinball cuadra en tu portátil, o
+   sigue desbordando?
+H. **Los críticos.** 6 % de base, ×2. ¿Salen lo bastante como para notarlos y lo
+   bastante poco como para que sigan siendo un premio? Diales: `prob_critico` y
+   `factor_critico`. Si te parece que el daño se ha vuelto aleatorio, es que la
+   probabilidad es demasiado alta o el cartel no se lee.
 
 Lo de abajo es lo que sigue sin comprobar (lo ya contestado se ha borrado:
 cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
@@ -182,11 +215,20 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 
 ## Siguiente
 
-1. **Jugar el reloj de 9 s.** Es lo único de la sesión que ninguna medida
-   puede validar, y es el dial que ya habías aprobado con las manos a 18
-2. **Fase 4, reliquias.** Quince, cubriendo los cinco ejes y seis ganchos. Con
-   ellas el descanso por fin compite con algo y el run deja de ser solo
-   desgaste, que era la queja de Daniel al empezar la sesión
+1. **La batería, y un run tuyo para sacar los dos números.** Sigue siendo lo que
+   más falta hace: la tabla de enemigos lleva tres versiones escritas a ojo
+2. **Conectar lo ya recortado:** cursor, barra de progreso del reloj enemigo,
+   marco de diálogo, tooltip nuevo
+3. **Generar la segunda tanda de `assets/prompts_cascara.md`** (fondos
+   bugueados por acto, bandeja de sistema) cuando Daniel confirme cuántas
+   variantes quiere por acto
+4. **Lo que le queda a la Fase 5:** el HUD sigue encima de la mesa (el apaño de
+   la Fase 1 que no se ha caído), el enemigo sigue en el tablero en vez de en su
+   panel, y el mapa todavía no es un explorador de carpetas
+5. **Los 27 iconos de reliquia**, con los prompts de `assets/prompts_reliquias.md`.
+   Ahora se ven en tres sitios —tele, escritorio y tooltip—, así que faltan más
+6. **Fase 6 si los combates aburren.** Un enemigo de tres minutos que solo tiene
+   vida es un saco; las misiones lo tapan a medias
 
 ## Mediciones
 
@@ -260,9 +302,41 @@ de geometría fina y se hace jugando, no midiendo.
   con 1,8× de vida y "mayor" en el nombre. Eso NO cumple `DISEÑO.md` §8: un
   enemigo con más vida no es un enemigo nuevo. Los jefes de verdad, con sus
   fases y los sprites de `assets/jefes/`, son Fase 6.
-- **Sin reliquias, el descanso no compite con nada.** `DISEÑO.md` §9 dice que
-  la tensión está en elegir entre curarte y mejorar; hasta la Fase 4 solo
-  existe curarte, así que ese nodo todavía no decide nada.
+- **La recompensa sale del combate, no del mapa.** El nodo del mapa sigue sin
+  decir qué te va a dar, porque hasta que haya chatarra y tienda (Fases 4 y 6)
+  todos los combates dan lo mismo: tres reliquias al azar. Cuando un nodo pueda
+  dar cosas distintas, la línea de recompensa entra en la ficha del mapa, que ya
+  tiene el hueco previsto.
+- **El eje de escalado se paga por victorias, no por tiempo.** `bolsa.victorias`
+  lo lleva `Run` y sube solo al ganar un combate: un descanso no cuenta, o
+  descansar daría poder además de vida.
+- **27 de las 45 reliquias no tienen icono**, y ninguna tiene sonido propio:
+  quedarse una suena con el arpegio del combo, que es un préstamo. Los prompts
+  para el arte que falta están en `assets/prompts_reliquias.md`.
+- **Las misiones son 14 y se ven casi todas en un run.** Con tres por combate y
+  doce combates ves 36 tiradas de un cajón de 14: se repiten. Ampliar es barato
+  —una fila de JSON— pero hay que hacerlo.
+- **Una misión puede quedar imposible en una mesa concreta.** Si pide tres
+  platillos y el platillo es el tiro más difícil de la mesa, esa escalera se
+  atasca ahí y el jugador se queda sin las dos siguientes. No hay tiempo límite
+  ni forma de saltarla a propósito: si esto molesta, lo que falta es poder
+  cambiar de misión con un tiro, no bajarles la exigencia.
+- **La duración larga puede destapar que los enemigos son sacos.** Con combates
+  de 25 s daba igual que un enemigo solo tuviera vida y un ataque; con tres
+  minutos, no. `DISEÑO.md` §11 tiene los seis comportamientos que hacen falta
+  (bloquear un recorrido, curarse, reflejar, blindaje, castigar el combo,
+  acelerar el reloj) y son Fase 6. Si Daniel dice que se hace largo, el orden
+  del plan cambia: la Fase 6 sube antes que la cáscara.
+- **La tele se come sitio en el hueco entre palas.** No es física, pero sí es
+  arte: 184×124 px justo encima de los flippers, por donde pasa la bola
+  constantemente. Si estorba visualmente, se encoge o se sube, pero tiene que
+  seguir dentro del encuadre con la cámara anclada abajo.
+- **Las reliquias no se ven durante el combate.** Sabes lo que llevas en el mapa
+  y en la pantalla de recompensa, pero no mientras juegas, así que una
+  condicional que se enciende y se apaga —"por debajo del 30% de vida"— no
+  avisa de que acaba de encenderse. Es exactamente la avería del platillo
+  esperando a pasar otra vez, y el sitio donde se arregla es la Fase 5: las
+  reliquias son iconos del escritorio y un icono puede encenderse.
 - **La bola no tiene giro.** No hay spin simulado, así que no hay efecto ni
   bola que "muerda" en un ángulo. La rodadura es la aproximación barata a eso
   y aguanta bien; si en algún momento se quiere una física que destaque de

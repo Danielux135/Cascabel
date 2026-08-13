@@ -8,6 +8,19 @@ extends RefCounted
 ## Se ve el 41 % de la mesa (antes el 28 %) y quedan 560 px de escritorio a los
 ## lados, que es el sitio donde la fase 5 pone las ventanas. La mesa sigue
 ## midiendo 400 unidades de ancho: la física no cambia nada.
+##
+## OJO, ESTO NO ES UNA CONSTANTE: `VistaMesa` lo REESCRIBE con el tamaño real
+## del viewport al arrancar y cada vez que cambia la ventana.
+##
+## El porqué, que es el fallo de "no me cuadra en el portátil": el proyecto está
+## en `stretch/aspect = expand`, así que en una pantalla que no da 16:9 exacto el
+## viewport CRECE y se ve más juego, no barras negras. Con estos dos números
+## clavados en 960x540, la cáscara medía contra el viewport de verdad y el HUD,
+## el mapa y la cámara medían contra 960x540: dos sistemas de coordenadas
+## distintos para la misma pantalla, y todo desalineado por la diferencia.
+##
+## Los 960x540 se quedan como valor de partida porque son las proporciones con
+## las que está diseñado todo y porque las pruebas headless no tienen ventana.
 var ancho_visible: float = 960.0
 var alto_visible: float = 540.0
 

@@ -1,0 +1,547 @@
+{
+  "_nota": "Cuarenta y cinco reliquias, nueve por eje (DISENO.md §8). Las claves de 'efectos' las interpreta sim/bolsa_reliquias.gd por su prefijo: suma_ se suma, factor_ se multiplica, bandera_ basta con una, y el sufijo _por_victoria las aplica una vez por combate ganado. 'cuando' + 'umbral' apagan y encienden la reliquia segun el estado del combate: las palabras validas estan en BolsaReliquias.CONDICIONES y hay una prueba que lo comprueba, porque un 'cuando' mal escrito apagaria la reliquia para siempre sin dar error.",
+  "_por_que_45_y_no_15": "El plan decia quince. Con tres ofrecidas por combate y doce combates ves ~36, o sea que con quince las veias TODAS y dos runs se parecian. Con cuarenta y cinco, cada run ensena la mitad del cajon y la siguiente partida trae otra cosa. La cifra que importa no es cuantas hay, es cuantas NO ves.",
+  "reliquias": [
+    {
+      "id": "cascabel_de_plata",
+      "nombre": "Cascabel de plata",
+      "eje": "combo",
+      "rareza": "arcana",
+      "gancho": "al golpear",
+      "icono": "llave_campana",
+      "texto": "Bumpers y giradores cobran del multiplicador, pero pegan la mitad.",
+      "efectos": {
+        "bandera_relleno_escala": true,
+        "factor_dano_relleno": 0.5
+      }
+    },
+    {
+      "id": "muelle_tenso",
+      "nombre": "Muelle tenso",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "al subir de tramo",
+      "icono": "muelle_oxidado",
+      "texto": "Cada tramo del multiplicador llega dos golpes antes.",
+      "efectos": {
+        "suma_adelanto_tramo": 2
+      }
+    },
+    {
+      "id": "cuerda_de_mas",
+      "nombre": "Cuerda de mas",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "al subir de tramo",
+      "icono": "cuerda_gancho",
+      "texto": "Hay un tramo mas de multiplicador por encima del ultimo.",
+      "efectos": {
+        "suma_tramos_extra": 1
+      }
+    },
+    {
+      "id": "arranque_en_caliente",
+      "nombre": "Arranque en caliente",
+      "eje": "combo",
+      "rareza": "rara",
+      "gancho": "al empezar la bola",
+      "texto": "Cada bola nueva te llega con cinco golpes de combo ya puestos.",
+      "efectos": {
+        "suma_golpes_inicio": 5
+      }
+    },
+    {
+      "id": "nudo_corredizo",
+      "nombre": "Nudo corredizo",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "al drenar",
+      "texto": "Drenar ya no te tira el multiplicador entero: conservas la mitad.",
+      "efectos": {
+        "suma_golpes_conservados": 0.5
+      }
+    },
+    {
+      "id": "tren_de_engranajes",
+      "nombre": "Tren de engranajes",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "al completar un recorrido",
+      "texto": "Completar cualquier recorrido cuenta como tres golpes mas de combo.",
+      "efectos": {
+        "suma_golpes_por_recorrido": 3
+      }
+    },
+    {
+      "id": "fila_cerrada",
+      "nombre": "Fila cerrada",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "al agotar un banco",
+      "icono": "clavos",
+      "texto": "Cerrar un banco entero suma cinco golpes de combo.",
+      "efectos": {
+        "suma_golpes_banco": 5
+      }
+    },
+    {
+      "id": "metronomo",
+      "nombre": "Metronomo",
+      "eje": "combo",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "combo_alto",
+      "umbral": 3,
+      "texto": "Mientras vayas por x3 o mas, todo tu dano sube un tercio.",
+      "efectos": {
+        "factor_dano_global": 1.35
+      }
+    },
+    {
+      "id": "carrete_de_seda",
+      "nombre": "Carrete de seda",
+      "eje": "combo",
+      "rareza": "comun",
+      "gancho": "pasivo condicional",
+      "cuando": "sin_drenar",
+      "texto": "Mientras no drenes en este combate, cada target le roba reloj al enemigo.",
+      "efectos": {
+        "suma_robo_reloj_target": 0.06
+      }
+    },
+    {
+      "id": "culata_reforzada",
+      "nombre": "Culata reforzada",
+      "eje": "golpe unico",
+      "rareza": "rara",
+      "gancho": "al completar un recorrido",
+      "icono": "guante_hierro",
+      "texto": "El canon pega un 60% mas.",
+      "efectos": {
+        "factor_dano_canon": 1.6
+      }
+    },
+    {
+      "id": "punteria_fria",
+      "nombre": "Punteria fria",
+      "eje": "golpe unico",
+      "rareza": "comun",
+      "gancho": "al agotar un banco",
+      "texto": "Cerrar un banco entero paga el doble.",
+      "efectos": {
+        "factor_dano_banco": 2.0
+      }
+    },
+    {
+      "id": "cerrojo",
+      "nombre": "Cerrojo",
+      "eje": "golpe unico",
+      "rareza": "rara",
+      "gancho": "al empezar la bola",
+      "icono": "flipper_laton",
+      "texto": "El primer golpe de cada bola pega el triple.",
+      "efectos": {
+        "factor_primer_golpe": 3.0
+      }
+    },
+    {
+      "id": "mira_de_bronce",
+      "nombre": "Mira de bronce",
+      "eje": "golpe unico",
+      "rareza": "comun",
+      "gancho": "al golpear un target",
+      "texto": "Cada target pega 12 mas, antes del multiplicador.",
+      "efectos": {
+        "suma_dano_target": 12
+      }
+    },
+    {
+      "id": "carga_hueca",
+      "nombre": "Carga hueca",
+      "eje": "golpe unico",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "enemigo_intacto",
+      "umbral": 0.6,
+      "texto": "Mientras al enemigo le quede mas del 60% de vida, el canon pega el doble.",
+      "efectos": {
+        "factor_dano_canon": 2.2
+      }
+    },
+    {
+      "id": "remate",
+      "nombre": "Remate",
+      "eje": "golpe unico",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "enemigo_tocado",
+      "umbral": 0.4,
+      "icono": "craneo_rata",
+      "texto": "Con el enemigo por debajo del 40%, todo tu dano sube un 40%.",
+      "efectos": {
+        "factor_dano_global": 1.4
+      }
+    },
+    {
+      "id": "via_unica",
+      "nombre": "Via unica",
+      "eje": "golpe unico",
+      "rareza": "arcana",
+      "gancho": "al completar un recorrido",
+      "texto": "Los recorridos pegan la mitad mas; el racimo pega mucho menos.",
+      "efectos": {
+        "factor_dano_recorrido": 1.5,
+        "factor_dano_relleno": 0.4
+      }
+    },
+    {
+      "id": "orbita_lastrada",
+      "nombre": "Orbita lastrada",
+      "eje": "golpe unico",
+      "rareza": "rara",
+      "gancho": "al completar un recorrido",
+      "icono": "bola_runica",
+      "texto": "La orbita, que pagaba en multiplicador, pasa a pegar el triple.",
+      "efectos": {
+        "factor_dano_orbita": 3.0
+      }
+    },
+    {
+      "id": "yunque_de_retorno",
+      "nombre": "Yunque de retorno",
+      "eje": "golpe unico",
+      "rareza": "comun",
+      "gancho": "al completar un recorrido",
+      "icono": "yunque_cadenas",
+      "texto": "Los carriles de retorno pegan dos veces y media.",
+      "efectos": {
+        "factor_dano_retorno": 2.5
+      }
+    },
+    {
+      "id": "gomas_nuevas",
+      "nombre": "Gomas nuevas",
+      "eje": "supervivencia",
+      "rareza": "comun",
+      "gancho": "al drenar",
+      "texto": "Drenar cuesta la mitad de vida.",
+      "efectos": {
+        "factor_drenaje": 0.5
+      }
+    },
+    {
+      "id": "rutina_de_reparacion",
+      "nombre": "Rutina de reparacion",
+      "eje": "supervivencia",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "icono": "taza",
+      "texto": "Ganar un combate te devuelve el 8% de la vida.",
+      "efectos": {
+        "suma_curacion_al_matar": 0.08
+      }
+    },
+    {
+      "id": "placa_termica",
+      "nombre": "Placa termica",
+      "eje": "supervivencia",
+      "rareza": "rara",
+      "gancho": "pasivo",
+      "icono": "reloj_arena",
+      "texto": "El reloj del enemigo carga un 15% mas despacio.",
+      "efectos": {
+        "factor_carga_reloj": 0.85
+      }
+    },
+    {
+      "id": "chapa_remachada",
+      "nombre": "Chapa remachada",
+      "eje": "supervivencia",
+      "rareza": "comun",
+      "gancho": "pasivo",
+      "texto": "180 de vida maxima, y te la da puesta.",
+      "efectos": {
+        "suma_vida_maxima": 180
+      }
+    },
+    {
+      "id": "amortiguador",
+      "nombre": "Amortiguador",
+      "eje": "supervivencia",
+      "rareza": "rara",
+      "gancho": "pasivo",
+      "texto": "Todo lo que te pega el enemigo pega un cuarto menos.",
+      "efectos": {
+        "factor_ataque_enemigo": 0.75
+      }
+    },
+    {
+      "id": "valvula_de_purga",
+      "nombre": "Valvula de purga",
+      "eje": "supervivencia",
+      "rareza": "comun",
+      "gancho": "al completar un recorrido",
+      "texto": "Cada recorrido completado te cura 30.",
+      "efectos": {
+        "suma_vida_por_recorrido": 30
+      }
+    },
+    {
+      "id": "modo_seguro",
+      "nombre": "Modo seguro",
+      "eje": "supervivencia",
+      "rareza": "arcana",
+      "gancho": "pasivo condicional",
+      "cuando": "vida_baja",
+      "umbral": 0.3,
+      "icono": "vial_violeta",
+      "texto": "Por debajo del 30% de vida, todo lo que te pega duele mucho menos.",
+      "efectos": {
+        "factor_ataque_enemigo": 0.45,
+        "factor_drenaje": 0.45
+      }
+    },
+    {
+      "id": "arranque_en_frio",
+      "nombre": "Arranque en frio",
+      "eje": "supervivencia",
+      "rareza": "rara",
+      "gancho": "al entrar en combate",
+      "icono": "farol",
+      "texto": "Cada combate empieza con el reloj del enemigo atrasado un tercio.",
+      "efectos": {
+        "suma_reloj_inicial": -0.35
+      }
+    },
+    {
+      "id": "cuna_acolchada",
+      "nombre": "Cuna acolchada",
+      "eje": "supervivencia",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "reloj_cargado",
+      "umbral": 0.66,
+      "texto": "El ultimo tercio del reloj corre mucho mas lento: te da tiempo a llegar.",
+      "efectos": {
+        "factor_carga_reloj": 0.55
+      }
+    },
+    {
+      "id": "registro_creciente",
+      "nombre": "Registro creciente",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "icono": "pergamino",
+      "texto": "Los targets pegan 6 mas por cada combate ganado.",
+      "efectos": {
+        "suma_dano_target_por_victoria": 6
+      }
+    },
+    {
+      "id": "interes_compuesto",
+      "nombre": "Interes compuesto",
+      "eje": "escalado",
+      "rareza": "arcana",
+      "gancho": "al matar",
+      "icono": "carta_lacrada",
+      "texto": "Todo tu dano sube un 5% por cada combate ganado.",
+      "efectos": {
+        "factor_dano_global_por_victoria": 0.05
+      }
+    },
+    {
+      "id": "memoria_reservada",
+      "nombre": "Memoria reservada",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "texto": "36 de vida maxima por cada combate ganado, y te la lleva puesta.",
+      "efectos": {
+        "suma_vida_maxima_por_victoria": 36
+      }
+    },
+    {
+      "id": "cache_caliente",
+      "nombre": "Cache caliente",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "texto": "Cada combate ganado suma un golpe al combo con el que te llega la bola.",
+      "efectos": {
+        "suma_golpes_inicio_por_victoria": 1
+      }
+    },
+    {
+      "id": "bobina_enfriada",
+      "nombre": "Bobina enfriada",
+      "eje": "escalado",
+      "rareza": "rara",
+      "gancho": "al matar",
+      "texto": "El reloj del enemigo carga un 2% mas lento por cada combate ganado.",
+      "efectos": {
+        "factor_carga_reloj_por_victoria": -0.02
+      }
+    },
+    {
+      "id": "deuda_tecnica",
+      "nombre": "Deuda tecnica",
+      "eje": "escalado",
+      "rareza": "arcana",
+      "gancho": "pasivo",
+      "texto": "Pegas un 60% mas desde ya, pero el reloj se acelera un 3% por combate ganado.",
+      "efectos": {
+        "factor_dano_global": 1.6,
+        "factor_carga_reloj_por_victoria": 0.03
+      }
+    },
+    {
+      "id": "desfragmentacion",
+      "nombre": "Desfragmentacion",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "texto": "Cada combate ganado te cura un 2% mas al ganar el siguiente.",
+      "efectos": {
+        "suma_curacion_al_matar_por_victoria": 0.02
+      }
+    },
+    {
+      "id": "indice_invertido",
+      "nombre": "Indice invertido",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "texto": "Cerrar un banco paga 12 mas por cada combate ganado.",
+      "efectos": {
+        "suma_dano_banco_por_victoria": 12
+      }
+    },
+    {
+      "id": "presupuesto",
+      "nombre": "Presupuesto",
+      "eje": "escalado",
+      "rareza": "comun",
+      "gancho": "al matar",
+      "icono": "moneda_goblin",
+      "texto": "Cada combate ganado suma un 2% de probabilidad de critico.",
+      "efectos": {
+        "suma_prob_critico_por_victoria": 0.02
+      }
+    },
+    {
+      "id": "excepcion_no_capturada",
+      "nombre": "Excepcion no capturada",
+      "eje": "caos",
+      "rareza": "comun",
+      "gancho": "pasivo",
+      "texto": "Un 12% mas de probabilidad de critico. Los criticos pegan el doble.",
+      "efectos": {
+        "suma_prob_critico": 0.12
+      }
+    },
+    {
+      "id": "copia_de_seguridad",
+      "nombre": "Copia de seguridad",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "al drenar",
+      "texto": "El primer drenaje de cada combate no cuesta vida ni multiplicador.",
+      "efectos": {
+        "bandera_red_de_seguridad": true
+      }
+    },
+    {
+      "id": "reloj_descacharrado",
+      "nombre": "Reloj descacharrado",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "al completar un recorrido",
+      "icono": "reloj_roto",
+      "texto": "El platillo roba el doble de reloj, pero el reloj carga un 10% mas rapido.",
+      "efectos": {
+        "factor_platillo": 2.0,
+        "factor_carga_reloj": 1.1
+      }
+    },
+    {
+      "id": "cuerda_floja",
+      "nombre": "Cuerda floja",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "sin_combo",
+      "icono": "vela",
+      "texto": "Mientras vayas a x1, pegas el doble. En cuanto encadenas, se apaga.",
+      "efectos": {
+        "factor_dano_global": 2.0
+      }
+    },
+    {
+      "id": "sobrecarga",
+      "nombre": "Sobrecarga",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "pasivo condicional",
+      "cuando": "vida_alta",
+      "umbral": 0.8,
+      "texto": "Por encima del 80% de vida pegas casi el doble, y a ti te pegan la mitad mas.",
+      "efectos": {
+        "factor_dano_global": 1.8,
+        "factor_ataque_enemigo": 1.5
+      }
+    },
+    {
+      "id": "desbordamiento",
+      "nombre": "Desbordamiento",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "combo_alto",
+      "umbral": 4,
+      "texto": "Con el multiplicador a tope, uno de cada cuatro golpes es critico.",
+      "efectos": {
+        "suma_prob_critico": 0.25
+      }
+    },
+    {
+      "id": "puntero_colgante",
+      "nombre": "Puntero colgante",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "al drenar",
+      "texto": "Pegas la mitad mas, y drenar duele el doble.",
+      "efectos": {
+        "factor_dano_global": 1.5,
+        "factor_drenaje": 2.0
+      }
+    },
+    {
+      "id": "bucle_infinito",
+      "nombre": "Bucle infinito",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "pasivo condicional",
+      "cuando": "reloj_frio",
+      "umbral": 0.33,
+      "texto": "Justo despues de que el enemigo pegue, mientras su reloj esta frio, pegas un 80% mas.",
+      "efectos": {
+        "factor_dano_global": 1.8
+      }
+    },
+    {
+      "id": "panico_del_kernel",
+      "nombre": "Panico del kernel",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "pasivo condicional",
+      "cuando": "vida_baja",
+      "umbral": 0.25,
+      "texto": "Por debajo del 25% de vida pegas dos veces y media.",
+      "efectos": {
+        "factor_dano_global": 2.5
+      }
+    }
+  ],
+  "_rarezas": "comun / rara / arcana. La rareza NO es cuanto sube un numero: es cuanto CAMBIA la partida. Una que da +12 de dano a los targets es comun aunque sume mucho; una que hace que el racimo cobre del multiplicador es arcana aunque el numero sea pequeno, porque te cambia a que tiro vas. Se reparte segun lo que diga tests/medir_reliquias.gd, no segun lo que parezca."
+}

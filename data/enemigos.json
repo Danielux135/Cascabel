@@ -1,16 +1,23 @@
 {
-  "_comentario": "Tabla salida de tests/medir_balance.gd, no de tantear. Fila elegida del barrido: vida 0,50 x ataque 0,80 x reloj partido en dos. En esa fila un jugador 'normal' acaba 2 de cada 3 runs y uno 'bueno' acaba siempre con ~40 de 60 de vida, que es el objetivo. Los numeros de aqui son esa fila llevada a la escala x3 de sim/parametros_combate.gd. El orden IMPORTA: sim/mapa.gd parte el catalogo en tercios y cada tercio es un acto, asi que los tres primeros son el acto I, los tres siguientes el II y los tres ultimos el III; hay una prueba que lo vigila. El ataque ya NO se cobra de una tacada: con el reloj en 9 s el enemigo pega el doble de veces la mitad de fuerte, y por eso estos ataques valen la mitad de lo que parecerian.",
+  "_comentario": "SEGUNDA CORRECCION, y la primera se llevo el run por delante. La tabla anterior salio de multiplicar la vida x14 con el modelo de tests/medir_balance.gd, y Daniel no pasaba del segundo combate. El fallo no fue la aritmetica: fue de quien se hizo la aritmetica. El perfil 'normal' del medidor hace 312 de dano por bola, y ese perfil NO es Daniel. Calibrar contra un jugador inventado y no contra el que juega es la misma averia de siempre: un dato correcto que mide otra cosa.",
+
+  "_lo_que_se_ha_hecho": "Vida entre 3 respecto de la tabla anterior, relojes entre ~1,7 y ataques entre ~5. El coste de un combate es tiempo/reloj x ataque + bolas x drenaje, o sea que dividir la vida por 3 divide el coste por 3, y bajar el ataque hace el resto. Sigue siendo ARITMETICA: lo que hay que hacer ahora es MEDIR A DANIEL. El HUD del mapa enseña su dano por bola real y la duracion media de sus combates; con esos dos numeros la tabla se escribe exacta en una pasada.",
+
+  "_por_que_cada_uno_lleva_su_reloj": "El coste crece con lo que dura el combate. Con un reloj unico, un enemigo del acto III duraba el doble y comia el doble de golpes, o sea que costaba cuatro veces mas sin que nadie lo hubiera decidido. Con el reloj propio se separan las dos cosas: LA VIDA DICE CUANTO DURA Y EL RELOJ DICE CUANTO APRIETA.",
+
+  "_orden": "El orden IMPORTA: sim/mapa.gd parte el catalogo en tercios y cada tercio es un acto. Hay una prueba que lo vigila, y otra que comprueba que el reloj crece con la vida.",
+
   "enemigos": [
-    { "id": "rata",                "nombre": "Rata",               "vida": 225, "ataque": 6,  "sprite": "res://assets/enemigos/rata.png" },
-    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 285, "ataque": 7,  "sprite": "res://assets/enemigos/limo_moneda.png" },
-    { "id": "goblin_carroniero",   "nombre": "Goblin carronero",   "vida": 345, "ataque": 7,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
+    { "id": "rata",                "nombre": "Rata",               "vida": 1250, "ataque": 9,  "reloj": 6.0,  "sprite": "res://assets/enemigos/rata.png" },
+    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 1460, "ataque": 10, "reloj": 6.5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
+    { "id": "goblin_carroniero",   "nombre": "Goblin carroñero",   "vida": 1670, "ataque": 11, "reloj": 7.0,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
 
-    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 405, "ataque": 10, "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
-    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 435, "ataque": 8,  "sprite": "res://assets/enemigos/esqueleto.png" },
-    { "id": "cultista",            "nombre": "Cultista",           "vida": 465, "ataque": 8,  "sprite": "res://assets/enemigos/cultista.png" },
+    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 1870, "ataque": 14, "reloj": 7.5,  "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
+    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 2080, "ataque": 12, "reloj": 8.0,  "sprite": "res://assets/enemigos/esqueleto.png" },
+    { "id": "cultista",            "nombre": "Cultista",           "vida": 2290, "ataque": 12, "reloj": 8.5,  "sprite": "res://assets/enemigos/cultista.png" },
 
-    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 570, "ataque": 11, "sprite": "res://assets/enemigos/goblin_bruto.png" },
-    { "id": "armadura_vacia",      "nombre": "Armadura vacia",     "vida": 615, "ataque": 12, "sprite": "res://assets/enemigos/armadura_vacia.png" },
-    { "id": "gargola",             "nombre": "Gargola",            "vida": 660, "ataque": 13, "sprite": "res://assets/enemigos/gargola.png" }
+    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 2600, "ataque": 13, "reloj": 9.0,  "sprite": "res://assets/enemigos/goblin_bruto.png" },
+    { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 2910, "ataque": 14, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" },
+    { "id": "gargola",             "nombre": "Gárgola",            "vida": 3220, "ataque": 16, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png" }
   ]
 }

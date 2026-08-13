@@ -20,7 +20,13 @@ extends RefCounted
 ## su identidad de pegar fuerte. El redondeo a entero estaba decidiendo el
 ## balance en vez del diseño. Con ×3 hay sitio para que cada enemigo tenga su
 ## número.
-var vida_jugador: int = 180
+## SUBE DE 180 A 1080 (x6) al alargar los combates a 2-5 minutos, y no es
+## inflar la barra: es resolución, la misma lección del x3 anterior. El coste de
+## un combate crece con lo que dura, así que con combates 14 veces más largos y
+## la vida en 180 los ataques de la tabla caían a 0,3 y el redondeo a entero
+## volvía a decidir el balance en vez del diseño. Con 1080 hay sitio para que
+## cada enemigo tenga su número otra vez.
+var vida_jugador: int = 1080
 
 # --- Daño base de cada golpe, antes del multiplicador ---
 ## OJO: estos valores están a la MITAD de los que había con el modelo anterior
@@ -44,6 +50,11 @@ var tramos_combo: Array = [
 	{"golpes": 10, "factor": 3},
 	{"golpes": 20, "factor": 4},
 ]
+## Cuántos golpes más pide cada tramo que añada una reliquia por encima del
+## último. 12 mantiene la progresión: los tramos van a 5, 10, 20, y el siguiente
+## a 32 golpes. Si fuera menos, la reliquia del tramo extra sería un x5 casi
+## regalado y se comería a las otras dos del eje de combo.
+var golpes_tramo_extra: int = 12
 
 # --- El reloj del enemigo ---
 ## `DISEÑO.md` §2. El enemigo pega por reloj, drenes o no. Es lo que mueve la
@@ -77,7 +88,9 @@ var reloj_carga: float = 9.0
 ## aviso el golpe llega de la nada y se lee como injusto. Baja a 2 porque tiene
 ## que caber holgado dentro de la carga: con 3 sobre 9 estaría avisando un
 ## tercio del tiempo y el aviso dejaría de significar nada.
-var reloj_aviso: float = 2.0
+## Baja a 1,5 porque los relojes de los enemigos empiezan en 6 s: con 2 sobre 6
+## el aviso ocupaba un tercio del reloj y dejaba de significar nada.
+var reloj_aviso: float = 1.5
 
 ## Cuánto pesa el contraataque por drenaje frente al del reloj. Drenar sigue
 ## costando vida —es invariante— pero ya no es la única presión, así que si
@@ -106,6 +119,19 @@ var pausa_ataque: float = 0.9    # enseñando el contraataque
 ## El girador: la bola lo atraviesa y lo hace girar. Cuenta como golpe, igual
 ## que un bumper, pero pega menos porque es mucho más fácil de encadenar.
 var dano_girador: int = 3
+
+# --- Críticos ---
+## Todo golpe puede salir crítico. Es de las cosas más baratas que se le pueden
+## poner a un juego de números: no cambia la media casi nada y cambia mucho cómo
+## SE SIENTE, porque de vez en cuando sale un número grande y eso se recuerda.
+##
+## La probabilidad base es pequeña a propósito: lo que la sube son las reliquias
+## (`suma_prob_critico`), y así el crítico es además un eje de build que se nota
+## sin tocar ningún otro número.
+var prob_critico: float = 0.06
+## Por cuánto multiplica. Dos es lo legible: un crítico tiene que reconocerse por
+## el tamaño del número sin leerlo.
+var factor_critico: float = 2.0
 
 ## Completar la órbita entera y sacar la bola del platillo. Pagan bien porque
 ## las dos hay que buscarlas: la órbita pide un tiro fuerte y limpio, y el

@@ -1,12 +1,15 @@
 class_name VistaMesa
 extends Node2D
 
-## Banco de pruebas del combate. Dibuja la simulación y la deja jugar.
+## La mesa: dibuja la simulación y la deja jugar, y coordina a todo lo demás.
 ##
-## OJO: esto NO es la cáscara del sistema operativo. No hay paneles enmarcados,
-## ni barra de tareas, ni mapa, ni reliquias. Solo la mesa, un enemigo y el bucle de un
-## combate hasta que uno de los dos muera. Las paredes, los flippers y los
-## targets se dibujan por código; bumpers, postes, bola y enemigo van con sprite.
+## Las capas, de atrás a delante: la cáscara (escritorio, barra de tareas,
+## iconos de reliquia) en −10, el suelo en −2, el enemigo en −1, la mesa aquí
+## en 0, la tele por encima cuando gira la ruleta, el HUD en 10, el mapa en 20 y
+## la pantalla de TILT en 40.
+##
+## Las paredes, los flippers y los targets se dibujan por código; bumpers,
+## postes, bola, enemigo y reliquias van con sprite.
 
 # Paleta cerrada: los hex viven en render/paleta.gd y en ningún sitio más.
 const C_CABINA      := Paleta.CABINA
@@ -34,7 +37,7 @@ const C_PIEDRA      := Paleta.PIEDRA
 ## Y no más abajo: con los flippers levantados las palas llegan a y=559 y se
 ## comían la línea de debajo del número.
 const COMBO_CENTRO := Vector2(200, 1120)
-const COMBO_TAMANO := 46
+const COMBO_TAMANO := 48
 const COMBO_ESTILO := {
 	1: {"col": C_TEXTO_TENUE, "alfa": 0.22},
 	2: {"col": C_ORO,         "alfa": 0.45},
@@ -128,12 +131,35 @@ const TAMANO_GIRADOR := 32
 
 var run: Run
 var _pantalla_mapa: NodoPantallaMapa
+## La tele de la mesa: enseña el multiplicador mientras juegas y la ruleta de la
+## recompensa cuando toca. Sustituye a la pantalla de "elige una de tres", que
+## sacaba de la mesa cada minuto y cansaba más de lo que aportaba.
+var tele: NodoTele
+## LA CÁSCARA: escritorio, barra de tareas, marco de la mesa y las reliquias
+## como iconos con tooltip. Sustituye a `NodoEscritorio`, que era solo el fondo.
+var cascara: NodoCascara
+## La pantalla azul de derrota. Es lo último que ve el jugador de un run, así
+## que es donde salen los dos números que hacen falta para cuadrar el balance.
+var tilt: NodoTilt
+var _catalogo_reliquias: Array[Reliquia] = []
+var _catalogo_misiones: Array[Mision] = []
+## Durante la ruleta la simulación está congelada y la cámara baja a la tele.
+## No es una pantalla aparte: es la misma mesa, quieta y oscurecida.
+var _en_ruleta := false
 ## Con el mapa delante la simulación no corre y las palas no responden: el
 ## combate está congelado esperando, no jugándose de fondo.
 var _en_mapa := false
 ## Combate resuelto, esperando que el jugador confirme para volver al mapa. Sin
 ## esto la pantalla de victoria duraría un fotograma.
 var _esperando_confirmacion := false
+## Al GANAR no se espera a que pulse nadie: se cuenta esto y se pasa solo a la
+## ruleta. Una tecla para cerrar una victoria es una parada más, y las paradas
+## son justo lo que sobraba. Al perder sí se espera: ahí se acaba el run y hay
+## que poder leerlo.
+var _espera_victoria: float = 0.0
+
+func en_ruleta() -> bool:
+	return _en_ruleta
 
 var _catalogo: Array = []
 var _depuracion := false
@@ -175,7 +201,7 @@ func _ready() -> void:
 	# El suelo se dibuja repitiendo la baldosa de 128x128, así que este
 	# CanvasItem tiene que permitir repetición de textura.
 	texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-	_fuente = ThemeDB.fallback_font
+	_fuente = FuenteUI.obtener()
 	_tex_bola = load("res://assets/mesa/bola.png")
 	_tex_poste = load("res://assets/mesa/poste_goma.png")
 	_tex_bumper = load("res://assets/mesa/bumper_gargola.png")
@@ -203,6 +229,12 @@ func _ready() -> void:
 	combate.enemigo_ataca.connect(_al_atacar_enemigo)
 	combate.reloj_avisa.connect(_al_avisar_reloj)
 	combate.reloj_atrasado.connect(_al_atrasar_reloj)
+	combate.mision_completada.connect(_al_completar_mision)
+	combate.mision_cambiada.connect(_al_cambiar_mision)
+	combate.mision_reiniciada.connect(_al_reiniciar_mision)
+	combate.golpe_critico.connect(_al_criticar)
+	combate.curado.connect(_al_curar)
+	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
 	_giro.resize(mesa.giradores.size())
@@ -211,7 +243,8 @@ func _ready() -> void:
 	impactos = Impactos.new(impacto)
 	_sonido = NodoSonido.new()
 	add_child(_sonido)
-	add_child(NodoEscritorio.new(cam, anim))
+	cascara = NodoCascara.new(self, cam, anim)
+	add_child(cascara)
 	_nodo_suelo = NodoSuelo.new(self)
 	add_child(_nodo_suelo)
 	_nodo_enemigo = NodoEnemigo.new(anim)
@@ -221,27 +254,92 @@ func _ready() -> void:
 	add_child(camara)
 	camara.make_current()
 	add_child(NodoHud.new(self, cam))
+	tilt = NodoTilt.new(self, cam)
+	add_child(tilt)
+
+	# EL TAMAÑO REAL DE LA PANTALLA, antes que nada. Con `aspect = expand` el
+	# viewport crece en una pantalla que no sea 16:9 exacto, y si `cam` se queda
+	# en 960x540 la cáscara mide contra el viewport de verdad mientras el HUD, el
+	# mapa y la cámara miden contra 960x540: dos sistemas de coordenadas para la
+	# misma pantalla, y todo desalineado por la diferencia.
+	_medir_pantalla()
+	get_viewport().size_changed.connect(_medir_pantalla)
 
 	_catalogo = CatalogoEnemigos.cargar()
 	if _catalogo.is_empty():
 		push_error("Sin enemigos en data/enemigos.json")
 		return
+	# Sin reliquias el run se juega igual, solo que sin ellas: un fichero que
+	# falte no puede tumbar la partida.
+	_catalogo_reliquias = CatalogoReliquias.cargar()
+	_catalogo_misiones = CatalogoMisiones.cargar()
 	_nuevo_run()
 
 # ------------------------------------------------------------------- el run
 
 func _nuevo_run() -> void:
-	run = Run.new(ParametrosRun.new(), combate.p, _catalogo)
+	run = Run.new(ParametrosRun.new(), combate.p, _catalogo,
+		int(Time.get_unix_time_from_system()), _catalogo_reliquias,
+		_catalogo_misiones)
+	# Las reliquias del run entran en el combate por aquí, y es el único sitio
+	# donde se cruzan las dos capas: `Combate` no sabe que existe un run.
+	combate.bolsa = run.bolsa
 	if _pantalla_mapa != null:
 		_pantalla_mapa.queue_free()
+	if tele != null:
+		tele.queue_free()
 	_pantalla_mapa = NodoPantallaMapa.new(run, cam)
 	add_child(_pantalla_mapa)
+	tele = NodoTele.new(self, run)
+	add_child(tele)
 	_volver_al_mapa()
 
 func _volver_al_mapa() -> void:
+	# Perder el run no lleva al mapa: lleva a la pantalla azul. Es la derrota de
+	# `DISEÑO.md` §3, y es donde se leen los números del run.
+	if run.terminada() and not run.victoria:
+		_en_mapa = true
+		_en_ruleta = false
+		_esperando_confirmacion = false
+		_pantalla_mapa.visible = false
+		tilt.visible = true
+		return
 	_en_mapa = true
+	_en_ruleta = false
 	_esperando_confirmacion = false
 	_pantalla_mapa.visible = true
+	tilt.visible = false
+
+## LA RULETA YA NO SALTA AL GANAR EL COMBATE. Salta al completar una misión, en
+## mitad del juego: la bola se queda donde está, la cámara baja a la tele, la
+## mesa se apaga, gira, y luego se reanuda todo con la bola en el mismo sitio.
+## Es lo que pidió Daniel y es lo que hacen el pinball del XP y Pokémon Pinball:
+## lo que ganas, lo ganas jugando.
+func _al_completar_mision(mision: Mision) -> void:
+	if not run.abrir_ruleta(mision.rareza):
+		return
+	_en_ruleta = true
+	_pantalla_mapa.visible = false
+	tele.empezar()
+
+## Lo llama la tele al cerrarse: la reliquia ya está en la bolsa. Se vuelve al
+## combate, no al mapa: la bola sigue viva y donde estaba.
+func terminar_ruleta() -> void:
+	_en_ruleta = false
+	# Si el combate se acabó mientras giraba la ruleta —el mismo golpe puede
+	# completar la misión y matar al enemigo— hay que cerrarlo de verdad, no solo
+	# volver al mapa: volver al mapa sin cerrar el combate dejaba el run en una
+	# fase sin salidas y la pantalla no respondía a nada.
+	if combate.terminado():
+		_cerrar_combate()
+
+func sonar_ruleta(avance: float) -> void:
+	# El mismo tic del reloj, subiendo de tono según se acerca la parada: es el
+	# sonido de algo que frena, y no hace falta uno nuevo para contarlo.
+	_sonido.reproducir("reloj", 0.85 + 0.5 * avance)
+
+func sonar_premio() -> void:
+	_sonido.reproducir("combo", 1.19)
 
 ## Entra en el nodo marcado del mapa. Un descanso se resuelve solo y te devuelve
 ## al mapa; un combate baja a la mesa con la vida que traigas.
@@ -260,20 +358,33 @@ func _empezar_combate(nodo: NodoMapa) -> void:
 	_tex_enemigo = load(str(nodo.enemigo.get("sprite", "")))
 	# La vida del run entra tal cual: no se cura entre combates, y eso es lo
 	# que hace que elegir rama importe.
-	combate.iniciar(Enemigo.new(nodo.enemigo), run.vida)
+	combate.iniciar(Enemigo.new(nodo.enemigo), run.vida,
+		run.escalera_de_misiones())
 	_nodo_enemigo.suelo = Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y)
 	_nodo_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
+	_esperando_confirmacion = false
+	_espera_victoria = 0.0
+	_mayor_golpe = 1
 	impactos.limpiar()
 	_numeros.clear()
 
 ## Cierra el combate contra el run y vuelve al mapa. La vida que quede es la que
 ## sigues teniendo: es el único sitio donde se traspasa.
 func _cerrar_combate() -> void:
+	run.apuntar_medida(combate.bolas_jugadas, combate.dano_total,
+		combate.tiempo_jugado)
 	run.resolver_combate(combate.fase == Combate.Fase.VICTORIA, combate.vida_jugador)
 	_volver_al_mapa()
 
 func _physics_process(delta: float) -> void:
 	if _en_mapa:
+		return
+	# Durante la ruleta la simulación NO corre y las palas no mueven nada, pero
+	# la cámara sí: baja hasta el ancla de abajo, que es donde está la tele.
+	# Congelar también la cámara dejaría la tele fuera de plano justo cuando es
+	# lo único que hay que mirar.
+	if _en_ruleta:
+		camara.avanzar(delta, 0.0, 0.0, false)
 		return
 	mesa.flipper_izq.pulsado = Input.is_physical_key_pressed(KEY_A) \
 		or Input.is_physical_key_pressed(KEY_LEFT) \
@@ -304,6 +415,15 @@ func _physics_process(delta: float) -> void:
 	# La cámara se mueve AQUÍ, pegada a la física: en `_process` iba un
 	# fotograma por detrás de la bola y en la órbita eso la metía tras el HUD.
 	camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, mesa.bola.viva)
+
+## Le dice a todo el mundo cuánta pantalla hay de verdad. Es un solo sitio a
+## propósito: en cuanto haya dos, uno se queda viejo y vuelve el desalineado.
+func _medir_pantalla() -> void:
+	var v := get_viewport_rect().size
+	if v.x <= 0.0 or v.y <= 0.0:
+		return
+	cam.ancho_visible = v.x
+	cam.alto_visible = v.y
 
 ## Congela el juego, pero solo si el impacto es de los fuertes: si no, un
 ## bumper rozado daría tirones todo el rato.
@@ -337,6 +457,17 @@ func _process(delta: float) -> void:
 
 	impactos.avanzar(delta)
 	_numeros = _caducar(_numeros, delta)
+	# La ruleta va en `_process` y no en la física: es animación, no simulación,
+	# y durante ella la física está parada a propósito.
+	if tele != null:
+		tele.avanzar(delta)
+	# La cuenta atrás de la victoria NO corre con la ruleta delante: si corriera,
+	# el combate se cerraría por debajo de la ruleta y el run se quedaría colgado
+	# en la fase de la ruleta para siempre. Es el cuelgue de la pantalla del mapa.
+	if _espera_victoria > 0.0 and not _en_ruleta:
+		_espera_victoria = maxf(_espera_victoria - delta, 0.0)
+		if _espera_victoria <= 0.0 and _esperando_confirmacion:
+			_cerrar_combate()
 	queue_redraw()
 
 func _caducar(lista: Array[Dictionary], delta: float) -> Array[Dictionary]:
@@ -359,13 +490,23 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 		KEY_ESCAPE:
 			get_tree().quit()
 		KEY_LEFT, KEY_A:
-			if _en_mapa:
+			# Durante la ruleta las palas piden otra tirada. Es la única entrada
+			# que ya tienes en la mano, así que no hay que aprender nada nuevo.
+			if _en_ruleta:
+				tele.repetir()
+			elif _en_mapa:
 				_pantalla_mapa.mover(-1)
 		KEY_RIGHT, KEY_D:
-			if _en_mapa:
+			if _en_ruleta:
+				tele.repetir()
+			elif _en_mapa:
 				_pantalla_mapa.mover(1)
 		KEY_ENTER, KEY_KP_ENTER:
-			if _en_mapa:
+			# Saltar lo que quede de la ruleta. Nunca cambia el premio: el premio
+			# se sortea antes de que gire nada.
+			if _en_ruleta:
+				tele.saltar()
+			elif _en_mapa:
 				_entrar_en_nodo()
 			elif _esperando_confirmacion:
 				_cerrar_combate()
@@ -459,8 +600,15 @@ func _al_buscar_bola(punto: Vector2) -> void:
 	impactos.onda(punto, C_ARCANO, 1.3)
 	_sacudir(anim.sacudida_ataque)
 
-func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
-	_numeros.append({"pos": punto, "t": 0.7, "texto": "%d" % dano, "col": C_ORO_CLARO})
+## EL NÚMERO DE DAÑO, que ahora sale en TODO lo que pegas y con el tamaño que
+## merece. Antes era un 9 px igual para un bumper de 6 que para un cañón de 300,
+## así que no contaba nada: el número estaba, pero no informaba.
+##
+## Ahora el tamaño y el color salen de lo gordo que es el golpe COMPARADO CON EL
+## RESTO DE TU PARTIDA, no de un umbral fijo: con reliquias de daño, un umbral
+## escrito a mano se queda viejo a los tres combates y todo sale del mismo color.
+func _al_infligir_dano(dano: int, multiplicador: int, punto: Vector2) -> void:
+	_numeros.append(_numero_de_dano(dano, multiplicador, punto))
 	flash_enemigo = maxf(flash_enemigo, 0.7)
 	_nodo_enemigo.recibir_dano()
 	_sacudir(anim.sacudida_dano)
@@ -468,7 +616,8 @@ func _al_infligir_dano(dano: int, _multiplicador: int, punto: Vector2) -> void:
 
 ## Solo salta cuando el multiplicador cambia de tramo, no en cada golpe.
 func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
-	_nodo_suelo.pulsar()
+	if tele != null:
+		tele.pulsar()
 	# `combo_cambiado` también salta al drenar, cuando cae a x1. Ahí no suena:
 	# el sonido de subir de tramo es un premio y sonaría a burla.
 	# Y sube de tono con el tramo: x2, x3 y x4 son el mismo arpegio cada vez
@@ -487,7 +636,13 @@ const TONO_COMBO := [1.0, 1.19, 1.50]
 func _tono_combo(multiplicador: int) -> float:
 	return TONO_COMBO[clampi(multiplicador - 2, 0, TONO_COMBO.size() - 1)]
 
-func _al_atacar_enemigo(_dano: int) -> void:
+## Lo que TE pegan también lleva número, y sale abajo, sobre el drenaje, que es
+## donde miras cuando pierdes la bola. Antes solo parpadeaba la barra de vida:
+## el golpe se veía, pero no se sabía cuánto había costado.
+func _al_atacar_enemigo(dano: int) -> void:
+	_numeros.append({"pos": Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 90.0),
+		"t": 1.1, "texto": "-%d" % dano, "col": C_GOMA_LUZ,
+		"tam": 24.0, "subida": 18.0})
 	flash_jugador = 1.0
 	_nodo_enemigo.embestir()
 	_sonido.reproducir("ataque")
@@ -512,8 +667,73 @@ func _al_atrasar_reloj(segundos: float) -> void:
 		"texto": "+%.0f s" % segundos, "col": C_ARCANO})
 	impactos.onda(centro, C_ARCANO, 1.6)
 
+## El golpe de referencia con el que se juzga si un número es grande: lo mejor
+## que has hecho en este combate. Se guarda aquí y no en la simulación porque es
+## puro dibujo.
+var _mayor_golpe: int = 1
+
+func _numero_de_dano(dano: int, multiplicador: int, punto: Vector2) -> Dictionary:
+	_mayor_golpe = maxi(_mayor_golpe, dano)
+	var peso := float(dano) / float(maxi(_mayor_golpe, 1))
+	var col := C_TEXTO
+	if multiplicador >= 4:
+		col = C_FUEGO
+	elif multiplicador == 3:
+		col = C_ORO_CLARO
+	elif multiplicador == 2:
+		col = C_ORO
+	return {
+		"pos": punto, "t": 0.75, "texto": "%d" % dano, "col": col,
+		# De 10 a 22 px según el peso. Un bumper suelto se lee pequeño y un
+		# cañón a x4 se lee de lejos, que es justo la información que falta.
+		# El tamaño se redondea al múltiplo de la celda de la fuente: un 14 la
+		# escalaría por 1,75 y le comería filas de píxeles a media letra.
+		"tam": float(FuenteUI.tam(8.0 + 16.0 * peso)), "subida": 26.0,
+	}
+
+## El crítico. Se anuncia APARTE del número: si solo cambiara el número, no se
+## lee "he tenido suerte", se lee "el daño de este juego es aleatorio".
+func _al_criticar(punto: Vector2, dano: int) -> void:
+	_numeros.append({"pos": punto + Vector2(0, -20), "t": 0.9,
+		"texto": "CRÍTICO", "col": C_FUEGO, "tam": 8.0, "subida": 30.0})
+	_numeros.append({"pos": punto, "t": 0.9, "texto": "%d" % dano,
+		"col": C_FUEGO, "tam": 24.0, "subida": 30.0})
+	impactos.onda(punto, C_FUEGO, 1.5)
+	impactos.chispas(punto, Vector2.ZERO, C_FUEGO, 1.4)
+	_sacudir(anim.sacudida_dano * 1.6)
+	_congelar(900.0)
+
+## Curarse también lleva número. Sale en verde y donde estaba la bola, que es
+## donde ha pasado.
+func _al_curar(cantidad: int, punto: Vector2) -> void:
+	_numeros.append({"pos": punto, "t": 1.0, "texto": "+%d" % cantidad,
+		"col": C_VERDE, "tam": 16.0, "subida": 24.0})
+
+## La red de seguridad se ha comido el drenaje. Se dice donde se MIDE el
+## castigo: sobre el corredor de drenaje, que es de donde no ha salido el golpe.
+func _al_perdonar_drenaje() -> void:
+	_numeros.append({"pos": Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 40.0),
+		"t": 1.2, "texto": "RECUPERADA", "col": C_VERDE})
+	impactos.onda(Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 40.0), C_VERDE, 1.6)
+	_sonido.reproducir("atrasar")
+
+## Misión nueva o progreso: suena distinto según sea empezar o avanzar. Sin
+## sonido, el progreso de la misión solo existe si estás mirando la tele, y
+## mientras juegas estás mirando la bola.
+func _al_cambiar_mision(mision: Mision) -> void:
+	if mision == null:
+		return
+	_sonido.reproducir("target", 1.35)
+
+func _al_reiniciar_mision(_mision: Mision) -> void:
+	_sonido.reproducir("drenaje", 0.8)
+	_numeros.append({"pos": Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 60.0),
+		"t": 1.2, "texto": "MISIÓN PERDIDA", "col": C_GOMA_LUZ})
+
 func _al_terminar_combate(victoria: bool) -> void:
 	_esperando_confirmacion = true
+	# Lo justo para que se vea morir al enemigo. Luego la ruleta, sola.
+	_espera_victoria = 1.2 if victoria else 0.0
 	if victoria:
 		_sonido.reproducir("muerte")
 		_nodo_enemigo.morir()
@@ -551,8 +771,24 @@ func _draw() -> void:
 	_dibujar_atrape()
 	_dibujar_numeros()
 	_dibujar_lanzador()
+	_dibujar_velo()
 	if _depuracion:
 		_dibujar_depuracion()
+
+## El velo de la ruleta: apaga la mesa entera menos la tele, que sube por encima
+## por z_index. Va aquí, en el mundo, y no en una capa de pantalla, porque lo que
+## se apaga es LA MESA: el escritorio de los lados no es parte del juego y
+## oscurecerlo también convertiría esto en un cambio de pantalla, que es
+## exactamente lo que se ha quitado.
+func _dibujar_velo() -> void:
+	if tele == null:
+		return
+	var alfa := tele.velo()
+	if alfa <= 0.0:
+		return
+	draw_rect(camara.rect_visible(), Color(C_CABINA, alfa))
+	# Y el texto de lo que hace la reliquia, que no cabe dentro de la tele.
+	tele.dibujar_explicacion(self, Mesa.ANCHO - 48.0, Mesa.ANCHO * 0.5)
 
 ## Que se vea que la bola está parada y es tuya. Un anillo y ya.
 ##
@@ -756,13 +992,22 @@ func _dibujar_bola() -> void:
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
+## Cada número trae su tamaño y su recorrido. `tam` y `subida` son opcionales
+## para que los avisos viejos sigan funcionando sin tocarlos.
 func _dibujar_numeros() -> void:
 	for d in _numeros:
 		var col: Color = d["col"]
-		col.a = clampf(d["t"] * 2.0, 0.0, 1.0)
-		var subida: float = (0.7 - float(d["t"])) * 22.0
-		draw_string(_fuente, (d["pos"] as Vector2) + Vector2(-10, -10 - subida),
-			d["texto"], HORIZONTAL_ALIGNMENT_CENTER, 20, 9, col)
+		col.a = clampf(float(d["t"]) * 2.5, 0.0, 1.0)
+		var tam: float = float(FuenteUI.tam(float(d.get("tam", 8.0))))
+		var recorrido: float = float(d.get("subida", 22.0))
+		var vivido: float = maxf(0.75 - float(d["t"]), 0.0)
+		var pos := (d["pos"] as Vector2) + Vector2(0, -10.0 - vivido * recorrido)
+		# Sombra de un píxel: sobre la piedra clara un número de oro se pierde,
+		# y estos números son la información principal del combate.
+		draw_string(_fuente, pos + Vector2(-59, 1), d["texto"],
+			HORIZONTAL_ALIGNMENT_CENTER, 120, int(tam), Color(C_CABINA, col.a * 0.8))
+		draw_string(_fuente, pos + Vector2(-60, 0), d["texto"],
+			HORIZONTAL_ALIGNMENT_CENTER, 120, int(tam), col)
 
 func _dibujar_depuracion() -> void:
 	for c in mesa.colisionadores:

@@ -38,9 +38,10 @@ Batería de pruebas, sin abrir ventana:
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-Medida de balance (no es una prueba: no falla, imprime tablas):
+Medidas (no son pruebas: no fallan, imprimen tablas):
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_reliquias.gd
 
 ## Invariantes
 
@@ -65,6 +66,26 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **No hay gestor de ventanas.** La cáscara son paneles enmarcados en
   posiciones fijas que PARECEN ventanas. Nada de arrastrar, redimensionar,
   foco, orden de apilado ni minimizar.
+- **La recompensa no saca de la mesa.** Se juega en la TELE, que es una pantalla
+  empotrada en el tablero encima de los flippers, donde ya vivía el
+  multiplicador. La cámara baja, el resto se apaga, la ruleta gira y sigue el
+  juego. **La tele no tiene colisionador y no puede tenerlo:** sería cambiar la
+  geometría y crear un rincón donde se acuña la bola, justo entre las palas.
+- **Nada de menús para elegir mejora.** La ruleta da una y las palas dan derecho
+  a UNA repetición. Ni tres tarjetas, ni pantalla aparte, ni pausa larga.
+- **Las reliquias se ganan JUGANDO, no por ganar el combate.** Se completan
+  misiones de mesa —el display del pinball del XP, la caza de Pokémon Pinball— y
+  cada misión paga una reliquia de su rareza. Ganar el combate no da objeto: te
+  deja pasar. Cada combate trae una escalera de tres misiones (común, rara,
+  arcana), así que quien aguanta la bola sale con tres reliquias y quien no, con
+  una: **el margen por habilidad se paga en objetos**.
+- **La tele dice siempre qué toca ahora.** Ese es su trabajo principal; el
+  multiplicador es lo secundario. Un combate largo sin objetivo escrito es el
+  mismo minuto repetido.
+- **Los marcos se REPITEN, no se estiran.** Estirar un pixelart lo destruye.
+  `render/nueve_trozos.gd` los repite, y por eso los bordes del atlas van sin
+  remates ni tornillos en las puntas: un detalle cerca del final de una tira se
+  convierte en un patrón que se repite y canta.
 - **Escalado por enteros siempre.**
 
 ## Trampas que ya nos han costado tiempo
@@ -143,6 +164,69 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   platillo compensa?" se contestó "prefiero el cañón" cuando en realidad era
   "no sabía que hacía nada". Si una pregunta de la lista depende de que el
   jugador haya entendido algo, verifica primero que lo entendió.
+- **Un dato escrito en un fichero de datos no da error cuando está mal.** Una
+  clave de reliquia mal escrita en `data/reliquias.json` no rompe nada: deja una
+  reliquia que no hace absolutamente nada, el jugador la coge, no la nota, y el
+  fallo se diagnostica como balance. Es la misma avería del platillo con otra
+  cara. **Todo lo que se configure por datos necesita una prueba que compruebe
+  que alguien LEE esa clave**, no solo que el fichero se parsea.
+- **Un denominador escrito a mano miente igual que un dato mal.** El HUD dividía
+  la vida por `p.vida_jugador` —la vida DE PARTIDA— en vez de por la máxima de
+  verdad, así que con una reliquia que subiera el techo salía "215/180" y la
+  barra se pasaba de largo. La curación estaba bien topada: lo que estaba mal
+  era contra qué se comparaba. **Cuando un número tenga tope, enséñalo siempre
+  contra la función que calcula el tope, nunca contra el parámetro.**
+- **La fuente del juego es NUESTRA y se genera con `python3 fuente.py`**, igual
+  que los sonidos. Rejilla de 5×7 en celda de 6×8, así que **solo se ve nítida a
+  8, 16, 24, 32 y 48**: todo el texto pasa por `FuenteUI.tam()` y hay una prueba
+  que impide que se cuele un tamaño suelto. Y los marcos de la cáscara salen del
+  mismo script, **cuadrados por construcción**: las nueve piezas miden la unidad
+  y los cuatro lados son el mismo perfil reflejado.
+- **Una tipografía suave alrededor de píxeles duros parte la pantalla en dos.**
+  El apaño de usar una fuente del sistema arreglaba los acentos y rompía otra
+  cosa: la cáscara y la mesa dejaban de parecer el mismo programa. Si algo se ve
+  "mal" y no sabes por qué, mira si hay material mezclado antes que geometría.
+- **Una fuente sin glifos no da error, deja un hueco.** Todo cogía la fuente de
+  reserva de Godot, que solo trae ASCII, y el juego llevaba meses sin acentos ni
+  eñes sin que saltara nada: "MANTÉN" salía "MANTN". La fuente vive en
+  `render/fuente_ui.gd` y hay una prueba que comprueba que sabe escribir en
+  castellano. **Nadie coge `ThemeDB.fallback_font` por su cuenta.**
+- **Calibrar contra un jugador inventado sale mal dos de dos.** Los perfiles de
+  `medir_balance.gd` son un modelo, y el de en medio hace 312 de daño por bola:
+  ESE NO ES DANIEL. Con la vida de los enemigos escrita para ese perfil, él no
+  pasaba del segundo combate. La aritmética estaba bien y medía a otro. Por eso
+  el juego mide ahora al jugador de verdad —`Run.dano_por_bola()` y
+  `segundos_por_combate()`, en la pantalla de fin de run— y **la tabla se
+  escribe con esos dos números, no con los del modelo.**
+- **Cobrar por tiempo no escala: al alargar los combates, el coste se dispara.**
+  El coste es `tiempo/reloj × ataque + bolas × drenaje`, así que multiplicar por
+  catorce la duración multiplica por catorce lo que cuesta, y ninguna tabla de
+  ataques cuadra —o el primer enemigo te mata o el último no hace nada—. Por eso
+  **el reloj es de cada enemigo, no global**: la vida dice cuánto DURA y el
+  reloj dice cuánto APRIETA, y son dos mandos separados.
+- **Una fase que no se cierra deja la pantalla muerta, sin dar error.** El golpe
+  que completaba la última misión podía ser el mismo que mataba al enemigo: el
+  run entraba en RULETA, el combate intentaba cerrarse, `resolver_combate` se
+  iba de puntillas por estar en otra fase, y el run se quedaba en RULETA para
+  siempre. El mapa salía sin ninguna rama viva y no respondía a nada. **Todo
+  `if fase != X: return` es un cuelgue esperando**: o se contempla la otra fase o
+  se deja constancia de por qué es imposible llegar ahí.
+- **Un número que no se ve no informa, aunque esté.** El daño salía en 9 px,
+  igual para un bumper de 6 que para un cañón de 300. El número estaba y no
+  decía nada. Ahora el tamaño sale de lo gordo que es el golpe COMPARADO CON EL
+  RESTO DE LA PARTIDA, no de un umbral fijo: con reliquias de daño, un umbral
+  escrito a mano se queda viejo a los tres combates.
+- **Un atlas de nueve trozos se corta en REJILLA FIJA, no por silueta.**
+  `procesar.py` recorta por silueta por defecto, que es lo correcto para un icono
+  y lo peor posible para un marco: cada pieza sale con el tamaño de su dibujo, y
+  entonces las esquinas no cuadran con los bordes por un par de píxeles. No da
+  error, deja el marco descuadrado. Para marcos: `--tira 3 --filas 3`. Hay una
+  prueba que comprueba que las cuatro esquinas midan igual.
+- **Una reliquia no es código.** Es una bolsa de modificadores con nombre, y el
+  combate pregunta por esas claves donde ya tomaba decisiones. Si una reliquia
+  nueva pide un `if` nuevo en `Combate`, es que falta un gancho: se añade el
+  gancho, no el caso. Y una bolsa vacía tiene que ser EXACTAMENTE neutra, o todo
+  el balance medido deja de valer sin avisar.
 - **El balance no se toca sin medir: hay una herramienta.**
   `tests/medir_balance.gd` monta combates con el `Combate` de verdad y tres
   perfiles de jugador, y barre configuraciones enteras. La tabla de enemigos se
@@ -172,6 +256,31 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   del barrido, escrito en puntos sobre una vida de 60: al pasar a 180 dejó de
   marcar ni una fila buena. **Las pruebas y los criterios se escriben contra
   los parámetros, no contra constantes.**
+- **Recortar una hoja de IA con fondo magenta no es solo cortar la caja.** Al
+  trocear las hojas de `assets/prompts_cascara.md` en sus nueve piezas, el
+  primer recorte solo delimitó el contenido (bounding box) y no volvió
+  transparente el magenta que quedaba dentro y alrededor. El PNG resultante
+  se veía bien en un visor porque el magenta cuadraba con el fondo de la
+  hoja, pero dentro del juego salía como motas rosas en las esquinas del
+  marco y detrás de los iconos con forma no cuadrada. **Cualquier recorte de
+  una hoja `#FF00FF` tiene que reescribir el canal alfa** (poner a 0 todo
+  píxel cercano al magenta), no solo recortar el rectángulo que lo contiene.
+- **Un mosaico de prueba antes de integrar ahorra una vuelta.** Para las
+  hojas de nueve trozos generadas por IA, montar un mosaico 6×6 en memoria
+  (repetir cada borde, poner las cuatro esquinas) y mirarlo ANTES de copiar
+  nada al repo cazó un fallo real: una hoja tenía las nueve celdas separadas
+  por huecos de magenta en vez de pegadas, así que dividir la imagen en
+  tercios iguales cortaba mitad celda y mitad hueco. Sin el mosaico eso solo
+  se ve dentro de Godot, tarde.
+- **Un icono de escritorio decorativo va a la izquierda, no a la derecha.**
+  En un escritorio de verdad los iconos se apilan donde hay sitio arriba a
+  la izquierda; la banda derecha se deja vacía a propósito. Metimos los
+  iconos nuevos a la derecha porque ahí es donde sobraba hueco en el layout,
+  y quedó mal a la primera. Si hacen falta dos grupos en la misma banda (las
+  reliquias, que si importan, y los decorativos, que no), que cuelguen desde
+  extremos opuestos —reliquias desde arriba, decorativos desde abajo— en vez
+  de repartir el escritorio en dos mitades que no es como se ve uno de
+  verdad.
 - **Un cambio de recompensa puede romper la mesa sin romper la física.** El
   cañón devolvía la bola al racimo de bumpers y alimentaba un bucle que
   mataba al enemigo sin que las palas participaran nunca. Cuando cambies

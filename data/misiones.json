@@ -1,0 +1,132 @@
+{
+  "_nota": "Las misiones de mesa. La tele las anuncia y completarlas es la UNICA forma de ganar reliquias: ganar el combate ya no da nada por si mismo, solo te deja pasar. Cada combate abre con una comun; al completarla se abre una rara, y luego una arcana. Un jugador que aguanta la bola sale de un combate con tres reliquias y uno que no, con una: ese es el margen por habilidad de DISENO.md §2, pagado en objetos en vez de en vida.",
+
+  "_los_tiros": "Los nombres tienen que ser los que cuenta sim/combate.gd: bumper, girador, target, banco, orbita, retorno, canon, platillo. Hay una prueba que lo comprueba, porque un tiro mal escrito deja una mision imposible y eso no da error.",
+
+  "_como_se_suben_de_nivel": "Una mision no sube de rareza pidiendo MAS de lo mismo, sino pidiendo lo que cuesta control: tiros dificiles (canon, platillo), en ORDEN, y sin drenar. Cuatro bumpers mas no es mas dificil, es mas largo.",
+
+  "misiones": [
+    {
+      "id": "calentamiento",
+      "nombre": "Calentamiento",
+      "rareza": "comun",
+      "texto": "Doce golpes en el racimo.",
+      "tiros": [{ "tiro": "bumper", "veces": 12 }]
+    },
+    {
+      "id": "fila_rota",
+      "nombre": "Fila rota",
+      "rareza": "comun",
+      "texto": "Abate tres targets.",
+      "tiros": [{ "tiro": "target", "veces": 3 }]
+    },
+    {
+      "id": "reconocimiento",
+      "nombre": "Reconocimiento",
+      "rareza": "comun",
+      "texto": "Una orbita y un carril de retorno.",
+      "tiros": [{ "tiro": "orbita", "veces": 1 }, { "tiro": "retorno", "veces": 1 }]
+    },
+    {
+      "id": "punteria",
+      "nombre": "Punteria",
+      "rareza": "comun",
+      "texto": "Cierra un banco entero.",
+      "tiros": [{ "tiro": "banco", "veces": 1 }]
+    },
+    {
+      "id": "engrase",
+      "nombre": "Engrase",
+      "rareza": "comun",
+      "texto": "Atraviesa el girador seis veces.",
+      "tiros": [{ "tiro": "girador", "veces": 6 }]
+    },
+
+    {
+      "id": "doble_banco",
+      "nombre": "Doble banco",
+      "rareza": "rara",
+      "texto": "Cierra dos bancos sin perder la bola.",
+      "tiros": [{ "tiro": "banco", "veces": 2 }],
+      "sin_drenar": true
+    },
+    {
+      "id": "artilleria",
+      "nombre": "Artilleria",
+      "rareza": "rara",
+      "texto": "Meter dos veces en el canon.",
+      "tiros": [{ "tiro": "canon", "veces": 2 }]
+    },
+    {
+      "id": "circuito",
+      "nombre": "Circuito",
+      "rareza": "rara",
+      "texto": "Orbita, retorno y canon. EN ESE ORDEN.",
+      "orden": true,
+      "tiros": [
+        { "tiro": "orbita", "veces": 1 },
+        { "tiro": "retorno", "veces": 1 },
+        { "tiro": "canon", "veces": 1 }
+      ]
+    },
+    {
+      "id": "robo_de_tiempo",
+      "nombre": "Robo de tiempo",
+      "rareza": "rara",
+      "texto": "Dos platillos.",
+      "tiros": [{ "tiro": "platillo", "veces": 2 }]
+    },
+    {
+      "id": "tanda_limpia",
+      "nombre": "Tanda limpia",
+      "rareza": "rara",
+      "texto": "Seis targets sin perder la bola.",
+      "tiros": [{ "tiro": "target", "veces": 6 }],
+      "sin_drenar": true
+    },
+
+    {
+      "id": "gran_vuelta",
+      "nombre": "Gran vuelta",
+      "rareza": "arcana",
+      "texto": "Orbita, canon, platillo y banco. En orden y sin perder la bola.",
+      "orden": true,
+      "sin_drenar": true,
+      "tiros": [
+        { "tiro": "orbita", "veces": 1 },
+        { "tiro": "canon", "veces": 1 },
+        { "tiro": "platillo", "veces": 1 },
+        { "tiro": "banco", "veces": 1 }
+      ]
+    },
+    {
+      "id": "la_maquina",
+      "nombre": "La maquina",
+      "rareza": "arcana",
+      "texto": "Tres bancos y dos canones sin perder la bola.",
+      "sin_drenar": true,
+      "tiros": [{ "tiro": "banco", "veces": 3 }, { "tiro": "canon", "veces": 2 }]
+    },
+    {
+      "id": "el_reloj_es_mio",
+      "nombre": "El reloj es mio",
+      "rareza": "arcana",
+      "texto": "Tres platillos sin perder la bola.",
+      "sin_drenar": true,
+      "tiros": [{ "tiro": "platillo", "veces": 3 }]
+    },
+    {
+      "id": "cadena_larga",
+      "nombre": "Cadena larga",
+      "rareza": "arcana",
+      "texto": "Canon, banco, canon, banco. En orden.",
+      "orden": true,
+      "tiros": [
+        { "tiro": "canon", "veces": 1 },
+        { "tiro": "banco", "veces": 1 },
+        { "tiro": "canon", "veces": 1 },
+        { "tiro": "banco", "veces": 1 }
+      ]
+    }
+  ]
+}

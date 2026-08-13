@@ -15,6 +15,8 @@ const C_TEXTO       := Paleta.TEXTO
 const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
 const C_VERDE       := Paleta.VERDE
 const C_ARCANO      := Paleta.ARCANO
+## Para el porcentaje de crítico cuando lo tienes por encima del base.
+const C_FUEGO       := Paleta.FUEGO
 
 ## Atrapes tras los cuales se deja de dar la pista de cómo atrapar.
 const VECES_PARA_APRENDER := 3
@@ -32,7 +34,7 @@ func _init(la_vista: VistaMesa, parametros: ParametrosCamara) -> void:
 	layer = 10
 
 func _ready() -> void:
-	_fuente = ThemeDB.fallback_font
+	_fuente = FuenteUI.obtener()
 	_izq = (_p.ancho_visible - Mesa.ANCHO) * 0.5
 	_lienzo = Node2D.new()
 	_lienzo.draw.connect(_dibujar)
@@ -54,6 +56,11 @@ func _dibujar() -> void:
 	var combate := vista.combate
 	if combate == null:
 		return
+	# Durante la ruleta el HUD se aparta entero. La recompensa se juega dentro de
+	# la mesa, con todo lo demás apagado: dejar las barras encendidas por encima
+	# la convertiría otra vez en una pantalla superpuesta.
+	if vista.en_ruleta():
+		return
 	var mesa := vista.mesa
 	var d := _izq
 
@@ -62,21 +69,34 @@ func _dibujar() -> void:
 
 	var e := combate.enemigo
 	if e != null:
-		_texto(Vector2(d + 12, 16), e.nombre, 10, C_TEXTO)
-		_texto(Vector2(d, 16), "%d/%d" % [e.vida, e.vida_maxima], 10, C_TEXTO_TENUE,
+		_texto(Vector2(d + 12, 16), e.nombre, 8, C_TEXTO)
+		_texto(Vector2(d, 16), "%d/%d" % [e.vida, e.vida_maxima], 8, C_TEXTO_TENUE,
 			HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
 		var col_enemigo := C_GOMA_LUZ if vista.flash_enemigo <= 0.0 else C_ORO_CLARO
 		_barra(Rect2(d + 12, 22, Mesa.ANCHO - 24, 8),
 			float(e.vida) / float(e.vida_maxima), col_enemigo)
 
 	var col_jugador := C_VERDE if vista.flash_jugador <= 0.0 else C_GOMA_LUZ
+	# CONTRA `vida_maxima()`, NO contra `p.vida_jugador`. Aquí ponía el
+	# parámetro, que es la vida de partida y no cuenta lo que suman las
+	# reliquias, así que con una que diera vida máxima salían cosas como
+	# "215/180" y la barra se pasaba de largo. El dato estaba bien; el
+	# denominador, no.
+	var maxima := combate.vida_maxima()
 	_texto(Vector2(d + 12, 46),
-		"VIDA %d/%d" % [combate.vida_jugador, combate.p.vida_jugador], 9, C_TEXTO)
+		"VIDA %d/%d" % [combate.vida_jugador, maxima], 8, C_TEXTO)
 	_barra(Rect2(d + 78, 40, 94, 7),
-		float(combate.vida_jugador) / float(combate.p.vida_jugador), col_jugador)
+		float(combate.vida_jugador) / float(maxi(maxima, 1)), col_jugador)
 	_texto(Vector2(d + 200, 46),
 		"ESTA BOLA  %d  (%d golpes)" % [combate.dano_de_la_bola, combate.golpes],
-		9, C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
+		8, C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
+	# La probabilidad de crítico, escrita. Un porcentaje que no se ve no existe:
+	# el jugador vería números grandes de vez en cuando y creería que el daño es
+	# aleatorio, en vez de leer que tiene una estadística que puede subir.
+	var critico := combate.prob_critico()
+	_texto(Vector2(d, 46), "CRÍTICO %d%%" % int(round(critico * 100.0)), 8,
+		C_FUEGO if critico > combate.p.prob_critico else C_TEXTO_TENUE,
+		HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
 
 	_dibujar_reloj(combate, d)
 	_dibujar_mensaje(combate, mesa, d)
@@ -108,12 +128,12 @@ func _dibujar_reloj(combate: Combate, d: float) -> void:
 	if vista.flash_reloj > 0.0:
 		col = C_ARCANO
 
-	_texto(Vector2(d + 12, 66), "ATAQUE EN %ds" % int(ceil(restante)), 9,
+	_texto(Vector2(d + 12, 66), "ATAQUE EN %ds" % int(ceil(restante)), 8,
 		C_ORO_CLARO if avisando else C_TEXTO_TENUE)
 	_barra(Rect2(d + 96, 60, Mesa.ANCHO - 108, 6), combate.carga_reloj, col)
 
 	if vista.flash_reloj > 0.0:
-		_texto(Vector2(d, 56), "+%.0f s" % vista.ultimo_atraso, 9, C_ARCANO,
+		_texto(Vector2(d, 56), "+%.0f s" % vista.ultimo_atraso, 8, C_ARCANO,
 			HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
 
 func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
@@ -158,7 +178,9 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 	if texto == "":
 		return
 	var y := _p.alto_visible * 0.5
-	_texto(Vector2(d, y), texto, 14, col, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
-	if combate.terminado():
+	_texto(Vector2(d, y), texto, 16, col, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
+	# Ganar ya no pide tecla: se pasa solo a la ruleta. Perder sí, que ahí se
+	# acaba el run y hay que poder leerlo.
+	if combate.fase == Combate.Fase.DERROTA:
 		_texto(Vector2(d, y + 20), "ENTER para volver al mapa",
-			9, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
+			8, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)

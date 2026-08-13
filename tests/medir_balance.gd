@@ -84,7 +84,7 @@ const PERFILES := [
 
 ## Tope de bolas por combate. Si un enemigo lo alcanza es que es un muro, y eso
 ## es justo lo que hay que ver.
-const MAX_BOLAS := 40
+const MAX_BOLAS := 200
 
 func _initialize() -> void:
 	var catalogo := CatalogoEnemigos.cargar()
@@ -119,6 +119,7 @@ func _copiar(base: ParametrosCombate) -> ParametrosCombate:
 	p.reloj_aviso = base.reloj_aviso
 	p.factor_ataque_drenaje = base.factor_ataque_drenaje
 	p.platillo_atrasa_reloj = base.platillo_atrasa_reloj
+	p.golpes_tramo_extra = base.golpes_tramo_extra
 	return p
 
 # ----------------------------------------------------- esquemas de combo
@@ -359,10 +360,13 @@ const SEMILLAS := [13, 271, 4242, 90210, 31337]
 ## búsqueda a ciegas y pasó a ser el margen alrededor del punto elegido: sirve
 ## para ver cuánto aguanta el balance si mañana se toca algo, y para volver a
 ## encontrar el punto si se toca de verdad.
-const ESCALAS_VIDA := [1.20, 1.10, 1.00, 0.90, 0.80]
+## Centradas en 1,0, que es la tabla escrita en `data/enemigos.json`. Como esa
+## tabla es ARITMÉTICA y no medida, aquí el margen es ancho a propósito: la
+## primera vez que se lance esto hay que poder ver hacia dónde corregir.
+const ESCALAS_VIDA := [1.40, 1.20, 1.00, 0.80, 0.60]
 ## El ataque, que hasta ahora iba pegado a la vida. Es el que pone cuánto duele
 ## cada golpe de reloj, mientras que la vida pone cuántos comes.
-const ESCALAS_ATAQUE := [1.0, 0.85]
+const ESCALAS_ATAQUE := [1.20, 1.00, 0.80, 0.60]
 ## En cuántos trozos se parte el reloj. 1 es el de ahora (18 s, ataque entero);
 ## 3 es cargar en 6 s y pegar un tercio.
 ##
@@ -376,7 +380,7 @@ const ESCALAS_ATAQUE := [1.0, 0.85]
 ## de acercarlos: metía los combates del bueno por debajo del umbral.
 ## 1 es el reloj tal y como está configurado ahora (9 s). Se deja el 2 para
 ## poder ver de un vistazo qué pasaría afinándolo todavía más.
-const FINURAS_RELOJ := [1, 2]
+const FINURAS_RELOJ := [1]
 
 func _barrido(catalogo: Array) -> void:
 	var semillas := [SEMILLAS[0], SEMILLAS[1], SEMILLAS[2]]
@@ -384,25 +388,46 @@ func _barrido(catalogo: Array) -> void:
 	print("  objetivo: normal acaba justo, bueno con holgura (le queda el %d-%d%%)"
 		% [int(VIDA_BUENO_MIN * 100.0), int(VIDA_BUENO_MAX * 100.0)])
 	print("")
-	print("  %5s %5s %6s  %-24s %-20s" % [
-		"vida", "atq", "reloj", "normal", "bueno"])
+	print("  %5s %5s %7s  %-24s %-20s" % [
+		"vida", "atq", "seg/cbt", "normal", "bueno"])
 	for escala in ESCALAS_VIDA:
 		for atq in ESCALAS_ATAQUE:
-			for finura in FINURAS_RELOJ:
-				var pr := ParametrosRun.new()
-				var pc := _reloj_fino(int(finura))
-				var escalado := _escalar(catalogo, escala, int(finura), atq)
-				var n := _runs(PERFILES[1] as Dictionary, escalado, pr, semillas, pc)
-				var b := _runs(PERFILES[2] as Dictionary, escalado, pr, semillas, pc)
-				print("  %5.2f %5.2f %5.1fs  %d/%d acaba, %4.1f nodos    %d/%d acaba, vida %-4s%s" % [
-					escala, atq, pc.reloj_carga,
-					int(n["acabados"]), semillas.size(), float(n["nodos"]),
-					int(b["acabados"]), semillas.size(),
-					("%.0f" % float(b["vida_final"])) if int(b["acabados"]) > 0 else "—",
-					"   <<<" if _cumple(n, b, semillas.size()) else ""])
+			var pr := ParametrosRun.new()
+			var pc := ParametrosCombate.new()
+			var escalado := _escalar(catalogo, escala, 1, atq)
+			var n := _runs(PERFILES[1] as Dictionary, escalado, pr, semillas, pc)
+			var b := _runs(PERFILES[2] as Dictionary, escalado, pr, semillas, pc)
+			var dur := _duracion_media(PERFILES[1] as Dictionary, escalado, pc)
+			print("  %5.2f %5.2f %6.0fs  %d/%d acaba, %4.1f nodos    %d/%d acaba, vida %-5s%s%s" % [
+				escala, atq, dur,
+				int(n["acabados"]), semillas.size(), float(n["nodos"]),
+				int(b["acabados"]), semillas.size(),
+				("%.0f" % float(b["vida_final"])) if int(b["acabados"]) > 0 else "—",
+				"  <<<" if _cumple(n, b, semillas.size()) else "",
+				"  DURA" if dur >= DURACION_MIN and dur <= DURACION_MAX else ""])
 	print("")
-	print("  <<< marca las filas que cumplen el objetivo")
+	print("  <<< cumple el objetivo de dificultad")
+	print("  DURA cumple el objetivo de DURACIÓN: %d-%d s por combate" % [
+		int(DURACION_MIN), int(DURACION_MAX)])
+	print("  la fila buena es la que lleva las dos marcas.")
 	print("")
+
+## Lo que Daniel pidió al alargar los combates: entre dos y cinco minutos, y los
+## jefes por encima. Se mide con el perfil `normal`, que es el de referencia.
+##
+## POR QUÉ ESTÁ AQUÍ Y NO EN LA CABEZA DE NADIE: la tabla de `enemigos.json` que
+## acompaña a esto es aritmética pura, calculada del modelo y NO lanzada. Esta
+## columna es la que dice si el cálculo era bueno.
+const DURACION_MIN := 120.0
+const DURACION_MAX := 300.0
+
+## Segundos que dura de media un combate contra el catálogo entero.
+func _duracion_media(perfil: Dictionary, catalogo: Array,
+		base: ParametrosCombate) -> float:
+	var total := 0.0
+	for datos in catalogo:
+		total += float(_un_combate(perfil, datos as Dictionary, base)["segundos"])
+	return total / float(maxi(catalogo.size(), 1))
 
 ## `normal` tiene que acabar la mayoría de las veces pero no siempre, y `bueno`
 ## siempre. Si normal acaba 3 de 3 el run es un paseo; si acaba 0 o 1, es el

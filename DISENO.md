@@ -222,7 +222,40 @@ distintos, no como el mismo con números más grandes.
 
 ---
 
-## 10. Ganchos de reliquia
+## 10. Misiones: de dónde salen las reliquias
+
+**Las reliquias se ganan jugando la mesa, no por ganar el combate.** La
+referencia es doble y las dos son de pinball de verdad: el display del 3D
+Pinball del XP, que SIEMPRE dice qué toca ahora y te asciende de rango al
+completar una misión; y Pokémon Pinball, donde lo que te llevas lo cazas tú
+dando bolazos, no eligiéndolo en un menú.
+
+Cada combate trae una **escalera de tres misiones**: común, rara y arcana. La
+tele las anuncia una a una. Completar la común abre la rara, y así. Cada misión
+paga una reliquia **de su misma rareza**.
+
+Eso hace tres cosas a la vez:
+
+- **El margen por habilidad se paga en objetos**, no en vida (§2). Quien aguanta
+  la bola sube tres escalones en un combate; quien no, uno.
+- **Un combate largo deja de ser un saco.** Sin misión, un enemigo de tres
+  minutos es el mismo minuto tres veces. Con ella hay un siguiente escalón
+  siempre visible.
+- **Ganar el combate no da objeto**: te deja pasar. Se acabó la parada al final.
+
+**Una misión no sube de rareza pidiendo más de lo mismo**, sino pidiendo lo que
+cuesta control: tiros difíciles, en ORDEN, y sin drenar. Cuatro bumpers más no
+es más difícil, es más largo.
+
+**Las rarezas: común, rara, arcana.** Y la rareza **no es cuánto sube un
+número, es cuánto cambia la partida**: una que da +12 de daño a los targets es
+común aunque sume mucho; una que hace que el racimo cobre del multiplicador es
+arcana aunque el número sea pequeño, porque te cambia a qué tiro vas, que es el
+pilar (§1).
+
+---
+
+## 10b. Ganchos de reliquia
 
 Las reliquias se diseñan contra esta rejilla, no una a una.
 
@@ -231,8 +264,13 @@ un recorrido concreto · al subir de tramo · al empezar la bola · al drenar ·
 al matar · al entrar en combate · al cazar en la zona alta · pasivos
 condicionales.
 
-Las quince primeras cubren los cinco ejes y al menos seis ganchos. Nada de
-quince variantes de "+2 de daño".
+Las primeras cubren los cinco ejes y al menos seis ganchos. Nada de
+variantes de "+2 de daño".
+
+**Cuántas.** El plan decía quince y se quedó corto: con tres ofrecidas por
+combate y doce combates ves unas treinta y seis, o sea que con quince las veías
+todas y dos runs se parecían. La cifra que importa no es cuántas hay, es
+cuántas NO ves. Van cuarenta y cinco, nueve por eje.
 
 ---
 

@@ -30,9 +30,19 @@ var fila_primera_elite: int = 1
 ## dejaría de ser una decisión.
 var curacion_descanso: float = 0.30
 
+## Casillas que enseña la ruleta al girar. Solo una es el premio; las demás son
+## lo que pasa de largo. Ocho es lo que cabe girando en la tele sin que se
+## convierta en un borrón.
+var casillas_ruleta: int = 8
+## Veces que puedes rechazar la tirada con un toque de flipper. UNA: con cero la
+## build se decide entera a suertes y `DISEÑO.md` §1 dice que la build decide
+## qué tiros te compensan; con dos o más vuelve a ser una pantalla de elegir,
+## que es justo lo que se ha quitado.
+var repeticiones_ruleta: int = 1
+
 ## Cuánto más duro es un élite que un combate normal del mismo acto, en vida.
-var factor_vida_elite: float = 1.35
+var factor_vida_elite: float = 1.25
 ## Y el jefe. Provisional del todo: los jefes de verdad son Fase 6, con sus
 ## fases y sus sprites de `assets/jefes/`. Aquí un jefe es todavía el enemigo
 ## más duro del acto con más vida, y eso NO cumple `DISEÑO.md` §8.
-var factor_vida_jefe: float = 1.8
+var factor_vida_jefe: float = 1.5

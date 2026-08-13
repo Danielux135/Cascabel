@@ -70,6 +70,9 @@ golpe desde los originales.
 
 ```
 assets/
+  ui/            LA CÁSCARA, generada por `fuente.py` (no se edita a mano)
+    fuente_cascabel.png + .json   la fuente pixelart del juego
+    ventana/ titulo/ barra/ boton/ tooltip/   marcos de nueve trozos
   reliquias/     18 iconos 64×64   (pantalla de recompensa)
   reliquias_32/  18 iconos 32×32   (escritorio)
   mesa/          objetos, bola 24, flippers 64
@@ -80,8 +83,23 @@ assets/
   shell/         fondo_escritorio 320×180, paleta propia
 ```
 
-De la cáscara solo existe el fondo. **Los marcos de nueve trozos, la barra de
-tareas, los botones y los tooltips están por hacer**: son la Fase 5.
+**La cáscara y la fuente se GENERAN, no se dibujan**, igual que los sonidos:
+`python3 fuente.py` escribe la fuente pixelart y los cinco marcos de nueve
+trozos. Editar esos PNG a mano es tirar el trabajo en la siguiente ejecución.
+
+La fuente es una rejilla de 5×7 en celda de 6×8, así que **se ve nítida a 8, 16,
+24, 32 y 48 y solo ahí**: todo el texto pasa por `FuenteUI.tam()`, que redondea
+al múltiplo más cercano. Hay una prueba que impide que se cuele un tamaño
+suelto.
+
+Los marcos generados son provisionales y se sabe: **cumplen y son sosos**, que
+es lo que pasa cuando el arte lo escribe un programa. Los prompts para
+sustituirlos por arte de verdad están en `assets/prompts_cascara.md`.
+
+`assets/ui_marco/` es el marco de PIEDRA de la mazmorra, y ya NO se usa para la
+cáscara: se probó y fallaba por dos sitios a la vez —recortado por silueta, cada
+pieza medía lo que medía su dibujo, y piedra tallada alrededor de una ventana no
+se lee como un sistema operativo—. Se queda para paneles dentro del juego.
 
 `flipper_izq.png` es el derecho reflejado por código.
 

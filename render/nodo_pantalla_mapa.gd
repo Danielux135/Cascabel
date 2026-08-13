@@ -87,7 +87,7 @@ func _init(el_run: Run, parametros: ParametrosCamara) -> void:
 	layer = 20
 
 func _ready() -> void:
-	_fuente = ThemeDB.fallback_font
+	_fuente = FuenteUI.obtener()
 	_lienzo = Node2D.new()
 	# Sin esto los retratos salen suavizados al escalarlos y desentonan con
 	# todo lo demás, que es pixelart.
@@ -165,13 +165,21 @@ func _dibujar_final() -> void:
 	_lienzo.draw_rect(Rect2(0, y - 46, _p.ancho_visible, 92), Color(C_CABINA, 0.92))
 	_lienzo.draw_string(_fuente, Vector2(0, y - 8),
 		"RUN GANADO" if run.victoria else "RUN PERDIDO",
-		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 22,
+		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 24,
 		C_VERDE if run.victoria else C_GOMA_LUZ)
 	_lienzo.draw_string(_fuente, Vector2(0, y + 16),
 		"acto %d  ·  %d nodos superados" % [acto_visible() + 1, run.nodos_superados],
-		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 11, C_TEXTO)
+		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 8, C_TEXTO)
 	_lienzo.draw_string(_fuente, Vector2(0, y + 34), "R para otro run",
-		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 10, C_TEXTO_TENUE)
+		HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 8, C_TEXTO_TENUE)
+	# LA MEDIDA DE ESTE RUN, que es lo que hace falta para escribir la tabla de
+	# enemigos exacta. Se ha calibrado dos veces contra un jugador inventado y
+	# las dos salió mal; estos dos números son los del jugador de verdad.
+	if run.combates_jugados > 0:
+		_lienzo.draw_string(_fuente, Vector2(0, y + 54),
+			"tu daño por bola: %.0f  ·  combate medio: %.0f s  ·  %d bolas" % [
+				run.dano_por_bola(), run.segundos_por_combate(), run.bolas_jugadas],
+			HORIZONTAL_ALIGNMENT_CENTER, _p.ancho_visible, 8, C_ORO_CLARO)
 
 func _dibujar_ramas(filas: Array[int], opciones: Array[int]) -> void:
 	for fila_i in filas:
@@ -283,38 +291,38 @@ func _dibujar_ficha(opciones: Array[int]) -> void:
 	if nodo.es_combate() and not nodo.enemigo.is_empty():
 		_lienzo.draw_string(_fuente, Vector2(x, base + 64),
 			str(nodo.enemigo.get("nombre", "?")),
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, C_TEXTO)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 24, C_TEXTO)
 		# Vida y ataque juntos: son las dos cifras que deciden si esta rama te
 		# la puedes permitir con la vida que traes.
 		_lienzo.draw_string(_fuente, Vector2(x, base + 92),
 			"%d pv  ·  pega %d por golpe de reloj" % [
 				int(nodo.enemigo.get("vida", 0)),
 				int(nodo.enemigo.get("ataque", 0))],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, C_ORO_CLARO)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, C_ORO_CLARO)
 	elif nodo.tipo == NodoMapa.Tipo.DESCANSO:
 		var cura := int(round(float(run.vida_maxima) * run.p.curacion_descanso))
 		_lienzo.draw_string(_fuente, Vector2(x, base + 64), "Descanso",
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 22, C_TEXTO)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 24, C_TEXTO)
 		_lienzo.draw_string(_fuente, Vector2(x, base + 92),
 			"recuperas %d pv  ·  te quedarías en %d/%d" % [
 				cura, mini(run.vida + cura, run.vida_maxima), run.vida_maxima],
-			HORIZONTAL_ALIGNMENT_LEFT, -1, 12, C_VERDE)
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 16, C_VERDE)
 
 	# Cuántas ramas hay, para que se vea que esto es UNA de varias.
 	if opciones.size() > 1:
 		_lienzo.draw_string(_fuente, Vector2(0, base + 34),
 			"rama %d de %d" % [
 				clampi(seleccion, 0, opciones.size() - 1) + 1, opciones.size()],
-			HORIZONTAL_ALIGNMENT_RIGHT, _p.ancho_visible - 24, 11, C_TEXTO_TENUE)
+			HORIZONTAL_ALIGNMENT_RIGHT, _p.ancho_visible - 24, 8, C_TEXTO_TENUE)
 
 func _dibujar_cabecera() -> void:
 	_lienzo.draw_rect(Rect2(0, 0, _p.ancho_visible, 62), Color(C_CABINA, 0.9))
 	_lienzo.draw_string(_fuente, Vector2(24, 26),
 		"ACTO %d de %d" % [acto_visible() + 1, run.p.actos],
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 14, C_TEXTO)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 16, C_TEXTO)
 	_lienzo.draw_string(_fuente, Vector2(24, 46),
 		"%d nodos superados" % run.nodos_superados,
-		HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO_TENUE)
+		HORIZONTAL_ALIGNMENT_LEFT, -1, 8, C_TEXTO_TENUE)
 
 	# La vida, que es LA información del mapa: no se cura entre combates, así
 	# que es lo que decide por qué rama te la juegas.
@@ -326,7 +334,16 @@ func _dibujar_cabecera() -> void:
 	_lienzo.draw_rect(Rect2(_p.ancho_visible - 190, 14, 166, 10), C_CABINA)
 	_lienzo.draw_rect(Rect2(_p.ancho_visible - 190, 14, 166.0 * proporcion, 10), col)
 	_lienzo.draw_string(_fuente, Vector2(_p.ancho_visible - 190, 46),
-		"no se cura entre combates", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO_TENUE)
+		"no se cura entre combates", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, C_TEXTO_TENUE)
+
+	# Lo que llevas encima. Va en el mapa porque es donde se decide la rama, y la
+	# build que llevas es la mitad de esa decisión: con reliquias de aguantar
+	# compensa el élite, y sin ellas no. Los iconos del escritorio con tooltip
+	# son Fase 5; esto es la lista, que es lo que hace falta para poder jugarlo.
+	if run.bolsa != null and not run.bolsa.vacia():
+		_lienzo.draw_string(_fuente, Vector2(24, 62 + 14),
+			"llevas:  " + "  ·  ".join(run.bolsa.nombres()),
+			HORIZONTAL_ALIGNMENT_LEFT, _p.ancho_visible - 48, 8, C_ORO_CLARO)
 
 func _dibujar_pie(opciones: Array[int]) -> void:
 	var texto := "IZQUIERDA/DERECHA elegir rama  ·  ENTER entrar  ·  R reiniciar el run"
@@ -335,4 +352,4 @@ func _dibujar_pie(opciones: Array[int]) -> void:
 	# Justo ENCIMA de la ficha, no al borde de la pantalla: abajo ya no hay
 	# sitio libre, ahí está el retrato.
 	_lienzo.draw_string(_fuente, Vector2(24, _p.alto_visible - ALTO_FICHA - 10),
-		texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, C_TEXTO_TENUE)
+		texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, C_TEXTO_TENUE)

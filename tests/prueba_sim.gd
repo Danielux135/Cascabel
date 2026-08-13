@@ -41,6 +41,11 @@ func _initialize() -> void:
 	_prueba_identidad_recorridos()
 	_prueba_mapa()
 	_prueba_run()
+	_prueba_reliquias()
+	_prueba_misiones()
+	_prueba_criticos()
+	_prueba_fuente()
+	_prueba_cascara()
 	_prueba_paleta()
 
 	print("")
@@ -633,6 +638,22 @@ func _prueba_catalogo() -> void:
 			brutos.append("%s pega %d" % [e.id, e.ataque])
 	_comprobar("ningun ataque pasa de un quinto de la vida del jugador",
 		brutos.is_empty(), str(brutos))
+
+	# El reloj de cada enemigo tiene que crecer con su vida, y por la misma razón
+	# por la que el reloj es suyo: la vida dice cuánto DURA el combate y el reloj
+	# cuánto APRIETA. Un enemigo del acto III con el reloj del acto I dura el
+	# doble y come el doble de golpes, o sea que cuesta cuatro veces más sin que
+	# nadie lo haya decidido. Es la trampa de "cobrar por tiempo se paga al
+	# cuadrado", ahora a escala de tabla.
+	var relojes: Array[String] = []
+	for i in range(1, lista.size()):
+		var antes := Enemigo.new(lista[i - 1])
+		var ahora := Enemigo.new(lista[i])
+		if ahora.reloj < antes.reloj:
+			relojes.append("%s (%.0f) tras %s (%.0f)" % [
+				ahora.id, ahora.reloj, antes.id, antes.reloj])
+	_comprobar("el reloj crece con la vida a lo largo del catalogo",
+		relojes.is_empty(), str(relojes))
 
 ## Los adornos del suelo están colocados a mano, que es justo lo que se
 ## descoloca sin avisar. Aquí se comprueba que caben en el campo, que solo la
@@ -2037,6 +2058,937 @@ func _prueba_lanzador() -> void:
 		"se quedo en %s" % str(r["pos"]))
 	_comprobar("una bola lanzada a tope no se sale de la mesa",
 		r["escapes"] == 0, "%d fotogramas fuera" % r["escapes"])
+
+## Las reliquias (DISEÑO.md §10 y §8).
+##
+## LO QUE SE COMPRUEBA AQUÍ NO ES QUE LOS NÚMEROS SEAN BUENOS —eso lo mide
+## `tests/medir_reliquias.gd`, que no falla nunca— sino tres cosas que sí son
+## condiciones y no juicios:
+##
+##   1. que el catálogo cumpla el reparto que pide el diseño
+##   2. que una bolsa VACÍA sea exactamente neutra, o sea que un combate sin
+##      reliquias siga siendo el combate de antes y las medidas viejas valgan
+##   3. que ninguna reliquia tenga un efecto MUERTO: una clave escrita en el
+##      JSON que ningún sitio del código lea es una reliquia que no hace nada, y
+##      eso no da error, solo miente
+func _prueba_reliquias() -> void:
+	var catalogo := CatalogoReliquias.cargar()
+	_comprobar("el catalogo de reliquias carga", catalogo.size() >= 45,
+		"hay %d" % catalogo.size())
+
+	var ids := {}
+	var por_eje := {}
+	var ganchos := {}
+	var sin_texto: Array[String] = []
+	for r in catalogo:
+		ids[r.id] = int(ids.get(r.id, 0)) + 1
+		por_eje[r.eje] = int(por_eje.get(r.eje, 0)) + 1
+		ganchos[r.gancho] = true
+		if r.texto == "" or r.efectos.is_empty():
+			sin_texto.append(r.id)
+	_comprobar("no hay dos reliquias con el mismo id", ids.size() == catalogo.size())
+	_comprobar("todas dicen lo que hacen y hacen algo", sin_texto.is_empty(),
+		str(sin_texto))
+
+	# DISEÑO.md §8: los cinco ejes, repartidos por igual. Es lo que impide que
+	# sean cuarenta y cinco variantes de "+2 de daño".
+	var reparto_ok := por_eje.size() == Reliquia.NOMBRE_EJE.size()
+	var por_lado := catalogo.size() / maxi(Reliquia.NOMBRE_EJE.size(), 1)
+	for eje in por_eje:
+		if int(por_eje[eje]) != por_lado:
+			reparto_ok = false
+	_comprobar("los cinco ejes tienen las mismas reliquias cada uno", reparto_ok,
+		str(por_eje))
+	_comprobar("y cubren al menos seis ganchos distintos", ganchos.size() >= 6,
+		"%d ganchos" % ganchos.size())
+
+	# El pool tiene que ser MAYOR que lo que se ve en un run, o dos partidas
+	# enseñan lo mismo. Con 3 por combate y ~12 combates se ven ~36.
+	var pr := ParametrosRun.new()
+	var vistas := pr.actos * (pr.filas_por_acto + 1)
+	_comprobar("el cajon es mucho mayor que lo que cabe en un run",
+		catalogo.size() > vistas * 2,
+		"%d reliquias contra %d combates" % [catalogo.size(), vistas])
+
+	_prueba_la_vida_no_se_pasa()
+	_prueba_reloj_por_enemigo()
+	_prueba_bolsa_vacia_es_neutra()
+	_prueba_ningun_efecto_muerto(catalogo)
+	_prueba_condiciones(catalogo)
+	_prueba_iconos(catalogo)
+	_prueba_efectos_de_reliquia()
+	_prueba_run_con_reliquias(catalogo)
+
+## Las condiciones son la parte que puede fallar EN SILENCIO: un `cuando` mal
+## escrito no da error, solo apaga la reliquia para siempre. Y una condición con
+## umbral 0 en una comparación "mayor o igual" está siempre encendida, que es la
+## misma avería por el otro lado.
+func _prueba_condiciones(catalogo: Array[Reliquia]) -> void:
+	var raras: Array[String] = []
+	var sin_umbral: Array[String] = []
+	const PIDEN_UMBRAL := ["vida_baja", "vida_alta", "combo_alto", "reloj_cargado",
+		"reloj_frio", "enemigo_tocado", "enemigo_intacto"]
+	for r in catalogo:
+		if r.cuando == "":
+			continue
+		if not BolsaReliquias.CONDICIONES.has(r.cuando):
+			raras.append("%s: %s" % [r.id, r.cuando])
+		elif PIDEN_UMBRAL.has(r.cuando) and r.umbral <= 0.0:
+			sin_umbral.append(r.id)
+	_comprobar("ninguna condicion esta mal escrita", raras.is_empty(), str(raras))
+	_comprobar("toda condicion que compara trae su umbral", sin_umbral.is_empty(),
+		str(sin_umbral))
+
+	# Y que de verdad enciendan y apaguen. Se prueba con la bolsa a pelo, sin
+	# combate: lo que puede romperse aquí es la comparación, no el combate.
+	var b := BolsaReliquias.new()
+	var baja := Reliquia.new({"id": "x", "cuando": "vida_baja", "umbral": 0.3,
+		"efectos": {"factor_dano_global": 2.0}})
+	b.anadir(baja)
+	b.contexto = {"vida": 0.9}
+	_comprobar("una reliquia condicional esta apagada si no se cumple",
+		is_equal_approx(b.factor("factor_dano_global"), 1.0))
+	b.contexto = {"vida": 0.2}
+	_comprobar("y encendida cuando se cumple",
+		is_equal_approx(b.factor("factor_dano_global"), 2.0))
+	b.contexto = {}
+	_comprobar("sin contexto se da por apagada, que es el lado seguro",
+		is_equal_approx(b.factor("factor_dano_global"), 1.0))
+
+## Los iconos que se declaran tienen que existir en los dos tamaños. Una ruta
+## mal escrita deja una tarjeta sin dibujo y no da error: otra vez lo mismo.
+func _prueba_iconos(catalogo: Array[Reliquia]) -> void:
+	var faltan: Array[String] = []
+	var con_icono := 0
+	for r in catalogo:
+		if r.icono == "":
+			continue
+		con_icono += 1
+		for lado in [64, 32]:
+			if not ResourceLoader.exists(r.ruta_icono(lado)):
+				faltan.append(r.ruta_icono(lado))
+	_comprobar("todos los iconos declarados existen", faltan.is_empty(), str(faltan))
+	_comprobar("y hay arte para las 18 que lo tienen asignado", con_icono == 18,
+		"%d con icono" % con_icono)
+
+## LA VIDA NO SE PASA DE LA MÁXIMA. Nunca, por ninguna vía.
+##
+## Salió jugando: "215/180". El fallo no era la curación —esa estaba topada— era
+## que el HUD dividía por `p.vida_jugador`, o sea la vida de partida, sin contar
+## lo que suman las reliquias. El dato estaba bien y el denominador no, que es
+## la avería de siempre con otra cara. Se comprueban las dos vías: la que cura
+## dentro del combate y la que sube el techo a mitad de run.
+func _prueba_la_vida_no_se_pasa() -> void:
+	var purga := _combate_con(["valvula_de_purga"])
+	for _i in 40:
+		_recorrido(purga, Rampa.Premio.DANO)
+	_comprobar("curarse en combate no pasa del maximo",
+		purga.vida_jugador <= purga.vida_maxima(),
+		"%d/%d" % [purga.vida_jugador, purga.vida_maxima()])
+
+	# Y la vida máxima que enseña el combate tiene que ser la MISMA que lleva el
+	# run: si se separan, una de las dos pantallas miente.
+	var enemigos := CatalogoEnemigos.cargar()
+	var chapa := CatalogoReliquias.por_id("chapa_remachada")
+	var memoria := CatalogoReliquias.por_id("memoria_reservada")
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 5)
+	r.bolsa.anadir(chapa)
+	r.bolsa.anadir(memoria)
+	r.elegir(r.opciones()[0])
+	r.resolver_combate(true, r.vida)
+	var c := Combate.new(ParametrosCombate.new())
+	c.bolsa = r.bolsa
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000, "ataque": 1}), r.vida)
+	_comprobar("el maximo del combate y el del run son el mismo numero",
+		c.vida_maxima() == r.vida_maxima,
+		"combate %d, run %d" % [c.vida_maxima(), r.vida_maxima])
+	_comprobar("y la vida del run nunca lo pasa", r.vida <= r.vida_maxima,
+		"%d/%d" % [r.vida, r.vida_maxima])
+
+## Cada enemigo tiene su reloj. Es lo que separa cuánto DURA un combate de
+## cuánto APRIETA, y sin eso los combates de dos a cinco minutos no cuadran:
+## el coste crece con el tiempo, así que con un reloj único todos acababan
+## costando lo mismo en proporción.
+func _prueba_reloj_por_enemigo() -> void:
+	var p := ParametrosCombate.new()
+	var lento := Combate.new(p)
+	lento.iniciar(Enemigo.new({"nombre": "Lento", "vida": 100000, "ataque": 5,
+		"reloj": 30.0}))
+	_comprobar("un enemigo con reloj propio lo usa",
+		is_equal_approx(lento.reloj_carga(), 30.0)
+			and lento.reloj_restante() > p.reloj_carga,
+		"carga %.1f" % lento.reloj_carga())
+
+	var sin_reloj := Combate.new(ParametrosCombate.new())
+	sin_reloj.iniciar(Enemigo.new({"nombre": "Normal", "vida": 100000, "ataque": 5}))
+	_comprobar("y sin reloj propio cae en el del parametro",
+		is_equal_approx(sin_reloj.reloj_carga(), sin_reloj.p.reloj_carga))
+
+	# Todos los del catálogo tienen que traerlo: uno sin él se colaría con el
+	# reloj de reserva y duraría lo mismo pero apretando el doble.
+	var faltan: Array[String] = []
+	for datos in CatalogoEnemigos.cargar():
+		if float((datos as Dictionary).get("reloj", 0.0)) <= 0.0:
+			faltan.append(str((datos as Dictionary).get("id", "?")))
+	_comprobar("todos los enemigos del catalogo traen su reloj",
+		faltan.is_empty(), str(faltan))
+
+## Una bolsa vacía tiene que devolver el neutro de cada tipo. Si no, TODO el
+## balance medido en la sesión anterior deja de valer sin avisar.
+func _prueba_bolsa_vacia_es_neutra() -> void:
+	var b := BolsaReliquias.new()
+	_comprobar("una bolsa vacia suma cero", is_equal_approx(b.suma("lo_que_sea"), 0.0))
+	_comprobar("una bolsa vacia multiplica por uno",
+		is_equal_approx(b.factor("lo_que_sea"), 1.0))
+	_comprobar("una bolsa vacia no levanta ninguna bandera",
+		not b.bandera("lo_que_sea"))
+	_comprobar("y no gasta azar si nadie le da probabilidad",
+		not b.azar("suma_prob_critico"))
+
+	# Y el combate con ella tiene que pegar lo de siempre.
+	var c := Combate.new()
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
+	_en_juego(c)
+	var vida := c.enemigo.vida
+	c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("sin reliquias un target pega exactamente su dano base",
+		vida - c.enemigo.vida == c.p.dano_target,
+		"pego %d, base %d" % [vida - c.enemigo.vida, c.p.dano_target])
+	_comprobar("y la vida maxima es la de los parametros",
+		c.vida_maxima() == c.p.vida_jugador)
+
+## Ningún efecto muerto: cada clave del JSON tiene que leerla alguien.
+##
+## Esta es la prueba que de verdad protege el sistema. Un `factor_dano_canom`
+## mal escrito en el JSON no da error, no rompe nada y deja una reliquia que no
+## hace absolutamente nada: el jugador la coge, ve que "no se nota" y el fallo
+## se diagnostica como balance. Ya pasó con el platillo, en otra forma.
+func _prueba_ningun_efecto_muerto(catalogo: Array[Reliquia]) -> void:
+	var codigo := ""
+	for archivo in ["combate.gd", "run.gd", "bolsa_reliquias.gd"]:
+		codigo += FileAccess.get_file_as_string("res://sim/" + archivo)
+	var muertos: Array[String] = []
+	for r in catalogo:
+		for clave in r.efectos:
+			var base := str(clave).trim_suffix(BolsaReliquias.SUFIJO_VICTORIA)
+			if not codigo.contains('"%s"' % base):
+				muertos.append("%s: %s" % [r.id, str(clave)])
+	_comprobar("ninguna reliquia tiene un efecto que nadie lee",
+		muertos.is_empty(), str(muertos))
+
+	# Y al revés: los prefijos deciden cómo se acumula, así que una clave con un
+	# prefijo raro se acumularía de una forma que quien la escribió no eligió.
+	var raras: Array[String] = []
+	for r in catalogo:
+		for clave in r.efectos:
+			var c := str(clave)
+			if not (c.begins_with("suma_") or c.begins_with("factor_")
+					or c.begins_with("bandera_")):
+				raras.append("%s: %s" % [r.id, c])
+	_comprobar("todas las claves llevan un prefijo conocido", raras.is_empty(),
+		str(raras))
+
+## Un combate con las reliquias puestas. Se comparan contra el mismo combate sin
+## ellas, y todo se escribe contra los PARÁMETROS: un número a mano aquí mediría
+## la escala de daño, no la reliquia.
+func _combate_con(ids: Array) -> Combate:
+	var c := Combate.new()
+	for el_id in ids:
+		var r := CatalogoReliquias.por_id(str(el_id))
+		if r != null:
+			c.bolsa.anadir(r)
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 20}))
+	_en_juego(c)
+	return c
+
+## Daño de un evento suelto, con la bolsa que se le ponga.
+func _dano_de(c: Combate, evento: String) -> int:
+	var vida := c.enemigo.vida
+	var punto := Vector2(200, 800)
+	match evento:
+		"target": c.mesa.target_abatido.emit(punto, 0)
+		"banco": c.mesa.banco_completado.emit(punto, 0)
+		"bumper": c.mesa.bumper_golpeado.emit(punto, 500.0)
+		"canon":
+			for i in c.mesa.rampas.size():
+				if (c.mesa.rampas[i] as Rampa).premio == Rampa.Premio.DANO_FUERTE:
+					c.mesa.rampa_salida.emit(punto, i)
+					break
+	return vida - c.enemigo.vida
+
+func _prueba_efectos_de_reliquia() -> void:
+	# El cañón, que es el eje de golpe único: la reliquia toca ESE tiro y no los
+	# demás. Si tocara todo sería un "+ daño" con nombre bonito.
+	var pelado := _combate_con([])
+	var canon := _combate_con(["culata_reforzada"])
+	_comprobar("la culata sube el canon y solo el canon",
+		_dano_de(canon, "canon") > _dano_de(pelado, "canon")
+			and _dano_de(canon, "target") == _dano_de(pelado, "target"))
+
+	# El banco.
+	var banco := _combate_con(["punteria_fria"])
+	_comprobar("la punteria fria dobla lo que paga cerrar un banco",
+		_dano_de(banco, "banco") == _dano_de(pelado, "banco") * 2,
+		"%d contra %d" % [_dano_de(banco, "banco"), _dano_de(pelado, "banco")])
+
+	# El primer golpe de la bola, y SOLO el primero.
+	var cerrojo := _combate_con(["cerrojo"])
+	var primero := _dano_de(cerrojo, "target")
+	var segundo := _dano_de(cerrojo, "target")
+	_comprobar("el cerrojo triplica el primer golpe de la bola",
+		primero > segundo, "%d y luego %d" % [primero, segundo])
+
+	# El relleno: sin reliquia el bumper NO cobra del multiplicador, con ella sí.
+	# Es la que cambia CÓMO juegas, y por eso se comprueba con el combo alto.
+	var normal := _combate_con([])
+	var plata := _combate_con(["cascabel_de_plata"])
+	for c in [normal, plata]:
+		_golpear(c, 12)
+	_comprobar("el racimo sigue sin cobrar del combo si no llevas el cascabel",
+		normal.multiplicador() > 1
+			and _dano_de(normal, "bumper") == normal.p.dano_bumper,
+		"x%d, pego %d" % [normal.multiplicador(), _dano_de(normal, "bumper")])
+	_comprobar("y con el cascabel el racimo cobra del combo aunque pegue la mitad",
+		_dano_de(plata, "bumper") > plata.p.dano_bumper,
+		"x%d, pego %d" % [plata.multiplicador(), _dano_de(plata, "bumper")])
+
+	# Los tramos del combo. Se comparan contra `tramos()`, no contra un número.
+	var muelle := _combate_con(["muelle_tenso"])
+	_comprobar("el muelle adelanta los tramos sin tocar los parametros",
+		int((muelle.tramos()[1] as Dictionary)["golpes"])
+			< int((pelado.tramos()[1] as Dictionary)["golpes"])
+			and pelado.p.tramos_combo.size() == muelle.p.tramos_combo.size(),
+		str(muelle.tramos()))
+	var cuerda := _combate_con(["cuerda_de_mas"])
+	_comprobar("la cuerda anade un tramo por encima del ultimo",
+		cuerda.tramos().size() == pelado.tramos().size() + 1
+			and int((cuerda.tramos().back() as Dictionary)["factor"])
+				> int((pelado.tramos().back() as Dictionary)["factor"]))
+
+	_prueba_reliquias_defensivas()
+	_prueba_ganchos_nuevos()
+
+## Los ganchos que existen para que las cuarenta y cinco quepan sin escribir
+## código por reliquia. Cada uno se mide por su efecto observable, no por la
+## clave: si mañana la clave cambia de nombre, esto tiene que seguir valiendo.
+func _prueba_ganchos_nuevos() -> void:
+	# "al entrar en combate": empezar con el reloj atrasado.
+	var frio := _combate_con(["arranque_en_frio"])
+	_comprobar("una reliquia puede atrasar el reloj antes de empezar",
+		frio.carga_reloj < 0.0 and frio.reloj_restante() > frio.p.reloj_carga,
+		"carga %.2f, quedan %.1f s" % [frio.carga_reloj, frio.reloj_restante()])
+
+	# "al empezar la bola": combo puesto de salida, en la primera bola y en las
+	# siguientes. La segunda es la que se olvida y la que de verdad importa.
+	var caliente := _combate_con(["arranque_en_caliente"])
+	var combo_inicial := caliente.multiplicador()
+	_comprobar("la bola puede llegar con combo puesto", combo_inicial > 1,
+		"x%d con %d golpes" % [combo_inicial, caliente.golpes])
+	_drenar(caliente)
+	_avanzar_combate(caliente, caliente.p.pausa_drenaje + caliente.p.pausa_ataque
+		+ DT * 8.0)
+	_comprobar("y la bola siguiente tambien, no solo la primera",
+		caliente.multiplicador() == combo_inicial,
+		"x%d con %d golpes" % [caliente.multiplicador(), caliente.golpes])
+
+	# "al drenar": conservar parte del combo.
+	var nudo := _combate_con(["nudo_corredizo"])
+	_golpear(nudo, 12)
+	var antes_de_drenar := nudo.golpes
+	_drenar(nudo)
+	_comprobar("una reliquia puede salvar parte del combo al drenar",
+		nudo.golpes > 0 and nudo.golpes < antes_de_drenar,
+		"%d de %d" % [nudo.golpes, antes_de_drenar])
+
+	# "al completar un recorrido": subir combo y curar, que son premios que NO
+	# son daño y por eso no caben dentro de `_golpear`.
+	var tren := _combate_con(["tren_de_engranajes"])
+	var golpes_antes := tren.golpes
+	_recorrido(tren, Rampa.Premio.DANO)
+	_comprobar("un recorrido puede sumar golpes de combo",
+		tren.golpes >= golpes_antes + 3, "%d y luego %d" % [golpes_antes, tren.golpes])
+
+	var purga := _combate_con(["valvula_de_purga"])
+	purga.vida_jugador = 50
+	_recorrido(purga, Rampa.Premio.DANO)
+	_comprobar("y un recorrido puede curar", purga.vida_jugador > 50,
+		"vida %d" % purga.vida_jugador)
+
+	# Robar reloj desde un target, que antes solo sabía hacer el platillo.
+	var seda := _combate_con(["carrete_de_seda"])
+	_avanzar_combate(seda, 3.0)
+	var carga := seda.carga_reloj
+	seda.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("un target puede robarle reloj al enemigo", seda.carga_reloj < carga,
+		"%.3f y luego %.3f" % [carga, seda.carga_reloj])
+
+	# El ataque del enemigo, que baja igual venga del reloj o del drenaje.
+	var duro := _combate_con([])
+	var blindado := _combate_con(["amortiguador"])
+	for c in [duro, blindado]:
+		_drenar(c)
+		_avanzar_combate(c, c.p.pausa_drenaje + DT * 4.0)
+	_comprobar("una armadura baja el golpe del enemigo",
+		blindado.ultimo_ataque < duro.ultimo_ataque,
+		"%d contra %d" % [blindado.ultimo_ataque, duro.ultimo_ataque])
+
+	_prueba_condicion_en_combate()
+
+## Una condicional dentro del combate de verdad, que es donde se puede romper:
+## el contexto lo publica `Combate` y si se publicara tarde, la reliquia miraría
+## el estado del golpe anterior.
+func _prueba_condicion_en_combate() -> void:
+	var panico := _combate_con(["panico_del_kernel"])
+	panico.vida_jugador = panico.vida_maxima()
+	var sano := _dano_de(panico, "target")
+	panico.vida_jugador = int(float(panico.vida_maxima()) * 0.1)
+	var tocado := _dano_de(panico, "target")
+	_comprobar("una reliquia condicional se enciende dentro del combate",
+		tocado > sano, "%d sano, %d tocado" % [sano, tocado])
+
+	# Y el combo alto: el golpe que CRUZA el umbral no se cobra a sí mismo el
+	# premio de haberlo cruzado. Si lo hiciera, el escalón se movería un golpe y
+	# la reliquia diría x3 cuando en realidad empieza a x2.
+	var metro := _combate_con(["metronomo"])
+	_golpear(metro, 9)
+	var cruza := _dano_de(metro, "target")
+	var siguiente := _dano_de(metro, "target")
+	_comprobar("el contexto se lee antes de sumar el golpe, no despues",
+		metro.multiplicador() >= 3 and siguiente > cruza,
+		"x%d, cruza %d, siguiente %d" % [metro.multiplicador(), cruza, siguiente])
+
+## Dispara la rampa que tenga ese premio, como hace el medidor.
+func _recorrido(c: Combate, premio: int) -> void:
+	for i in c.mesa.rampas.size():
+		if (c.mesa.rampas[i] as Rampa).premio == premio:
+			c.mesa.rampa_salida.emit(Vector2(200, 800), i)
+			return
+
+## Las que tocan el castigo, no el daño. Se miden por lo que le cuesta al
+## jugador, que es la unidad en la que está escrito el balance.
+func _prueba_reliquias_defensivas() -> void:
+	# Drenar más barato.
+	var duro := _combate_con([])
+	var blando := _combate_con(["gomas_nuevas"])
+	for c in [duro, blando]:
+		_drenar(c)
+		_avanzar_combate(c, c.p.pausa_drenaje + DT * 4.0)
+	var coste_duro := duro.vida_maxima() - duro.vida_jugador
+	var coste_blando := blando.vida_maxima() - blando.vida_jugador
+	_comprobar("las gomas nuevas abaratan el drenaje", coste_blando < coste_duro,
+		"%d contra %d" % [coste_blando, coste_duro])
+
+	# La red de seguridad: una vez por combate, y la segunda ya cobra.
+	var red := _combate_con(["copia_de_seguridad"])
+	_golpear(red, 6)
+	_drenar(red)
+	_avanzar_combate(red, red.p.pausa_drenaje + red.p.pausa_ataque + DT * 8.0)
+	_comprobar("la copia de seguridad se come el primer drenaje entero",
+		red.vida_jugador == red.vida_maxima() and red.golpes == 6,
+		"vida %d, %d golpes" % [red.vida_jugador, red.golpes])
+	_drenar(red)
+	_avanzar_combate(red, red.p.pausa_drenaje + red.p.pausa_ataque + DT * 8.0)
+	_comprobar("y el segundo drenaje ya cuesta como siempre",
+		red.vida_jugador < red.vida_maxima() and red.golpes == 0,
+		"vida %d, %d golpes" % [red.vida_jugador, red.golpes])
+
+	# El reloj más lento. Se mide en la carga de la barra, que es lo que ve el
+	# jugador, y en los segundos que se le enseñan, que tienen que cuadrar.
+	var rapido := _combate_con([])
+	var lento := _combate_con(["placa_termica"])
+	for c in [rapido, lento]:
+		_avanzar_combate(c, 3.0)
+	_comprobar("la placa termica frena el reloj del enemigo",
+		lento.carga_reloj < rapido.carga_reloj,
+		"%.3f contra %.3f" % [lento.carga_reloj, rapido.carga_reloj])
+	_comprobar("y los segundos que se ensenan cuadran con lo que tarda de verdad",
+		lento.reloj_restante() > rapido.reloj_restante()
+			and lento.reloj_restante() > lento.p.reloj_carga - 3.0,
+		"quedan %.2f s" % lento.reloj_restante())
+
+## El run con reliquias: que se ofrezcan tres, que no se repitan, que se pueda
+## que se pueda repetir la tirada y que el eje de escalado crezca con las
+## victorias y no antes.
+func _prueba_run_con_reliquias(catalogo: Array[Reliquia]) -> void:
+	var enemigos := CatalogoEnemigos.cargar()
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 77,
+		catalogo)
+	_comprobar("un run empieza sin reliquias", r.bolsa.vacia())
+
+	# Un run SIN catálogo de reliquias tiene que comportarse como antes, o las
+	# medidas de las sesiones anteriores dejan de valer.
+	var pelado := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 77)
+	pelado.elegir(pelado.opciones()[0])
+	pelado.resolver_combate(true, 100)
+	_comprobar("sin catalogo de reliquias el run no tira ruleta y sigue igual",
+		pelado.fase == Run.Fase.ELIGIENDO and pelado.premio == null)
+
+	var tomadas: Array[String] = []
+	var vueltas := 0
+	var rarezas := [Mision.Rareza.COMUN, Mision.Rareza.RARA, Mision.Rareza.ARCANA]
+	while not r.terminada() and vueltas < 60:
+		vueltas += 1
+		if r.fase == Run.Fase.RULETA:
+			_comprobar_una_vez("la ruleta trae sus casillas y un premio",
+				r.premio != null and r.casillas.size() == r.p.casillas_ruleta
+					and r.casillas[0] == r.premio,
+				"%d casillas" % r.casillas.size())
+			var repetida := false
+			for c in r.casillas:
+				if r.bolsa.tiene(c.id):
+					repetida = true
+			_comprobar_una_vez("y nunca sale una que ya llevas", not repetida)
+			var ganada := r.aceptar_premio()
+			if ganada != null:
+				tomadas.append(ganada.id)
+			continue
+		var opciones := r.opciones()
+		if opciones.is_empty():
+			break
+		var nodo := r.elegir(opciones[0])
+		if nodo == null:
+			break
+		if nodo.es_combate():
+			# Las reliquias se ganan completando misiones DENTRO del combate.
+			r.abrir_ruleta(int(rarezas[vueltas % 3]))
+			if r.fase == Run.Fase.RULETA:
+				var g := r.aceptar_premio()
+				if g != null:
+					tomadas.append(g.id)
+			r.resolver_combate(true, r.vida)
+	_comprobar("un run entero acumula reliquias distintas",
+		tomadas.size() >= 3 and tomadas.size() == _sin_repetir(tomadas).size(),
+		"%d tomadas: %s" % [tomadas.size(), str(tomadas)])
+	# El eje de escalado se paga por COMBATES ganados, no por nodos: un descanso
+	# es un nodo superado y no tiene que contar, o descansar daría poder además
+	# de vida.
+	_comprobar("las victorias no pueden pasar de los nodos superados",
+		r.bolsa.victorias > 0 and r.bolsa.victorias <= r.nodos_superados,
+		"%d victorias, %d nodos" % [r.bolsa.victorias, r.nodos_superados])
+
+	_prueba_ruleta(enemigos, catalogo)
+	_prueba_no_se_cuelga(enemigos, catalogo)
+	_prueba_descanso_no_da_poder(enemigos, catalogo)
+
+## La ruleta. Lo que puede romperse aquí no es el sorteo, es que la repetición
+## cambie algo que no debe, o que la animación pueda alterar el premio.
+func _prueba_ruleta(enemigos: Array, catalogo: Array[Reliquia]) -> void:
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 99,
+		catalogo)
+	r.elegir(r.opciones()[0])
+	# GANAR EL COMBATE YA NO DA NADA. La ruleta la abre completar una misión, y
+	# la abre a mitad de combate: es lo que pidió Daniel y lo que hacen el
+	# pinball del XP y Pokémon Pinball.
+	r.resolver_combate(true, 100)
+	_comprobar("ganar un combate NO abre la ruleta",
+		r.fase == Run.Fase.ELIGIENDO and r.premio == null)
+	_comprobar("la ruleta la abre una mision, con su rareza",
+		r.abrir_ruleta(Mision.Rareza.RARA) and r.premio != null
+			and r.premio.rareza == Mision.Rareza.RARA,
+		"salio %s" % (r.premio.nombre_rareza() if r.premio != null else "nada"))
+	_comprobar("y trae una repeticion, ni cero ni dos",
+		r.repeticiones == r.p.repeticiones_ruleta and r.repeticiones == 1,
+		"%d" % r.repeticiones)
+
+	# EL PREMIO SE SORTEA ANTES DE GIRAR NADA. Es lo que permite que la
+	# animación se pueda saltar o perder un fotograma sin cambiar lo que toca.
+	var antes := r.premio
+	_comprobar("mirar la ruleta no la cambia", r.premio == antes)
+
+	var primero := r.premio
+	_comprobar("se puede repetir la tirada una vez", r.repetir_tirada())
+	_comprobar("y solo una", not r.repetir_tirada() and r.repeticiones == 0)
+	_comprobar("repetir deja un premio valido", r.premio != null,
+		"antes %s" % (primero.id if primero != null else "—"))
+
+	var ganada := r.aceptar_premio()
+	_comprobar("aceptar mete la reliquia en la bolsa y cierra la ruleta",
+		ganada != null and r.bolsa.tiene(ganada.id) and r.premio == null
+			and r.fase != Run.Fase.RULETA)
+	_comprobar("aceptar dos veces no regala una segunda",
+		r.aceptar_premio() == null and r.bolsa.reliquias.size() == 1)
+
+	# Y perder no regala nada.
+	var r3 := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 99,
+		catalogo)
+	r3.elegir(r3.opciones()[0])
+	r3.resolver_combate(false, 0)
+	_comprobar("con el run perdido la ruleta ya no se abre",
+		r3.terminada() and not r3.abrir_ruleta(Mision.Rareza.COMUN))
+
+## EL CUELGUE DE LA PANTALLA DEL MAPA. El golpe que completaba la última misión
+## podía ser el mismo que mataba al enemigo: el run entraba en RULETA, el
+## combate intentaba cerrarse, `resolver_combate` se iba de puntillas por estar
+## en otra fase, y el run se quedaba en RULETA para siempre. El mapa salía sin
+## ninguna rama viva y no respondía a nada. Ni error ni aviso: pantalla muerta.
+func _prueba_no_se_cuelga(enemigos: Array, catalogo: Array[Reliquia]) -> void:
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos, 4,
+		catalogo)
+	r.elegir(r.opciones()[0])
+	_comprobar("se puede abrir la ruleta en mitad de un combate",
+		r.abrir_ruleta(Mision.Rareza.COMUN) and r.fase == Run.Fase.RULETA)
+	# Y ahora el combate se acaba con la ruleta abierta, que es el caso que
+	# colgaba la partida.
+	r.resolver_combate(true, 500)
+	_comprobar("un combate que acaba con la ruleta abierta no cuelga el run",
+		r.fase == Run.Fase.ELIGIENDO and not r.opciones().is_empty(),
+		"fase %d, %d opciones" % [r.fase, r.opciones().size()])
+	_comprobar("y la reliquia que ya estaba ganada no se pierde por el camino",
+		not r.bolsa.vacia())
+
+	# La regla de fondo: FUERA de un run terminado, el mapa nunca puede quedarse
+	# sin salidas. Si esto falla, la pantalla no responde y no hay error.
+	var vueltas := 0
+	while not r.terminada() and vueltas < 60:
+		vueltas += 1
+		if r.fase == Run.Fase.RULETA:
+			r.aceptar_premio()
+			continue
+		_comprobar_una_vez("el mapa nunca se queda sin ramas",
+			not r.opciones().is_empty(),
+			"fila %d, fase %d" % [r.fila, r.fase])
+		if r.opciones().is_empty():
+			break
+		var nodo := r.elegir(r.opciones()[0])
+		if nodo == null:
+			break
+		if nodo.es_combate():
+			r.abrir_ruleta(Mision.Rareza.COMUN)
+			r.resolver_combate(true, r.vida)
+
+func _prueba_descanso_no_da_poder(enemigos: Array, catalogo: Array[Reliquia]) -> void:
+	# Se busca una semilla que tenga descanso alcanzable y se recorre hasta él.
+	for semilla in [3, 7, 11, 19, 23, 29, 31, 37]:
+		var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), enemigos,
+			int(semilla), catalogo)
+		var vueltas := 0
+		while not r.terminada() and vueltas < 60:
+			vueltas += 1
+			if r.fase == Run.Fase.RULETA:
+				r.aceptar_premio()
+				continue
+			var opciones := r.opciones()
+			if opciones.is_empty():
+				break
+			var antes := r.bolsa.victorias
+			# Se va a por el descanso si lo hay en la fila siguiente: es lo que
+			# se quiere medir, y la rama por la que se llegue da igual.
+			var destino: int = opciones[0]
+			for c in opciones:
+				var candidato := r.mapa.nodo(r.fila + 1, c)
+				if candidato.tipo == NodoMapa.Tipo.DESCANSO:
+					destino = c
+					break
+			var nodo := r.elegir(destino)
+			if nodo == null:
+				break
+			if not nodo.es_combate():
+				_comprobar("descansar no cuenta como victoria ni tira ruleta",
+					r.bolsa.victorias == antes and r.premio == null,
+					"%d antes, %d despues" % [antes, r.bolsa.victorias])
+				return
+			r.resolver_combate(true, r.vida)
+	_comprobar("descansar no cuenta como victoria ni tira ruleta", true,
+		"ninguna semilla paso por un descanso")
+
+func _sin_repetir(lista: Array[String]) -> Array[String]:
+	var vistos := {}
+	var salida: Array[String] = []
+	for x in lista:
+		if not vistos.has(x):
+			vistos[x] = true
+			salida.append(x)
+	return salida
+
+## Para las comprobaciones dentro de un bucle: interesa que se cumpla siempre,
+## no contar doce pruebas iguales en el listado.
+var _una_vez := {}
+
+func _comprobar_una_vez(nombre: String, condicion: bool, detalle: String = "") -> void:
+	if _una_vez.has(nombre):
+		if not condicion and bool(_una_vez[nombre]):
+			_una_vez[nombre] = false
+		return
+	_una_vez[nombre] = condicion
+	_comprobar(nombre, condicion, detalle)
+
+## Los críticos. Lo que puede romperse: que la probabilidad no llegue al golpe,
+## o que una reliquia de crítico no sume nada.
+func _prueba_criticos() -> void:
+	var c := Combate.new()
+	_comprobar("hay probabilidad de critico de base",
+		c.prob_critico() > 0.0 and c.factor_critico() > 1.0,
+		"%.2f x%.1f" % [c.prob_critico(), c.factor_critico()])
+
+	var cargado := _combate_con(["excepcion_no_capturada"])
+	_comprobar("una reliquia sube la probabilidad de critico",
+		cargado.prob_critico() > cargado.p.prob_critico,
+		"%.2f contra %.2f" % [cargado.prob_critico(), cargado.p.prob_critico])
+
+	# Con la probabilidad a tope, TODOS los golpes tienen que salir críticos y
+	# pegar el doble. Se fuerza por parámetro, no por reliquia: lo que se está
+	# comprobando es el mecanismo, no una reliquia concreta.
+	var p := ParametrosCombate.new()
+	p.prob_critico = 1.0
+	var seguro := Combate.new(p)
+	seguro.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1}))
+	_en_juego(seguro)
+	var criticos := 0
+	seguro.golpe_critico.connect(func(_pt: Vector2, _d: int) -> void: criticos += 1)
+	var pegado := _dano_de(seguro, "target")
+	_comprobar("con la probabilidad al 100% el golpe sale critico y avisa",
+		criticos == 1 and pegado == int(round(float(seguro.p.dano_target)
+			* seguro.factor_critico())),
+		"%d criticos, pego %d" % [criticos, pegado])
+
+	# Y a cero no sale ninguno: el azar no puede colarse en una medida.
+	var nunca := ParametrosCombate.new()
+	nunca.prob_critico = 0.0
+	var limpio := Combate.new(nunca)
+	limpio.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1}))
+	_en_juego(limpio)
+	_comprobar("y a cero no hay criticos, asi que las medidas siguen siendo fijas",
+		_dano_de(limpio, "target") == limpio.p.dano_target)
+
+## Las misiones de mesa, que son la ÚNICA forma de ganar una reliquia.
+##
+## Lo que puede romperse aquí y no daría error: un tiro mal escrito en el JSON
+## deja una misión imposible, y una misión imposible corta la escalera entera de
+## ese combate. El jugador no ve un error: ve que no le dan nada.
+func _prueba_misiones() -> void:
+	var catalogo := CatalogoMisiones.cargar()
+	_comprobar("el catalogo de misiones carga", catalogo.size() >= 12,
+		"hay %d" % catalogo.size())
+
+	# Los tiros tienen que ser los que cuenta `Combate`. La lista se saca del
+	# propio código, no de una copia a mano: una copia se queda vieja.
+	var codigo := FileAccess.get_file_as_string("res://sim/combate.gd")
+	var malos: Array[String] = []
+	var por_rareza := {}
+	for m in catalogo:
+		por_rareza[m.rareza] = int(por_rareza.get(m.rareza, 0)) + 1
+		if m.tiros.is_empty() or m.texto == "":
+			malos.append(m.id + " (vacia)")
+		for i in m.tiros.size():
+			if not codigo.contains('_apuntar("%s")' % m.tiro(i)):
+				malos.append("%s: %s" % [m.id, m.tiro(i)])
+	_comprobar("ningun tiro de mision esta mal escrito", malos.is_empty(),
+		str(malos))
+	_comprobar("hay misiones de las tres rarezas",
+		por_rareza.size() == Mision.NOMBRE_RAREZA.size(), str(por_rareza))
+
+	_prueba_escalera_de_misiones(catalogo)
+
+func _prueba_escalera_de_misiones(catalogo: Array[Mision]) -> void:
+	# Una escalera hecha a mano para no depender del sorteo.
+	var comun: Mision = null
+	var arcana: Mision = null
+	for m in catalogo:
+		if comun == null and m.rareza == Mision.Rareza.COMUN:
+			comun = m
+		if arcana == null and m.rareza == Mision.Rareza.ARCANA and m.sin_drenar:
+			arcana = m
+	var escalera: Array[Mision] = [comun, arcana]
+
+	var c := Combate.new()
+	var completadas: Array[Mision] = []
+	c.mision_completada.connect(func(m: Mision) -> void: completadas.append(m))
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 5}),
+		-1, escalera)
+	_en_juego(c)
+	_comprobar("el combate arranca con la primera mision puesta",
+		c.mision() == comun and c.paso_actual() == 0)
+
+	# Completarla entera sube al escalón siguiente y avisa una sola vez.
+	for i in comun.tiros.size():
+		for _k in comun.veces(i):
+			_tiro_de_mision(c, comun.tiro(i))
+	_comprobar("completar una mision pasa a la siguiente y avisa",
+		completadas.size() == 1 and completadas[0] == comun
+			and c.mision() == arcana,
+		"%d completadas" % completadas.size())
+
+	# Y una misión que pide no drenar se reinicia al drenar.
+	_tiro_de_mision(c, arcana.tiro(0))
+	var llevaba := c.llevas(0)
+	_drenar(c)
+	_comprobar("drenar reinicia una mision que pedia aguantar la bola",
+		llevaba > 0 and c.llevas(0) == 0,
+		"llevaba %d, lleva %d" % [llevaba, c.llevas(0)])
+
+	# Sin escalera el combate se juega igual: es lo que deja correr los medidores.
+	var pelado := Combate.new()
+	pelado.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000, "ataque": 5}))
+	_en_juego(pelado)
+	_golpear(pelado, 5)
+	_comprobar("sin misiones el combate se juega igual",
+		pelado.mision() == null and pelado.golpes == 5)
+
+	# Y la medida del jugador, que es lo que permite escribir la tabla exacta.
+	_comprobar("el combate mide el dano por bola del jugador de verdad",
+		pelado.dano_por_bola() > 0.0 and pelado.bolas_jugadas >= 1,
+		"%.0f en %d bolas" % [pelado.dano_por_bola(), pelado.bolas_jugadas])
+
+## Dispara el evento de mesa que corresponde a un tiro de misión.
+func _tiro_de_mision(c: Combate, tiro: String) -> void:
+	var punto := Vector2(200, 800)
+	match tiro:
+		"bumper": c.mesa.bumper_golpeado.emit(punto, 500.0)
+		"girador": c.mesa.girador_girado.emit(punto, 0, 500.0)
+		"target": c.mesa.target_abatido.emit(punto, 0)
+		"banco": c.mesa.banco_completado.emit(punto, 0)
+		"platillo": c.mesa.platillo_expulsado.emit(punto, 0)
+		"orbita": _recorrido(c, Rampa.Premio.MULTIPLICADOR)
+		"canon": _recorrido(c, Rampa.Premio.DANO_FUERTE)
+		"retorno": _recorrido(c, Rampa.Premio.DANO)
+
+## La fuente tiene que saber escribir en castellano.
+##
+## Salió jugando: no había ni acentos ni ñ en ninguna pantalla. La causa era que
+## todo cogía la fuente de reserva de Godot, que solo trae ASCII, así que
+## "MANTÉN" salía como "MANTN". Un glifo que falta no da error: deja un hueco, y
+## nadie mira un hueco. Por eso esto se comprueba y no se supone.
+func _prueba_fuente() -> void:
+	_comprobar("la fuente sabe escribir acentos y enes",
+		FuenteUI.tiene_castellano(),
+		"faltan glifos de '%s' — relanza `python3 fuente.py`" % FuenteUI.LETRAS)
+
+	# LA FUENTE ES NUESTRA Y ES PIXELART. Si esto cae en la de reserva de Godot,
+	# el texto vuelve a ser una tipografía suave alrededor de una mesa de
+	# píxeles duros, que es lo que hacía que la cáscara pareciera dos programas
+	# distintos pegados.
+	_comprobar("la fuente es la de mapa de bits del juego, no una de reserva",
+		FuenteUI.obtener() is FontFile and FuenteUI.alto() == 8,
+		"alto %d" % FuenteUI.alto())
+
+	# Y todo el texto tiene que pedir múltiplos de la celda: un 11 escala la
+	# fuente por 1,375 y le come filas de píxeles a media letra. Es la misma
+	# regla de escalado por enteros que la mesa, aplicada a las letras.
+	var u := FuenteUI.alto()
+	_comprobar("los tamanos se redondean al multiplo de la celda",
+		FuenteUI.tam(11) == u and FuenteUI.tam(22) == u * 3
+			and FuenteUI.tam(2) == u,
+		"%d %d %d" % [FuenteUI.tam(11), FuenteUI.tam(22), FuenteUI.tam(2)])
+
+	var sueltos_tam: Array[String] = []
+	var re_tam := RegEx.new()
+	re_tam.compile(r",\s*(\d+),\s*\n?\s*(?:C_[A-Z_]+|Color\()")
+	for archivo in (DirAccess.open("res://render").get_files()
+			if DirAccess.open("res://render") else PackedStringArray()):
+		if not archivo.ends_with(".gd"):
+			continue
+		var texto := FileAccess.get_file_as_string("res://render/" + archivo)
+		for m in re_tam.search_all(texto):
+			var n := int(m.get_string(1))
+			if n >= 7 and n % u != 0:
+				sueltos_tam.append("%s: %d" % [archivo, n])
+	_comprobar("ningun texto pide un tamano que no sea multiplo de la celda",
+		sueltos_tam.is_empty(), str(sueltos_tam))
+
+	# Y que nadie se haya vuelto a coger la fuente de reserva por su cuenta:
+	# con una sola que lo haga, esa pantalla pierde los acentos y las demás no,
+	# que es peor que perderlos en todas porque parece cosa del texto.
+	var dir := DirAccess.open("res://render")
+	var sueltos: Array[String] = []
+	for archivo in (dir.get_files() if dir else PackedStringArray()):
+		if not archivo.ends_with(".gd") or archivo == "fuente_ui.gd":
+			continue
+		if FileAccess.get_file_as_string("res://render/" + archivo) \
+				.contains("ThemeDB.fallback_font"):
+			sueltos.append(archivo)
+	_comprobar("nadie coge la fuente de reserva por su cuenta",
+		sueltos.is_empty(), str(sueltos))
+
+## LA CÁSCARA (Fase 5). Lo que se comprueba aquí es la geometría del marco de
+## nueve trozos, que es la pieza técnica de la fase, y que los huecos donde van
+## las cosas caen donde tienen que caer.
+##
+## Lo que NO se comprueba y hay que mirar jugando: si la broma se entiende. Eso
+## es el criterio de salida y no se lee en una prueba.
+func _prueba_cascara() -> void:
+	var marco := NueveTrozos.cargar("res://assets/ui/ventana")
+	var faltan: Array[String] = []
+	for n in NueveTrozos.NOMBRES:
+		if marco.tiene(n) == null:
+			faltan.append(n)
+	_comprobar("el marco de nueve trozos tiene sus nueve piezas",
+		faltan.is_empty(), str(faltan))
+
+	# LA COMPROBACIÓN QUE DE VERDAD IMPORTA de un atlas de nueve trozos: las
+	# cuatro esquinas tienen que medir lo mismo. Si no, es que se cortó por
+	# SILUETA en vez de en rejilla fija —que es lo que hace `procesar.py` por
+	# defecto, y lo correcto para un icono— y entonces las esquinas no cuadran
+	# con los bordes. No da error: deja un marco descuadrado por 2 px.
+	# Los cinco marcos de la cáscara los genera `fuente.py`, así que salen
+	# cuadrados por construcción. La comprobación se queda porque es la que se
+	# lleva por delante un marco recortado por silueta, que fue el fallo de la
+	# primera pasada: cada pieza medía lo que medía su dibujo y el borde
+	# izquierdo no era igual que el derecho.
+	var descuadrados: Array[String] = []
+	for nombre in ["ventana", "titulo", "barra", "boton", "tooltip"]:
+		var m := NueveTrozos.cargar("res://assets/ui/" + nombre)
+		if not m.completo() or not m.esquinas_cuadran():
+			descuadrados.append(nombre)
+	_comprobar("los cinco marcos de la cascara cuadran",
+		descuadrados.is_empty(),
+		"%s — relanza `python3 fuente.py`" % str(descuadrados))
+
+	# El interior tiene que ser el hueco de dentro, y nunca salirse de la caja.
+	var g := marco.grosor()
+	var caja := Rect2(100, 100, 400, 300)
+	var dentro := marco.interior(caja)
+	_comprobar("el interior del marco cae dentro del marco",
+		caja.encloses(dentro) and is_equal_approx(dentro.position.x, 100.0 + g.x)
+			and is_equal_approx(dentro.size.x, 400.0 - g.x - g.z),
+		str(dentro))
+
+	# Y con una caja más pequeña que el propio marco no puede salir un interior
+	# de tamaño negativo: un botón puede ser más pequeño que su marco.
+	var enano := marco.interior(Rect2(0, 0, 4, 4))
+	_comprobar("un marco mas grande que su caja no da tamanos negativos",
+		enano.size.x >= 0.0 and enano.size.y >= 0.0, str(enano))
+
+	_prueba_huecos_de_la_cascara()
+
+## Los huecos: la franja de la mesa y las bandas de escritorio. Son los 280 px
+## por lado que `PLAN.md` reservó desde la Fase 1, y lo que puede romperse es
+## que un icono caiga encima de la mesa o debajo de la barra de tareas.
+func _prueba_huecos_de_la_cascara() -> void:
+	# Sin `VistaMesa`: montarla aquí arrancaría un run entero y cargaría todos
+	# los sprites para medir cuatro rectángulos. La cáscara aguanta sin ella,
+	# que además es lo que hace que se pueda probar.
+	var cascara := NodoCascara.new(null, ParametrosCamara.new(),
+		ParametrosAnimacion.new())
+	get_root().add_child(cascara)
+
+	var franja := cascara.franja_mesa()
+	var ventana := cascara.ventana_mesa()
+	var izq := cascara.banda_izquierda()
+	var der := cascara.banda_derecha()
+	_comprobar("la mesa va centrada y mide lo que mide la mesa",
+		is_equal_approx(franja.size.x, Mesa.ANCHO)
+			and is_equal_approx(ventana.position.x, izq.size.x),
+		"franja %s" % str(franja))
+	# La ventana tiene que ENVOLVER a la mesa: si el marco se metiera dentro,
+	# comería campo de juego, y la anchura de la mesa es intocable.
+	_comprobar("la ventana envuelve la mesa sin comerle campo",
+		ventana.encloses(franja) and ventana.position.y < franja.position.y,
+		"ventana %s" % str(ventana))
+	_comprobar("y quedan dos bandas de escritorio del mismo ancho",
+		is_equal_approx(izq.size.x, der.size.x) and izq.size.x > 200.0,
+		"%.0f y %.0f" % [izq.size.x, der.size.x])
+
+	# Ningún icono puede pisar la mesa ni meterse bajo la barra de tareas: el
+	# escritorio es lo que sobra, y lo que sobra tiene un borde.
+	var intrusos: Array[String] = []
+	for i in 12:
+		var caja := cascara.caja_icono(i)
+		if caja.end.x > ventana.position.x or caja.end.y > izq.end.y:
+			intrusos.append("%d en %s" % [i, str(caja)])
+	_comprobar("ningun icono de reliquia pisa la mesa ni la barra de tareas",
+		intrusos.is_empty(), str(intrusos))
+
+	cascara.free()
 
 ## Bloque 2, coherencia visual: la paleta de CONTEXTO.md manda.
 ##

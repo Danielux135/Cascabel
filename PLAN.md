@@ -138,24 +138,37 @@ intentarlo.
 
 ---
 
-## Fase 4 — Reliquias
+## Fase 4 — Reliquias · ESCRITA, SIN PROBAR
 
-**Quince**, no sesenta.
+**Cuarenta y cinco**, nueve por eje.
+
+*Revisión: aquí ponía "quince, no sesenta", y quince se quedaban cortas por una
+razón de aritmética, no de gusto. Con tres ofrecidas por combate y doce combates
+ves unas treinta y seis: con quince las veías TODAS y la segunda partida traía lo
+mismo que la primera. **La cifra que importa no es cuántas hay, es cuántas no
+ves.** Con cuarenta y cinco, un run enseña la mitad del cajón.*
+
+*Lo que sí sigue en pie del "no sesenta": no valen por ser muchas. Cada una tiene
+que caber en un gancho que ya existe, y si pide un `if` nuevo en `Combate` es que
+falta un gancho.*
+
+*Escritas las cuarenta y cinco, nueve por eje y once ganchos. Falta lo único que
+cierra la fase: jugarlas. El criterio de salida no se lee, se juega.*
 
 - Ganchos: al golpear, al drenar, al empezar bola, al matar, al entrar en
   rampa
 - Elección de tres tras cada combate
 - Modifican efectos y números, **nunca geometría ni tamaño de bola**
 
-Las quince deben cubrir familias distintas: daño plano, daño condicional,
-multiplicador, defensa, economía, y una que cambie cómo juegas.
+Deben cubrir familias distintas: daño plano, daño condicional, multiplicador,
+defensa, economía, y varias que cambien cómo juegas.
 
 **Criterio de salida:** dos partidas con reliquias distintas se sienten
 como partidas distintas.
 
 ---
 
-## Fase 5 — La cáscara
+## Fase 5 — La cáscara · PRIMERA PASADA HECHA
 
 Ahora el juego se mete dentro del sistema operativo falso, y de paso se
 llena la pantalla.
@@ -214,6 +227,32 @@ Paneles fijos, cada uno en su sitio, que parecen ventanas y no se mueven:
 Arrastra dos apaños de la Fase 1 que se resuelven aquí: el HUD que tapa la
 bola en lo alto de la órbita y los laterales del escritorio apagados a mano.
 
+*Hecho en la primera pasada: el renderizador de nueve trozos con su prueba, el
+escritorio, la barra de tareas con botón Inicio y reloj, el marco alrededor de
+la mesa, las reliquias como iconos con tooltip amarillo, y TILT como pantalla
+azul con volcado. Arrastraba dos apaños de la Fase 1 y **se ha resuelto uno**:
+los laterales ya no son un degradado a mano, son escritorio con contenido.*
+
+*Segunda pasada: la fuente pasó a ser propia y pixelart (`fuente.py`), y los
+cinco marcos pasaron de dibujarse por código (biselados planos) a generarse
+igual. Después, Daniel generó arte de verdad con IA siguiendo
+`assets/prompts_cascara.md` y esta sesión se recortó e integró: ventana, barra
+de título y barra de tareas (recortadas de las hojas y validadas con una
+previsualización de mosaico antes de tocar el repo), botón Inicio con el
+cascabel de logo, botones min/max/cerrar, nueve iconos decorativos, y tres
+fondos de escritorio que cambian por acto. Trampa real de esta pasada: el
+primer recorte dejaba el fondo magenta de las hojas de IA sin volver
+transparente, y salía como motas rosas en las esquinas del marco y detrás de
+los iconos — está en `CLAUDE.md`, "Trampas".*
+
+*Queda: el HUD sigue encima de la mesa, el enemigo sigue en el tablero en vez
+de en su panel, el mapa no es un explorador de carpetas todavía. De arte
+recortado pero sin conectar: cursor, barra de progreso del reloj enemigo,
+marco de diálogo, tooltip nuevo. Y una segunda tanda de prompts pedida y
+todavía sin generar: fondos "bugueados" en variantes por acto y piezas de
+bandeja (reloj con sprite propio, separador, altavoz, icono de sin-red) — en
+la sección 2 de `assets/prompts_cascara.md`.*
+
 **Criterio de salida:** quien vea una captura entiende la broma sin que se
 la expliquen, y la cáscara y la mesa se leen como el mismo juego.
 
@@ -223,7 +262,7 @@ la expliquen, y la cáscara y la mesa se leen como el mismo juego.
 
 Lo más largo. Rellenar moldes que ya funcionan.
 
-- De 15 a 50-60 reliquias
+- De 45 a 70-80 reliquias, y arte para las que no lo tienen
 - Enemigos con comportamientos distintos, no solo más vida
 - Los tres jefes con sus fases
 - Dos o tres mesas más **diseñadas a mano**, como biomas

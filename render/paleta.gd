@@ -118,3 +118,12 @@ const NODO_ELITE     := ROJO_LUZ
 const NODO_DESCANSO  := VERDE
 const NODO_JEFE      := ARCANO
 const NODO_HECHO     := GRIS_2     # por donde ya has pasado
+
+# --- La cáscara (Fase 5) ---
+## El amarillo de los tooltips, que es el color de la broma: los globos de ayuda
+## de aquel sistema operativo eran de este tono. Sale del tramo de pergamino, así
+## que sigue siendo de la paleta y no un amarillo inventado.
+const PERGAMINO  := TIERRA_6
+## La pantalla azul de TILT. Es azul de verdad, no el azul de los carriles: la
+## broma no funciona si no se reconoce al instante.
+const TILT_FONDO := AZUL
