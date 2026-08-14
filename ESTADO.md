@@ -14,8 +14,19 @@ pasa de una pantalla, sobra algo.
 Lo mínimo que hay que saber si esta conversación empieza de cero.
 
 **Dónde estamos.** La Fase 5 (la cáscara) está **escrita entera y sin ejecutar
-ni una vez**. La última sesión fue en remoto: allí no se alcanzan ni Godot ni
-`rtk`, así que todo lo de abajo es código escrito y releído, no probado.
+ni una vez**: se escribió en remoto y allí no se podía lanzar el juego.
+
+**Y eso último ya no es verdad, que es lo que más ahorra saber:** en una sesión
+remota **sí se puede lanzar Godot**. Se baja el binario de Linux de la misma
+versión y se corre en la caja de la sesión:
+
+    curl -sSL -o g.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+    unzip -q g.zip && chmod +x Godot_v4.7.1-stable_linux.x86_64
+    ./Godot_v4.7.1-stable_linux.x86_64 --headless --path <copia> --import
+
+Con `sim/`, `data/` y `tests/` copiados y un `project.godot` sin `main_scene`
+basta: los medidores no tocan `render/` ni assets. **Todo el rebalance de esta
+sesión se ha medido así, ejecutando de verdad**, no calculando.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
@@ -43,50 +54,60 @@ un rato:** el reloj dentro de la barra de título (pregunta N2) y la vida en un
 panel lateral en vez de encima de la mesa (pregunta N4). Si cualquiera de las
 dos molesta, se deshace; no hay nada construido encima.
 
-**Y lo que manda por encima de la Fase 5 sigue siendo el REBALANCE**, tanda 1
-de "Siguiente". La Fase 5 estaba en pausa por eso y sigue estándolo: se ha
-adelantado porque era trabajo de interfaz que no depende del balance, no
-porque haya dejado de ser lo urgente.
+**El REBALANCE (tanda 1) está hecho y medido**, y lo que ha destapado cambia el
+orden del plan: ver la sección de abajo. Lo que manda ahora es la **Fase 6**.
 
 ---
 
 ## Fase actual
 
-**Fase 5 escrita entera; sigue mandando el balance.** Daniel ganó el run
-completo —acto 3, 15 nodos— **con 1764 de 1800 de vida**. Perdió 36 puntos en
-todo el run: el juego no le tocó ni una vez. El rebalance sigue siendo la
-tanda 1 de "Siguiente".
+**Rebalance hecho, y el modelo por fin reproduce a Daniel.** Lo que faltaba no
+era otro número: era que **el medidor jugaba sin reliquias**. `medir_balance.gd`
+juega el run entero, pero su jugador de mentira no completa misiones, así que
+llega al jefe del acto 3 con la bolsa vacía. Daniel llega con once reliquias
+encima. Por eso el modelo decía que se pierden 500 de 1080 en un run y Daniel
+perdió 36 de 1800: **no medía un balance flojo, medía a otro jugador.**
 
-### Los dos números, por fin medidos sobre el jugador de verdad
+`tests/medir_daniel.gd` (nuevo) arregla eso: el combate comparte la bolsa del
+run, recibe la escalera de misiones real, tira la ruleta al completarlas, y usa
+la vida de verdad en vez de vida infinita —así las reliquias condicionales se
+encienden cuando les toca—. **Acaba el run con el 99 % de vida contra el 98 %
+real de Daniel.** Es la primera vez que el modelo y la partida dicen lo mismo.
 
-| Qué | Valor | Contra qué |
+### Lo que dice el barrido, y es más gordo que la tabla
+
+Primero se barrió vida × ataque, que era lo que mandaba la tanda 1. **De las 20
+casillas, ninguna deja el run entre el 25 y el 60 % de vida.** El patrón es
+siempre el mismo: o el enemigo no te toca (93-100 % al acabar), o te mata. No
+hay banda intermedia.
+
+La causa está medida y **ya estaba escrita como aviso en Abierto**: un enemigo
+que solo tiene vida y UN ataque por reloj no puede apretar de forma continua
+durante dos minutos, solo puede pegar picos. Subir el ataque hace los picos
+letales; bajarlo los vuelve invisibles. **Lo que falta no es un número de
+`data/enemigos.json`: son los comportamientos de la Fase 6** (`DISEÑO.md` §11).
+
+Lo segundo que salió, al añadir la curación como tercer eje: **las reliquias de
+cura devuelven más de lo que cualquier tabla puede quitar.** `rutina_de_
+reparacion` daba el 8 % al matar (96 % de barra en un run) y `desfragmentacion`
+un 2 % acumulativo por victoria (156 %). Eso rompe el invariante de `DISEÑO.md`
+§9 —la vida no se cura entre combates— que es lo que hace que elegir rama
+importe. Bajadas a un tercio, con su texto reescrito.
+
+### Lo que se ha escrito, que es lo mejor alcanzable sin Fase 6
+
+| Qué | Antes | Ahora |
 |---|---|---|
-| Daño por bola | **797** | el modelo decía 312 (perfil normal) y 840 (bueno) |
-| Combate medio | **45 s** | se esperaban 7-14 s |
-| Bolas en todo el run | 43 | ~2,9 por combate en 15 nodos |
-| Vida al ganar | 1764/1800 | **el 98 %** |
+| Vida de enemigo | 1250-3220 | **3750-9660** (×3) |
+| Ataque | 9-16 | **6-11** (×0,7) |
+| Curación de reliquias | — | **a un tercio** |
+| Combate medio | 52 s | **137 s** (el objetivo era 120-300) |
+| Vida al acabar el run | 87 % | **71 %** |
+| Runs acabados de 5 | 5/5 | **3/5** |
 
-**Daniel juega como el perfil "bueno" del medidor**, no como el normal: 797
-está a un pelo de los 840. Ahí estaba el error de calibración —la tabla de
-enemigos se escribió para 312— y por eso no le pasa nada.
+Confirmado lanzando el medidor contra los JSON ya escritos, no calculado.
 
-Y sale una cosa que el medidor no había visto: **43 bolas en 15 combates son
-2,9 bolas por combate**, o sea que casi nunca drena, y con 45 s de combate
-está comiendo unos 5-7 relojes por enemigo y aun así solo pierde 36 puntos en
-todo el run. **El reloj no aprieta y el drenaje no duele.** Con la fórmula de
-siempre —`bolas × drenaje + relojes × ataque`— los dos sumandos están cerca
-de cero, y no es el escalón de otras veces: es que los ataques son pequeños.
-
-**Decisión de Daniel: subir vida Y ataque a la vez.** Enemigos más gordos
-para que el combate dure, y ataques más caros para que cada reloj y cada dren
-se noten. Con el aviso ya escrito en Abierto: un enemigo de tres minutos que
-solo tiene vida es un saco, así que si al alargar se hace pesado, la Fase 6
-—comportamientos de enemigo— sube antes que la cáscara.
-
-**Antes de tocar un número, `tests/medir_balance.gd`, y esta vez con los
-números de Daniel, no con los perfiles inventados.**
-
-### Lo que ha cambiado de sitio, que es lo gordo de la sesión
+### Lo que cambió de sitio la sesión anterior
 
 | Qué | Antes | Ahora |
 |---|---|---|
@@ -194,6 +215,7 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `reloj_carga` | 9 s | Solo de reserva: ahora cada enemigo trae el suyo en `data/enemigos.json` |
 | `reloj_aviso` | 1,5 s | Tiene que caber holgado dentro de la carga: los relojes empiezan en 6 s |
 | `factor_ataque_drenaje` | 0,5 | Cuánto duele drenar frente al reloj |
+| curación de reliquias | a un tercio | Si el run vuelve a acabarse al 100 %, es esto antes que la tabla |
 | `platillo_atrasa_reloj` | 0,35 | Se mide en fracción de barra, no en segundos: ahora son ~3 s |
 | `dano_rampa_fuerte` | 78 | Lo que paga el cañón por ese retorno difícil |
 | `curacion_descanso` | 0,30 | Si descansar es siempre obvio, bájalo |
@@ -203,7 +225,7 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `repeticiones_ruleta` | 1 | Con 0 la build se decide a suertes; con 2+ vuelve a ser un menú |
 | `vida_jugador` | **1080** | ×6 por resolución al alargar los combates |
 | `reloj` (por enemigo) | 6-10 s | El dial de cuánto APRIETA cada uno, aparte de cuánto dura |
-| vida de enemigo | 1250-3220 | **Aritmética, no medida.** El dial de cuánto DURA el combate |
+| vida de enemigo | **3750-9660** | Medido con `medir_daniel.gd`. El dial de cuánto DURA el combate |
 | `prob_critico` | 0,06 | Cuántos críticos salen. Las reliquias lo suben |
 | `factor_critico` | 2,0 | Por cuánto multiplica un crítico |
 | `golpes_tramo_extra` | 12 | Lo que pide el tramo que añade una reliquia. Menos y el x5 sale regalado |
@@ -250,9 +272,23 @@ N8. **LOS FONDOS BUGUEADOS.** Cambian entre combate y combate. Acto 1 limpio,
     acto 2 con dos maneras de fallar, acto 3 con cuatro. ¿Se nota que el sistema
     se va cayendo, o pasa desapercibido?
 
-**Y lo de siempre, que sigue mandando:** cuando esté el rebalance, un run y
-estas tres: ¿en qué nodo mueres?, ¿con cuánta vida llegas al jefe de cada acto?
-y ¿se hace pesado algún combate?
+**LO PRIMERO DE TODO, que es el rebalance y es lo que más puede haber salido
+mal.** Un run entero con la tabla nueva, y estas cuatro:
+
+R1. **¿SE HACE PESADO UN COMBATE?** Ahora duran 137 s de media contra los 45 de
+    antes: tres veces más. **Esta es LA pregunta de la sesión.** Si se hace
+    pesado, no es que la vida esté alta: es que el enemigo es un saco, y lo que
+    toca es la Fase 6, que ya está puesta la primera de "Siguiente" por medida.
+R2. **¿En qué nodo mueres y con cuánta vida llegas al jefe de cada acto?** El
+    modelo dice 3 de 5 runs acabados y el 71 % de vida al ganar. Si acabas
+    siempre y por encima del 90 %, el modelo se ha vuelto a quedar corto.
+R3. **Las reliquias de cura, que han bajado a un tercio.** "Rutina de
+    reparación" pasa del 8 % al 3 % y "Desfragmentación" del 2 % al 0,7 %.
+    ¿Siguen mereciendo la pena o han quedado en nada? Si nunca las eliges, se
+    subirá el número, pero **no al de antes**: al 8 % el run se curaba entero.
+R4. **¿Sigue el reloj sin apretar?** Con el combate a 137 s comes muchos más
+    relojes que antes. Si aun así no notas nada, el problema no es cuántos
+    comes sino que cada uno pega poco, y eso ya no se arregla con la tabla.
 
 M. **LOS SPRITES REPARADOS.** Mira sobre todo la calavera llameante, la
    sombra y la armadura vacía: a la armadura le he quitado unas motas verdes
@@ -330,10 +366,16 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 
 **Por tandas. Una por sesión, y el modelo de cada una entre paréntesis.**
 
-1. **REBALANCE, que es lo que manda** (Opus, razonamiento alto). Barrer con
-   `tests/medir_balance.gd` usando 797 de daño por bola y 45 s de combate, y
-   rehacer la tabla de `data/enemigos.json` subiendo vida y ataque a la vez.
-   Nada de escribirla a ojo: ya salió mal tres veces
+1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto). **Sube a
+   la cabeza por medida, no por gusto:** el barrido dice que con un solo ataque
+   por reloj no existe ninguna tabla que deje el run en la banda de dificultad
+   que se busca. `DISEÑO.md` §11 tiene los seis (bloquear un recorrido, curarse,
+   reflejar, blindaje, castigar el combo, acelerar el reloj). Y con combates de
+   137 s, un enemigo que solo tiene vida se nota que es un saco
+1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes:
+   con comportamientos dentro, `tests/medir_daniel.gd` vuelve a barrer y la
+   banda del 25-60 % pasa a ser alcanzable. Hasta entonces, tocar la tabla es
+   mover el mismo número por cuarta vez
 2. **Tanda de assets A: la hoja del espectro** (Sonnet, medio). En cuanto
    Daniel diga si la tiene o si hay que regenerarla. Es el único sprite que
    sigue roto
@@ -352,8 +394,21 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 5. **Fase 5: juzgarla jugando** (Daniel). El código está escrito entero y sin
    ejecutar. Lo que queda no se lee, se juega: las preguntas N1-N8 de arriba. Si
    N2 o N4 salen mal, lo que vuelve a la mesa es reversible en un rato
-6. **Fase 6** (Opus, alto), y sube de prioridad en cuanto Daniel diga que un
-   combate se hace pesado
+7. **Animación fotograma a fotograma de enemigos/criaturas/jefes** (Opus,
+   razonamiento alto). Pedida por Daniel. **Los prompts ya están escritos** en
+   `assets/prompts_animacion.md`: hoja 4×4 por bicho (idle, golpe, ataque,
+   muerte), las nueve descripciones con escala común, los jefes a 4×5, el
+   cascabel de fuego, y el subsistema que hace falta. Hoy todo bicho es UN
+   sprite estático deformado por código —`render/nodo_enemigo.gd`: respiración
+   y embestida son squash/stretch en píxeles enteros, sin un solo fotograma de
+   verdad—. Hace falta un subsistema nuevo: hojas de varios fotogramas y un
+   reproductor que las pase, respetando rejilla de píxeles y escalado entero.
+   Opus y alto porque es subsistema nuevo que cruza arte + timing + las
+   trampas ya cazadas en `CLAUDE.md` (rejilla de píxeles, hitstop en
+   `_physics_process`), y los fallos de ese tipo han costado sesiones enteras.
+   Diseñar antes de tocar código: cuántos estados por criatura (idle, golpe,
+   ataque, muerte), cuántos fotogramas cada uno, y de dónde sale el arte —
+   ¿prompts de IA como las hojas de `assets/prompts_cascara.md`, o a mano?
 
 ## Mediciones
 
@@ -366,10 +421,13 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 | Vida de enemigos | 225-660, salida del barrido |
 | Runs acabados: malo / normal / bueno | 0/5 · 2/5 · 5/5 |
 | **Daniel, medido jugando** | **797 por bola · 45 s · 43 bolas · 1764/1800 al ganar** |
+| **El modelo reproduciéndolo** | **729 por bola · 99 % de vida al acabar, con reliquias puestas** |
+| Tabla nueva, medida | 137 s por combate · 71 % de vida al acabar · 3/5 runs |
 
-Todo lo de arriba sale de `tests/medir_balance.gd`; la última fila sale de un
-run de verdad y **manda sobre las otras**. **Antes de tocar un número de
-balance, lánzalo**: la tabla ya se hizo dos veces a ojo y las dos salió mal.
+**Cuál lanzar:** `tests/medir_balance.gd` mide la economía SECA del combate y
+las tablas viejas siguen comparables con él. `tests/medir_daniel.gd` mide el RUN
+con reliquias, y es el único que reproduce a Daniel: **para tocar balance, ese**.
+La tabla ya se hizo tres veces contra el jugador equivocado.
 
 ## El pilar: la cuna ya alcanza
 

@@ -236,9 +236,9 @@
       "rareza": "comun",
       "gancho": "al matar",
       "icono": "taza",
-      "texto": "Ganar un combate te devuelve el 8% de la vida.",
+      "texto": "Ganar un combate te devuelve el 3% de la vida.",
       "efectos": {
-        "suma_curacion_al_matar": 0.08
+        "suma_curacion_al_matar": 0.03
       }
     },
     {
@@ -259,9 +259,9 @@
       "eje": "supervivencia",
       "rareza": "comun",
       "gancho": "pasivo",
-      "texto": "180 de vida maxima, y te la da puesta.",
+      "texto": "63 de vida maxima, y te la da puesta.",
       "efectos": {
-        "suma_vida_maxima": 180
+        "suma_vida_maxima": 63
       }
     },
     {
@@ -281,9 +281,9 @@
       "eje": "supervivencia",
       "rareza": "comun",
       "gancho": "al completar un recorrido",
-      "texto": "Cada recorrido completado te cura 30.",
+      "texto": "Cada recorrido completado te cura 10.",
       "efectos": {
-        "suma_vida_por_recorrido": 30
+        "suma_vida_por_recorrido": 10
       }
     },
     {
@@ -356,9 +356,9 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
-      "texto": "36 de vida maxima por cada combate ganado, y te la lleva puesta.",
+      "texto": "12 de vida maxima por cada combate ganado, y te la lleva puesta.",
       "efectos": {
-        "suma_vida_maxima_por_victoria": 36
+        "suma_vida_maxima_por_victoria": 12
       }
     },
     {
@@ -401,9 +401,9 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
-      "texto": "Cada combate ganado te cura un 2% mas al ganar el siguiente.",
+      "texto": "Cada combate ganado te cura un poco mas al ganar el siguiente.",
       "efectos": {
-        "suma_curacion_al_matar_por_victoria": 0.02
+        "suma_curacion_al_matar_por_victoria": 0.007
       }
     },
     {

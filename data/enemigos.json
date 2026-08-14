@@ -1,23 +1,25 @@
 {
-  "_comentario": "SEGUNDA CORRECCION, y la primera se llevo el run por delante. La tabla anterior salio de multiplicar la vida x14 con el modelo de tests/medir_balance.gd, y Daniel no pasaba del segundo combate. El fallo no fue la aritmetica: fue de quien se hizo la aritmetica. El perfil 'normal' del medidor hace 312 de dano por bola, y ese perfil NO es Daniel. Calibrar contra un jugador inventado y no contra el que juega es la misma averia de siempre: un dato correcto que mide otra cosa.",
+  "_comentario": "TERCERA CORRECCION, y la primera MEDIDA contra el jugador que existe. Las dos anteriores se calibraron contra perfiles del medidor que no eran Daniel, y la segunda ademas contra un modelo que jugaba SIN RELIQUIAS. Eso ultimo era el fallo de fondo: tests/medir_balance.gd juega el run entero pero su jugador de mentira no completa misiones, asi que llega al jefe del acto 3 con la bolsa vacia, y Daniel llega con once reliquias encima. El modelo decia que se perdian 500 de 1080 en un run; Daniel perdio 36 de 1800. No estaba midiendo un balance flojo: estaba midiendo a otro jugador.",
 
-  "_lo_que_se_ha_hecho": "Vida entre 3 respecto de la tabla anterior, relojes entre ~1,7 y ataques entre ~5. El coste de un combate es tiempo/reloj x ataque + bolas x drenaje, o sea que dividir la vida por 3 divide el coste por 3, y bajar el ataque hace el resto. Sigue siendo ARITMETICA: lo que hay que hacer ahora es MEDIR A DANIEL. El HUD del mapa enseña su dano por bola real y la duracion media de sus combates; con esos dos numeros la tabla se escribe exacta en una pasada.",
+  "_de_donde_salen_estos_numeros": "De tests/medir_daniel.gd, que es el medidor nuevo: el combate comparte la bolsa del run, recibe la escalera de misiones real, tira la ruleta al completarlas y juega con la vida de verdad en vez de con vida infinita. Ese medidor reproduce a Daniel por primera vez (acaba el run con el 99% de vida contra el 98% real). Sobre el se barrio vida x ataque x curacion, y esta tabla es la casilla vida x3,0 y ataque x0,7 con la curacion de reliquias a un tercio: 137 s por combate (el objetivo era 120-300) y 3 de 5 runs acabados.",
+
+  "_lo_que_el_barrido_dice_y_no_se_puede_arreglar_aqui": "Ninguna casilla del barrido deja el run entre el 25 y el 60 por ciento de vida con una tasa de exito decente. O el enemigo no te toca, o te mata. La razon esta medida y ya estaba escrita en ESTADO.md como aviso: un enemigo que solo tiene vida y UN ataque por reloj no puede apretar de forma continua durante dos minutos, solo puede pegar picos. Subir el ataque hace los picos letales; bajarlo los vuelve invisibles. Lo que falta no es otro numero en este fichero: son los comportamientos de la Fase 6 (DISENO.md 11). Esta tabla es lo mejor alcanzable sin ellos.",
 
   "_por_que_cada_uno_lleva_su_reloj": "El coste crece con lo que dura el combate. Con un reloj unico, un enemigo del acto III duraba el doble y comia el doble de golpes, o sea que costaba cuatro veces mas sin que nadie lo hubiera decidido. Con el reloj propio se separan las dos cosas: LA VIDA DICE CUANTO DURA Y EL RELOJ DICE CUANTO APRIETA.",
 
   "_orden": "El orden IMPORTA: sim/mapa.gd parte el catalogo en tercios y cada tercio es un acto. Hay una prueba que lo vigila, y otra que comprueba que el reloj crece con la vida.",
 
   "enemigos": [
-    { "id": "rata",                "nombre": "Rata",               "vida": 1250, "ataque": 9,  "reloj": 6.0,  "sprite": "res://assets/enemigos/rata.png" },
-    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 1460, "ataque": 10, "reloj": 6.5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
-    { "id": "goblin_carroniero",   "nombre": "Goblin carroñero",   "vida": 1670, "ataque": 11, "reloj": 7.0,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
+    { "id": "rata",                "nombre": "Rata",               "vida": 3750, "ataque": 6,  "reloj": 6.0,  "sprite": "res://assets/enemigos/rata.png" },
+    { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 4380, "ataque": 7,  "reloj": 6.5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
+    { "id": "goblin_carroniero",   "nombre": "Goblin carroñero",   "vida": 5010, "ataque": 8,  "reloj": 7.0,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
 
-    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 1870, "ataque": 14, "reloj": 7.5,  "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
-    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 2080, "ataque": 12, "reloj": 8.0,  "sprite": "res://assets/enemigos/esqueleto.png" },
-    { "id": "cultista",            "nombre": "Cultista",           "vida": 2290, "ataque": 12, "reloj": 8.5,  "sprite": "res://assets/enemigos/cultista.png" },
+    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 5610, "ataque": 10, "reloj": 7.5,  "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
+    { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 6240, "ataque": 8,  "reloj": 8.0,  "sprite": "res://assets/enemigos/esqueleto.png" },
+    { "id": "cultista",            "nombre": "Cultista",           "vida": 6870, "ataque": 8,  "reloj": 8.5,  "sprite": "res://assets/enemigos/cultista.png" },
 
-    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 2600, "ataque": 13, "reloj": 9.0,  "sprite": "res://assets/enemigos/goblin_bruto.png" },
-    { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 2910, "ataque": 14, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" },
-    { "id": "gargola",             "nombre": "Gárgola",            "vida": 3220, "ataque": 16, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png" }
+    { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 7800, "ataque": 9,  "reloj": 9.0,  "sprite": "res://assets/enemigos/goblin_bruto.png" },
+    { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 8730, "ataque": 10, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" },
+    { "id": "gargola",             "nombre": "Gárgola",            "vida": 9660, "ataque": 11, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png" }
   ]
 }
