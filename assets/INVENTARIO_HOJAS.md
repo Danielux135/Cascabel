@@ -125,3 +125,47 @@ definitivo (¿`reliquias/`? ¿carpeta nueva de coleccionables si esto no es
 una reliquia normal?) y estilo de borde (aceptar o regenerar), y solo
 entonces mover de `_pruebas/` a su carpeta final y conectar el nodo que lo
 usa.
+
+## Tanda del 14 de agosto — sin hojas nuevas: reparación medida dentro del juego
+
+No entró ni una hoja de `Desktop\Sprites`. Lo que se hizo fue **auditar los
+272 PNG con detectores y luego MIRARLOS dentro de Godot** (sesión remota con
+ventana virtual; receta en `CLAUDE.md`, "Godot"). 36 ficheros tocados.
+
+| Qué estaba mal | Dónde | Cuánto |
+|---|---|---|
+| **Halo de magenta** del recorte, pegado al contorno | `ui/iconos/` (9), `ui/cursor/` (3), `ui/botones/` (6), `ui/inicio/` (2), `ui/dialogo/` (2) | 717 px |
+| Sal de cuantización y verdes/rosas sueltos | los 3 cursores | 34 px |
+| Sal de cuantización | 6 de `reliquias/`, 2 de `reliquias2/`, 3 de `criaturas_64/` | 28 px |
+| Interior comido | `ui/cursor/`, `ui/iconos/` | 34 px |
+
+**Por qué el halo seguía ahí:** `ui/iconos` y `ui/cursor` **nunca pasaron por
+`procesar.py`**. Se ve sin abrirlos: el 100 % de sus píxeles está fuera de la
+paleta de 33. Ningún paso de recorte les reescribió el alfa, así que el fondo
+se quedó pegado al contorno mezclado con el borde del dibujo. Se ha quitado
+por tono (magenta 282-345°) exigiendo además que el píxel sea MÁS magenta que
+sus vecinos sanos, para no comerse un violeta pintado a propósito. Comparado
+antes/después icono por icono y luego en captura del juego.
+
+**`cr_espectro` ya NO está roto.** La hoja de criaturas del 13 de agosto
+(15:55:11) lo regeneró entero y nadie lo había vuelto a medir: hoy sale con
+interior comido = 0 y motas = 0. Sale de `NO_TOCAR` en `limpiar.py`, y con eso
+se cae la "tanda de assets A" del plan.
+
+**Lo que NO se ha tocado, y es a propósito:**
+
+- `shell/fondo_acto3.png` y `fondo_acto3_a.png` llevan 823 px de magenta cada
+  uno. **Es el glitch, no un fallo**: son los fondos del acto 3 corrompiéndose.
+- Todo `ui/` está fuera de paleta y casi todo está bien: los marcos de nueve
+  trozos, la barra, el botón, el título, el tooltip, el diálogo y la barra de
+  progreso los genera `fuente.py` con los grises de Windows, que son la
+  identidad de la cáscara.
+- `ui/fuente_cascabel.png` sale con "223 islas sueltas" en cualquier detector
+  de motas. Son las letras. No es un fallo.
+- `ui_marco/` (9 piezas) tiene halo y fleco antialiaseado, y **no lo carga
+  nadie**. Arreglar arte muerto es ruido: o se conecta o se borra.
+
+**Sigue sin generar, igual que antes:** la bandeja del reloj (`bandeja_reloj`,
+`prompts_cascara.md` §11) y los tres iconos de bandeja (§12). La barra de tareas
+dibuja su bandeja con `draw_rect` a mano — y ahí estaba, de paso, el reloj
+cortado a "14:5" que se ha arreglado esta sesión.

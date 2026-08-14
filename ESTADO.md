@@ -17,7 +17,11 @@ Lo mínimo que hay que saber si esta conversación empieza de cero.
 ni una vez**: se escribió en remoto y allí no se podía lanzar el juego.
 
 **Y eso último ya no es verdad, que es lo que más ahorra saber:** en una sesión
-remota **sí se puede lanzar Godot**. Se baja el binario de Linux de la misma
+remota **sí se puede lanzar Godot, y desde esta sesión además CON VENTANA**:
+con un display virtual se abre el juego de verdad, se le mandan teclas y se
+guardan capturas. La receta entera está en `CLAUDE.md`, "Godot". Así se cazaron
+el halo de magenta de los iconos y el reloj cortado de la barra de tareas, y
+**ninguno de los dos salía en la batería**. Se baja el binario de Linux de la misma
 versión y se corre en la caja de la sesión:
 
     curl -sSL -o g.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
@@ -140,6 +144,64 @@ reliquia dentro de la tele. Arreglado el patrón y el 11.
 
 ## Hecho
 
+- **El cuadro de diálogo del ataque, que era el peor bug que quedaba.** Su
+  `relleno` no era un tono plano sino una baldosa con borde, así que al
+  repetirse pintaba una **rejilla de ladrillos** por todo el cartel — y ese
+  marco solo sale cuando el enemigo ataca. Era el único de los seis recortado a
+  mano de una hoja de IA; ahora lo genera `fuente.py` con el mismo perfil
+  biselado que los demás.
+- **Los carteles del centro se cortaban por el tamaño de letra.** "ESPACIO:
+  mantener y soltar para lanzar" salía "…para l", y "MANTÉN A o D PARA ATRAPAR
+  Y APUNTAR" igual: a 16 px caben 33 caracteres en los 400 de la mesa y esos
+  textos tienen 38 y 35. Ahora `_tam_que_cabe` baja al tamaño que quepa en vez
+  de recortar, así que la frase se lee entera.
+- **Las tildes, en los datos y en las MAYÚSCULAS.** 52 cambios en
+  `data/misiones.json` y `data/reliquias.json` —nombres y textos, uno a uno, no
+  buscar-y-reemplazar: "Puntería", "Metrónomo", "El reloj es mío", "daño",
+  "cañón", "más", "último"—. Y en la fuente: **la tilde de las mayúsculas iba
+  pegada a la letra y en la Í y la É desaparecía del todo** ("CRÍTICO" se leía
+  "CRITICO"). Misma regla que la ñ: tilde arriba, fila en blanco, cuerpo
+  comprimido a cinco filas.
+- **El marco de la ventana de la mesa, que estaba mal montado desde la Fase 5.**
+  Se dibujaba con CUATRO marcos de nueve trozos completos alrededor del hueco en
+  vez de uno solo sin centro. Un nueve-trozos en una caja más estrecha que sus
+  dos esquinas no se encoge: las esquinas se pegan a tamaño completo, se
+  solapan entre sí y **sobresalen 4 px hacia dentro del campo por los cuatro
+  lados**. Eso era el amasijo de tornillos de las cuatro puntas y lo que le
+  comía tablero. Ahora es `NueveTrozos.dibujar_hueco`: un marco, sin relleno.
+- **"COMUN" era el identificador del JSON pintado en pantalla.** La rareza, el
+  tiro de la misión y el eje de la reliquia compartían una sola tabla para leer
+  los datos y para dibujar, y la clave va sin tilde por fuerza. La tele llevaba
+  desde la Fase 4 poniendo COMUN, CANON, ORBITA y GOLPE UNICO. Separadas en
+  `NOMBRE_*` (clave) y `ROTULO_*` (rótulo): ahora salen **COMÚN, CAÑÓN, ÓRBITA,
+  golpe único**.
+- **La batería tenía nueve pruebas que no se ejecutaban.** Un mensaje de
+  comprobación llamaba a `nombre_rareza()` sobre una `Reliquia`, que no lo
+  tenía; GDScript evalúa el argumento aunque la prueba pase, así que abortaba el
+  bloque. Eran 312 donde hay 321. Los fallos siguen siendo 13, los mismos.
+- **Los textos de la cáscara, mirados de verdad.** Fátima vio en la captura lo
+  que yo había dado por bueno. Cuatro cosas, todas del mismo par de causas:
+  **la `ñ` se leía como una `n`** (la tilde estaba dibujada pegada a la letra y
+  las dos manchas se fundían; la `Ñ` igual), y **tres textos más recortados por
+  el `width` de `draw_string`**: la etiqueta "Dirección" del mapa salía
+  "Direc", la pestaña de la barra de tareas cortaba el título de "(no
+  responde)", y el nombre bajo un icono de reliquia tenía sitio para nueve
+  caracteres, así que **41 de las 45 reliquias salían cortadas** — ahora van en
+  dos renglones, como un escritorio de verdad, sin salirse por el margen.
+  Comprobado todo en captura con la bolsa llena.
+- **Assets bugueados, barridos y arreglados mirando el juego.** 36 ficheros.
+  El fallo gordo era un **halo de magenta** pegado al contorno de los nueve
+  iconos de escritorio, los tres cursores, los seis botones de la barra de
+  título, el botón de Inicio y dos esquinas del diálogo: 717 px de fondo que el
+  recorte no volvió transparente, invisible en un visor y evidente dentro de
+  Godot. Además, sal de cuantización y verdes sueltos en los cursores y en
+  nueve reliquias/criaturas. **`cr_espectro` ya no está roto** —la hoja del 13
+  de agosto lo regeneró entero— así que sale de la lista de intocables de
+  `limpiar.py`. Los tres fixers convergen a cero. Y de paso, dos bugs de
+  código que solo se ven jugando: el reloj de la barra de tareas marcaba
+  "14:5" (el `width` de `draw_string` recorta y el ancho estaba estimado a
+  ojo), y la prueba del crítico llevaba en rojo por un lambda que capturaba
+  el contador por valor —el crítico funcionaba—. Los dos en `CLAUDE.md`.
 - **Exploración: criatura de fuego coleccionable (cascabel).** Sprite de 8
   frames generado con Claude Design, procesado y limpiado sin `procesar.py`
   real (sandbox sin `scipy`, reimplementado a mano). Confirmado con Fátima:
@@ -295,6 +357,43 @@ M. **LOS SPRITES REPARADOS.** Mira sobre todo la calavera llameante, la
    sueltas que tenía en hombros y piernas. Si ves algún bicho al que le falte
    un trozo o le sobre un pegote, dímelo por nombre.
 
+M2. **LOS ICONOS DEL ESCRITORIO Y LOS CURSORES, sin el halo rosa.** Estaba
+   comprobado ampliando la captura del juego y ya no está, pero el arreglo
+   quita píxeles del contorno: mira que ningún icono haya adelgazado por un
+   lado. Los que más perdieron son `registro`, `disco` y `papelera`.
+
+M7. **LAS MAYÚSCULAS CON TILDE.** Á É Í Ó Ú Ü tienen ahora el cuerpo una fila
+   más corto para que la tilde quepa encima. Mira "CRÍTICO" en `jugador.sys` y
+   "COMÚN" en la tele: la tilde se ve, pero la letra queda algo más baja que
+   sus vecinas. **Si prefieres las mayúsculas a plena altura y la tilde
+   apretada, se deshace borrando la fila `"     "` de esos seis glifos en
+   `fuente.py`.** Es tuyo.
+
+M8. **EL CARTEL DEL ATAQUE.** Es el que estaba lleno de ladrillos. Ahora es un
+   cuadro de diálogo gris claro. ¿Se lee el nombre del enemigo y el daño de un
+   vistazo, con la bola parada detrás?
+
+M6. **EL MARCO DE LA VENTANA DE LA MESA.** Es lo que más ha cambiado de sitio:
+   ya no hay tornillos en las cuatro puntas y el marco no se mete en el campo.
+   Mira si ahora se ve DEMASIADO liso —son 8 px de gris y nada más— o si con la
+   barra de título y los tres botones ya cuenta la broma. **Ese sigue siendo el
+   criterio de salida de la fase (N7).**
+
+M4. **LOS NOMBRES DE RELIQUIA EN EL ESCRITORIO.** Ahora son dos renglones. ¿Se
+   leen, o el escritorio se ha llenado de texto? El paso vertical entre iconos
+   ha subido de 54 a 66 px para que quepa el segundo renglón: si con doce
+   reliquias la banda se queda corta, se ve enseguida.
+
+M5. **LA Ñ Y LAS TILDES.** "goblin_carroñero" ya sale con la tilde. Las tildes
+   de á é í ó ú siguen tocando la letra —se leen, pero van pegadas— y **eso no
+   lo he cambiado porque es tuyo**: si las quieres separadas, es una línea en
+   `fuente.py` (tilde en la fila 0 y la 1 en blanco). Tengo las dos versiones
+   comparadas si quieres verlas.
+
+M3. **EL ESPECTRO.** Llevaba en la lista de "roto, no tocar" desde el fallo del
+   magenta y **hoy sale entero**: cero interior comido, cero motas. Míralo en el
+   mapa y confirma, y si está bien esa línea se cae del plan.
+
 A. **LAS MISIONES, que es lo nuevo y lo que hay que juzgar.** ¿La tele te dice
    con claridad qué toca? ¿Te descubres yendo a por un tiro concreto porque lo
    pide la misión? Si te da igual lo que ponga y sigues dando tumbos, la misión
@@ -372,13 +471,22 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
    que se busca. `DISEÑO.md` §11 tiene los seis (bloquear un recorrido, curarse,
    reflejar, blindaje, castigar el combo, acelerar el reloj). Y con combates de
    137 s, un enemigo que solo tiene vida se nota que es un saco
+1a. **PONER LA BATERÍA EN VERDE** (Sonnet, razonamiento alto). **Va antes que
+   la Fase 6 aunque la Fase 6 sea más importante**, porque es el candado: la
+   regla del repo es que no se commitea con la batería en rojo, y son 13 rojos
+   que ya están diagnosticados y ninguno es un fallo del juego. Dos trabajos
+   distintos: darle a `NodoCascara` un viewport de verdad dentro de la prueba
+   (seis) y reescribir siete comprobaciones contra los parámetros en vez de
+   contra números escritos a mano. Alto porque el riesgo es tapar un rojo
+   verdadero cambiando el número que lo destapaba: cada una hay que
+   reproducirla antes de tocarla
 1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes:
    con comportamientos dentro, `tests/medir_daniel.gd` vuelve a barrer y la
    banda del 25-60 % pasa a ser alcanzable. Hasta entonces, tocar la tabla es
    mover el mismo número por cuarta vez
-2. **Tanda de assets A: la hoja del espectro** (Sonnet, medio). En cuanto
-   Daniel diga si la tiene o si hay que regenerarla. Es el único sprite que
-   sigue roto
+2. ~~**Tanda de assets A: la hoja del espectro**~~ **HECHA sin gastar tanda:**
+   la hoja del 13 de agosto ya lo había regenerado y nadie lo había medido.
+   Sale de la lista de intocables de `limpiar.py`. Falta que Daniel lo mire (M3)
 2b. **Cerrar la criatura del cascabel** (Sonnet, medio para colocarla;
    Opus + Daniel/Fátima si hace falta reabrir el estilo de borde). Decidir
    destino final (¿`reliquias/`? ¿carpeta nueva?), decidir si se acepta el
@@ -461,6 +569,65 @@ la derecha se queda en y=903 sin tocar nada. O sea que hay UN tiro de cuna
 de geometría fina y se hace jugando, no midiendo.
 
 ## Abierto
+
+- **`fuente.py` ya no reproduce los marcos del repo, y la tabla de herramientas
+  de `CLAUDE.md` invita a lanzarlo.** Medido: al regenerar, las nueve piezas de
+  `ventana`, `titulo` y `barra` salen con todos los píxeles distintos y
+  `tooltip` sale de 4×4 en vez de 8×8. O los marcos del repo los hizo una
+  versión anterior del script, o se retocaron después y no se anotó. Esta
+  sesión regeneró la fuente y **restauró los marcos a mano** para no romper
+  nada. Hay que decidir cuál de los dos es el bueno. **Mientras tanto, lanzar
+  `fuente.py` a secas destruye la cáscara.**
+- **Quedan carpetas mías dentro del repo: `_to_delete/`.** Tres carpetas de
+  parche ya aplicadas, cuatro `.tgz` y dos `index.lock` sueltos. El puente del
+  escritorio NO puede borrar ficheros, así que las dejé ahí y **Godot las
+  escaneó**: cada copia de `nodo_cascara.gd` daba "Class NodoCascara hides a
+  global script class" y llenaba el editor de rojos que no eran del juego.
+  Tapado con un `.gdignore` vacío dentro, que hace que Godot se salte el
+  directorio, y `_to_delete/` está en `.gitignore`. **Se puede borrar entera
+  desde el Explorador: dentro no hay nada que sirva.**
+- ~~Los NOMBRES de misión también van sin tildes~~ HECHO, aparte de los textos:
+  "Punteria", "Artilleria", "La maquina", "El reloj es mio". Entra en la misma
+  pasada que lo de abajo.
+- **La `Ú` de "COMÚN" va apretada.** La tilde de las MAYÚSCULAS se come la
+  primera fila de la letra —no hay sitio para más en una celda de 8 px— y a
+  ese tamaño la Ú se puede confundir con una O. Se lee, pero si molesta, la
+  salida es subir la celda a 10 px, y eso agranda TODO el texto del juego.
+  Decisión de Fátima, no mía.
+- ~~El texto de las reliquias está escrito sin tildes~~ **HECHO.** Lo que sigue abierto de aquí es solo la `Ú` apretada, arriba.
+- **VIEJO, ya no aplica:** 47 palabras en 31
+  entradas de `data/reliquias.json` y `data/misiones.json`: "dano", "canon",
+  "mas", "Metronomo", "Cuerda de mas", "El reloj es mio". Viene de cuando la
+  fuente de reserva no sabía dibujar acentos —el motivo por el que existe
+  `fuente.py`— y ese motivo ya no está. `enemigos.json` sí los usa, así que en
+  la misma pantalla conviven "goblin_carroñero" bien escrito y "Cuerda de mas".
+- **LA BATERÍA ESTÁ EN ROJO: 13 de 312, y el commit está atado a que pase.**
+  Medido lanzándola, no leído. La primera ya está diagnosticada y arreglada (la
+  del crítico, un lambda que capturaba por valor) y era **falsa**: el juego
+  estaba bien. Las otras 13 se parten en dos montones y **ninguna es un fallo
+  visible jugando**:
+  · **Seis son de pantalla**: la batería corre con `--script`, así que
+    `NodoCascara` no tiene viewport y `pantalla()` devuelve ceros — de ahí los
+    "−208 y −208" y los `[0, 0, 0]` de fondos. En el juego de verdad esos
+    paneles y esos fondos se dibujan bien; está mirado en captura.
+  · **Siete son constantes viejas contra la escala nueva.** Confirmada una:
+    "quedarse sin vida es derrota" monta un enemigo con `ataque: 1000` para
+    matar de un drenaje, pero con `vida_jugador` a 1080 y `factor_ataque_
+    drenaje` 0,5 el drenaje quita 500 y quedan 580. Es exactamente la trampa
+    que ya está escrita en `CLAUDE.md`: **las pruebas se escriben contra los
+    parámetros, no contra constantes.**
+- **`assets/ui_marco/` no lo carga nadie.** Nueve piezas de marco de piedra
+  remachada, 28 000 px, con alfa parcial (fleco antialiaseado, que en pixelart
+  con escalado entero es fleco borroso) y un halo de magenta de los gordos. No
+  se ha tocado a propósito: arreglar arte muerto es ruido. O se conecta o se
+  borra, y eso lo decide quien sepa si ese marco se quería.
+- **Hay mucho arte generado que el código no usa.** Sin referencia ninguna:
+  `bolas/`, `bolas_64/`, `criaturas_64/` (sí se ven, pero por otra ruta),
+  `mesa_anim/`, `mesa_placas/`, `mesa_props/`, `mesa_tunel/`, `reliquias2/`,
+  `ui_marco/` y **9 de los 13 PNG de `mesa/`** (del bumper de engranaje al
+  target de lápida). Los jefes ya se sabía que estaban aparcados a propósito;
+  esto otro no estaba anotado. No es un bug, pero explica por qué la mesa se ve
+  más pelada que la carpeta de assets.
 
 - **Los dos carriles de retorno no miden lo mismo**: 34 px de boca el
   izquierdo, 27 el derecho, porque el carril lanzador come sitio a la

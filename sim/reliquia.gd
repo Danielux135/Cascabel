@@ -25,9 +25,19 @@ extends RefCounted
 ## de qué va una reliquia antes de leerla.
 enum Eje { COMBO, GOLPE_UNICO, SUPERVIVENCIA, ESCALADO, CAOS }
 
+## La clave del JSON. Identificador, sin tilde, no se toca.
 const NOMBRE_EJE := {
 	Eje.COMBO: "combo",
 	Eje.GOLPE_UNICO: "golpe unico",
+	Eje.SUPERVIVENCIA: "supervivencia",
+	Eje.ESCALADO: "escalado",
+	Eje.CAOS: "caos",
+}
+
+## Lo que se PINTA. Ver `Mision.ROTULO_RAREZA`: la tele escribía la clave.
+const ROTULO_EJE := {
+	Eje.COMBO: "combo",
+	Eje.GOLPE_UNICO: "golpe único",
 	Eje.SUPERVIVENCIA: "supervivencia",
 	Eje.ESCALADO: "escalado",
 	Eje.CAOS: "caos",
@@ -81,8 +91,24 @@ func ruta_icono(lado: int = 64) -> String:
 		return ""
 	return "res://assets/reliquias%s/%s.png" % ["_32" if lado == 32 else "", icono]
 
+## La rareza comparte enum y tablas con `Mision`: una misión de rareza N paga
+## una reliquia de rareza N. Estaban las de la misión y no las de la reliquia,
+## así que `prueba_sim.gd` llamaba a `nombre_rareza()` sobre una Reliquia y
+## petaba en cada pasada — dentro del MENSAJE de una comprobación, que se
+## construye siempre, así que el error salía aunque la prueba estuviera en verde.
+func nombre_rareza() -> String:
+	return str(Mision.NOMBRE_RAREZA.get(rareza, "?"))
+
+## Para PINTAR, con su tilde. Ver `Mision.ROTULO_RAREZA`.
+func rotulo_rareza() -> String:
+	return str(Mision.ROTULO_RAREZA.get(rareza, "?"))
+
 func nombre_eje() -> String:
 	return str(NOMBRE_EJE.get(eje, "?"))
+
+## Para PINTAR, con su tilde.
+func rotulo_eje() -> String:
+	return str(ROTULO_EJE.get(eje, "?"))
 
 static func eje_desde(texto_eje: String) -> int:
 	for clave in NOMBRE_EJE:

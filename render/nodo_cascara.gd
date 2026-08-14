@@ -53,6 +53,10 @@ const GROSOR_VENTANA := 8.0
 ## dibujan a 32: cualquier otro tamaño escala en fracciones y hierve.
 const LADO_ICONO := 32.0
 const SEPARACION_ICONO := 12.0
+## Lo ancho que puede ser el nombre bajo un icono de reliquia. El paso de
+## columna es `LADO_ICONO + SEPARACION_ICONO + 46` = 90, así que 78 deja
+## aire y no invade la columna de al lado.
+const ANCHO_NOMBRE_ICONO := 78.0
 const MARGEN_ESCRITORIO := 14.0
 
 ## LOS PANELES DE LA BANDA DERECHA. Alturas fijas y en múltiplos de 8, como todo
@@ -291,15 +295,17 @@ func interior_panel(caja: Rect2) -> Rect2:
 ## como los iconos de un escritorio de verdad.
 func caja_icono(i: int) -> Rect2:
 	var banda := banda_izquierda()
+	# El +22 es el hueco del NOMBRE, que ahora son dos renglones de 8 px. Con el
+	# +10 de antes el segundo renglón besaba el icono de abajo.
 	var por_columna := maxi(int((banda.size.y - MARGEN_ESCRITORIO * 2.0)
-		/ (LADO_ICONO + SEPARACION_ICONO + 10.0)), 1)
+		/ (LADO_ICONO + SEPARACION_ICONO + 22.0)), 1)
 	var col := i / por_columna
 	var fila := i % por_columna
 	return Rect2(
 		roundf(banda.position.x + MARGEN_ESCRITORIO
 			+ float(col) * (LADO_ICONO + SEPARACION_ICONO + 46.0)),
 		roundf(banda.position.y + MARGEN_ESCRITORIO
-			+ float(fila) * (LADO_ICONO + SEPARACION_ICONO + 10.0)),
+			+ float(fila) * (LADO_ICONO + SEPARACION_ICONO + 22.0)),
 		LADO_ICONO, LADO_ICONO)
 
 func _icono_en(punto: Vector2) -> int:
@@ -450,15 +456,27 @@ func _dibujar_reloj_en_titulo(en: CanvasItem, barra: Rect2, tope_der: float) -> 
 ## para enmarcar algo que ya se está dibujando por su cuenta, como la mesa.
 func _marco_hueco(en: CanvasItem, marco: NueveTrozos, fuera: Rect2,
 		hueco: Rect2) -> void:
-	var g := marco.grosor()
-	marco.dibujar(en, Rect2(fuera.position,
-		Vector2(fuera.size.x, hueco.position.y - fuera.position.y)))
-	marco.dibujar(en, Rect2(fuera.position.x, hueco.end.y,
-		fuera.size.x, fuera.end.y - hueco.end.y))
-	marco.dibujar(en, Rect2(fuera.position.x, hueco.position.y,
-		g.x, hueco.size.y))
-	marco.dibujar(en, Rect2(hueco.end.x, hueco.position.y,
-		fuera.end.x - hueco.end.x, hueco.size.y))
+	# UN marco, al que no se le pinta el centro. Ver `NueveTrozos.dibujar_hueco`
+	# para lo que hacía antes y por qué salía un amasijo en las cuatro puntas.
+	marco.dibujar_hueco(en, fuera)
+	# Lo que queda entre el interior del marco y el hueco de verdad —aquí, la
+	# franja de la barra de título— sí se rellena: es mueble, no campo.
+	var dentro := marco.interior(fuera)
+	var relleno := marco.tiene("relleno")
+	if relleno != null:
+		for banda in [
+			Rect2(dentro.position.x, dentro.position.y,
+				dentro.size.x, hueco.position.y - dentro.position.y),
+			Rect2(dentro.position.x, hueco.end.y,
+				dentro.size.x, dentro.end.y - hueco.end.y),
+			Rect2(dentro.position.x, hueco.position.y,
+				hueco.position.x - dentro.position.x, hueco.size.y),
+			Rect2(hueco.end.x, hueco.position.y,
+				dentro.end.x - hueco.end.x, hueco.size.y),
+		]:
+			if banda.size.x > 0.0 and banda.size.y > 0.0:
+				en.draw_texture_rect(relleno,
+					Rect2(banda.position.round(), banda.size.round()), true)
 
 # ------------------------------------------------------------------- dibujo
 
@@ -539,7 +557,14 @@ func dibujar_barra_tareas(en: CanvasItem) -> void:
 	# no se distinguía de nada.
 	var hora := Time.get_time_dict_from_system()
 	var texto_hora := "%02d:%02d" % [int(hora["hour"]), int(hora["minute"])]
-	var ancho_bandeja := 12.0 + FuenteUI.tam(8) * texto_hora.length() * 0.6
+	# El ancho SE MIDE, no se estima. Estaba escrito como `tam(8) * letras * 0,6`
+	# y el avance real de la fuente son 6 px sobre una celda de 8, o sea 0,75:
+	# la bandeja salia 6 px corta, el `width` de `draw_string` recorta a lo
+	# ancho, y el reloj llevaba toda la Fase 5 marcando "14:5" sin el ultimo
+	# digito. Un factor a ojo mide la escala, no lo que dice.
+	var ancho_hora := _fuente.get_string_size(
+		texto_hora, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+	var ancho_bandeja := 12.0 + ancho_hora
 	var bandeja := Rect2(p.x - ancho_bandeja - 6.0, caja.position.y + 5.0,
 		ancho_bandeja, ALTO_BARRA - 10.0)
 	en.draw_rect(bandeja, C_VACIO)
@@ -553,7 +578,13 @@ func dibujar_barra_tareas(en: CanvasItem) -> void:
 	var titulo_texto := "cascabel.exe"
 	if vista != null and vista.run != null and vista.run.terminada():
 		titulo_texto = "cascabel.exe  (no responde)"
-	var pestana := Rect2(74.0, caja.position.y + 4.0, 150.0, ALTO_BARRA - 8.0)
+	# La pestaña se ensancha con lo que pone. Con 150 px fijos, el título largo
+	# —el de "no responde", que es justo el momento en que quieres leerlo— pedía
+	# 162 y el `width` lo cortaba a "cascabel.exe  (no respon".
+	var ancho_pestana := maxf(150.0, _fuente.get_string_size(
+		titulo_texto, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x + 16.0)
+	var pestana := Rect2(74.0, caja.position.y + 4.0, ancho_pestana,
+		ALTO_BARRA - 8.0)
 	if _boton.completo():
 		_boton.dibujar(en, pestana)
 	en.draw_string(_fuente, Vector2(pestana.position.x + 6.0,
@@ -569,6 +600,7 @@ func _dibujar_iconos() -> void:
 	if vista == null or vista.run == null or vista.run.bolsa == null:
 		return
 	var bolsa := vista.run.bolsa
+	var banda := banda_izquierda()
 	for i in bolsa.reliquias.size():
 		var r := bolsa.reliquias[i]
 		var caja := caja_icono(i)
@@ -587,9 +619,22 @@ func _dibujar_iconos() -> void:
 		if activa:
 			_lienzo.draw_rect(caja.grow(2.0), Color(col, 0.75), false, 1.0)
 
-		_lienzo.draw_string(_fuente,
-			Vector2(caja.position.x - 12.0, caja.end.y + 11.0), r.nombre,
-			HORIZONTAL_ALIGNMENT_CENTER, LADO_ICONO + 24.0, 8,
+		# EL NOMBRE VA EN DOS LÍNEAS, como en un escritorio de verdad. Con una
+		# sola y 56 px de `width`, que RECORTA, cabían nueve caracteres: 41 de
+		# las 45 reliquias salían cortadas a media palabra ("Excepcion no
+		# capturada" pide 132 px). El ancho se queda dentro del paso de columna
+		# y el segundo renglón cabe en el hueco que ya había hasta el icono
+		# siguiente.
+		# Y NO SE SALE POR LA IZQUIERDA. Centrado sobre un icono que está a 14 px
+		# del borde, un nombre de 78 px empieza en −9 y se come la primera letra.
+		# Se centra si cabe y si no se pega al margen, que es lo que hace un
+		# escritorio de verdad con un nombre largo en la primera columna.
+		var x_nombre := maxf(
+			caja.position.x - (ANCHO_NOMBRE_ICONO - LADO_ICONO) * 0.5,
+			banda.position.x + 2.0)
+		_lienzo.draw_multiline_string(_fuente,
+			Vector2(x_nombre, caja.end.y + 11.0), r.nombre,
+			HORIZONTAL_ALIGNMENT_CENTER, ANCHO_NOMBRE_ICONO, 8, 2,
 			Color(C_TEXTO if activa else C_TEXTO_TENUE, tinte.a))
 
 ## Los iconos que NO hacen nada. Van en la banda IZQUIERDA, que es donde de

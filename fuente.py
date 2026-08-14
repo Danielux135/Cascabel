@@ -163,15 +163,28 @@ for base, acentuada in [("a", "á"), ("e", "é"), ("i", "í"), ("o", "ó"), ("u"
 
 G["ü"] = list(G["u"])
 G["ü"][0] = " # # "
-G["ñ"] = ["     ", " ### ", "#### ", "#   #", "#   #", "#   #", "#   #"]
+# LA TILDE NECESITA UNA FILA EN BLANCO DEBAJO. Estaba dibujada pegada a la
+# barra alta de la "n" —tilde en la fila 1, "n" desde la 2— y las dos se
+# fundían en un techo grueso: la ñ salía leyéndose como una n. Se ve a 8 px
+# dentro del juego, no en el atlas. La fila 0 estaba libre.
+G["ñ"] = [" ### ", "     ", "#### ", "#   #", "#   #", "#   #", "#   #"]
 
-G["Á"] = ["  ## ", " ### ", "#   #", "#####", "#   #", "#   #", "#   #"]
-G["É"] = ["  ## ", "#####", "#    ", "#### ", "#    ", "#    ", "#####"]
-G["Í"] = ["  ## ", "#####", "  #  ", "  #  ", "  #  ", "  #  ", "#####"]
-G["Ó"] = ["  ## ", " ### ", "#   #", "#   #", "#   #", "#   #", " ### "]
-G["Ú"] = ["  ## ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "]
-G["Ü"] = [" # # ", "#   #", "#   #", "#   #", "#   #", "#   #", " ### "]
-G["Ñ"] = [" ### ", "#   #", "##  #", "# # #", "#  ##", "#   #", "#   #"]
+# LA MISMA REGLA QUE LA ñ: fila 1 EN BLANCO y el cuerpo comprimido a cinco.
+# Antes la tilde iba pegada a la primera fila de la letra y en las que tienen
+# la fila de arriba llena —la I y la E— desaparecía del todo: "CRÍTICO" salía
+# leyéndose "CRITICO" con la barra un poco más gorda. En la A, la O y la U se
+# distinguía a duras penas. Comprimir el cuerpo cuesta una fila de dibujo y es
+# lo que hace que la tilde exista a 8 px, que es donde se lee.
+G["Á"] = ["  ## ", "     ", " ### ", "#   #", "#####", "#   #", "#   #"]
+G["É"] = ["  ## ", "     ", "#####", "#    ", "#### ", "#    ", "#####"]
+G["Í"] = ["  ## ", "     ", "#####", "  #  ", "  #  ", "  #  ", "#####"]
+G["Ó"] = ["  ## ", "     ", " ### ", "#   #", "#   #", "#   #", " ### "]
+G["Ú"] = ["  ## ", "     ", "#   #", "#   #", "#   #", "#   #", " ### "]
+G["Ü"] = [" # # ", "     ", "#   #", "#   #", "#   #", "#   #", " ### "]
+# Lo mismo arriba, y aquí no había fila libre: la "N" ocupa las siete. Se
+# comprime a cinco quedándose con la diagonal entera —que es lo que hace
+# que una N sea una N— y se gana el hueco bajo la tilde.
+G["Ñ"] = [" ### ", "     ", "#   #", "##  #", "# # #", "#  ##", "#   #"]
 
 G["°"] = [" ##  ", "#  # ", " ##  ", "     ", "     ", "     ", "     "]
 
@@ -315,7 +328,21 @@ def marcos():
            [c("negro"), c("pergamino"), c("pergamino"), c("pergamino")],
            c("pergamino"), unidad=4)
 
-    print("  marcos: ventana, titulo, barra, boton, tooltip")
+    # EL CUADRO DE DIÁLOGO. Gris CLARO, porque encima se escribe en oscuro, y
+    # con la línea blanca por fuera para que se lea levantado sobre la mesa: es
+    # lo que INTERRUMPE el juego y tiene que parecer que se ha puesto delante.
+    #
+    # Estaba recortado a mano de una hoja de IA y era el único marco de la
+    # cáscara que no salía de aquí. Se veía: su `relleno` no era un tono plano
+    # sino una baldosa con borde propio, así que al repetirse dibujaba una
+    # REJILLA de ladrillos por todo el cuadro. Solo aparece cuando el enemigo
+    # ataca, que es el peor momento para tener la pantalla llena de ruido.
+    _marco("assets/ui/dialogo",
+           [c("negro"), c("blanco"), c("gris5"), c("gris5"),
+            c("gris5"), c("gris4"), c("gris3"), c("gris2")],
+           c("gris5"))
+
+    print("  marcos: ventana, titulo, barra, boton, tooltip, dialogo")
 
 
 if __name__ == "__main__":

@@ -240,7 +240,7 @@ func _dibujar_mision(combate: Combate) -> void:
 	var ancho := MARCO.size.x - 8.0
 
 	draw_string(_fuente, Vector2(x, MARCO.position.y + 13.0),
-		m.nombre_rareza().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, ancho, 8, col)
+		m.rotulo_rareza().to_upper(), HORIZONTAL_ALIGNMENT_LEFT, ancho, 8, col)
 	draw_string(_fuente, Vector2(x, MARCO.position.y + 13.0),
 		"x%d" % combate.multiplicador(), HORIZONTAL_ALIGNMENT_RIGHT, ancho, 8,
 		Color(C_TEXTO_TENUE, 0.9))
@@ -273,7 +273,7 @@ func _dibujar_mision(combate: Combate) -> void:
 	# Y el tiro que toca ahora, escrito: las casillas dicen cuánto falta, no qué.
 	if paso >= 0:
 		draw_string(_fuente, Vector2(x, MARCO.end.y - 4.0),
-			m.tiro(paso).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, ancho, 8,
+			m.rotulo_tiro(paso).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, ancho, 8,
 			Color(col, 0.9))
 	if m.sin_drenar:
 		draw_string(_fuente, Vector2(x, MARCO.position.y + 30.0), "SIN DRENAR",
@@ -347,7 +347,7 @@ func _dibujar_premio(grande: bool) -> void:
 				MARCO.size.x - 8.0, 8, C_ORO_CLARO)
 		return
 	draw_string(_fuente, Vector2(MARCO.position.x + 4.0, MARCO.position.y + 100.0),
-		r.nombre_eje().to_upper(), HORIZONTAL_ALIGNMENT_CENTER,
+		r.rotulo_eje().to_upper(), HORIZONTAL_ALIGNMENT_CENTER,
 		MARCO.size.x - 8.0, 8, C_TEXTO_TENUE)
 
 ## El texto de lo que hace NO cabe dentro de una tele de 176x116, así que sale

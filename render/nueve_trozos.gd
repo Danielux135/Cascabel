@@ -90,6 +90,25 @@ func esquinas_cuadran() -> bool:
 ## Dibuja el marco dentro de `caja`. `tinte` sirve para apagarlo cuando el panel
 ## no es el que importa ahora mismo.
 func dibujar(en: CanvasItem, caja: Rect2, tinte: Color = Color.WHITE) -> void:
+	_dibujar(en, caja, tinte, true)
+
+## El mismo marco pero SIN el relleno del centro, para enmarcar algo que ya se
+## está dibujando ahí: la mesa.
+##
+## POR QUÉ EXISTE. El marco de la ventana de la mesa se montaba con CUATRO
+## marcos completos —uno arriba, uno abajo y uno por lado— alrededor del hueco.
+## Un marco de nueve trozos metido en una caja más estrecha que sus dos esquinas
+## no se encoge: `dibujar` recorta el grosor a la mitad de la caja, pero las
+## esquinas se PEGAN a tamaño completo. En una tira de 8 px con esquinas de 8,
+## las dos esquinas caen a 4 px una de otra, se solapan, y cada una sobresale 4
+## px hacia dentro del campo. Eso era el amasijo de tornillos de las cuatro
+## puntas de la mesa, y era además lo que le comía píxeles al tablero por los
+## cuatro lados. Un marco con agujero es UN marco al que no se le pinta el
+## centro, no cuatro marcos pegados.
+func dibujar_hueco(en: CanvasItem, caja: Rect2, tinte: Color = Color.WHITE) -> void:
+	_dibujar(en, caja, tinte, false)
+
+func _dibujar(en: CanvasItem, caja: Rect2, tinte: Color, con_relleno: bool) -> void:
 	var g := grosor()
 	# Con una caja más pequeña que el propio marco no se dibuja el relleno: se
 	# encogen los bordes. Un marco de 47 px por lado en un botón de 60 no cabe.
@@ -102,7 +121,8 @@ func dibujar(en: CanvasItem, caja: Rect2, tinte: Color = Color.WHITE) -> void:
 	var centro := Rect2(r.position + Vector2(izq, arr),
 		Vector2(maxf(r.size.x - izq - der, 0.0), maxf(r.size.y - arr - aba, 0.0)))
 
-	_repetir(en, tiene("relleno"), centro, tinte)
+	if con_relleno:
+		_repetir(en, tiene("relleno"), centro, tinte)
 	_repetir(en, tiene("borde_sup"), Rect2(centro.position.x, r.position.y,
 		centro.size.x, arr), tinte)
 	_repetir(en, tiene("borde_inf"), Rect2(centro.position.x, r.end.y - aba,

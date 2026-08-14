@@ -112,10 +112,12 @@ def quitar_motas(op, min_px=3):
     return op & ~mota, int(mota.sum())
 
 
-# Demasiado destrozado para parchear: el cuerpo del espectro son mechones
-# sueltos y cerrar la silueta lo convierte en un pegote que le tapa un ojo.
-# Necesita la hoja original o volver a generarse. Comprobado mirandolo.
-NO_TOCAR = ("criaturas_64/cr_espectro.png",)
+# Aqui vivia `criaturas_64/cr_espectro.png`, que estaba tan comido que cerrarle
+# la silueta le tapaba un ojo. YA NO HACE FALTA: la hoja de criaturas del 13 de
+# agosto (15:55:11) lo regenero entero. Medido con los tres detectores de este
+# fichero, el espectro sale hoy con comido=0 y motas=0. La lista se queda por si
+# vuelve a hacer falta.
+NO_TOCAR = ()
 
 
 def reparar(p, aplicar):

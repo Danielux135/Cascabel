@@ -23,10 +23,36 @@ extends RefCounted
 ## Cuánto paga completarla. Es la rareza de la reliquia que sortea la ruleta.
 enum Rareza { COMUN, RARA, ARCANA }
 
+## LA CLAVE con la que la rareza viene escrita en el JSON. Es un identificador:
+## va sin tilde y no se toca, porque cambiarla rompe los ficheros de datos.
 const NOMBRE_RAREZA := {
 	Rareza.COMUN: "comun",
 	Rareza.RARA: "rara",
 	Rareza.ARCANA: "arcana",
+}
+
+## CÓMO SE ESCRIBE en pantalla. Un identificador y un rótulo no son la misma
+## cadena, y usar el identificador para pintar es lo que ponía **"COMUN"** en la
+## tele desde que existen las misiones: la fuente sabe dibujar la Ú, pero nadie
+## se la estaba pidiendo. Misma trampa en `tiro`: "canon" y "orbita" son claves,
+## y salían así escritas encima de las casillas de progreso.
+const ROTULO_RAREZA := {
+	Rareza.COMUN: "común",
+	Rareza.RARA: "rara",
+	Rareza.ARCANA: "arcana",
+}
+
+## Los tiros que puede pedir una misión, con su nombre bien escrito. La clave es
+## la que emite `Mesa`; el valor es lo que lee el jugador.
+const ROTULO_TIRO := {
+	"bumper": "bumper",
+	"girador": "girador",
+	"target": "target",
+	"banco": "banco",
+	"orbita": "órbita",
+	"retorno": "retorno",
+	"canon": "cañón",
+	"platillo": "platillo",
 }
 
 var id: String
@@ -55,6 +81,16 @@ func _init(datos: Dictionary) -> void:
 
 func nombre_rareza() -> String:
 	return str(NOMBRE_RAREZA.get(rareza, "?"))
+
+## Para PINTAR. `nombre_rareza()` es la clave del JSON y no se lee en pantalla.
+func rotulo_rareza() -> String:
+	return str(ROTULO_RAREZA.get(rareza, "?"))
+
+## El rótulo del paso `i`, bien escrito. Si el tiro no está en la tabla se
+## devuelve la clave: mejor "girador" mal puesto que un hueco.
+func rotulo_tiro(i: int) -> String:
+	var clave := tiro(i)
+	return str(ROTULO_TIRO.get(clave, clave))
 
 static func rareza_desde(texto_rareza: String) -> int:
 	for clave in NOMBRE_RAREZA:

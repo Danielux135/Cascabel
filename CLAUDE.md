@@ -43,13 +43,34 @@ Medidas (no son pruebas: no fallan, imprimen tablas):
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_reliquias.gd
 
+### En una sesión remota se puede lanzar el juego CON VENTANA
+
+No solo los medidores sin `render/`. Con un display virtual, Godot abre la
+ventana de verdad, se le mandan teclas y se guardan capturas, así que **se
+puede MIRAR el juego en vez de imaginárselo**:
+
+    curl -sSL -o g.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
+    unzip -q g.zip && chmod +x Godot_v4.7.1-stable_linux.x86_64
+    Xvfb :99 -screen 0 1920x1080x24 &
+    DISPLAY=:99 LIBGL_ALWAYS_SOFTWARE=1 ./Godot_v4.7.1-stable_linux.x86_64 \
+        --path <copia> --display-driver x11 --rendering-driver opengl3 --windowed
+
+Para conducirlo se mete un autoload de usar y tirar que lea un guion de
+`OS.get_environment`, mande las teclas con `Input.parse_input_event` y guarde
+`get_viewport().get_texture().get_image().save_png(...)`. **Ese autoload no va
+al repo**: se pone en la copia de la caja y se borra. El audio no arranca (no
+hay tarjeta) y avisa; da igual.
+
+Esto es lo que cazó el halo de magenta y el reloj cortado, y ninguno de los
+dos salía en la batería. **Lo visual se mira, no se deduce.**
+
 ## Herramientas del repo
 
 Se generan, no se dibujan ni se editan a mano:
 
 | Script | Qué hace |
 |---|---|
-| `python3 fuente.py` | la fuente pixelart y los cinco marcos de nueve trozos |
+| `python3 fuente.py` | la fuente pixelart y los cinco marcos de nueve trozos — **OJO: los marcos que saca hoy NO son los del repo**, ver Trampas |
 | `python3 sonidos.py` | los sonidos sintetizados (y luego hay que reimportar) |
 | `python3 procesar.py hoja.png ...` | recorta una hoja de IA con fondo magenta |
 | `python3 limpiar.py assets/` | repara sprites YA recortados de los que no queda hoja |
@@ -382,6 +403,124 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
   es que haya bucle, es quién lo mantiene:** uno que exige control del
   jugador en cada vuelta es bueno —es el eje de build "golpe único"—; uno
   que se sostiene solo está roto.
+
+- **Un lambda de GDScript captura las locales POR VALOR.** Una prueba contaba
+  los críticos con `var criticos := 0` y un `connect(func(): criticos += 1)`:
+  el `+= 1` sube la copia de dentro del lambda y el de fuera se queda a 0 para
+  siempre. La prueba llevaba en rojo desde la Fase 4 **y el juego no tenía
+  nada**: el daño que ella misma imprimía ya era 36 sobre un `dano_target` de
+  18, o sea que el crítico salía y doblaba. Todos los demás contadores del
+  fichero usan `[0]` porque un Array es referencia; ese era el único `int`
+  suelto. **Un rojo que no se reproduce a mano es la prueba, no el juego.**
+- **El `width` de `draw_string` RECORTA, y un ancho a ojo es una mentira que
+  no da error.** La bandeja del reloj de la barra de tareas se dimensionaba con
+  `tam(8) * letras * 0,6`, pero el avance real de la fuente son 6 px sobre una
+  celda de 8, o sea 0,75. La caja salía 6 px corta, el `width` cortaba a lo
+  ancho y **el reloj llevaba toda la Fase 5 marcando "14:5" sin el último
+  dígito**. Nadie lo vio porque la hora cambia y el hueco parece diseño. Los
+  anchos se miden con `get_string_size`, no se estiman. **Y no era uno:**
+  la etiqueta "Dirección" del mapa tenía 32 px para 54 y llevaba toda la
+  fase poniendo "Direc"; la pestaña de la barra de tareas cortaba el título
+  de "(no responde)"; y el nombre bajo un icono de reliquia tenía 56 px, o
+  sea nueve caracteres, así que **41 de las 45 reliquias salían cortadas**.
+  Un `width` fijo con texto que viene de un JSON es siempre una bomba.
+- **El halo de magenta de un recorte SOLO se ve dentro de Godot.** Los nueve
+  iconos de escritorio, los tres cursores, los botones de la barra de título y
+  el botón de Inicio tenían un fleco de píxeles magenta pegado al contorno —de
+  (181,0,178) puro hasta mezclas oscurísimas— y en un visor no se distinguía
+  del fondo. Lanzando el juego y ampliando la banda de iconos canta a la
+  primera. **La causa de fondo: `ui/iconos` y `ui/cursor` NUNCA pasaron por
+  `procesar.py`** —el 100 % de sus píxeles está fuera de la paleta de 33—, así
+  que ningún paso de recorte les tocó el alfa. Si un asset de IA está fuera de
+  paleta, es que no se proceso: mirar antes el halo que el color.
+- **Fuera de paleta no siempre es un fallo.** Todo `ui/` está al 100 % fuera de
+  los 33 colores y eso es a propósito en casi todo: los marcos de nueve trozos,
+  la barra, el botón, el título, el tooltip, el diálogo y la barra de progreso
+  los genera `fuente.py` con los grises de Windows, que son la identidad de la
+  cáscara. Lo que sí era fallo es el arte de IA de esa misma carpeta. **El
+  criterio no es la paleta, es quién generó el asset.**
+
+- **Una tilde pegada a la letra no es una tilde: es un techo más grueso.** La
+  `ñ` tenía la tilde en la fila 1 y la `n` desde la 2, sin hueco, así que las
+  dos manchas se fundían y **la ñ se leía como una n**: "goblin_carroñero"
+  salía "goblin_carronero". A 8 px eso solo se ve dentro del juego; en el atlas
+  ampliado parece que está. La `Ñ` igual, y encima sin fila libre: hay que
+  comprimir la N a cinco filas —conservando la diagonal, que es lo que la hace
+  N— para ganar el hueco. Las minúsculas tienen dos filas arriba: **tilde en la
+  0 y la 1 EN BLANCO**.
+- **Una prueba que comprueba que algo EXISTE no comprueba que esté bien
+  dibujado.** "la fuente sabe escribir acentos y eñes" estaba en verde todo el
+  tiempo que la ñ fue ilegible, porque solo miraba que el glifo estuviera en el
+  atlas. Para arte no hay prueba que valga: se mira.
+- **`fuente.py` YA NO reproduce los marcos que hay en el repo, así que lanzarlo
+  destruye la cáscara.** Medido: al regenerarlo, las nueve piezas de `ventana`,
+  `titulo` y `barra` salen con TODOS los píxeles distintos, y `tooltip` sale de
+  4×4 en vez de 8×8. Es decir, los marcos del repo los hizo una versión
+  anterior del script o se tocaron después. **La fuente sí se puede regenerar**
+  —el atlas sale idéntico salvo los glifos que cambies— pero hay que restaurar
+  las cinco carpetas de marcos justo después:
+
+      python3 fuente.py
+      git checkout -- assets/ui/ventana assets/ui/titulo assets/ui/barra \
+          assets/ui/boton assets/ui/tooltip
+
+  Hasta que alguien decida cuál de los dos marcos es el bueno, esto es una
+  trampa cargada: la tabla de "Herramientas del repo" invita a lanzarlo.
+
+- **Un marco con agujero es UN marco sin centro, no cuatro marcos pegados.** El
+  de la ventana de la mesa se montaba con cuatro nueve-trozos completos
+  alrededor del hueco. Un nueve-trozos metido en una caja más estrecha que sus
+  dos esquinas NO se encoge: `dibujar` recorta el grosor a la mitad de la caja,
+  pero las esquinas se PEGAN a tamaño completo. En una tira de 8 px con
+  esquinas de 8, las dos esquinas caen a 4 px una de otra, se solapan, y cada
+  una **sobresale 4 px hacia dentro del campo**. Eso era el amasijo de
+  tornillos de las cuatro puntas de la mesa, y de paso le comía píxeles al
+  tablero por los cuatro lados. Ahora hay `NueveTrozos.dibujar_hueco`. **Regla
+  general: un nueve-trozos en una caja menor que 2× su esquina va a salir mal,
+  y no da ningún aviso.**
+- **Un identificador no es un rótulo.** La rareza, el tiro de una misión y el
+  eje de una reliquia se guardaban en una sola tabla que servía a la vez para
+  leer el JSON y para PINTAR. Como la clave del JSON va sin tilde, la tele
+  llevaba desde la Fase 4 escribiendo **"COMUN", "CANON" y "ORBITA"**, y el
+  tooltip "GOLPE UNICO". Ahora hay dos tablas: `NOMBRE_*` es la clave —no se
+  toca, rompería los datos— y `ROTULO_*` es lo que se lee. **Si una cadena se
+  dibuja, no puede ser la misma que se parsea.**
+- **Un error dentro del MENSAJE de una comprobación revienta la batería sin que
+  ninguna prueba salga en rojo.** `prueba_sim.gd` construía un mensaje con
+  `reliquia.nombre_rareza()`, que no existía en `Reliquia`; GDScript evalúa el
+  argumento siempre, aunque la comprobación pase, así que abortaba el bloque
+  entero. Se veían 312 pruebas donde hay 321: **nueve pruebas no se estaban
+  ejecutando y el contador no lo decía.** Si el número total de pruebas cambia
+  sin que hayas añadido ninguna, mira los `SCRIPT ERROR` antes que los FALLO.
+
+- **NADA se descomprime dentro del repo, ni en una carpeta que se llame
+  `_to_delete`.** Godot escanea el proyecto ENTERO: una copia de
+  `render/nodo_cascara.gd` en cualquier subcarpeta le da "Class NodoCascara
+  hides a global script class" y llena el editor de errores rojos que no tienen
+  nada que ver con el código. Pasó al traer los parches de una sesión remota:
+  el bridge del escritorio no puede borrar ficheros —`rm` da "Operation not
+  permitted"—, así que lo que entra ahí se queda. El apaño, si ya está dentro,
+  es un fichero vacío `.gdignore` en la carpeta: Godot se salta el directorio
+  entero. Comprobado mirando `.godot/global_script_class_cache.cfg`. Pero el
+  sitio de un fichero de paso es FUERA del repo, y si no hay fuera, se copia
+  encima directamente sin descomprimir a un lado.
+
+- **Un `relleno` de nueve trozos tiene que ser un tono PLANO.** El del cuadro de
+  diálogo era una baldosa con borde propio, así que al repetirse dibujaba una
+  rejilla de ladrillos por todo el cuadro. Solo salía cuando el enemigo ataca,
+  que es el único momento en que ese marco aparece — y el peor para llenar la
+  pantalla de ruido. Era el único marco de la cáscara recortado a mano de una
+  hoja de IA; ahora lo genera `fuente.py` como los otros cinco. **El mosaico de
+  prueba que ya está en estas trampas lo canta en dos segundos: montarlo para
+  los nueve marcos ANTES de mirarlo dentro del juego.**
+- **El `width` de `draw_string` recorta, y el tamaño de letra también es un
+  ancho.** Los carteles del centro de la mesa se escribían a 16 px contra los
+  400 de ancho: a 16 el avance son 12, o sea 33 caracteres, y "ESPACIO:
+  mantener y soltar para lanzar" tiene 38. Salía "…para l". La salida no es
+  acortar el texto —una pista que enseña menos vale menos— sino **bajar al
+  tamaño que quepa**: `_tam_que_cabe` en `nodo_hud.gd`, que prueba por
+  múltiplos de la celda. Todo texto de ancho variable que venga de un JSON
+  (nombres de enemigo, de reliquia, de misión) tiene que pasar por ahí.
 
 ## Cómo trabajar
 

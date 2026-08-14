@@ -297,10 +297,19 @@ func _dibujar_herramientas(v: Rect2) -> void:
 		x = caja.end.x + 6.0
 
 	# La barra de direcciones, hundida como las de verdad.
-	var direccion := Rect2(x + 34.0, barra.position.y + 4.0,
-		barra.end.x - x - 40.0, ALTO_HERRAMIENTAS - 8.0)
+	#
+	# EL HUECO DE LA ETIQUETA SE MIDE. Estaba escrito a mano —la etiqueta con 32
+	# px de `width` y la caja empezando en x+34— y "Dirección" pide 54, así que
+	# el `width` de `draw_string`, que RECORTA, dejaba "Direc" cortado a medias
+	# desde que existe la pantalla. Se mide el texto y la caja empieza detrás.
+	var etiqueta := "Dirección"
+	var ancho_etiqueta := _fuente.get_string_size(
+		etiqueta, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+	var tras_etiqueta := x + 2.0 + ancho_etiqueta + 8.0
+	var direccion := Rect2(tras_etiqueta, barra.position.y + 4.0,
+		barra.end.x - tras_etiqueta - 6.0, ALTO_HERRAMIENTAS - 8.0)
 	_lienzo.draw_string(_fuente, Vector2(x + 2.0, barra.position.y + 16.0),
-		"Dirección", HORIZONTAL_ALIGNMENT_LEFT, 32.0, 8, C_CABINA)
+		etiqueta, HORIZONTAL_ALIGNMENT_LEFT, ancho_etiqueta, 8, C_CABINA)
 	_lienzo.draw_rect(direccion, C_CABINA)
 	_lienzo.draw_rect(direccion, Color(C_TEXTO_TENUE, 0.7), false, 1.0)
 	_lienzo.draw_string(_fuente, Vector2(direccion.position.x + 6.0,

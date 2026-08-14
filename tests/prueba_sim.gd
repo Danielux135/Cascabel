@@ -2755,13 +2755,19 @@ func _prueba_criticos() -> void:
 	var seguro := Combate.new(p)
 	seguro.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1}))
 	_en_juego(seguro)
-	var criticos := 0
-	seguro.golpe_critico.connect(func(_pt: Vector2, _d: int) -> void: criticos += 1)
+	# EL CONTADOR VA EN UN ARRAY, como todos los demas de este fichero. Un
+	# lambda de GDScript captura las locales POR VALOR: con un `int` suelto, el
+	# `+= 1` sube la copia del lambda y el de fuera se queda a 0 para siempre.
+	# Esta prueba llevaba en rojo por eso y el juego no tenia nada: el daño
+	# medido ya era 36 sobre un `dano_target` de 18, o sea que el critico SI
+	# salia y SI doblaba. Comprobado con una sonda aparte.
+	var criticos := [0]
+	seguro.golpe_critico.connect(func(_pt: Vector2, _d: int) -> void: criticos[0] += 1)
 	var pegado := _dano_de(seguro, "target")
 	_comprobar("con la probabilidad al 100% el golpe sale critico y avisa",
-		criticos == 1 and pegado == int(round(float(seguro.p.dano_target)
+		criticos[0] == 1 and pegado == int(round(float(seguro.p.dano_target)
 			* seguro.factor_critico())),
-		"%d criticos, pego %d" % [criticos, pegado])
+		"%d criticos, pego %d" % [criticos[0], pegado])
 
 	# Y a cero no sale ninguno: el azar no puede colarse en una medida.
 	var nunca := ParametrosCombate.new()

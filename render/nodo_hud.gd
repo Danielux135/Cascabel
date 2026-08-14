@@ -74,6 +74,27 @@ func _texto(pos: Vector2, txt: String, tam: int, col: Color,
 		alineado: int = HORIZONTAL_ALIGNMENT_LEFT, ancho: float = -1.0) -> void:
 	_lienzo.draw_string(_fuente, pos, txt, alineado, ancho, tam, col)
 
+## El tamaño más grande, de los que la fuente sabe dibujar nítidos, con el que
+## `txt` CABE en `ancho`.
+##
+## El `width` de `draw_string` recorta sin avisar, y los carteles del centro se
+## escribían a 16 px contra los 400 de la mesa: a 16 el avance son 12 px, o sea
+## 33 caracteres. "ESPACIO: mantener y soltar para lanzar" tiene 38 y salía
+## **"...para l"**, y "MANTÉN A o D PARA ATRAPAR Y APUNTAR" tiene 35 y también.
+## Los dos son pistas que se leen una vez y luego estorban, así que bajar de
+## tamaño es mejor que acortar el texto: la frase entera enseña más.
+##
+## Baja por múltiplos de la celda —`FuenteUI.tam` no deja otra cosa— y nunca por
+## debajo de 8, que es el tamaño natural: si a 8 tampoco cabe, el problema es el
+## texto y hay que verlo cortado para enterarse.
+func _tam_que_cabe(txt: String, ancho: float, preferido: int) -> int:
+	var t := FuenteUI.tam(preferido)
+	while t > FuenteUI.alto():
+		if _fuente.get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT, -1.0, t).x <= ancho:
+			return t
+		t -= FuenteUI.alto()
+	return FuenteUI.alto()
+
 func _dibujar() -> void:
 	var combate := vista.combate
 	if combate == null or vista.cascara == null:
@@ -209,7 +230,8 @@ func _dibujar_mensaje(combate: Combate) -> void:
 	var franja := vista.cascara.franja_mesa()
 	var y := franja.position.y + franja.size.y * 0.5
 	if not interrumpe:
-		_texto(Vector2(franja.position.x, y), texto, 16, col,
+		_texto(Vector2(franja.position.x, y), texto,
+			_tam_que_cabe(texto, franja.size.x, 16), col,
 			HORIZONTAL_ALIGNMENT_CENTER, franja.size.x)
 		return
 
@@ -221,7 +243,10 @@ func _dibujar_mensaje(combate: Combate) -> void:
 	var caja := Rect2(franja.position.x + 24.0, y - alto * 0.5,
 		franja.size.x - 48.0, alto)
 	var dentro := vista.cascara.dibujar_dialogo(_lienzo, caja)
-	_texto(Vector2(dentro.position.x, dentro.position.y + 26.0), texto, 16,
+	# El nombre del enemigo entra aquí desde el JSON: "GOBLIN CARROÑERO ATACA
+	# −8" son 26 caracteres, y uno más largo se comería el cuadro.
+	_texto(Vector2(dentro.position.x, dentro.position.y + 26.0), texto,
+		_tam_que_cabe(texto, dentro.size.x, 16),
 		NodoCascara.C_TEXTO_DIALOGO, HORIZONTAL_ALIGNMENT_CENTER, dentro.size.x)
 	# Una tira del color del estado bajo el texto: ata el cartel a lo que ha
 	# pasado sin depender de leer la palabra.
