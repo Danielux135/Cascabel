@@ -40,8 +40,48 @@ PALETA_HEX = [
 PALETA = np.array([[int(h[i:i+2], 16) for i in (0, 2, 4)] for h in PALETA_HEX],
                   dtype=np.float32)
 
-FONDO = np.array([243, 16, 233], dtype=np.float32)   # magenta real del generador
-TOL_FONDO = 95.0
+FONDO = np.array([243, 16, 233], dtype=np.float32)   # magenta nominal (reserva)
+TOL_FONDO = 95.0                                     # solo para el desflecado
+
+# --- deteccion de fondo por TONO, no por distancia RGB -------------------
+# La distancia euclidea al magenta se come los violetas saturados del arte:
+# (156,5,197) —la llama de la calavera, el cuerpo del espectro— cae a 88 del
+# magenta, por debajo de los 95 de tolerancia, y desaparece. El tono no: el
+# fondo es magenta puro (S~0.95) y un violeta de dibujo baja de saturacion o
+# se va 25-30 grados de tono. Comparar en HSV separa las dos cosas.
+TONO_MARGEN = 14.0     # grados alrededor del tono del fondo
+SAT_MINIMA = 0.72      # por debajo es color de dibujo, no fondo plano
+VAL_MINIMO = 0.62      # por debajo es una sombra, no fondo
+
+
+def hsv(rgb):
+    """rgb float 0-255 (..., 3) -> (tono 0-360, saturacion 0-1, valor 0-1)."""
+    a = rgb.astype(np.float32)
+    r, g, b = a[..., 0], a[..., 1], a[..., 2]
+    mx, mn = a.max(-1), a.min(-1)
+    c = mx - mn
+    v = mx / 255.0
+    s = np.where(mx > 0, c / np.maximum(mx, 1e-6), 0.0)
+    h = np.zeros_like(mx)
+    m = c > 0
+    i = (mx == r) & m; h[i] = (60 * ((g - b)[i] / c[i])) % 360
+    i = (mx == g) & m; h[i] = 60 * ((b - r)[i] / c[i]) + 120
+    i = (mx == b) & m; h[i] = 60 * ((r - g)[i] / c[i]) + 240
+    return h, s, v
+
+
+def color_de_fondo(rgb):
+    """El generador no siempre da el mismo magenta (hemos visto 224,12,223 y
+    243,16,233). Se lee del borde de la hoja en vez de darlo por supuesto."""
+    borde = np.concatenate([rgb[0, :], rgb[-1, :], rgb[:, 0], rgb[:, -1]])
+    return np.median(borde, axis=0).astype(np.float32)
+
+
+def es_magenta(rgb, ref, margen=TONO_MARGEN, sat=SAT_MINIMA, val=VAL_MINIMO):
+    h, s, v = hsv(rgb)
+    hr = hsv(ref.reshape(1, 1, 3))[0][0, 0]
+    dh = np.minimum(np.abs(h - hr), 360 - np.abs(h - hr))
+    return (dh < margen) & (s > sat) & (v > val)
 
 
 # ------------------------------------------------------------------- color
@@ -82,10 +122,10 @@ def cuantizar(rgb, mascara):
 
 # ------------------------------------------------------------------ fondo
 def mascara_fondo(rgb):
-    """Fondo = píxeles parecidos al magenta QUE ADEMÁS estén conectados con
-    el borde. Sin lo segundo, un objeto violeta se recortaría por dentro."""
-    d = np.sqrt(((rgb.astype(np.float32) - FONDO) ** 2).sum(axis=2))
-    parecido = d < TOL_FONDO
+    """Fondo = pixeles de TONO magenta QUE ADEMAS esten conectados con el
+    borde. Sin lo segundo, un objeto violeta se recortaria por dentro."""
+    ref = color_de_fondo(rgb)
+    parecido = es_magenta(rgb.astype(np.float32), ref)
     etiquetas, n = ndimage.label(parecido)
     if n == 0:
         return np.zeros(rgb.shape[:2], dtype=bool)
@@ -94,14 +134,23 @@ def mascara_fondo(rgb):
     borde.discard(0)
 
     # bolsas de fondo encerradas: el hueco de un muelle o el ojo de una llave
-    # no tocan el borde, pero siguen siendo fondo. Tolerancia mucho más
-    # estricta para no confundirlas con un objeto violeta.
+    # no tocan el borde, pero siguen siendo fondo. Criterio mas estricto para
+    # no confundirlas con un objeto violeta.
+    estricto = es_magenta(rgb.astype(np.float32), ref, margen=8, sat=0.85)
     encerradas = [e for e in range(1, n + 1)
                   if e not in borde
                   and (etiquetas == e).sum() > 4
-                  and d[etiquetas == e].mean() < 45]
+                  and estricto[etiquetas == e].mean() > 0.7]
 
-    return np.isin(etiquetas, list(borde) + encerradas)
+    fondo = np.isin(etiquetas, list(borde) + encerradas)
+
+    # tapar los dedos de fondo que se cuelan por un hueco de 1-2 px entre
+    # mechones: el espectro perdia el 22% del cuerpo por ahi. Solo se
+    # recupera lo que NO sea magenta de verdad, asi que un hueco legitimo
+    # (el ojo de una llave) se queda abierto.
+    objeto = ndimage.binary_closing(~fondo, np.ones((3, 3)), border_value=0)
+    recuperado = objeto & fondo & ~estricto
+    return fondo & ~recuperado
 
 
 # ---------------------------------------------------------------- proceso
@@ -109,11 +158,13 @@ def desflecar(rgb, objeto):
     """Los bordes suavizados dejan un halo magenta dentro del objeto —muy
     visible en huecos pequeños, como el interior de un muelle—. Esos píxeles
     se sustituyen por el color válido más cercano."""
-    d = np.sqrt(((rgb.astype(np.float32) - FONDO) ** 2).sum(axis=2))
+    ref = color_de_fondo(rgb)
     # solo en la franja pegada al fondo: si no, un objeto violeta —un vial de
-    # poción— se detecta entero como halo y se destruye
+    # poción— se detecta entero como halo y se destruye. Y el criterio es de
+    # TONO, con el margen abierto: un halo es magenta lavado, no violeta.
     franja = ndimage.binary_dilation(~objeto, iterations=4) & objeto
-    sucio = franja & (d < TOL_FONDO * 1.9)
+    sucio = franja & es_magenta(rgb.astype(np.float32), ref,
+                                margen=22, sat=0.45, val=0.45)
     limpio = objeto & ~sucio
     if not sucio.any() or not limpio.any():
         return rgb

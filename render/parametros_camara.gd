@@ -36,14 +36,20 @@ var adelanto_subiendo: float = 0.0
 ## quedarse atrás. Es la garantía dura de la regla 1.
 var margen_bola: float = 24.0
 
-## APAÑO PROVISIONAL. Por arriba hace falta más margen que por abajo, porque la
-## franja del HUD son 58 px opacos pegados al borde superior y la bola se metía
-## detrás justo en lo alto de la órbita: el tiro más largo de la mesa era el
-## único que no se veía. Con esto la cámara nunca deja subir la bola por encima
-## de la franja.
-## Cuando la fase 5 rehaga la interfaz y el HUD deje de estar ahí, este número
-## baja a `margen_bola` y ya.
-var alto_franja_hud: float = 58.0
+## Lo que hay dibujado encima de la mesa por arriba, y por debajo de lo cual la
+## bola no puede subir sin esconderse.
+##
+## YA NO ES UN APAÑO. Eran 58 px porque el HUD era una franja opaca pegada al
+## borde superior, dentro de los 400 px de la mesa: el tiro más largo del juego
+## —lo alto de la órbita— era el único que no se veía. El HUD se ha mudado a los
+## paneles de la banda derecha, así que lo único que queda arriba es el marco de
+## la ventana de la mesa con su barra de título, que son 8 + 16 = 24 px.
+##
+## Y ahora el número SIGNIFICA algo: es `NodoCascara.chrome_superior()`, o sea
+## la altura medida de lo que tapa. Se escribe aquí porque las pruebas headless
+## no montan la cáscara, y la vista lo vuelve a leer de ella al arrancar, que es
+## el único sitio donde puede cambiar.
+var alto_franja_hud: float = 24.0
 var margen_superior: float = 16.0
 
 ## REGLA 2 — ancla inferior. Con la bola por debajo de esta línea (medida desde

@@ -55,11 +55,14 @@ const C_METAL_LUZ     := Paleta.METAL_LUZ
 ## `flipper_radio` mientras se ajusta el tacto.
 const GROSOR_BORDE_FLIPPER := 1.5
 
-## El enemigo vive en la parte alta del campo, detrás de los bumpers. Los
-## sprites son 96x96 con los pies ya alineados dentro del marco, así que basta
-## con posar el borde inferior del marco en el suelo.
-const ENEMIGO_CENTRO_X := 200.0
-const ENEMIGO_SUELO_Y := 758.0
+## EL ENEMIGO YA NO ESTÁ EN LA MESA. Vivía en la parte alta del campo, en
+## y=758, y de ahí se han quitado dos cosas a la vez: el invariante dice que los
+## enemigos normales viven FUERA del campo de juego, y con la cámara anclada
+## abajo casi nunca se le veía, así que el destello al pegarle —que es la
+## respuesta a cada golpe— pasaba fuera de plano. Ahora vive en el panel
+## `enemigo.exe` de la banda derecha (`NodoPanelEnemigo`) y está siempre a la
+## vista. Los sprites siguen siendo 96x96 con los pies alineados dentro del
+## marco: lo único que cambia es dónde se posan.
 ## El target no lleva sprite: se dibuja del tamaño exacto del colisionador, que
 ## sale de `target_ancho` y `target_canto`. Esto es solo lo que se enciende de su
 ## cara, en píxeles.
@@ -135,9 +138,18 @@ var _pantalla_mapa: NodoPantallaMapa
 ## recompensa cuando toca. Sustituye a la pantalla de "elige una de tres", que
 ## sacaba de la mesa cada minuto y cansaba más de lo que aportaba.
 var tele: NodoTele
-## LA CÁSCARA: escritorio, barra de tareas, marco de la mesa y las reliquias
-## como iconos con tooltip. Sustituye a `NodoEscritorio`, que era solo el fondo.
+## LA CÁSCARA: escritorio, barra de tareas, paneles laterales y las reliquias
+## como iconos con tooltip. Va DETRÁS de la mesa (capa −10).
 var cascara: NodoCascara
+## Y la otra mitad de la cáscara, DELANTE (capa 5): el marco de la ventana de la
+## mesa, la barra de tareas y el tooltip. Son dos nodos porque la mesa se dibuja
+## en medio, y el fondo negro del tablero se comía todo lo que cayera dentro de
+## su columna de 400 px.
+var cascara_frente: NodoCascaraFrente
+## El enemigo, en su panel de la banda derecha. Se lleva sus propias partículas.
+var panel_enemigo: NodoPanelEnemigo
+## El puntero del sistema falso, dibujado en la rejilla de píxeles del juego.
+var cursor: NodoCursor
 ## La pantalla azul de derrota. Es lo último que ve el jugador de un run, así
 ## que es donde salen los dos números que hacen falta para cuadrar el balance.
 var tilt: NodoTilt
@@ -181,7 +193,6 @@ var _flipper_izq_antes := false
 var _flipper_der_antes := false
 var _sonido: NodoSonido
 var _nodo_suelo: NodoSuelo
-var _nodo_enemigo: NodoEnemigo
 var _tex_girador: Array[Texture2D] = []
 var _giro: Array[float] = []
 var _giro_velocidad: Array[float] = []
@@ -247,8 +258,16 @@ func _ready() -> void:
 	add_child(cascara)
 	_nodo_suelo = NodoSuelo.new(self)
 	add_child(_nodo_suelo)
-	_nodo_enemigo = NodoEnemigo.new(anim)
-	add_child(_nodo_enemigo)
+	# LA CÁMARA MIDE CONTRA LA CÁSCARA, no contra un número escrito a mano. Lo
+	# que puede tapar la bola por arriba es el marco de la ventana de la mesa con
+	# su barra de título, y eso lo sabe la cáscara. Con el número copiado aquí,
+	# cambiar el grosor del marco dejaría a la cámara midiendo el marco viejo y
+	# la bola volvería a esconderse en lo alto de la órbita sin que nada avisara.
+	cam.alto_franja_hud = NodoCascara.chrome_superior()
+	cascara_frente = NodoCascaraFrente.new(cascara)
+	add_child(cascara_frente)
+	panel_enemigo = NodoPanelEnemigo.new(cascara, anim, impacto)
+	add_child(panel_enemigo)
 
 	camara = CamaraMesa.new(cam, Mesa.ALTO, Mesa.ANCHO * 0.5)
 	add_child(camara)
@@ -256,6 +275,8 @@ func _ready() -> void:
 	add_child(NodoHud.new(self, cam))
 	tilt = NodoTilt.new(self, cam)
 	add_child(tilt)
+	cursor = NodoCursor.new(self)
+	add_child(cursor)
 
 	# EL TAMAÑO REAL DE LA PANTALLA, antes que nada. Con `aspect = expand` el
 	# viewport crece en una pantalla que no sea 16:9 exacto, y si `cam` se queda
@@ -295,6 +316,13 @@ func _nuevo_run() -> void:
 	_volver_al_mapa()
 
 func _volver_al_mapa() -> void:
+	# SE TIRA EL DADO DEL FONDO, y este es el único momento en el que se puede:
+	# entre combate y combate. El acto decide cuántas variantes hay —el 1 va
+	# limpio, el 3 tiene cuatro maneras distintas de estar roto— y el dado dice
+	# cuál toca. Tirarlo cada fotograma haría parpadear el escritorio, y eso no
+	# se lee como un sistema corrompiéndose: se lee como un juego con un fallo.
+	if cascara != null:
+		cascara.tirar_fondo()
 	# Perder el run no lleva al mapa: lleva a la pantalla azul. Es la derrota de
 	# `DISEÑO.md` §3, y es donde se leen los números del run.
 	if run.terminada() and not run.victoria:
@@ -360,8 +388,7 @@ func _empezar_combate(nodo: NodoMapa) -> void:
 	# que hace que elegir rama importe.
 	combate.iniciar(Enemigo.new(nodo.enemigo), run.vida,
 		run.escalera_de_misiones())
-	_nodo_enemigo.suelo = Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y)
-	_nodo_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
+	panel_enemigo.configurar(_tex_enemigo, combate.enemigo.flota)
 	_esperando_confirmacion = false
 	_espera_victoria = 0.0
 	_mayor_golpe = 1
@@ -456,6 +483,12 @@ func _process(delta: float) -> void:
 		_giro_velocidad[i] = maxf(_giro_velocidad[i] - anim.girador_frenado * delta, 0.0)
 
 	impactos.avanzar(delta)
+	# El panel del enemigo lleva sus propias partículas, en coordenadas de
+	# pantalla: hay que avanzárselas igual que a las de la mesa o se quedarían
+	# congeladas y no caducarían nunca, que es la trampa de "todo efecto tiene
+	# que caducar solo".
+	if panel_enemigo != null:
+		panel_enemigo.avanzar(delta)
 	_numeros = _caducar(_numeros, delta)
 	# La ruleta va en `_process` y no en la física: es animación, no simulación,
 	# y durante ella la física está parada a propósito.
@@ -610,7 +643,7 @@ func _al_buscar_bola(punto: Vector2) -> void:
 func _al_infligir_dano(dano: int, multiplicador: int, punto: Vector2) -> void:
 	_numeros.append(_numero_de_dano(dano, multiplicador, punto))
 	flash_enemigo = maxf(flash_enemigo, 0.7)
-	_nodo_enemigo.recibir_dano()
+	panel_enemigo.enemigo.recibir_dano()
 	_sacudir(anim.sacudida_dano)
 	impactos.chispas(punto, Vector2.ZERO, C_ORO_CLARO, 0.6)
 
@@ -644,7 +677,7 @@ func _al_atacar_enemigo(dano: int) -> void:
 		"t": 1.1, "texto": "-%d" % dano, "col": C_GOMA_LUZ,
 		"tam": 24.0, "subida": 18.0})
 	flash_jugador = 1.0
-	_nodo_enemigo.embestir()
+	panel_enemigo.enemigo.embestir()
 	_sonido.reproducir("ataque")
 	_sacudir(anim.sacudida_ataque)
 	_hitstop = maxf(_hitstop, anim.hitstop)
@@ -736,31 +769,35 @@ func _al_terminar_combate(victoria: bool) -> void:
 	_espera_victoria = 1.2 if victoria else 0.0
 	if victoria:
 		_sonido.reproducir("muerte")
-		_nodo_enemigo.morir()
-		var centro := Vector2(ENEMIGO_CENTRO_X, ENEMIGO_SUELO_Y - 40.0)
-		impactos.onda(centro, C_FUEGO, 2.2)
-		impactos.chispas(centro, Vector2.ZERO, C_FUEGO, 3.0)
-		impactos.polvo(centro, Vector2.ZERO, C_PIEDRA, 2.5)
+		panel_enemigo.enemigo.morir()
+		# LOS EFECTOS DE LA MUERTE VAN EN EL PANEL, no en `impactos`, que dibuja
+		# en coordenadas de MUNDO: con el enemigo fuera de la mesa, esa explosión
+		# saldría en el sitio vacío del tablero donde el enemigo estaba antes.
+		# Es el mismo fallo de siempre —un efecto se muestra donde se mide— y
+		# aquí se ve enseguida porque no hay nada que explotar ahí.
+		var centro := panel_enemigo.centro()
+		panel_enemigo.efectos.onda(centro, C_FUEGO, 2.2)
+		panel_enemigo.efectos.chispas(centro, Vector2.ZERO, C_FUEGO, 3.0)
+		panel_enemigo.efectos.polvo(centro, Vector2.ZERO, C_PIEDRA, 2.5)
 		_sacudir(anim.sacudida_muerte)
 		_hitstop = maxf(_hitstop, anim.hitstop)
 
 # ------------------------------------------------------------------- dibujo
 
 func _draw() -> void:
-	# Las capas: el fondo, el suelo, los adornos y el combo los pinta _nodo_suelo
-	# (z -2) y el enemigo _nodo_enemigo (z -1), porque el enemigo tiene que
-	# quedar entre medias y un solo CanvasItem no se puede partir. El HUD y el
-	# escritorio van en CanvasLayer aparte, para que no se los lleve la cámara.
-	# Aquí empieza la capa 0.
+	# Las capas, de atrás a delante: escritorio y paneles (−10), suelo y adornos
+	# (z −2, `_nodo_suelo`), la mesa aquí (0), el marco de su ventana (5), el
+	# enemigo en su panel (8), el HUD (10), el mapa (20), TILT (40) y el puntero
+	# (100). Todo lo que no es mesa va en CanvasLayer aparte para que no se lo
+	# lleve la cámara. Aquí empieza la capa 0.
 	# Sombreados de profundidad. Van translúcidos para que la piedra siga
 	# viéndose por debajo; antes eran planos y tapaban el suelo.
 	draw_rect(Rect2(20, 1160, 360, 120), Color(C_MESA_BAJA, 0.30))
 	draw_rect(Rect2(358, 900, 22, 360), Color(C_CARRIL, 0.80))
 	draw_rect(Rect2(0, int(mesa.p.y_drenaje) - 8, Mesa.ANCHO, 8), C_DRENAJE)
 
-	# El enemigo NO se dibuja aquí: vive en _nodo_enemigo, que tiene material
-	# propio para el destello y la disolución y se cuela por z_index entre el
-	# suelo y todo lo demás.
+	# El enemigo NO se dibuja aquí ni está en la mesa: vive en `panel_enemigo`,
+	# en la banda derecha, con material propio para el destello y la disolución.
 	_dibujar_inlanes()
 	_dibujar_rampas()
 	_dibujar_platillos()

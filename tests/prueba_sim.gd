@@ -1283,6 +1283,27 @@ func _prueba_pantalla_mapa(catalogo: Array) -> void:
 		_comprobar("el enemigo %s tiene retrato" % str((e as Dictionary).get("id", "?")),
 			ruta != "" and ResourceLoader.exists(ruta), "sprite '%s'" % ruta)
 
+	# Y NINGUNO PUEDE SER MÁS GRANDE QUE SU HUECO. El enemigo se dibuja a su
+	# tamaño nativo con los pies posados dentro del panel, así que un sprite de
+	# 128 —los de `assets/jefes/`— se saldría por arriba y se metería en la barra
+	# de título. No daría ningún error: dejaría un bicho cortado. Y el retrato
+	# del mapa además escalaría 128 a 96, que no es división entera y hierve.
+	var grandes: Array[String] = []
+	for e in catalogo:
+		var ruta := str((e as Dictionary).get("sprite", ""))
+		if ruta == "" or not ResourceLoader.exists(ruta):
+			continue
+		var tex := load(ruta) as Texture2D
+		if tex == null:
+			continue
+		var lado := NodoCascara.LADO_RETRATO_PANEL
+		if float(tex.get_height()) > lado or float(tex.get_width()) > lado \
+				or int(NodoPantallaMapa.RETRATO_NODO) == 0 \
+				or tex.get_height() % int(NodoPantallaMapa.RETRATO_NODO) != 0:
+			grandes.append("%s %dx%d" % [ruta, tex.get_width(), tex.get_height()])
+	_comprobar("todos los retratos caben en el panel y escalan por enteros",
+		grandes.is_empty(), str(grandes))
+
 	pantalla.seleccion = 0
 	var esperado: int = opciones[0]
 	var entrado := pantalla.confirmar()
@@ -1840,8 +1861,9 @@ func _prueba_camara() -> void:
 	_comprobar("regla 1: la bola nunca se sale de la pantalla",
 		fuera == 0, "%d fotogramas con la bola fuera" % fuera)
 
-	# La franja del HUD son 58 px opacos pegados al borde de arriba, y en lo
-	# alto de la órbita la bola se metía detrás: el tiro más largo de la mesa
+	# Lo que hay dibujado encima de la mesa por arriba (antes 58 px de franja de
+	# HUD, ahora los 24 del marco de la ventana con su barra de título): en lo
+	# alto de la órbita la bola se metía detrás, y el tiro más largo de la mesa
 	# era el único que no se veía. Se recorren las tres rampas midiéndolo.
 	var tapada := 0
 	var mas_arriba_pantalla := INF
@@ -2872,7 +2894,13 @@ func _prueba_fuente() -> void:
 
 	var sueltos_tam: Array[String] = []
 	var re_tam := RegEx.new()
-	re_tam.compile(r",\s*(\d+),\s*\n?\s*(?:C_[A-Z_]+|Color\()")
+	# EL PATRÓN LLEVABA UN AGUJERO y por él se coló un 11 durante toda la Fase 5:
+	# solo miraba los tamaños seguidos de una constante `C_ALGO` o de un
+	# `Color(...)`, así que un `draw_string(..., 11, col)` con el color en una
+	# variable en minúsculas pasaba de largo. Era el nombre de la reliquia en la
+	# tele, escalado por 1,375 y con filas de píxeles comidas. Ahora también
+	# entran las variables y los `Paleta.ALGO` sueltos.
+	re_tam.compile(r",\s*(\d+),\s*\n?\s*(?:C_[A-Z_]+|Color\(|Paleta\.|[a-z_][a-z0-9_]*\s*\))")
 	for archivo in (DirAccess.open("res://render").get_files()
 			if DirAccess.open("res://render") else PackedStringArray()):
 		if not archivo.ends_with(".gd"):
@@ -2988,7 +3016,108 @@ func _prueba_huecos_de_la_cascara() -> void:
 	_comprobar("ningun icono de reliquia pisa la mesa ni la barra de tareas",
 		intrusos.is_empty(), str(intrusos))
 
+	_prueba_paneles_de_la_cascara(cascara, ventana, der)
+	_prueba_fondos_por_acto(cascara)
 	cascara.free()
+
+## LOS PANELES DE LA BANDA DERECHA, que es donde vive el HUD desde que dejó de
+## estar encima de la mesa. Lo que puede romperse aquí es exactamente lo mismo
+## que con los iconos: que un panel pise el campo de juego o se meta debajo de la
+## barra de tareas. Y una cosa más, que solo pasa con los paneles: que se solapen
+## entre ellos, porque sus alturas están escritas a mano y la suma tiene que
+## caber en la banda.
+func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
+		der: Rect2) -> void:
+	var paneles := {
+		"enemigo": cascara.panel_enemigo(),
+		"jugador": cascara.panel_jugador(),
+		"ayuda": cascara.panel_ayuda(),
+	}
+	var fuera: Array[String] = []
+	for nombre in paneles:
+		var caja: Rect2 = paneles[nombre]
+		if caja.position.x < ventana.end.x or caja.end.x > der.end.x \
+				or caja.position.y < 0.0 or caja.end.y > der.end.y:
+			fuera.append("%s en %s" % [str(nombre), str(caja)])
+	_comprobar("ningun panel pisa la mesa ni la barra de tareas",
+		fuera.is_empty(), "banda %s — %s" % [str(der), str(fuera)])
+
+	var solapados: Array[String] = []
+	var lista: Array = paneles.keys()
+	for i in lista.size():
+		for j in range(i + 1, lista.size()):
+			var a: Rect2 = paneles[lista[i]]
+			var b: Rect2 = paneles[lista[j]]
+			if a.intersects(b):
+				solapados.append("%s con %s" % [str(lista[i]), str(lista[j])])
+	_comprobar("los tres paneles caben en la banda sin solaparse",
+		solapados.is_empty(), str(solapados))
+
+	# Y el enemigo tiene que caber ENTERO dentro del suyo. Un sprite de 96 px que
+	# se sale por abajo se come el nombre y la barra de vida, y eso no da error:
+	# deja un panel con un bicho cortado y sin datos.
+	var dentro := cascara.interior_panel(cascara.panel_enemigo())
+	var pies := cascara.suelo_enemigo()
+	var techo := pies.y - NodoCascara.LADO_RETRATO_PANEL
+	_comprobar("el enemigo cabe entero dentro de su panel",
+		techo >= dentro.position.y and pies.y <= dentro.end.y
+			and dentro.size.x >= NodoCascara.LADO_RETRATO_PANEL,
+		"pies en %s, hueco %s" % [str(pies), str(dentro)])
+
+	# LA CÁMARA MIDE CONTRA ESTO. Si el marco de la ventana engorda y el
+	# parámetro se queda viejo, la bola vuelve a esconderse en lo alto de la
+	# órbita —el tiro más largo de la mesa— y no salta ningún error: solo deja de
+	# verse. Es la misma avería del denominador escrito a mano.
+	_comprobar("la camara mide el chrome de verdad, no un numero copiado",
+		is_equal_approx(ParametrosCamara.new().alto_franja_hud,
+			NodoCascara.chrome_superior()),
+		"parametro %.0f, chrome %.0f" % [ParametrosCamara.new().alto_franja_hud,
+			NodoCascara.chrome_superior()])
+
+## LOS FONDOS DEL ESCRITORIO, uno por acto y con variantes. `DISEÑO.md` §3 dice
+## que el sistema se corrompe acto a acto, así que la corrupción tiene que
+## CRECER: si el acto 3 no trae más variantes que el 1, el escritorio no está
+## contando nada.
+##
+## Y se comprueba que cargan de verdad, no que estén en el disco: un PNG sin
+## importar no da error, deja el escritorio en negro y se diagnostica como un
+## fallo de dibujo.
+func _prueba_fondos_por_acto(cascara: NodoCascara) -> void:
+	var faltan: Array[String] = []
+	for lista in NodoCascara.FONDOS_POR_ACTO:
+		for nombre in lista:
+			var ruta := "res://assets/shell/%s.png" % str(nombre)
+			if not ResourceLoader.exists(ruta):
+				faltan.append(str(nombre))
+	_comprobar("todos los fondos de la cascara existen y se importan",
+		faltan.is_empty(), "%s — abre el proyecto una vez para importarlos"
+			% str(faltan))
+
+	var por_acto: Array[int] = []
+	for acto in NodoCascara.FONDOS_POR_ACTO.size():
+		por_acto.append(cascara.variantes_de_acto(acto))
+	_comprobar("cada acto tiene al menos un fondo",
+		not por_acto.has(0), str(por_acto))
+	_comprobar("la corrupcion crece: el acto 3 tiene mas variantes que el 1",
+		por_acto[por_acto.size() - 1] > por_acto[0], str(por_acto))
+
+	# Tirar el dado muchas veces tiene que dar TODAS las variantes de cada acto.
+	# Con un módulo mal puesto saldría siempre la misma y el trabajo de arte de
+	# la tanda anterior no se vería nunca — y no daría ningún error, que es la
+	# forma cara de perder assets.
+	var cortos: Array[String] = []
+	for acto in NodoCascara.FONDOS_POR_ACTO.size():
+		var vistas := {}
+		for _i in 300:
+			cascara.tirar_fondo()
+			var t := cascara.fondo_de_acto(acto)
+			if t != null:
+				vistas[t.resource_path] = true
+		if vistas.size() != por_acto[acto]:
+			cortos.append("acto %d: %d de %d" % [acto + 1, vistas.size(),
+				por_acto[acto]])
+	_comprobar("el dado del fondo llega a todas las variantes de cada acto",
+		cortos.is_empty(), str(cortos))
 
 ## Bloque 2, coherencia visual: la paleta de CONTEXTO.md manda.
 ##

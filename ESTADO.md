@@ -7,51 +7,125 @@ resume lo tuyo en dos o tres líneas dentro de "Hecho" y borra el detalle.
 Lo que merezca sobrevivir para siempre va a `CLAUDE.md`, no aquí. Si esto
 pasa de una pantalla, sobra algo.
 
-**Última actualización:** arte de IA de la cáscara integrado (ventana, título,
-barra de tareas, Inicio, botones, iconos), con el fallo del magenta sin
-transparentar ya cerrado.
+---
+
+## PARA RETOMAR ESTO SIN CONTEXTO
+
+Lo mínimo que hay que saber si esta conversación empieza de cero.
+
+**Dónde estamos.** La Fase 5 (la cáscara) está **escrita entera y sin ejecutar
+ni una vez**. La última sesión fue en remoto: allí no se alcanzan ni Godot ni
+`rtk`, así que todo lo de abajo es código escrito y releído, no probado.
+
+**Lo primero que hay que hacer, en este orden y antes de tocar nada:**
+
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
+
+El `--import` no es opcional: los 5 fondos bugueados nuevos de `assets/shell/`
+no tienen `.import`, así que hasta que se importen no existen para el juego y
+**dos pruebas nuevas van a salir en rojo diciendo exactamente eso**. Si salen
+en rojo después de importar, entonces sí es un fallo de verdad.
+
+**Está todo sin commitear**, y también lo de la sesión de assets anterior. El
+commit se hace cuando la batería pase, no antes.
+
+**Ficheros nuevos de la última sesión** (`render/`): `nodo_cascara_frente.gd`,
+`nodo_panel_enemigo.gd`, `nodo_cursor.gd`. Borrado: ninguno salvo un
+`nodo_marco_mesa.gd` intermedio que no llegó a durar. Reescritos a fondo:
+`nodo_cascara.gd`, `nodo_hud.gd`, `nodo_pantalla_mapa.gd`. Tocados:
+`vista_mesa.gd`, `parametros_camara.gd`, `nodo_enemigo.gd`, `nodo_tele.gd`,
+`tests/prueba_sim.gd`. **El mapa de capas está en `CLAUDE.md`** y conviene
+mirarlo antes de dibujar nada.
+
+**Las dos decisiones que pueden caerse al jugar, y las dos son reversibles en
+un rato:** el reloj dentro de la barra de título (pregunta N2) y la vida en un
+panel lateral en vez de encima de la mesa (pregunta N4). Si cualquiera de las
+dos molesta, se deshace; no hay nada construido encima.
+
+**Y lo que manda por encima de la Fase 5 sigue siendo el REBALANCE**, tanda 1
+de "Siguiente". La Fase 5 estaba en pausa por eso y sigue estándolo: se ha
+adelantado porque era trabajo de interfaz que no depende del balance, no
+porque haya dejado de ser lo urgente.
 
 ---
 
 ## Fase actual
 
-**Fase 5, tercera pasada: cáscara con arte de verdad.** Nada se ha ejecutado
-todavía: el sandbox no llega a Godot, así que todo lo de abajo es sin probar.
+**Fase 5 escrita entera; sigue mandando el balance.** Daniel ganó el run
+completo —acto 3, 15 nodos— **con 1764 de 1800 de vida**. Perdió 36 puntos en
+todo el run: el juego no le tocó ni una vez. El rebalance sigue siendo la
+tanda 1 de "Siguiente".
 
-**La fuente y los marcos son nuestros y se generan por código** (`fuente.py`,
-igual que `sonidos.py` genera los sonidos). Eso ya cerró dos fallos de
-sesiones anteriores: la fuente de reserva de Godot sin acentos, y los marcos
-recortados por silueta que no cuadraban entre sí. Detalle en `CLAUDE.md`.
+### Los dos números, por fin medidos sobre el jugador de verdad
 
-**El cuadre en portátiles con pantalla no-16:9 tenía causa de código:**
-`stretch/aspect = expand` hace crecer el viewport, y `ParametrosCamara` seguía
-clavado en 960×540 mientras la cáscara medía el viewport real —dos sistemas de
-coordenadas para la misma pantalla—. `VistaMesa._medir_pantalla()` los
-sincroniza ahora en un solo sitio. **Sin confirmar por Daniel todavía.**
+| Qué | Valor | Contra qué |
+|---|---|---|
+| Daño por bola | **797** | el modelo decía 312 (perfil normal) y 840 (bueno) |
+| Combate medio | **45 s** | se esperaban 7-14 s |
+| Bolas en todo el run | 43 | ~2,9 por combate en 15 nodos |
+| Vida al ganar | 1764/1800 | **el 98 %** |
 
-**El arte de IA de la cáscara ya está recortado e integrado esta sesión:**
-ventana, barra de título y barra de tareas (de las hojas que generó Daniel
-con `assets/prompts_cascara.md`, validadas con un mosaico de prueba antes de
-tocar el repo), botón Inicio con el cascabel de logo, botones min/max/cerrar,
-nueve iconos decorativos, y tres fondos que cambian por acto. Un primer
-recorte dejó el fondo magenta sin volver transparente —motas rosas en las
-esquinas y detrás de los iconos, que Daniel cazó a la primera jugada— y ya
-está arreglado. Los iconos decorativos están en la banda izquierda, colgando
-desde abajo para no chocar con las reliquias (arriba). El reloj de la barra de
-tareas tiene ya su propia bandeja hundida, aunque el sprite de esa bandeja
-sigue siendo un `draw_rect` de apaño.
+**Daniel juega como el perfil "bueno" del medidor**, no como el normal: 797
+está a un pelo de los 840. Ahí estaba el error de calibración —la tabla de
+enemigos se escribió para 312— y por eso no le pasa nada.
 
-**Sin conectar todavía, aunque ya están recortados:** cursor, barra de
-progreso del reloj enemigo, marco de diálogo, tooltip nuevo —
-`assets/ui/cursor`, `assets/ui/progreso`, `assets/ui/dialogo`,
-`assets/ui/tooltip`. Y una segunda tanda de prompts, pedida por Daniel y
-todavía sin generar: fondos que se "buguean" en variantes por acto (no una
-imagen fija, sino dos o tres fallos distintos que se sortean) y piezas
-pequeñas de bandeja de sistema (sprite del reloj, separador, altavoz, icono de
-sin-red) — sección 2 de `assets/prompts_cascara.md`.
+Y sale una cosa que el medidor no había visto: **43 bolas en 15 combates son
+2,9 bolas por combate**, o sea que casi nunca drena, y con 45 s de combate
+está comiendo unos 5-7 relojes por enemigo y aun así solo pierde 36 puntos en
+todo el run. **El reloj no aprieta y el drenaje no duele.** Con la fórmula de
+siempre —`bolas × drenaje + relojes × ataque`— los dos sumandos están cerca
+de cero, y no es el escalón de otras veces: es que los ataques son pequeños.
+
+**Decisión de Daniel: subir vida Y ataque a la vez.** Enemigos más gordos
+para que el combate dure, y ataques más caros para que cada reloj y cada dren
+se noten. Con el aviso ya escrito en Abierto: un enemigo de tres minutos que
+solo tiene vida es un saco, así que si al alargar se hace pesado, la Fase 6
+—comportamientos de enemigo— sube antes que la cáscara.
+
+**Antes de tocar un número, `tests/medir_balance.gd`, y esta vez con los
+números de Daniel, no con los perfiles inventados.**
+
+### Lo que ha cambiado de sitio, que es lo gordo de la sesión
+
+| Qué | Antes | Ahora |
+|---|---|---|
+| Vida, enemigo, crítico, daño de bola | franja de 70 px sobre la mesa | paneles `enemigo.exe`, `jugador.sys`, `ayuda.hlp` en la banda derecha |
+| El reloj del enemigo | barra en esa misma franja | **barra de progreso dentro de la barra de título de la mesa** |
+| El enemigo | dentro del campo, en y=758 | su panel, con partículas propias |
+| El mapa | pantalla suelta con fondo plano | ventana de explorador: menú, ruta, detalles y barra de estado |
+| `alto_franja_hud` | 58 px escritos a mano | 24, y sale de `NodoCascara.chrome_superior()` |
+| Fondo del escritorio | uno fijo por acto | variante al azar por acto, tirada al volver al mapa |
+
+**La decisión de tacto la tomó Daniel: el reloj se queda en la mesa.** Dentro
+de la barra de título, que ya gastaba 16 px pegados al campo diciendo
+"cascabel.exe". Cuesta cero píxeles de campo, sigue en la línea de visión —que
+era la razón de tenerlo en el HUD— y encima es la broma: una ventana con una
+barra de progreso que no querrías que se llenara.
+
+### La avería que se ha encontrado de paso
+
+La cáscara va en la capa −10 y `NodoSuelo` pinta un rectángulo negro OPACO
+sobre los 400 px de la mesa de arriba abajo. O sea que **la barra de título de
+la ventana de la mesa se dibujaba entera y no se veía nunca**, y la barra de
+tareas quedaba partida por la mitad —se salvó de milagro: Inicio, la pestaña y
+el reloj caen los tres fuera de esa columna—. El docstring prometía una capa 5
+desde la primera pasada y la capa no existía. Ahora sí: `NodoCascaraFrente`.
+La regla está en `CLAUDE.md`, "Trampas".
+
+Y una segunda, más pequeña: la prueba que impide tamaños de fuente sueltos
+tenía un agujero en el patrón y dejaba pasar un `11` en el nombre de la
+reliquia dentro de la tele. Arreglado el patrón y el 11.
 
 ## Hecho
 
+- **Exploración: criatura de fuego coleccionable (cascabel).** Sprite de 8
+  frames generado con Claude Design, procesado y limpiado sin `procesar.py`
+  real (sandbox sin `scipy`, reimplementado a mano). Confirmado con Fátima:
+  desentona sin cuantizar contra reliquias reales, y cuantizado se acerca
+  pero el contorno redondeado no es ruido —es la silueta que dibujó la
+  IA—, así que limpiar no lo arregla. Queda en `assets/_pruebas/
+  cascabel_brasa/`, sin carpeta final ni nodo que lo use.
 - **Fase 0** física, flippers, bumpers, targets, daño en vivo, multiplicador
   de combo, vida del enemigo
 - **Fase 1** 960×540 con escalado entero y pantalla completa, mesa 400×1300,
@@ -92,6 +166,15 @@ sin-red) — sección 2 de `assets/prompts_cascara.md`.
   acto, descanso en la penúltima fila, y la vida que NO se cura entre
   combates, que es lo que hace que elegir rama importe. Pantalla de mapa
   propia con la vida y lo que hay en cada rama; derrota y victoria de run
+- **Fase 4** las 45 reliquias escritas con sus once ganchos, la ruleta dentro
+  de la tele y las misiones de mesa que las pagan. Sin cerrar: el criterio de
+  salida es que dos partidas se sientan distintas, y eso se juega
+- **Fase 5** (escrita, sin ejecutar) renderizador de nueve trozos, fuente
+  propia pixelart, escritorio con barra de tareas e iconos de reliquia con
+  tooltip, TILT como pantalla azul, arte de IA recortado e integrado, y la
+  última pasada: HUD y enemigo fuera de la mesa a los paneles de la derecha,
+  reloj dentro de la barra de título, mapa como explorador de carpetas,
+  fondos con variante por acto y puntero propio
 
 ## Diales vivos
 
@@ -129,14 +212,52 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 ## Que pruebe Daniel
 
-**Primero la batería, que nada de esto se ha ejecutado:**
+**Primero importar y luego la batería. En ese orden, y nada de esto se ha
+ejecutado:**
 
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**Y luego juega un run y DIME DOS NÚMEROS.** Al acabar (ganes o pierdas) la
-pantalla enseña *tu daño por bola* y *tu combate medio*. Con esos dos la tabla
-de enemigos se escribe exacta, sin modelos y sin volver a fallar. Es lo más
-útil que puedes darme ahora mismo, más que cualquier impresión.
+**Lo de esta sesión, por orden de lo que más puede haber salido mal:**
+
+N1. **¿SE VE LA BOLA EN LO ALTO DE LA ÓRBITA?** Es la prueba de que quitar el
+    HUD ha servido para algo. Antes tenía 58 px opacos encima; ahora 24. Lanza a
+    tope diez veces y mira si la bola sale por arriba del todo sin esconderse.
+N2. **EL RELOJ EN LA BARRA DE TÍTULO.** Está pegado a la mesa, escrito y con
+    barra, arriba del campo. ¿Lo pillas de reojo sin dejar de mirar la bola, o
+    te enteras de que te van a pegar cuando ya te han pegado? **Si esto falla,
+    falla la decisión entera** y el reloj vuelve a estar sobre el tablero.
+N3. **EL ENEMIGO EN SU PANEL, a la derecha.** ¿Se lee el destello al pegarle
+    ahora que está siempre a la vista? ¿Y la disolución al matarlo, con la
+    explosión dentro del panel? Antes casi nunca estaba en plano.
+N4. **LOS TRES PANELES DE LA DERECHA.** ¿Cabe todo sin apretarse y se lee sin
+    girar la cabeza? Lo que más miedo me da es la vida: mirar a un lado para
+    saber cuánta te queda mientras persigues la bola puede ser peor que tenerla
+    encima. Si lo es, dilo y la vida vuelve a la barra de título con el reloj.
+N5. **EL MAPA COMO EXPLORADOR.** Ruta arriba, detalles del nodo marcado a la
+    izquierda, "N objetos" abajo, y los nodos como archivos con su extensión
+    (`rata.exe`, `descanso.tmp`, un jefe en `.sys`). ¿Se sigue eligiendo rama
+    igual de rápido, o el mueble se ha comido la legibilidad del grafo?
+N6. **EL PUNTERO.** Ahora es el nuestro, pixelart, y el del sistema se esconde
+    dentro de la ventana. ¿Va donde tiene que ir? ¿Sale el reloj de arena
+    durante la ruleta? Si al hacer alt-tab desaparece y no vuelve, dímelo: es lo
+    más fácil de que se me haya escapado.
+N7. **LA VENTANA DE LA MESA, que hasta ahora no se veía.** Barra de título con
+    "cascabel.exe" y tres botones, encima del campo. Es la primera vez que está
+    en pantalla de verdad. ¿Se entiende la broma de un vistazo? **Ese es el
+    criterio de salida de la fase.**
+N8. **LOS FONDOS BUGUEADOS.** Cambian entre combate y combate. Acto 1 limpio,
+    acto 2 con dos maneras de fallar, acto 3 con cuatro. ¿Se nota que el sistema
+    se va cayendo, o pasa desapercibido?
+
+**Y lo de siempre, que sigue mandando:** cuando esté el rebalance, un run y
+estas tres: ¿en qué nodo mueres?, ¿con cuánta vida llegas al jefe de cada acto?
+y ¿se hace pesado algún combate?
+
+M. **LOS SPRITES REPARADOS.** Mira sobre todo la calavera llameante, la
+   sombra y la armadura vacía: a la armadura le he quitado unas motas verdes
+   sueltas que tenía en hombros y piernas. Si ves algún bicho al que le falte
+   un trozo o le sobre un pegote, dímelo por nombre.
 
 A. **LAS MISIONES, que es lo nuevo y lo que hay que juzgar.** ¿La tele te dice
    con claridad qué toca? ¿Te descubres yendo a por un tiro concreto porque lo
@@ -157,23 +278,18 @@ F. **¿Se hacen largos los combates ahora que hay misión dentro?** Esa es la
 G. **Los números de daño.** ¿Se leen sin dejar de mirar la bola? ¿El tamaño
    distingue de verdad un bumper de un cañón? Si saturan la pantalla, el dial es
    el rango 10-22 px de `_numero_de_dano` en `render/vista_mesa.gd`.
-I. **LA FUENTE, que es lo de esta sesión.** ¿Se lee bien a 8 px? Es la parte
-   que más puede fallar: una fuente de 5×7 es legible o no lo es, y eso no lo
-   dice ninguna prueba. Si alguna letra se confunde con otra, dime cuáles: se
+I. **LA FUENTE a 8 px.** Ahora casi todo el texto va a ese tamaño, así que pesa
+   más que nunca: una fuente de 5×7 es legible o no lo es, y eso no lo dice
+   ninguna prueba. Si alguna letra se confunde con otra, dime cuáles: se
    arreglan en `fuente.py`, que las tiene escritas como dibujos de texto.
-I2. **La cáscara con los marcos nuevos.** Ahora la mesa es una ventana con barra
-   de título y un marco de 8 px, en vez de 47 px de piedra descuadrada. ¿Se
-   entiende la broma de un vistazo? Ese es el criterio de salida de la fase.
 J. **Los iconos de reliquia, pasando el ratón por encima.** ¿El tooltip llega a
    tiempo y dice algo útil? Y lo importante: **¿se ve encenderse y apagarse un
    icono condicional** cuando cruzas su umbral en mitad de un combate?
 K. **La pantalla de TILT.** ¿Da ganas de volver a intentarlo? Ahí salen los dos
    números que necesito.
-L. **EL ARTE NUEVO DE LA CÁSCARA, que es lo de esta sesión.** Ventana, barra de
-   título, barra de tareas, botón Inicio, iconos del escritorio. ¿Ahora sí
-   parece un sistema operativo, y sin motas rosas en ninguna esquina? Y el
-   pendiente de siempre: ¿la ventana del pinball cuadra en tu portátil, o
-   sigue desbordando?
+L. **El pendiente de siempre: ¿la ventana del pinball cuadra en tu portátil**, o
+   sigue desbordando? Ahora hay tres paneles más midiendo contra la misma
+   pantalla, así que si algo se sale se va a ver antes.
 H. **Los críticos.** 6 % de base, ×2. ¿Salen lo bastante como para notarlos y lo
    bastante poco como para que sigan siendo un premio? Diales: `prob_critico` y
    `factor_critico`. Si te parece que el daño se ha vuelto aleatorio, es que la
@@ -191,8 +307,6 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
    Si sigue soldándose, baja `rodadura`; si no llega a asentarse, súbela.
 4. **Los huecos del tablero en negro y el destello al pegar**, que es lo
    único que cambió de color.
-5. **Que la banda gris de la derecha haya desaparecido** en pantalla
-   completa.
 6. **Subir de tramo, con el racimo sonando.** ¿Se oye que has subido sin
    mirar el número? ¿Y se distingue x3 de x4 solo por el tono? Si tapa
    demasiado los golpes, el dial es `db` de `combo` en `nodo_sonido.gd`.
@@ -206,7 +320,6 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 11. **A ciegas, sin mirar la pantalla:** ¿sabes qué acabas de conseguir solo
     por el sonido? Racimo, target, banco cerrado, órbita, retorno, cañón y
     platillo tienen sonido propio. Si dos se confunden, dime cuáles.
-12. → ahora es el punto D de arriba.
 13. **¿La vida aguanta un acto?** Si mueres siempre en el acto I, o el reloj
     aprieta demasiado o los enemigos tienen mal la vida. Dime en qué nodo
     mueres y con cuánta vida llegabas.
@@ -215,20 +328,32 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 
 ## Siguiente
 
-1. **La batería, y un run tuyo para sacar los dos números.** Sigue siendo lo que
-   más falta hace: la tabla de enemigos lleva tres versiones escritas a ojo
-2. **Conectar lo ya recortado:** cursor, barra de progreso del reloj enemigo,
-   marco de diálogo, tooltip nuevo
-3. **Generar la segunda tanda de `assets/prompts_cascara.md`** (fondos
-   bugueados por acto, bandeja de sistema) cuando Daniel confirme cuántas
-   variantes quiere por acto
-4. **Lo que le queda a la Fase 5:** el HUD sigue encima de la mesa (el apaño de
-   la Fase 1 que no se ha caído), el enemigo sigue en el tablero en vez de en su
-   panel, y el mapa todavía no es un explorador de carpetas
-5. **Los 27 iconos de reliquia**, con los prompts de `assets/prompts_reliquias.md`.
-   Ahora se ven en tres sitios —tele, escritorio y tooltip—, así que faltan más
-6. **Fase 6 si los combates aburren.** Un enemigo de tres minutos que solo tiene
-   vida es un saco; las misiones lo tapan a medias
+**Por tandas. Una por sesión, y el modelo de cada una entre paréntesis.**
+
+1. **REBALANCE, que es lo que manda** (Opus, razonamiento alto). Barrer con
+   `tests/medir_balance.gd` usando 797 de daño por bola y 45 s de combate, y
+   rehacer la tabla de `data/enemigos.json` subiendo vida y ataque a la vez.
+   Nada de escribirla a ojo: ya salió mal tres veces
+2. **Tanda de assets A: la hoja del espectro** (Sonnet, medio). En cuanto
+   Daniel diga si la tiene o si hay que regenerarla. Es el único sprite que
+   sigue roto
+2b. **Cerrar la criatura del cascabel** (Sonnet, medio para colocarla;
+   Opus + Daniel/Fátima si hace falta reabrir el estilo de borde). Decidir
+   destino final (¿`reliquias/`? ¿carpeta nueva?), decidir si se acepta el
+   contorno más suave o se regenera, correr `procesar.py` real para
+   confirmar el resultado, y conectar el nodo que la use
+3. **Tanda de assets C: piezas de bandeja de sistema** (Sonnet, medio). Es lo
+   único que queda de `assets/prompts_cascara.md` §2 sin generar: reloj con
+   sprite propio, separador, altavoz e icono de sin-red. La barra de tareas
+   dibuja su bandeja con `draw_rect` a mano hasta entonces. **Guardar la hoja**
+4. **Tanda de assets D: los 27 iconos de reliquia que faltan** (Sonnet,
+   medio), con `assets/prompts_reliquias.md`. Se ven en tres sitios —tele,
+   escritorio y tooltip—, así que se notan
+5. **Fase 5: juzgarla jugando** (Daniel). El código está escrito entero y sin
+   ejecutar. Lo que queda no se lee, se juega: las preguntas N1-N8 de arriba. Si
+   N2 o N4 salen mal, lo que vuelve a la mesa es reversible en un rato
+6. **Fase 6** (Opus, alto), y sube de prioridad en cuanto Daniel diga que un
+   combate se hace pesado
 
 ## Mediciones
 
@@ -240,8 +365,10 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 | Brecha entre jugar mal y jugar bien | 20× (8,4× sin multiplicador) |
 | Vida de enemigos | 225-660, salida del barrido |
 | Runs acabados: malo / normal / bueno | 0/5 · 2/5 · 5/5 |
+| **Daniel, medido jugando** | **797 por bola · 45 s · 43 bolas · 1764/1800 al ganar** |
 
-Todo esto sale de `tests/medir_balance.gd`. **Antes de tocar un número de
+Todo lo de arriba sale de `tests/medir_balance.gd`; la última fila sale de un
+run de verdad y **manda sobre las otras**. **Antes de tocar un número de
 balance, lánzalo**: la tabla ya se hizo dos veces a ojo y las dos salió mal.
 
 ## El pilar: la cuna ya alcanza
@@ -331,12 +458,6 @@ de geometría fina y se hace jugando, no midiendo.
   arte: 184×124 px justo encima de los flippers, por donde pasa la bola
   constantemente. Si estorba visualmente, se encoge o se sube, pero tiene que
   seguir dentro del encuadre con la cámara anclada abajo.
-- **Las reliquias no se ven durante el combate.** Sabes lo que llevas en el mapa
-  y en la pantalla de recompensa, pero no mientras juegas, así que una
-  condicional que se enciende y se apaga —"por debajo del 30% de vida"— no
-  avisa de que acaba de encenderse. Es exactamente la avería del platillo
-  esperando a pasar otra vez, y el sitio donde se arregla es la Fase 5: las
-  reliquias son iconos del escritorio y un icono puede encenderse.
 - **La bola no tiene giro.** No hay spin simulado, así que no hay efecto ni
   bola que "muerda" en un ángulo. La rodadura es la aproximación barata a eso
   y aguanta bien; si en algún momento se quiere una física que destaque de
@@ -354,11 +475,15 @@ de geometría fina y se hace jugando, no midiendo.
   produce una bola, no juega con las palas: no hay física dentro. Sirve para la
   economía del combate, que es lo que se estaba midiendo, pero no dice nada de
   si un tiro es cazable ni de cómo se siente nada.
-- Enemigo fuera de pantalla al hacer scroll → Fase 5, panel propio
-- Laterales del escritorio apagados al 66% como apaño → Fase 5
-- **El juego pasa a llamarse Cascabel** (`DISEÑO.md` rev. 4). Cambiados los
-  documentos, `project.godot` y los comentarios del código; las rutas y el
-  nombre del repo siguen siendo `tilt-os` a propósito. La cáscara del
-  sistema operativo se queda como marco visual, ahora en pixelart con marcos
-  de nueve trozos y sin gestor de ventanas: la Fase 5 está reescrita con eso.
-  **De la cáscara no hay ningún asset todavía salvo el fondo.**
+- **Los paneles de la derecha siguen encendidos durante la ruleta.** La mesa se
+  apaga y la tele manda, pero el enemigo y las barras siguen a plena luz en su
+  banda, que es otra capa. Es a propósito —así se ve contra quién estás—, pero
+  si distrae en la ruleta, atenuarlos es un `modulate` y hay que probarlo
+  antes: el enemigo lleva shader y el `modulate` puede no aplicarle.
+- **La bandeja del reloj de la barra de tareas sigue dibujada con `draw_rect`**
+  a mano, porque su arte es lo único de `prompts_cascara.md` §2 que no se ha
+  generado. Es la tanda 3 de "Siguiente".
+- **El juego se llama Cascabel** (`DISEÑO.md` rev. 4). Las rutas y el nombre del
+  repo siguen siendo `tilt-os` a propósito. La cáscara del sistema operativo es
+  el marco visual, en pixelart con marcos de nueve trozos y sin gestor de
+  ventanas.

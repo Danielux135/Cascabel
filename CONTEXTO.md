@@ -64,9 +64,14 @@ el juego se siente muerto.
 ## Assets
 
 Generados con ChatGPT, procesados con `procesar.py`. El script recorta el
-fondo magenta, detecta sprites por silueta, reduce y cuantiza a la paleta.
-**No edites los PNG a mano**: si cambia la paleta, se reprocesan todos de
-golpe desde los originales.
+fondo magenta **por tono** —por distancia RGB se comía los violetas del
+dibujo, ver `CLAUDE.md`—, detecta sprites por silueta, reduce y cuantiza a la
+paleta. **No edites los PNG a mano**: si cambia la paleta, se reprocesan
+todos de golpe desde los originales.
+
+Las hojas originales están en `C:\Users\Daniel\Desktop\Sprites`, fuera del
+repo, y **solo las del 9 de agosto**. Para los sprites sin hoja está
+`limpiar.py`, que repara lo ya recortado en vez de rehacerlo.
 
 ```
 assets/

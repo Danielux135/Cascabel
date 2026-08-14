@@ -245,13 +245,29 @@ primer recorte dejaba el fondo magenta de las hojas de IA sin volver
 transparente, y salía como motas rosas en las esquinas del marco y detrás de
 los iconos — está en `CLAUDE.md`, "Trampas".*
 
-*Queda: el HUD sigue encima de la mesa, el enemigo sigue en el tablero en vez
-de en su panel, el mapa no es un explorador de carpetas todavía. De arte
-recortado pero sin conectar: cursor, barra de progreso del reloj enemigo,
-marco de diálogo, tooltip nuevo. Y una segunda tanda de prompts pedida y
-todavía sin generar: fondos "bugueados" en variantes por acto y piezas de
-bandeja (reloj con sprite propio, separador, altavoz, icono de sin-red) — en
-la sección 2 de `assets/prompts_cascara.md`.*
+*Tercera pasada, y con ella la fase queda ESCRITA ENTERA: el HUD se fue de
+encima de la mesa a tres paneles de la banda derecha (`enemigo.exe`,
+`jugador.sys`, `ayuda.hlp`), el enemigo dejó el tablero y vive en el suyo, el
+mapa pasó a ser una ventana de explorador con barra de menú, panel de detalles
+y barra de estado, y los fondos bugueados se conectaron como variantes al azar
+por acto. Se conectó también el arte que estaba recortado y sin usar: puntero,
+barra de progreso y marco de diálogo.*
+
+*Y salió una avería de las de no ver: la cáscara va en la capa −10 y el fondo
+negro del tablero es opaco, así que **la barra de título de la ventana de la
+mesa no se veía nunca** y la barra de tareas quedaba partida por la mitad. Está
+en `CLAUDE.md`, "Trampas". Lo que cruza la columna de la mesa va ahora en
+`NodoCascaraFrente`, en la capa 5.*
+
+*La decisión de tacto de la pasada, que la tomó Daniel: **el reloj del enemigo
+NO se va a un panel.** Se queda pegado a la mesa, dentro de la barra de título
+de su ventana, como barra de progreso. Cuesta cero píxeles de campo y sigue en
+la línea de visión, que era la razón de tenerlo en el HUD.*
+
+*Queda sin generar la segunda tanda de prompts de bandeja de sistema (reloj con
+sprite propio, separador, altavoz, icono de sin-red) — sección 2 de
+`assets/prompts_cascara.md`. Y queda lo único que cierra la fase de verdad:
+jugarla.*
 
 **Criterio de salida:** quien vea una captura entiende la broma sin que se
 la expliquen, y la cáscara y la mesa se leen como el mismo juego.

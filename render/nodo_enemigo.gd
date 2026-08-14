@@ -5,8 +5,12 @@ extends Node2D
 ## material es por CanvasItem, no por comando de dibujo, y el destello y la
 ## disolución son shader.
 ##
-## Se dibuja con z_index negativo para que quede DETRÁS de lo que pinta la
-## vista (paredes, bumpers, bola) y solo por delante del suelo.
+## YA NO VIVE EN LA MESA. Estaba dentro del campo de juego, con z_index −1 para
+## colarse entre el suelo y todo lo demás; ahora lo cuelga `NodoPanelEnemigo` de
+## una capa de pantalla, dentro del panel `enemigo.exe` de la banda derecha. Este
+## nodo no sabe dónde está: dibuja donde le digan que están los pies, y por eso
+## sirve igual en coordenadas de mundo (la prueba de respiración) que en
+## coordenadas de pantalla (el juego).
 ##
 ## Todo lo que deforma o mueve el sprite va en píxeles enteros.
 

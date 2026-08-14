@@ -1,11 +1,31 @@
 class_name NodoHud
 extends CanvasLayer
 
-## El HUD, en capa fija: con la cámara vertical, si se dibujara en el mundo se
-## iría con el scroll.
+## EL HUD, QUE YA NO ESTÁ ENCIMA DE LA MESA.
 ##
-## Todo va dentro de la franja de la mesa (x 280..680 en pantalla) para que se
-## lea como parte del juego y no invada el escritorio de los lados.
+## Antes era una franja opaca de 70 px pegada al borde de arriba, dentro de los
+## 400 px de la mesa. Costaba dos cosas: tapaba la bola en lo alto de la órbita
+## —el tiro más largo de la mesa era el único que no se veía, y hubo que
+## inventarle a la cámara un `alto_franja_hud` para taparlo—, y hacía que la
+## cáscara fuera decorado mientras la información de verdad seguía flotando
+## encima del juego.
+##
+## Ahora escribe DENTRO de los paneles de la banda derecha, que dibuja
+## `NodoCascara`: `enemigo.exe` arriba, `jugador.sys` debajo y `ayuda.hlp`
+## abajo del todo. Esa banda estaba vacía; la izquierda ya la ocupaban los
+## iconos.
+##
+## EXCEPCIÓN A PROPÓSITO, y es la que decidió Daniel: **el reloj del enemigo se
+## queda en la mesa**. No aquí: lo dibuja la cáscara dentro de la barra de título
+## de la ventana de la mesa. La razón está medida en el código de la cámara —si
+## el reloj no se ve de reojo sin dejar de mirar la bola, el golpe se lee como
+## injusto— y la barra de título ya gastaba 16 px pegados al campo sin decir
+## nada. Cero píxeles de campo perdidos y sigue en la línea de visión.
+##
+## Aquí solo queda una cosa dibujada sobre la mesa: el cartel del centro. Y los
+## que INTERRUMPEN el juego llevan marco de diálogo de Windows; los avisos que
+## salen con la bola viva, no, que un cuadro de diálogo tapa justo lo que hay
+## que mirar.
 
 const C_CABINA      := Paleta.CABINA
 const C_ORO         := Paleta.ORO
@@ -17,6 +37,7 @@ const C_VERDE       := Paleta.VERDE
 const C_ARCANO      := Paleta.ARCANO
 ## Para el porcentaje de crítico cuando lo tienes por encima del base.
 const C_FUEGO       := Paleta.FUEGO
+const C_BLANCO      := Paleta.DESTELLO
 
 ## Atrapes tras los cuales se deja de dar la pista de cómo atrapar.
 const VECES_PARA_APRENDER := 3
@@ -25,8 +46,6 @@ var vista: VistaMesa
 var _p: ParametrosCamara
 var _fuente: Font
 var _lienzo: Node2D
-## Borde izquierdo de la mesa en pantalla.
-var _izq: float = 120.0
 
 func _init(la_vista: VistaMesa, parametros: ParametrosCamara) -> void:
 	vista = la_vista
@@ -35,8 +54,11 @@ func _init(la_vista: VistaMesa, parametros: ParametrosCamara) -> void:
 
 func _ready() -> void:
 	_fuente = FuenteUI.obtener()
-	_izq = (_p.ancho_visible - Mesa.ANCHO) * 0.5
 	_lienzo = Node2D.new()
+	_lienzo.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	# El marco de diálogo es de nueve trozos y se repite: sin esto saldría
+	# estirado, que es lo único que un marco de nueve trozos no puede hacer.
+	_lienzo.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	_lienzo.draw.connect(_dibujar)
 	add_child(_lienzo)
 
@@ -54,91 +76,95 @@ func _texto(pos: Vector2, txt: String, tam: int, col: Color,
 
 func _dibujar() -> void:
 	var combate := vista.combate
-	if combate == null:
+	if combate == null or vista.cascara == null:
 		return
-	# Durante la ruleta el HUD se aparta entero. La recompensa se juega dentro de
-	# la mesa, con todo lo demás apagado: dejar las barras encendidas por encima
-	# la convertiría otra vez en una pantalla superpuesta.
-	if vista.en_ruleta():
-		return
-	var mesa := vista.mesa
-	var d := _izq
+	_panel_enemigo(combate)
+	_panel_jugador(combate)
+	_panel_ayuda()
+	# Lo único que sigue dibujándose sobre la mesa. Durante la ruleta se calla:
+	# ahí la mesa está apagada a propósito y solo manda la tele.
+	if not vista.en_ruleta():
+		_dibujar_mensaje(combate)
 
-	# Franja de arriba: enemigo y jugador, sobre el ancho de la mesa.
-	_lienzo.draw_rect(Rect2(d, 0, Mesa.ANCHO, 70), Color(C_CABINA, 0.82))
+# ---------------------------------------------------------------- los paneles
 
+## `enemigo.exe`. El retrato lo dibuja `NodoPanelEnemigo` en su propia capa,
+## porque lleva shader; aquí va lo que se escribe debajo.
+func _panel_enemigo(combate: Combate) -> void:
 	var e := combate.enemigo
-	if e != null:
-		_texto(Vector2(d + 12, 16), e.nombre, 8, C_TEXTO)
-		_texto(Vector2(d, 16), "%d/%d" % [e.vida, e.vida_maxima], 8, C_TEXTO_TENUE,
-			HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
-		var col_enemigo := C_GOMA_LUZ if vista.flash_enemigo <= 0.0 else C_ORO_CLARO
-		_barra(Rect2(d + 12, 22, Mesa.ANCHO - 24, 8),
-			float(e.vida) / float(e.vida_maxima), col_enemigo)
+	if e == null:
+		return
+	var cascara := vista.cascara
+	var d := cascara.interior_panel(cascara.panel_enemigo())
+	var pies := cascara.suelo_enemigo()
+	var y := pies.y + 18.0
 
+	_texto(Vector2(d.position.x, y), e.nombre, 8, C_TEXTO,
+		HORIZONTAL_ALIGNMENT_CENTER, d.size.x)
+	var col_enemigo := C_GOMA_LUZ if vista.flash_enemigo <= 0.0 else C_ORO_CLARO
+	_barra(Rect2(d.position.x + 8.0, y + 8.0, d.size.x - 16.0, 8.0),
+		float(e.vida) / float(maxi(e.vida_maxima, 1)), col_enemigo)
+	_texto(Vector2(d.position.x, y + 30.0), "%d/%d" % [e.vida, e.vida_maxima],
+		8, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, d.size.x)
+
+## `jugador.sys`. Vida, lo que llevas hecho con esta bola y la probabilidad de
+## crítico. Las tres cosas que antes ocupaban la franja de arriba de la mesa.
+func _panel_jugador(combate: Combate) -> void:
+	var cascara := vista.cascara
+	var d := cascara.interior_panel(cascara.panel_jugador())
+	var x := d.position.x + 8.0
+	var ancho := d.size.x - 16.0
 	var col_jugador := C_VERDE if vista.flash_jugador <= 0.0 else C_GOMA_LUZ
-	# CONTRA `vida_maxima()`, NO contra `p.vida_jugador`. Aquí ponía el
-	# parámetro, que es la vida de partida y no cuenta lo que suman las
-	# reliquias, así que con una que diera vida máxima salían cosas como
-	# "215/180" y la barra se pasaba de largo. El dato estaba bien; el
-	# denominador, no.
+
+	# CONTRA `vida_maxima()`, NO contra `p.vida_jugador`. Aquí llegó a estar el
+	# parámetro, que es la vida DE PARTIDA y no cuenta lo que suman las
+	# reliquias: con una que subiera el techo salía "215/180" y la barra se
+	# pasaba de largo. El dato estaba bien; el denominador, no.
 	var maxima := combate.vida_maxima()
-	_texto(Vector2(d + 12, 46),
-		"VIDA %d/%d" % [combate.vida_jugador, maxima], 8, C_TEXTO)
-	_barra(Rect2(d + 78, 40, 94, 7),
+	_texto(Vector2(x, d.position.y + 14.0), "VIDA", 8, C_TEXTO)
+	_texto(Vector2(x, d.position.y + 14.0), "%d/%d" % [combate.vida_jugador, maxima],
+		8, C_TEXTO, HORIZONTAL_ALIGNMENT_RIGHT, ancho)
+	_barra(Rect2(x, d.position.y + 20.0, ancho, 8.0),
 		float(combate.vida_jugador) / float(maxi(maxima, 1)), col_jugador)
-	_texto(Vector2(d + 200, 46),
-		"ESTA BOLA  %d  (%d golpes)" % [combate.dano_de_la_bola, combate.golpes],
-		8, C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE)
+
+	_texto(Vector2(x, d.position.y + 50.0), "ESTA BOLA", 8, C_TEXTO_TENUE)
+	_texto(Vector2(x, d.position.y + 50.0), "%d" % combate.dano_de_la_bola, 8,
+		C_ORO_CLARO if combate.dano_de_la_bola > 0 else C_TEXTO_TENUE,
+		HORIZONTAL_ALIGNMENT_RIGHT, ancho)
+	_texto(Vector2(x, d.position.y + 66.0), "golpes", 8, C_TEXTO_TENUE)
+	_texto(Vector2(x, d.position.y + 66.0), "%d" % combate.golpes, 8, C_TEXTO,
+		HORIZONTAL_ALIGNMENT_RIGHT, ancho)
+
 	# La probabilidad de crítico, escrita. Un porcentaje que no se ve no existe:
 	# el jugador vería números grandes de vez en cuando y creería que el daño es
 	# aleatorio, en vez de leer que tiene una estadística que puede subir.
 	var critico := combate.prob_critico()
-	_texto(Vector2(d, 46), "CRÍTICO %d%%" % int(round(critico * 100.0)), 8,
-		C_FUEGO if critico > combate.p.prob_critico else C_TEXTO_TENUE,
-		HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
+	var sube := critico > combate.p.prob_critico
+	_texto(Vector2(x, d.position.y + 86.0), "CRÍTICO", 8,
+		C_FUEGO if sube else C_TEXTO_TENUE)
+	_texto(Vector2(x, d.position.y + 86.0), "%d%%" % int(round(critico * 100.0)),
+		8, C_FUEGO if sube else C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_RIGHT, ancho)
 
-	_dibujar_reloj(combate, d)
-	_dibujar_mensaje(combate, mesa, d)
+## `ayuda.hlp`. Las teclas, que estaban escritas en el pie de la mesa comiéndose
+## una línea de campo. Aquí no molestan a nadie y siguen a la vista.
+func _panel_ayuda() -> void:
+	var cascara := vista.cascara
+	var d := cascara.interior_panel(cascara.panel_ayuda())
+	var x := d.position.x + 8.0
+	_texto(Vector2(x, d.position.y + 14.0), "A / D  flippers", 8, C_TEXTO_TENUE)
+	_texto(Vector2(x, d.position.y + 28.0), "ESPACIO  lanzar", 8, C_TEXTO_TENUE)
+	_texto(Vector2(x, d.position.y + 42.0), "R  otro run", 8, C_TEXTO_TENUE)
 
-	_texto(Vector2(d + 12, _p.alto_visible - 8),
-		"A/D flippers  ESPACIO lanzar  R otro run  F1 colisiones",
-		8, C_TEXTO_TENUE)
+# ----------------------------------------------------------- sobre la mesa
 
-## El reloj del enemigo, pegado al fondo de la franja y a todo lo ancho. Va ahí
-## y no en un rincón porque es la presión del combate: si no se ve de reojo sin
-## dejar de mirar la bola, no sirve de nada.
-##
-## En la cuenta atrás parpadea. El parpadeo va por tramos enteros de tiempo, no
-## por seno, para que no haya medio píxel de color a medio camino.
-##
-## La barra va ETIQUETADA y con los segundos escritos SIEMPRE, no solo en los
-## últimos tres. Una barra pelada no se lee como un reloj: sin el número, el
-## jugador solo se entera de que existe cuando ya le está pegando, y entonces
-## nada de lo que haga en la mesa parece relacionado con ella.
-func _dibujar_reloj(combate: Combate, d: float) -> void:
-	var restante := combate.reloj_restante()
-	var avisando := restante <= combate.p.reloj_aviso
-	var col := C_GOMA_LUZ
-	if avisando:
-		var parpadeo := int(restante * 6.0) % 2 == 0
-		col = C_ORO_CLARO if parpadeo else C_GOMA_LUZ
-	# El platillo acaba de robarle tiempo al reloj: se enciende la barra, que es
-	# el contador del que habla el "+N s" que ha salido abajo en la mesa.
-	if vista.flash_reloj > 0.0:
-		col = C_ARCANO
-
-	_texto(Vector2(d + 12, 66), "ATAQUE EN %ds" % int(ceil(restante)), 8,
-		C_ORO_CLARO if avisando else C_TEXTO_TENUE)
-	_barra(Rect2(d + 96, 60, Mesa.ANCHO - 108, 6), combate.carga_reloj, col)
-
-	if vista.flash_reloj > 0.0:
-		_texto(Vector2(d, 56), "+%.0f s" % vista.ultimo_atraso, 8, C_ARCANO,
-			HORIZONTAL_ALIGNMENT_RIGHT, Mesa.ANCHO - 12)
-
-func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
+## El cartel del centro. Lo que interrumpe lleva marco de diálogo; lo que sale
+## con la bola viva va como texto suelto, porque un cuadro de diálogo encima de
+## la mesa tapa justo lo que hay que mirar.
+func _dibujar_mensaje(combate: Combate) -> void:
+	var mesa := vista.mesa
 	var texto := ""
 	var col := C_TEXTO
+	var interrumpe := false
 	match combate.fase:
 		Combate.Fase.LANZANDO:
 			if mesa.bola.viva and mesa.bola.en_carril:
@@ -156,12 +182,11 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 			elif vista.veces_atrapada < VECES_PARA_APRENDER:
 				texto = "MANTÉN A o D PARA ATRAPAR Y APUNTAR"
 				col = C_TEXTO_TENUE
-			# La pista de atrapar VOLVIÓ, y el porqué importa: se
-			# quitó cuando el tiro de la cuna subía 40 px y no llegaba
-			# a ninguna boca: enseñar una técnica que no sirve es peor que no
-			# enseñar nada. Ahora la cuna alcanza el banco de targets: la
-				# técnica existe, así que se cuenta. Se calla a las tres
-				# atrapadas, que quien ya sabe no necesita que se lo repitan.
+			# La pista de atrapar VOLVIÓ, y el porqué importa: se quitó cuando
+			# el tiro de la cuna subía 40 px y no llegaba a ninguna boca, y
+			# enseñar una técnica que no sirve es peor que no enseñar nada.
+			# Ahora la cuna alcanza el banco de targets. Se calla a las tres
+			# atrapadas: quien ya sabe no necesita que se lo repitan.
 		Combate.Fase.DRENADA:
 			texto = "BOLA PERDIDA  ·  COMBO A x1"
 			col = C_TEXTO_TENUE
@@ -169,18 +194,42 @@ func _dibujar_mensaje(combate: Combate, mesa: Mesa, d: float) -> void:
 			texto = "%s ATACA  -%d" % [
 				combate.enemigo.nombre.to_upper(), combate.ultimo_ataque]
 			col = C_GOMA_LUZ
+			interrumpe = true
 		Combate.Fase.VICTORIA:
 			texto = "VICTORIA"
 			col = C_VERDE
+			interrumpe = true
 		Combate.Fase.DERROTA:
 			texto = "DERROTA"
 			col = C_GOMA_LUZ
+			interrumpe = true
 	if texto == "":
 		return
-	var y := _p.alto_visible * 0.5
-	_texto(Vector2(d, y), texto, 16, col, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
+
+	var franja := vista.cascara.franja_mesa()
+	var y := franja.position.y + franja.size.y * 0.5
+	if not interrumpe:
+		_texto(Vector2(franja.position.x, y), texto, 16, col,
+			HORIZONTAL_ALIGNMENT_CENTER, franja.size.x)
+		return
+
+	# Con marco de diálogo. El texto va en negro porque el relleno del marco es
+	# el gris claro de Windows: escribirlo en el blanco del resto de la interfaz
+	# lo deja ilegible y eso no da ningún error.
+	var pide_tecla := combate.fase == Combate.Fase.DERROTA
+	var alto := 72.0 if pide_tecla else 56.0
+	var caja := Rect2(franja.position.x + 24.0, y - alto * 0.5,
+		franja.size.x - 48.0, alto)
+	var dentro := vista.cascara.dibujar_dialogo(_lienzo, caja)
+	_texto(Vector2(dentro.position.x, dentro.position.y + 26.0), texto, 16,
+		NodoCascara.C_TEXTO_DIALOGO, HORIZONTAL_ALIGNMENT_CENTER, dentro.size.x)
+	# Una tira del color del estado bajo el texto: ata el cartel a lo que ha
+	# pasado sin depender de leer la palabra.
+	_lienzo.draw_rect(Rect2(dentro.position.x + 8.0, dentro.position.y + 34.0,
+		dentro.size.x - 16.0, 2.0), col)
 	# Ganar ya no pide tecla: se pasa solo a la ruleta. Perder sí, que ahí se
 	# acaba el run y hay que poder leerlo.
-	if combate.fase == Combate.Fase.DERROTA:
-		_texto(Vector2(d, y + 20), "ENTER para volver al mapa",
-			8, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, Mesa.ANCHO)
+	if pide_tecla:
+		_texto(Vector2(dentro.position.x, dentro.position.y + 52.0),
+			"ENTER para volver al mapa", 8, NodoCascara.C_TEXTO_DIALOGO,
+			HORIZONTAL_ALIGNMENT_CENTER, dentro.size.x)

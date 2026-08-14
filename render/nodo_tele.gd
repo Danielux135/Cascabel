@@ -338,7 +338,7 @@ func _dibujar_premio(grande: bool) -> void:
 		draw_rect(Rect2(c.x - 22.0, MARCO.position.y + 16.0, 44, 44),
 			Color(col, 0.55))
 	draw_string(_fuente, Vector2(MARCO.position.x + 4.0, MARCO.position.y + 86.0),
-		r.nombre, HORIZONTAL_ALIGNMENT_CENTER, MARCO.size.x - 8.0, 11, col)
+		r.nombre, HORIZONTAL_ALIGNMENT_CENTER, MARCO.size.x - 8.0, 8, col)
 	if not grande:
 		# La ventana de repetir. Se dice con la tecla que ya tienes en la mano.
 		if run.repeticiones > 0:

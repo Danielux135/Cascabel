@@ -43,9 +43,32 @@ Medidas (no son pruebas: no fallan, imprimen tablas):
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_reliquias.gd
 
+## Herramientas del repo
+
+Se generan, no se dibujan ni se editan a mano:
+
+| Script | Qué hace |
+|---|---|
+| `python3 fuente.py` | la fuente pixelart y los cinco marcos de nueve trozos |
+| `python3 sonidos.py` | los sonidos sintetizados (y luego hay que reimportar) |
+| `python3 procesar.py hoja.png ...` | recorta una hoja de IA con fondo magenta |
+| `python3 limpiar.py assets/` | repara sprites YA recortados de los que no queda hoja |
+
+`limpiar.py` va en simulacro por defecto: imprime qué tocaría y no escribe
+nada hasta que se le pasa `--aplicar`. Arregla tres cosas —sal de
+cuantización, interior comido y motas sueltas— y lleva su propia lista de
+ficheros intocables.
+
+**Las hojas originales de IA viven en `C:\Users\Daniel\Desktop\Sprites`**,
+no en el repo. Solo están las del 9 de agosto (mesa, enemigos, jefes,
+reliquias, efectos, fondo): de las tandas posteriores —`criaturas_64`,
+`mesa_anim`, `bolas`, `bolas_64`, la cáscara— **no hay original**, así que
+esos sprites solo se pueden reparar, no rehacer. Guardar la hoja al generar
+una tanda nueva no es opcional.
+
 ## Invariantes
 
-Decisiones cerradas. No las reabras sin que Daniel lo pida.
+Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
 
 - **Mesas diseñadas a mano, nunca procedurales.** Lo que varía entre
   partidas son reliquias, enemigos y modificadores, no la geometría. **El
@@ -82,11 +105,38 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **La tele dice siempre qué toca ahora.** Ese es su trabajo principal; el
   multiplicador es lo secundario. Un combate largo sin objetivo escrito es el
   mismo minuto repetido.
+- **El HUD no va encima de la mesa.** Vida, enemigo, crítico y daño de bola
+  viven en los paneles de la banda derecha, que dibuja la cáscara. La única
+  excepción es **el reloj del enemigo, que va dentro de la barra de título de la
+  ventana de la mesa**: tiene que verse de reojo sin dejar de mirar la bola, y
+  ahí está pegado al campo sin quitarle ni un píxel. Cualquier dato nuevo que
+  pida sitio va a un panel, no a una franja sobre el tablero.
 - **Los marcos se REPITEN, no se estiran.** Estirar un pixelart lo destruye.
   `render/nueve_trozos.gd` los repite, y por eso los bordes del atlas van sin
   remates ni tornillos en las puntas: un detalle cerca del final de una tira se
   convierte en un patrón que se repite y canta.
 - **Escalado por enteros siempre.**
+
+## Las capas de dibujo
+
+De atrás a delante. Saber esto de memoria ahorra la avería de dibujar algo
+donde no se ve.
+
+| Capa | Nodo | Qué |
+|---|---|---|
+| −10 | `NodoCascara` | fondo del escritorio, iconos de las dos bandas, paneles de la derecha |
+| −2 | `NodoSuelo` | **rectángulo negro OPACO de 400×1300**, suelo y adornos |
+| −1 | (libre) | era el enemigo; ya no |
+| 0 | `VistaMesa` | paredes, rampas, bumpers, bola, números, velo |
+| 5 | `NodoCascaraFrente` | marco de la ventana de la mesa + su reloj, barra de tareas, tooltip |
+| 8 | `NodoPanelEnemigo` | el enemigo y sus partículas, dentro de su panel |
+| 10 | `NodoHud` | lo que se escribe dentro de los paneles, y el cartel del centro |
+| 20 | `NodoPantallaMapa` | el explorador de carpetas, maximizado |
+| 40 | `NodoTilt` | la pantalla azul |
+| 100 | `NodoCursor` | el puntero |
+
+La regla que sale de la tabla: **la capa −2 tapa todo lo que haya detrás dentro
+de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 
 ## Trampas que ya nos han costado tiempo
 
@@ -265,6 +315,50 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
   marco y detrás de los iconos con forma no cuadrada. **Cualquier recorte de
   una hoja `#FF00FF` tiene que reescribir el canal alfa** (poner a 0 todo
   píxel cercano al magenta), no solo recortar el rectángulo que lo contiene.
+- **Recortar el fondo por DISTANCIA RGB borra a los muñecos violetas.**
+  `procesar.py` medía la distancia euclídea al magenta y cortaba a 95. Un
+  violeta saturado del dibujo —(156,5,197), la llama de la calavera, el
+  cuerpo del espectro— cae a 88 de ese magenta: por debajo del umbral, así
+  que se borraba como si fuera fondo. No da error y no se ve en un visor:
+  deja al bicho comido por dentro. El espectro perdió el 22 % del cuerpo.
+  **El fondo se detecta por TONO, no por distancia**: es magenta puro
+  (S≈0,95) y un violeta de dibujo baja de saturación o se va 25-30° de tono,
+  que es lo que los separa. Y el magenta del generador no siempre es el
+  mismo —hemos visto (243,16,233) y (224,12,223)—, así que se lee del borde
+  de la hoja en vez de darlo por constante.
+- **Un hueco dentro de un sprite no significa que falte nada.** Al reparar
+  lo ya recortado, la tentación es cerrar la silueta y rellenar todo lo
+  transparente que quede dentro: eso tapa los radios del girador, los
+  barrotes de la reja y la grieta del suelo, que son huecos a propósito.
+  `limpiar.py` solo rellena donde el borde del hueco sea violeta de verdad
+  (tono 255-330 con saturación y con luz), que es la firma del fallo de
+  arriba. **Un arreglo automático de arte se mira antes de aplicarlo**: el
+  del espectro salía peor que el original —le tapaba un ojo—, así que está
+  en la lista de excepciones esperando su hoja.
+- **La cuantización a paleta deja sal.** Píxeles sueltos a los que les toca
+  un color que no tiene nada que ver con sus vecinos: motas verdes en una
+  armadura marrón. Es del script, no del generador. `limpiar.py` los caza
+  midiendo en Lab contra los 8 vecinos.
+
+- **Una capa DETRÁS de la mesa no existe allí donde la mesa dibuja.** La cáscara
+  va en la capa −10 y `NodoSuelo` pinta un rectángulo de cabina OPACO sobre los
+  400 px de ancho de la mesa, de arriba abajo de la pantalla. O sea que la barra
+  de título de la ventana de la mesa —con su "cascabel.exe" y sus tres botones—
+  se dibujaba entera y no se veía jamás: de la ventana solo sobrevivían las
+  cuatro tiras de 8 px que sobresalen por los lados. La barra de tareas quedaba
+  partida por el medio y se salvó de milagro, porque el botón Inicio, la pestaña
+  y el reloj caen los tres FUERA de esa columna. **Todo lo que cruce la columna
+  de la mesa va en `NodoCascaraFrente` (capa 5), no en `NodoCascara` (−10)**, y
+  lo que se queda detrás es solo lo que nunca la pisa: fondo, iconos de las dos
+  bandas y paneles de la derecha.
+- **Un patrón de prueba con un agujero deja pasar exactamente lo que buscaba.**
+  La prueba que impide tamaños de fuente sueltos buscaba `, 11, C_ALGO` o
+  `, 11, Color(`, así que un `draw_string(..., 11, col)` con el color en una
+  variable en minúsculas pasaba de largo: el nombre de la reliquia en la tele
+  llevaba toda la Fase 5 escalado por 1,375, con filas de píxeles comidas, y la
+  prueba decía que no había ninguno. **Un patrón que enumera las formas buenas
+  se salta las que no se te ocurrieron**; si la regla es "todos los tamaños",
+  el patrón tiene que cazar todas las llamadas y filtrar después.
 - **Un mosaico de prueba antes de integrar ahorra una vuelta.** Para las
   hojas de nueve trozos generadas por IA, montar un mosaico 6×6 en memoria
   (repetir cada borde, poner las cuatro esquinas) y mirarlo ANTES de copiar
@@ -300,6 +394,41 @@ Decisiones cerradas. No las reabras sin que Daniel lo pida.
 - **Los criterios de salida se comprueban jugando, no leyendo el código.**
   Cuando algo dependa del tacto, exponlo como parámetro y pregunta. No
   decidas desde el código lo que solo se sabe con las manos.
+- **Di siempre qué modelo y qué nivel de razonamiento usas para cada tarea**,
+  antes de empezarla, para que Daniel pueda ver dónde se va el presupuesto.
+  Guía por tipo de trabajo:
+
+  | Tarea | Modelo / razonamiento |
+  |---|---|
+  | Auditar assets, correr scripts, renombrar, mover ficheros | Haiku, razonamiento bajo |
+  | Escribir un script de proceso, editar `.md`, conectar un asset ya recortado | Sonnet, razonamiento medio |
+  | Balance, física, geometría de mesa, diagnosticar un bug de tacto | Opus, razonamiento alto |
+  | Decidir diseño, reabrir un invariante | Opus + preguntar a Daniel o Fátima |
+
+- **`rtk` (Rust Token Killer) siempre que se pueda.** Es un programa de
+  consola instalado en el cmd/PowerShell de Daniel que recorta el contexto
+  antes de mandarlo. Se usa para leer código y ficheros grandes en vez de
+  volcarlos enteros. **Ojo:** desde un sandbox en la nube no se alcanza —el
+  bridge da una VM Linux, no la consola de Windows—, así que en una sesión
+  remota se trabaja sin él y se dice. En sesión local, con él.
+  *(Pendiente: anotar aquí el comando exacto y los flags cuando Daniel los
+  pase.)*
+
+- **El trabajo de arte va POR TANDAS**, no todo de una vez: una tanda es un
+  grupo de assets que comparte hoja y destino, se recorta, se mira en un
+  mosaico y se integra antes de empezar la siguiente. Las tandas pendientes
+  están en `ESTADO.md`.
+
+- **Cada tanda de assets se documenta en `assets/INVENTARIO_HOJAS.md` antes
+  de cerrar la sesión, siempre, sin que haga falta que Daniel lo pida.** Qué
+  hoja es cada cosa, a qué carpeta y nombre fue, y qué se dejó fuera y por
+  qué. La primera vez que hubo que mapear 29 hojas sin ese registro se
+  perdió media sesión mirando miniaturas para adivinar qué era cada una —
+  varias eran redos de cosas que ya estaban integradas, y sin documentarlo
+  la próxima sesión habría vuelto a mirarlas una por una. El inventario es
+  la memoria entre sesiones que `ESTADO.md` no puede ser, porque
+  `ESTADO.md` tiene que quedarse corto y esto no cabe ahí.
+
 - **No te incluyas como colaborador, contribuidor ni autor** en el
   repositorio ni en ningún archivo: ni README, ni CONTRIBUTORS, ni
   cabeceras, ni mensajes de commit.
