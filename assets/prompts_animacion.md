@@ -9,6 +9,19 @@ mismo "cumple y es soso" que los marcos que escribía `fuente.py`.
 Esto es la tanda 7 de `ESTADO.md`. **Se diseña antes de generar**, porque una
 hoja de animación mal cortada no se arregla luego: se vuelve a generar.
 
+> **ANTES DE PEGAR NADA: el prefijo está en `assets/GUIA_ESTILO.md`.** Todos los
+> prompts de este fichero empiezan por "Following the style guide above" y
+> durante un tiempo esa guía no estaba escrita en ninguna parte del repo. Ya lo
+> está, y es la de verdad —la que Fátima usó y la que generó el arte que hay
+> integrado—, no una reconstrucción. Se pegan el bloque A y el B, y luego el
+> prompt.
+>
+> **Para animación, la línea del bloque A que más trabaja es "Maximum three
+> tones per surface", y la del bloque B es la del contorno angular.** Un
+> generador al que le pides ocho fotogramas tiende a suavizar para que la
+> transición quede "bonita", y suavizar es exactamente lo que no se puede
+> reparar después.
+
 ---
 
 ## Lo que hay que decidir ANTES de pegar un prompt
@@ -138,34 +151,144 @@ del enemigo normal porque un jefe hoy es "el mismo con más vida". Estas hojas
 solo valen la pena **cuando los jefes sean enemigos de verdad, en Fase 6**. Si
 la Fase 6 no está, esta sección se salta.
 
-## 3. El cascabel con la criatura de fuego
+## 3. El cascabel: por qué la campana y la criatura van SEPARADAS
 
-Lo que quedó pendiente de la exploración de Fátima: hay 8 fotogramas ya
-generados con Claude Design en `assets/_pruebas/cascabel_brasa/`, en tira de una
-fila, 64×64. **No hace falta regenerarlos para animar**: lo que quedó abierto es
-el estilo del contorno, no el movimiento.
+**El prompt que había aquí estaba mal y conviene saber por qué**, porque el fallo
+es de diseño y no se ve mirando la imagen. Pedía *"a round stone bell with a
+small fire creature living inside it"*, o sea **las dos cosas dibujadas juntas en
+la misma celda**. Y `DISEÑO.md` §4 dice lo contrario, con todas las letras:
 
-Si se regenera, este es el prompt, y esta vez con fondo magenta como todo lo
-demás en vez de alfa real:
+> *"Se dibuja en dos capas: la cáscara rueda, la criatura no. Como una bola de
+> hámster. La cáscara gira con ocho o doce rotaciones pregeneradas por código y
+> ajustadas a rejilla; la criatura se queda derecha, se aplasta al chocar y mira
+> hacia donde va."*
 
-> Following the style guide above, create a sprite animation sheet on a flat
-> magenta `#FF00FF` background, as a single horizontal row of 8 equal 64x64
-> cells with NO gaps between them.
+Una campana con el bicho pintado dentro **no se puede rotar**: al girar la
+cáscara, gira el bicho con ella y queda boca abajo. Y no se puede aplastar la
+criatura sin aplastar la campana. Los 8 fotogramas de
+`assets/_pruebas/cascabel_brasa/` valen como prueba de que el formato funciona
+—y como referencia de estilo— pero **no como asset final**.
+
+Además, dibujarlas juntas tira a la basura la combinatoria: hay **9 cáscaras en
+`assets/bolas/` y 9 criaturas en `assets/criaturas_64/`**, que separadas son 81
+cascabeles con el mismo código de dibujo, y juntas serían 81 hojas que generar.
+
+**Las cáscaras ya están y no se animan**: las rota el código. Lo único que hay
+que generar es la criatura.
+
+## 4. Las nueve criaturas animadas
+
+**Esta es la tanda que hay que hacer**, y es la que da los coleccionables de
+`PROPÓSITO.md` §4.
+
+### Las decisiones, antes del prompt
+
+**Ocho fotogramas en una sola fila, celda de 64.** No es un número redondo por
+capricho: es exactamente el formato de la exploración de `cascabel_brasa`, que ya
+está probado de punta a punta con este generador. Cambiar de formato en el piloto
+es cambiar dos cosas a la vez.
+
+**Un solo estado: `idle`.** Y esto es lo que ahorra la tanda entera. La criatura
+va dentro de una bola que se pasa la partida rebotando, así que:
+
+| Lo que hace la criatura | Quién lo hace | ¿Se dibuja? |
+|---|---|---|
+| Respirar / moverse | **la hoja** | **sí, los 8 fotogramas** |
+| Aplastarse al chocar | el código (squash de píxel entero) | **no** |
+| Mirar hacia donde va | el código (desplazamiento de un par de píxeles) | **no** |
+| Girar | **nadie: la criatura NO gira**, es la cáscara la que rueda | **no** |
+
+Es la misma regla del punto 3 de arriba: no se pide arte de lo que ya hace el
+motor, porque dibujarlo además lo duplica y el bicho hierve.
+
+**Sin cáscara alrededor y sin contorno de bola.** La criatura se dibuja sola,
+como si se asomara. Las que ya están en `assets/criaturas_64/` se generaron así
+—la hoja del 13 de agosto está documentada como *"criaturas peek 3×3"*— y por eso
+sirven como referencia exacta.
+
+**El piloto es `cr_brasa`**, y por dos razones: es la que Fátima ya exploró, así
+que hay con qué comparar; y es fuego, que es el caso más difícil —una llama que
+se mueve de verdad entre fotogramas es lo que separa una animación buena de ocho
+copias con un píxel movido—. Si sale bien, las otras ocho son trámite.
+
+### El prompt
+
+Se pega `GUIA_ESTILO.md` primero, **y la referencia**: el PNG de
+`assets/criaturas_64/cr_brasa.png` va adjunto al prompt. Si se describe con
+palabras sale otra criatura, y el escritorio enseñaría una y la mesa otra.
+
+> Following the style guide above, and using the attached sprite as the exact
+> reference for this creature — same character, same colours, same silhouette —
+> create a sprite animation sheet on a flat magenta `#FF00FF` background, as a
+> single horizontal row of 8 equal 64x64 cells with NO gaps between them and no
+> border, numbering or grid lines anywhere.
 >
-> CRITICAL: fixed grid, equal cells, the object centred in every cell and its
-> base on the same row of pixels throughout. No motion blur, no ghosting, no
-> glow bleeding onto the magenta, hard 1px black outline, flat colours, no
-> antialiasing. The contour must be ANGULAR and cut on the pixel grid — no soft
-> rounded silhouette, no 3D shading, no gradients: it has to sit next to
-> `farol.png` and `vela.png` without looking like it came from somewhere else.
+> CRITICAL: this is cut on a FIXED GRID. All eight cells are exactly the same
+> size, and in every cell the creature is centred horizontally and its lowest
+> point sits on the SAME ROW OF PIXELS. If one frame sits two pixels lower than
+> the next, the creature jitters.
 >
-> A round stone bell of the sort that goes on a cat's collar, with a slit mouth,
-> and a small fire creature living inside it: two bright eyes visible in the
-> flame. The 8 frames are one seamless loop of the flame breathing inside the
-> bell — the bell itself barely moves; the fire does the work.
+> CRITICAL: draw the creature ALONE. No ball, no bell, no sphere, no glass, no
+> capsule and no circular outline of any kind around it, and no ground, no
+> pedestal and no shadow under it. In the game this creature is drawn inside a
+> separate shell sprite that is layered on top, so anything round you add here
+> will be duplicated.
+>
+> CRITICAL: the creature does NOT rotate, does not tilt and does not change
+> scale between frames, and it never leaves its cell. It stays upright and
+> facing the viewer in all eight cells.
+>
+> CRITICAL: no motion blur, no speed lines, no ghosting, no onion-skinned
+> previous frames, no glow bleeding onto the magenta.
+>
+> The 8 frames are ONE SEAMLESS LOOP — frame 8 must lead straight back into
+> frame 1 with no jump. The difference between two consecutive frames must be
+> clearly visible at the real size of one cell with no zoom: a one-pixel
+> difference disappears in the game. Make the loop asymmetric rather than a
+> simple rise and fall, so it does not read as a machine breathing.
+>
+> The creature is: [descripción de la tabla].
 
-→ celda 64. Destino: **sin decidir** (`ESTADO.md`, tanda 2b). No es una reliquia
-normal, así que probablemente carpeta propia de coleccionables.
+### Las nueve descripciones
+
+Cada una tiene que decir **qué parte se mueve**, que es lo único que distingue
+una animación de ocho fotogramas idénticos.
+
+| Criatura | Descripción para el último párrafo |
+|---|---|
+| `cr_brasa` | *"a small live flame with two bright eyes in it. The flame is the whole creature. Over the loop it leans, gutters and flares as if in a draught — the eyes stay level while the fire moves around them"* |
+| `cr_calavera` | *"a small skull with a flame burning behind its eye sockets. The skull barely moves; the eye flames flicker and change size"* |
+| `cr_diablillo` | *"a tiny horned imp with a wide grin. It shifts its weight side to side and its ears and tail-tip twitch on different frames"* |
+| `cr_espectro` | *"a small hooded spectre with no legs, its lower half trailing off into nothing. It drifts and the trailing edge ripples — the hood and face stay still"* |
+| `cr_gusano` | *"a fat pale dungeon grub. It compresses and extends along its length, like a caterpillar breathing, with the segments moving in sequence rather than all at once"* |
+| `cr_musgo` | *"a lump of living moss with two small eyes. Tufts and fronds sway on it at slightly different rates; the body itself hardly moves"* |
+| `cr_rata` | *"a small dungeon rat. Its nose and whiskers twitch, its ears flick, and it blinks once during the loop — the body stays still"* |
+| `cr_sapo` | *"a squat warty toad. It inflates and deflates its throat sac; the throat does almost all the movement and the body follows a little behind"* |
+| `cr_sombra` | *"a small blot of living shadow with two pale eyes. Its outline creeps and shifts, so its silhouette is never twice the same, but it keeps the same overall mass"* |
+
+### Después de generar
+
+    python3 procesar.py hoja.png --tam 64 --tira 8 --filas 1 \
+        --salida assets/criaturas_anim/cr_brasa/ \
+        --nombres "idle_1,idle_2,idle_3,idle_4,idle_5,idle_6,idle_7,idle_8"
+
+`--tira 8 --filas 1` no es opcional: **por defecto `procesar.py` recorta por
+silueta**, y en una animación eso saca cada fotograma con la caja de su propio
+dibujo, así que la criatura salta de sitio y de tamaño a cada fotograma. Es la
+misma avería que descuadró los marcos de nueve trozos, y aquí canta más porque se
+mueve.
+
+Y **guardar la hoja** en `Desktop\Sprites` con su fila en `INVENTARIO_HOJAS.md`.
+De las tandas sin hoja guardada —`criaturas_64`, `bolas`, la cáscara— no hay
+original, así que esos sprites solo se pueden reparar, no rehacer.
+
+### Cómo mirarlo antes de meterlo en el juego
+
+El mosaico de prueba que ya está en `CLAUDE.md`, pero para animación: montar los
+8 fotogramas **en fila y a tamaño real**, y encima la misma fila a 4×. A tamaño
+real se ve si el movimiento existe; a 4× se ve si el contorno está en rejilla.
+Los dos fallos que ha tenido esta clase de hoja —fotogramas casi idénticos y
+silueta redondeada— se ven ahí y no se ven dentro de Godot hasta mucho después.
 
 ---
 
@@ -193,3 +316,38 @@ respiración por código apagada, la Rata tiene que leerse mejor que ahora en la
 cuatro cosas —quieta, golpeada, pegando y muriéndose— sin tocar ningún otro
 bicho. Si no gana la comparación, el problema es el arte, no el reproductor, y
 lo que hay que cambiar es el prompt.
+
+**Y sirve igual para las criaturas**, con una diferencia: la criatura no tiene
+"antes" con el que comparar, porque hoy la bola es un círculo. Ahí el criterio es
+otro: **poner `cr_brasa` animada dentro de la cáscara `casc_hierro` girando, y
+que las dos capas se lean como un solo bicho** y no como una calcomanía pegada a
+una bola.
+
+---
+
+## Orden de las hojas, y por qué ese
+
+Las de animación no van todas seguidas: se reparten según lo que desbloquean.
+
+| # | Hoja | Cuándo | Por qué ahí |
+|---|---|---|---|
+| 1 | **`cr_brasa` animada** (§4) | ya | Es el piloto y el caso más difícil. Y sin criaturas no hay coleccionable, que es el gancho de `PROPÓSITO.md` §2 |
+| 2 | **Las otras 8 criaturas** (§4) | tras validar la 1 | Trámite si la 1 sale bien. Si no, se cambia el prompt antes de gastar ocho hojas |
+| 3 | **Bandeja de sistema** (`prompts_cascara.md` §11-12) | tanda de cáscara | Lo único de la cáscara sin generar, y la barra de tareas lo dibuja con `draw_rect` a mano hasta entonces |
+| 4 | **27 iconos de reliquia** (`prompts_reliquias.md`) | cuando toque | 27 de 45 reliquias siguen sin icono y se ven en tres sitios |
+| 5 | **`rata` animada** (§1) | con la Fase 6 | Un enemigo animado sin comportamiento sigue siendo un saco, solo que un saco que respira |
+| 6 | **Las otras 8 enemigos** (§1) | tras validar la 5 | |
+| 7 | **Los tres jefes** (§2) | **solo con Fase 6** | Hoy un jefe es el mismo enemigo con más vida. La sección lo dice: si no está la Fase 6, se salta |
+
+### Lo que `PROPÓSITO.md` va a pedir y aún NO tiene prompt
+
+Se anota aquí para que no se genere por sorpresa a mitad de otra tanda:
+
+- **La barra de CARGA de rampa** y el efecto de DESCARGA (§6 de `PROPÓSITO.md`).
+  La barra es cáscara —una barra de progreso de Windows— y probablemente sale de
+  `fuente.py`, no de una hoja de IA. El efecto de descarga sí es arte.
+- **El poste que tapa el outlane** y el kickback (§7). Son objetos de mesa, celda
+  pequeña, y valen los prompts de `mesa/` que ya existen como plantilla.
+- **El campo de pines** (§8). Un solo pin, y se repite por código.
+- **Los ficheros de `RECUPERADO/`** (§2 y §9). Iconos de 32, y ya hay nueve
+  iconos de escritorio integrados que dan el estilo exacto.

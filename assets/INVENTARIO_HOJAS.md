@@ -19,6 +19,18 @@ jefes, reliquias, mesa). Ver `ESTADO.md` histórico y `CLAUDE.md` para el
 fallo del magenta que salió de aquí. No hay mapeo hoja-a-hoja detallado de
 esta tanda porque se hizo antes de que existiera este fichero.
 
+**Recuperada una, la de objetos de mesa** (Fátima, agosto): el prompt entero
+está transcrito en `assets/GUIA_ESTILO.md`, con la tabla de los nueve objetos
+mapeados a sus ficheros. Es una rejilla 3×3 y da `bumper_gargola`,
+`bumper_engranaje`, `target_lapida`, `target_escudo`, `poste_goma`, `drenaje`,
+`girador`, `flecha_on` y `flecha_off`. **Y trae una pregunta abierta**: pide
+perspectiva cenital pura, que es lo contrario de lo que dice `CONTEXTO.md` para
+todo lo demás. Sin decidir antes de la siguiente hoja de mesa.
+
+**Y de esa tanda salió también el style guide**, que llevaba desde entonces sin
+estar escrito en el repo aunque los tres ficheros de prompts empiezan por
+"Following the style guide above". Está en `assets/GUIA_ESTILO.md`, bloque A.
+
 ## Tanda del 13 de agosto — 29 hojas, mayoría ruido
 
 Generadas por Daniel tras el primer run ganado, para: recuperar

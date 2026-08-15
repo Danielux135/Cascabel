@@ -44,6 +44,9 @@ signal mision_cambiada(mision: Mision)
 ## Se ha perdido el progreso de una misión por drenar. Se anuncia porque si no
 ## el jugador ve el contador a cero y cree que es un fallo.
 signal mision_reiniciada(mision: Mision)
+## Un estado acaba de reventar (la brasa). Lo escucha la vista para el efecto:
+## un estallido que no se ve ni se oye no es un estallido, es un número.
+signal estallido_de_estado(id: String)
 signal combate_terminado(victoria: bool)
 
 enum Fase { LANZANDO, BOLA_VIVA, DRENADA, RESOLVIENDO_ATAQUE, VICTORIA, DERROTA }
@@ -56,6 +59,10 @@ var enemigo: Enemigo
 ## exactamente igual que antes de que existieran. Eso es lo que permite que las
 ## medidas viejas sigan valiendo.
 var bolsa := BolsaReliquias.new()
+## LO QUE DURA EN EL TIEMPO: veneno, escarcha, brasa, marca y frenesí. Es la capa
+## que faltaba para que un cascabel pudiera hacer algo que se VEA pasar en vez de
+## mover un porcentaje. Ver `sim/estados.gd`.
+var estados := Estados.new()
 
 var vida_jugador: int = 0
 ## Golpes seguidos sin drenar. Es lo que manda en el multiplicador.
@@ -106,8 +113,12 @@ func dano_por_bola() -> float:
 ## Probabilidad de crítico ahora mismo, con lo que sumen las reliquias. Existe
 ## como función pública porque el HUD la escribe: una estadística que no se ve
 ## no se lee como estadística, se lee como que el daño es aleatorio.
+## OJO: esto es lo que se ENSEÑA en el panel, así que tiene que contar lo mismo
+## que se tira de verdad, frenesí incluido. Un número que no coincide con lo que
+## pasa se lee como que el crítico está roto.
 func prob_critico() -> float:
-	return clampf(bolsa.suma("suma_prob_critico", p.prob_critico), 0.0, 1.0)
+	return clampf(bolsa.suma("suma_prob_critico",
+		p.prob_critico + estados.suma_critico()), 0.0, 1.0)
 
 ## Y por cuánto multiplica un crítico.
 func factor_critico() -> float:
@@ -176,6 +187,11 @@ func iniciar(el_enemigo: Enemigo, vida_inicial: int = -1,
 	_primer_golpe = true
 	_red_gastada = false
 	drenajes = 0
+	# LOS ESTADOS NO CRUZAN DE UN COMBATE A OTRO. Son del enemigo que los tiene
+	# encima, y el enemigo es otro: heredar veinte de veneno mataría al siguiente
+	# antes de empezar. El frenesí tampoco, que si no la build de crítico
+	# arrancaría a tope en el combate dos.
+	estados.limpiar()
 	bolas_jugadas = 1
 	dano_total = 0
 	tiempo_jugado = 0.0
@@ -211,8 +227,14 @@ func _rearmar_progreso() -> void:
 ## el daño, con el nombre del tiro: `Combate` no tiene un `if` por misión, tiene
 ## un contador. Una misión nueva es una fila más en el JSON.
 func _apuntar(tiro: String) -> void:
+	if not _en_juego():
+		return
+	# LOS ESTADOS ENTRAN AQUÍ, y por la misma razón que las misiones: este es el
+	# único sitio que sabe qué tiro acaba de pasar. Ni un `if` por estado — se
+	# pregunta a la bolsa por `aplica_<estado>_<tiro>` y se aplica lo que salga.
+	_aplicar_estados(tiro)
 	var m := mision()
-	if m == null or not _en_juego():
+	if m == null:
 		return
 	var toco := false
 	for i in m.tiros.size():
@@ -232,6 +254,28 @@ func _apuntar(tiro: String) -> void:
 		_completar_mision(m)
 	else:
 		mision_cambiada.emit(m)
+
+## Aplica los estados que toque este tiro. `tiro` son los ocho de la mesa más
+## dos que no son tiros: `critico`, que salta al criticar, y `matar`.
+func _aplicar_estados(tiro: String) -> void:
+	for el_id in Estados.ids():
+		var n := int(bolsa.suma("aplica_%s_%s" % [el_id, tiro]))
+		if n > 0:
+			estados.aplicar(el_id, n)
+
+## El daño que reparten los estados. NO pasa por `_golpear` a propósito: un tic
+## de veneno no es un golpe tuyo, así que no sube el combo, no cuenta para la
+## misión y no puede ser crítico. Si pasara por ahí, el veneno subiría el
+## multiplicador solo y aguantar la bola dejaría de ser lo que lo sube.
+func _dano_de_estados(dano: int, punto: Vector2) -> void:
+	if dano <= 0 or enemigo == null or not enemigo.vivo():
+		return
+	var aplicado := enemigo.recibir(dano)
+	dano_de_la_bola += aplicado
+	dano_total += aplicado
+	dano_infligido.emit(aplicado, 0, punto)
+	if not enemigo.vivo():
+		_ganar()
 
 func _completar_mision(m: Mision) -> void:
 	nivel_mision += 1
@@ -297,8 +341,16 @@ func multiplicador() -> int:
 ## de 3-2-1 saltaría cuando quedaran 3,5 y mentiría justo en el momento en el
 ## que el jugador lo está usando.
 func reloj_restante() -> float:
-	var ritmo := maxf(bolsa.factor("factor_carga_reloj"), 0.001)
-	return maxf((1.0 - carga_reloj) * reloj_carga() / ritmo, 0.0)
+	return maxf((1.0 - carga_reloj) * reloj_carga() / ritmo_reloj(), 0.0)
+
+## LO RÁPIDO QUE SUBE LA BARRA DEL RELOJ, en un solo sitio. Lo miran TRES: el que
+## la sube, el que enseña los segundos que faltan y el que dice cuánto acaba de
+## robar el platillo. Con la cuenta repetida en los tres, meter la escarcha en
+## uno solo dejaría los otros dos mintiendo —y mintiendo justo en el número que
+## el jugador usa para decidir—, que es la avería del denominador escrito a mano
+## de `CLAUDE.md`.
+func ritmo_reloj() -> float:
+	return maxf(bolsa.factor("factor_carga_reloj") * estados.factor_reloj(), 0.001)
 
 ## Los segundos que tarda en cargar el reloj DE ESTE enemigo. Cada uno tiene el
 ## suyo; el parámetro general es solo el de reserva.
@@ -316,6 +368,12 @@ func avanzar(dt: float) -> void:
 	if _en_juego():
 		tiempo_jugado += dt
 		_avanzar_reloj(dt)
+		# Los estados corren con el combate, no con la bola: el veneno sigue
+		# haciendo efecto mientras la bola está en una rampa o en el platillo.
+		var paso := estados.avanzar(dt)
+		for id_estallado in paso["estallidos"]:
+			estallido_de_estado.emit(str(id_estallado))
+		_dano_de_estados(int(paso["dano"]), mesa.bola.pos)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
@@ -328,7 +386,7 @@ func _avanzar_reloj(dt: float) -> void:
 	# Las reliquias que tocan el reloj lo hacen aquí y solo aquí: no cambian
 	# `reloj_carga`, cambian lo rápido que sube la barra. Así el aviso de 3-2-1 y
 	# los segundos que se enseñan siguen saliendo del mismo sitio.
-	carga_reloj += dt * bolsa.factor("factor_carga_reloj") / maxf(reloj_carga(), 0.001)
+	carga_reloj += dt * ritmo_reloj() / maxf(reloj_carga(), 0.001)
 	if carga_reloj >= 1.0:
 		carga_reloj = 0.0
 		_aviso_dado = -1
@@ -385,7 +443,15 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true,
 		dano_f *= bolsa.factor("factor_primer_golpe")
 	# El crítico. La probabilidad base sale de los parámetros y las reliquias la
 	# suman encima, así que "más críticos" es un eje de build sin código nuevo.
-	var critico := bolsa.azar("suma_prob_critico", p.prob_critico)
+	# EL CRÍTICO, con los estados dentro. La `marca` gasta una acumulación y
+	# fuerza el crítico —se comprueba ANTES de tirar el dado, o gastaría marca en
+	# golpes que ya iban a criticar—, y el `frenesí` suma probabilidad, que es lo
+	# que hace la build de crítico encadenado: cada crítico deja frenesí y el
+	# frenesí trae el siguiente.
+	var critico := estados.consumir_critico()
+	if not critico:
+		critico = bolsa.azar("suma_prob_critico",
+			p.prob_critico + estados.suma_critico())
 	if critico:
 		dano_f *= factor_critico()
 	# Suelo de 1: un factor por debajo de 1 no puede convertir un golpe en nada,
@@ -397,6 +463,9 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true,
 	dano_infligido.emit(dano, multiplicador(), punto)
 	if critico:
 		golpe_critico.emit(punto, dano)
+		# `critico` no es un tiro, pero entra por el mismo sitio: así una
+		# reliquia puede decir `aplica_frenesi_critico: 1` sin código nuevo.
+		_aplicar_estados("critico")
 	if not enemigo.vivo():
 		_ganar()
 
@@ -515,7 +584,7 @@ func _robar_reloj(fraccion: float) -> void:
 	# En segundos de verdad, o sea contando lo que frenen las reliquias: es el
 	# número que se le enseña al jugador junto a la barra.
 	reloj_atrasado.emit((antes - carga_reloj) * reloj_carga()
-		/ maxf(bolsa.factor("factor_carga_reloj"), 0.001))
+		/ ritmo_reloj())
 
 # ------------------------------------------------------------- resolución
 

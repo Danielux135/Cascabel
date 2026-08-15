@@ -1,0 +1,96 @@
+{
+  "_nota": "LA CAPA DE PREPARACIÓN de DISEÑO.md §5: lo que eliges ANTES del run. Elegir antes no es desbloquear entre runs, así que esto no toca §13: todo está abierto desde el primer día. PROPÓSITO.md §4.",
+
+  "_por_que_se_reescribio_esto_entero": "La primera versión eran nueve bolsas de porcentajes, y salieron MEDIDAS Y EQUILIBRADAS Y COMPLETAMENTE INVISIBLES: un x1,19 al daño no se ve mientras juegas. El fallo no era el número, era la forma — una bolsa de modificadores solo sabe producir porcentajes, y para que pasen cosas hacen falta EVENTOS. Ahora cada cascabel planta un elemento (`sim/estados.gd`) o cambia la física de la bola, y las reliquias escalan lo que el cascabel planta: ahí es donde vive la build.",
+
+  "_las_dos_mitades_de_un_cascabel": "ELEMENTO: qué estado aplica y con qué tiro, en `efectos` con claves `aplica_<estado>_<tiro>`. FÍSICA: cómo se mueve la bola, en `mesa`. Un cascabel puede traer las dos, una o ninguna.",
+
+  "_la_fisica_y_el_invariante": "CLAUDE.md dice 'la bola solo en efectos, nunca en tamaño ni masa', y su razón escrita es que descuadra el hueco entre palas. Eso solo lo toca el RADIO. Fátima abrió el invariante (ago-2026) a rebote, gravedad y rodadura, que no tocan el hueco; `radio_bola` sigue intocable y hay una prueba que lo comprueba. Y cada cascabel pasa las mismas tres pruebas de jugabilidad que las palas: que la bola llegue a una pala, que se pueda atrapar en la cuna y que no se quede encerrada rebotando.",
+
+  "_la_regla_vieja_sigue_en_pie": "UN CASCABEL CAMBIA QUÉ TIRO TE COMPENSA, NO CUÁNTO PEGAS (DISEÑO.md §1), y LO QUE SUBA EL DAÑO SE PAGA EN RELOJ, NUNCA EN DRENAJE — medido: más daño acorta el combate, y un combate corto come menos relojes, así que un castigo por drenar no llega a pagar un daño más alto.",
+
+  "_ojo_con_el_combo": "`suma_golpes_por_recorrido` NO da identidad de tiro: es un empujón al MULTIPLICADOR, y el multiplicador paga todo lo que golpees después, bumpers incluidos. Medido: subía más al jugador de racimo que al de recorridos. Para identidad de tiro, `factor_dano_<tiro>` o `aplica_<estado>_<tiro>`.",
+
+  "_los_ids": "Los ids de cascabel son los MISMOS que los de `data/recuperable.json`. Hay una prueba que lo comprueba: dos listas de nombres que se copian a mano se desincronizan siempre.",
+
+  "cascabeles": [
+    {
+      "id": "casc_acero", "tiro": "ninguno", "elemento": "",
+      "resumen": "Sin efectos y sin peso raro. La vara con la que se mide todo lo demás.",
+      "efectos": {}, "mesa": {}
+    },
+    {
+      "id": "casc_hueso", "tiro": "targets y banco", "elemento": "veneno",
+      "resumen": "VENENO. Cada target envenena y cerrar un banco envenena a lo bestia; el veneno tictaquea solo, así que cuanto más aguantes la bola más se acumula. El reloj corre un 55 % más.",
+      "efectos": {"aplica_veneno_target": 2, "aplica_veneno_banco": 6, "aplica_veneno_girador": 1, "factor_carga_reloj": 1.55},
+      "mesa": {"rodadura": 5.6}
+    },
+    {
+      "id": "casc_hierro", "tiro": "platillo y retorno", "elemento": "escarcha",
+      "resumen": "ESCARCHA. Su reloj arranca un 30 % más rápido, y el platillo y los retornos lo congelan hasta dejarlo a la mitad: la seguridad se COMPRA jugando, no viene puesta. Pesada y obediente.",
+      "efectos": {"aplica_escarcha_platillo": 4, "aplica_escarcha_retorno": 1, "factor_carga_reloj": 1.3},
+      "mesa": {"gravedad": 1950.0, "rebote_pared": 0.34, "rodadura": 5.2}
+    },
+    {
+      "id": "casc_vidrio", "tiro": "el racimo, a lo loco", "elemento": "brasa",
+      "resumen": "BRASA. Bumpers y giradores dejan brasas que NO hacen daño mientras arden: estallan a los cuatro segundos, y cuantas más hayas metido, más fuerte. El reloj corre un 55 % más. Ligerísima y rebota como una canica.",
+      "efectos": {"aplica_brasa_bumper": 1, "aplica_brasa_girador": 2, "factor_carga_reloj": 1.55, "factor_drenaje": 1.3},
+      "mesa": {"gravedad": 1520.0, "rebote_pared": 0.60, "rodadura": 3.2}
+    },
+    {
+      "id": "casc_oxido", "tiro": "órbita y cañón", "elemento": "marca",
+      "resumen": "MARCA. Las órbitas y el cañón corroen al enemigo: los siguientes golpes son críticos seguros. El reloj corre un 40 % más.",
+      "efectos": {"aplica_marca_orbita": 2, "aplica_marca_canon": 3, "factor_carga_reloj": 1.4},
+      "mesa": {"rodadura": 4.8}
+    },
+    {
+      "id": "casc_plata", "tiro": "ninguno: se retroalimenta", "elemento": "frenesi",
+      "resumen": "FRENESÍ. Cada crítico sube la probabilidad del siguiente y se apaga en cinco segundos: o encadenas o se cae. El reloj corre un 70 % más, que es lo que paga la cadena. Ligera y viva.",
+      "efectos": {"aplica_frenesi_critico": 2, "suma_prob_critico": 0.06, "suma_factor_critico": 0.4, "factor_carga_reloj": 1.7},
+      "mesa": {"gravedad": 1560.0, "rebote_pared": 0.52}
+    },
+    {
+      "id": "casc_piedra", "tiro": "targets y cañón", "elemento": "",
+      "resumen": "Sin elemento: PESO. Cae a plomo y no rebota, así que llega abajo antes y con más fuerza. Bumpers y girador pegan la mitad; targets y cañón, mucho más.",
+      "efectos": {"factor_dano_relleno": 0.5, "suma_dano_target": 12, "factor_dano_canon": 1.4},
+      "mesa": {"gravedad": 2200.0, "rebote_pared": 0.28, "rodadura": 5.0}
+    },
+    {
+      "id": "casc_bronce", "tiro": "el racimo, y pronto", "elemento": "",
+      "resumen": "Sin elemento: CAMPANA. El multiplicador sube tres golpes antes y le falta el último tramo, y la bola rebota más de lo normal. El reloj corre un 15 % más.",
+      "efectos": {"suma_adelanto_tramo": 3, "suma_tramos_extra": -1, "factor_carga_reloj": 1.15},
+      "mesa": {"rebote_pared": 0.54}
+    },
+    {
+      "id": "casc_runas", "tiro": "combo largo, contrarreloj", "elemento": "escarcha",
+      "resumen": "ARCANO. Drenar ya no te quita el multiplicador y las órbitas escarchan, pero el reloj corre un 30 % más. La build de aguantar la bola eternamente.",
+      "efectos": {"suma_golpes_conservados": 1.0, "factor_carga_reloj": 1.3, "aplica_escarcha_orbita": 2},
+      "mesa": {}
+    }
+  ],
+
+  "_las_palas": "Estas SÍ tocan la física, y es lo que DISEÑO.md §5 quiere: son tus manos. `flipper_longitud` decide el hueco entre palas, que es la dificultad entera de un pinball, así que elegir palas es también elegir dificultad. Todo lo que no esté escrito aquí se queda con el valor de `sim/parametros_mesa.gd`. OJO: `Mesa.new()` copia los parámetros dentro de cada colisionador, así que estos valores tienen que estar puestos ANTES de construir la mesa; cambiarlos después no hace nada.",
+
+  "palas": [
+    {
+      "id": "pala_fabrica", "nombre": "De fábrica",
+      "resumen": "64 de largo, giro 30. Las de siempre, y con las que está medido todo.",
+      "mesa": {}
+    },
+    {
+      "id": "pala_cortas", "nombre": "Cortas",
+      "resumen": "Llegan antes y alcanzan menos. Hueco central más grande: se drena más.",
+      "mesa": {"flipper_longitud": 56.0, "flipper_velocidad_giro": 36.0}
+    },
+    {
+      "id": "pala_largas", "nombre": "Largas",
+      "resumen": "Hueco central más pequeño, pero giran despacio y el tiro sale más flojo.",
+      "mesa": {"flipper_longitud": 72.0, "flipper_velocidad_giro": 24.0}
+    },
+    {
+      "id": "pala_desiguales", "nombre": "Desiguales",
+      "resumen": "Larga la izquierda, corta la derecha. La mesa deja de ser simétrica y hay que aprenderla otra vez.",
+      "mesa": {"flipper_longitud": 72.0, "flipper_longitud_der": 56.0, "flipper_velocidad_giro": 28.0}
+    }
+  ]
+}

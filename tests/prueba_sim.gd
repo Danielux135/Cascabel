@@ -30,6 +30,12 @@ func _initialize() -> void:
 	_prueba_giradores()
 	_prueba_animacion()
 	_prueba_camara()
+	_prueba_guardado()
+	_prueba_preparacion()
+	_prueba_estados()
+	_prueba_palas_jugables()
+	_prueba_recuperable()
+	_prueba_regiones_clic()
 	_prueba_rampas()
 	_prueba_sonido()
 	_prueba_impactos()
@@ -45,7 +51,7 @@ func _initialize() -> void:
 	_prueba_misiones()
 	_prueba_criticos()
 	_prueba_fuente()
-	_prueba_cascara()
+	await _prueba_cascara()
 	_prueba_paleta()
 
 	print("")
@@ -525,7 +531,11 @@ func _prueba_combo() -> void:
 		mal.is_empty(), str(mal))
 
 	# El multiplicador se aplica al golpe que cruza el tramo, no al siguiente.
-	var c2 := Combate.new()
+	# Prob de critico a cero: se mide daño exacto por golpe, y un crítico de
+	# la probabilidad de base puede doblar cualquiera de ellos sin avisar.
+	var p2 := ParametrosCombate.new()
+	p2.prob_critico = 0.0
+	var c2 := Combate.new(p2)
 	c2.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
 	_en_juego(c2)
 	_golpear(c2, 4)
@@ -545,7 +555,7 @@ func _prueba_combo() -> void:
 	# Y la otra mitad de la regla: un bumper con el combo alto sigue pagando su
 	# daño pelado. Sin esto, quitarle el `escala` a un bumper por accidente no
 	# rompería ninguna prueba.
-	var c2b := Combate.new()
+	var c2b := Combate.new(p2)
 	c2b.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000, "ataque": 1}))
 	_en_juego(c2b)
 	_golpear(c2b, 12)
@@ -590,7 +600,13 @@ func _prueba_victoria() -> void:
 
 func _prueba_derrota() -> void:
 	var c := Combate.new()
-	c.iniciar(Enemigo.new({"nombre": "Duro", "vida": 9999, "ataque": 1000}))
+	# El ataque tiene que drenar la vida ENTERA de un solo golpe. Un "1000" a
+	# mano dejó de bastar cuando `vida_jugador` subió a 1080: el drenaje solo
+	# quita `ataque * factor_ataque_drenaje`, así que se calcula contra los
+	# parámetros de verdad en vez de una constante que la próxima subida de
+	# vida vuelve a dejar corta.
+	var ataque_letal := int(ceil(float(c.p.vida_jugador) / c.p.factor_ataque_drenaje)) + 1
+	c.iniciar(Enemigo.new({"nombre": "Duro", "vida": 9999, "ataque": ataque_letal}))
 	_en_juego(c)
 	_drenar(c)
 	_avanzar_combate(c, c.p.pausa_drenaje + 0.1)
@@ -1830,11 +1846,34 @@ func _prueba_camara() -> void:
 	_comprobar("y con los flippers a la vista",
 		camara.limite_abajo() + cp.alto_visible * 0.5 >= Mesa.ALTO - 1.0)
 
-	# REGLA 4: un temblorcito de la bola no mueve la cámara.
-	camara.y_actual = 300.0
-	camara.avanzar(DT, 300.0 - cp.adelanto + cp.zona_muerta * 0.5, 500.0, true)
+	# REGLA 4: un temblorcito de la bola no mueve la cámara. Escrito contra
+	# `objetivo()` y no contra `cp.adelanto`: el adelanto ya no es un número
+	# fijo, depende de la velocidad, y una prueba que rehaga la cuenta a mano
+	# mide la fórmula vieja en cuanto la fórmula cambia.
+	var y_temblor := 300.0
+	var vy_temblor := 500.0
+	var obj_temblor := camara.objetivo(y_temblor, vy_temblor, true)
+	camara.y_actual = obj_temblor - cp.zona_muerta * 0.5
+	var antes := camara.y_actual
+	camara.avanzar(DT, y_temblor, vy_temblor, true)
 	_comprobar("regla 4: dentro de la zona muerta la camara no se mueve",
-		is_equal_approx(camara.y_actual, 300.0), "se movio a %.2f" % camara.y_actual)
+		is_equal_approx(camara.y_actual, antes), "se movio a %.2f" % camara.y_actual)
+
+	# LA ZONA MUERTA NO PUEDE DEJAR UN ERROR PERMANENTE. Estaba escrita como
+	# destino —se movía hacia el BORDE de la zona en vez de hacia el objetivo—
+	# así que la cámara se quedaba parada a 45 px del ancla PARA SIEMPRE y los
+	# últimos 45 px de mesa, los del drenaje, no se veían nunca. La batería no
+	# lo cazaba porque solo comprobaba `objetivo()`, que es pura y decía la
+	# verdad: nadie miraba dónde acaba `y_actual`.
+	camara.y_actual = camara.limite_arriba()
+	camara._siguiendo = false
+	for _i in int(20.0 / DT):
+		camara.avanzar(DT, 0.0, 0.0, false)
+	_comprobar("sin bola, la camara llega al ancla y no se queda corta",
+		absf(camara.y_actual - camara.limite_abajo()) < 1.0,
+		"se quedo en %.1f con el ancla en %.1f, o sea %.0f px de mesa sin ver"
+			% [camara.y_actual, camara.limite_abajo(),
+				camara.limite_abajo() - camara.y_actual])
 
 	# REGLA 3 y garantía de la 1, jugando de verdad.
 	var fraccionarias := 0
@@ -1890,11 +1929,811 @@ func _prueba_camara() -> void:
 		tapada == 0, "%d fotogramas tapada; lo mas alto fue y=%.0f de pantalla"
 			% [tapada, mas_arriba_pantalla])
 
+	# LOS FLIPPERS NO SE NEGOCIAN, y esta es la prueba que faltaba. La garantía
+	# vieja prometía que la BOLA estuviera en pantalla, y eso se cumple dejándola
+	# pegada al canto de abajo con nada debajo: se veía la bola y no se veía la
+	# pala a la que iba. Medido antes del arreglo: el 57 % de los fotogramas con
+	# la bola bajo la línea de seguridad no tenían la punta del flipper en
+	# plano, y a 1900 px/s el borde se quedaba 456 px por encima de ella.
+	#
+	# Se barre a velocidad fija en vez de jugar una bola de verdad porque el
+	# fallo escala con la velocidad y una bola de verdad no alcanza el techo:
+	# la mesa da 1089 px/s como mucho.
+	# La punta se calcula de los parámetros, nunca a mano: el día que el flipper
+	# cambie de largo o de ángulo, una constante escrita aquí seguiría en verde
+	# midiendo una mesa que ya no existe.
+	var pm := ParametrosMesa.new()
+	var y_punta_flipper: float = maxf(pm.flipper_eje_izq.y, pm.flipper_eje_der.y) \
+		+ pm.flipper_longitud * sin(deg_to_rad(pm.flipper_reposo_izq)) \
+		+ pm.flipper_radio
+	var sin_flipper := 0
+	var bola_tapada := 0
+	for velocidad in [400.0, 900.0, 1400.0, 1900.0]:
+		var cam3 := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
+		cam3.y_actual = cam3.limite_abajo()
+		var yb := 200.0
+		# Se arranca con la cámara ya asentada arriba, como cuando la bola baja
+		# de la órbita: si no, el ancla de partida tapa el fallo.
+		for _i in int(1.0 / DT):
+			cam3.avanzar(DT, yb, 0.0, true)
+		while yb < Mesa.ALTO:
+			yb += velocidad * DT
+			cam3.avanzar(DT, yb, velocidad, true)
+			var en_pantalla := yb - cam3.y_actual + cp.alto_visible * 0.5
+			if en_pantalla < cp.alto_franja_hud:
+				bola_tapada += 1
+			if yb > Mesa.ALTO - cp.margen_ancla:
+				if cam3.y_actual + cp.alto_visible * 0.5 < y_punta_flipper:
+					sin_flipper += 1
+		cam3.free()
+	_comprobar("bajo la linea de seguridad se ve siempre la punta del flipper",
+		sin_flipper == 0, "%d fotogramas sin flipper en plano" % sin_flipper)
+	# Y el arreglo no puede pagarse escondiendo la bola por arriba: las dos
+	# garantías tiran en sentidos contrarios y la de abajo es la que manda, así
+	# que hay que comprobar que la de arriba sigue cumpliéndose.
+	_comprobar("y la bola sigue sin esconderse tras la barra de titulo",
+		bola_tapada == 0, "%d fotogramas tapada" % bola_tapada)
+
 	# Y nunca se enseña fuera de la mesa.
 	_comprobar("la camara no se sale de la mesa",
 		camara.limite_arriba() >= cp.alto_visible * 0.5
 		and camara.limite_abajo() <= Mesa.ALTO - cp.alto_visible * 0.5 + 0.01)
 	camara.free()
+
+## EL GUARDADO. Es la primera vez que el juego tiene estado que sobrevive a
+## cerrarlo, y un guardado que se pierde en silencio es el peor fallo posible de
+## toda la meta-progresión: el jugador no lo diagnostica como un bug, lo
+## diagnostica como que el juego no le da nada.
+func _prueba_guardado() -> void:
+	var ruta := "user://_prueba_guardado.json"
+	if FileAccess.file_exists(ruta):
+		DirAccess.open("user://").remove(ruta)
+
+	# Sin fichero: guardado vacío y VÁLIDO, y sabiendo que no había nada. La
+	# diferencia entre "primera partida" y "tu guardado no se ha podido leer" no
+	# es la misma para el jugador, así que tampoco puede serlo para el código.
+	var vacio := Guardado.cargar(ruta)
+	_comprobar("sin fichero, el guardado sale vacio y no revienta",
+		vacio != null and vacio.cuantas_recuperadas() == 0 and not vacio.hubo_fichero)
+
+	# Ida y vuelta completa. Si un campo se cae por el camino no da error: deja
+	# una estadistica a cero que parece que nunca pasó.
+	var g := Guardado.new()
+	g.recuperar("cr_brasa")
+	g.recuperar("log_mesa")
+	g.apuntar_muerte("rata")
+	g.apuntar_muerte("rata")
+	g.apuntar_muerte("gargola")
+	g.runs_jugados = 7
+	g.runs_ganados = 2
+	g.combates_ganados = 31
+	g.bolas_jugadas = 140
+	g.dano_total = 99000
+	g.mejor_dano_por_bola = 812.5
+	g.segundos_jugados = 4321.0
+	g.papelera_vaciada = 3
+	_comprobar("guardar escribe de verdad", g.guardar(ruta))
+
+	var l := Guardado.cargar(ruta)
+	var igual := l.tiene("cr_brasa") and l.tiene("log_mesa") \
+		and l.runs_jugados == 7 and l.runs_ganados == 2 \
+		and l.combates_ganados == 31 and l.bolas_jugadas == 140 \
+		and l.dano_total == 99000 and is_equal_approx(l.mejor_dano_por_bola, 812.5) \
+		and is_equal_approx(l.segundos_jugados, 4321.0) \
+		and l.papelera_vaciada == 3 and l.total_matados() == 3 \
+		and int(l.matados.get("rata", 0)) == 2
+	_comprobar("el guardado va y vuelve entero", igual,
+		"recuperadas %d, runs %d, matados %d"
+			% [l.cuantas_recuperadas(), l.runs_jugados, l.total_matados()])
+	_comprobar("y sabe que habia fichero", l.hubo_fichero and not l.ilegible)
+
+	# UN FICHERO ROTO NO PUEDE TUMBAR EL JUEGO, y tiene que DECIRLO. Callárselo
+	# es la avería del platillo otra vez: el jugador ve su progreso a cero y lo
+	# diagnostica como que el juego no guarda.
+	var f := FileAccess.open(ruta, FileAccess.WRITE)
+	f.store_string("{esto no es json, ")
+	f.close()
+	var roto := Guardado.cargar(ruta)
+	_comprobar("un guardado ilegible no revienta y se declara",
+		roto != null and roto.cuantas_recuperadas() == 0 and roto.ilegible)
+
+	# Y una versión del futuro tampoco se adivina.
+	var futuro := Guardado.desde_diccionario({"version": Guardado.VERSION + 1,
+		"runs_jugados": 99})
+	_comprobar("un guardado de una version mas nueva no se inventa",
+		futuro.ilegible and futuro.runs_jugados == 0)
+
+	# Recuperar dos veces la misma pieza no la duplica ni cuenta como nueva.
+	var d := Guardado.new()
+	_comprobar("recuperar dice si era nuevo", d.recuperar("cr_sapo"))
+	_comprobar("y no cuenta dos veces lo mismo",
+		not d.recuperar("cr_sapo") and d.cuantas_recuperadas() == 1)
+
+	# La papelera se vacía y se lleva la cuenta de las veces: hay un easter egg
+	# colgando de eso.
+	d.apuntar_muerte("rata")
+	d.vaciar_papelera()
+	_comprobar("vaciar la papelera la deja vacia y lo apunta",
+		d.total_matados() == 0 and d.papelera_vaciada == 1)
+
+	# EL PAGO DEL RUN. Lo que arregla el agujero de `PROPÓSITO.md` §1 es que un
+	# run PERDIDO también pague: con cero, perder sigue sin costar nada y
+	# volvemos al problema de partida.
+	_comprobar("un run corto paga al menos una pieza",
+		Guardado.piezas_ganadas(0) >= 1)
+	_comprobar("y llegar mas lejos paga mas",
+		Guardado.piezas_ganadas(20) > Guardado.piezas_ganadas(0))
+
+	DirAccess.open("user://").remove(ruta)
+
+## LOS ESTADOS: el motor de builds. Es la capa que hace que un cascabel pueda
+## hacer algo que se VEA pasar en vez de mover un porcentaje, así que lo que hay
+## que comprobar no es que los números salgan: es que **pasen cosas**.
+func _prueba_estados() -> void:
+	var defs := Estados.definiciones()
+	_comprobar("los estados se cargan", defs.size() > 0, "%d" % defs.size())
+
+	var ids := {}
+	var sin_efecto: Array = []
+	for d in defs:
+		var def := d as Estados.Definicion
+		ids[def.id] = int(ids.get(def.id, 0)) + 1
+		# Un estado que no hace NADA no da error: se aplica, se ve la
+		# acumulación subir y no pasa nada. Todo estado tiene que traer al menos
+		# un efecto de los cinco.
+		if is_zero_approx(def.dano_tick) and is_zero_approx(def.dano_al_expirar) \
+				and is_zero_approx(def.factor_reloj_por_acumulacion) \
+				and is_zero_approx(def.suma_critico_por_acumulacion) \
+				and not def.critico_garantizado:
+			sin_efecto.append(def.id)
+		# Y un id con tilde o con guion bajo rompe la clave `aplica_<id>_<tiro>`
+		# en silencio: el cascabel no aplicaría nada y nadie se enteraría.
+		if def.id != def.id.to_lower() or def.id.contains("_") \
+				or def.id.to_ascii_buffer().size() != def.id.length():
+			sin_efecto.append("id raro: " + def.id)
+	_comprobar("todo estado hace algo y tiene un id usable en una clave",
+		sin_efecto.is_empty(), str(sin_efecto))
+	var repes: Array = []
+	for k in ids:
+		if int(ids[k]) > 1:
+			repes.append(k)
+	_comprobar("ningun id de estado esta repetido", repes.is_empty(), str(repes))
+
+	# EL VENENO ACUMULA Y TICTAQUEA. Es el bucle entero de la build de veneno:
+	# más acumulaciones, más daño por tic.
+	var e := Estados.new()
+	e.aplicar("veneno", 3)
+	var poco := e.avanzar(1.0)
+	e.limpiar()
+	e.aplicar("veneno", 6)
+	var mucho := e.avanzar(1.0)
+	_comprobar("el veneno hace mas daño cuanto mas acumulas",
+		int(mucho["dano"]) > int(poco["dano"]) and int(poco["dano"]) > 0,
+		"3 acum -> %d, 6 acum -> %d" % [int(poco["dano"]), int(mucho["dano"])])
+	_comprobar("y el tope de acumulaciones se respeta",
+		Estados.new().aplicar("veneno", 9999)
+			<= Estados.definicion("veneno").max_acumulaciones)
+
+	# LA BRASA NO REFRESCA Y ESTALLA. Si refrescara, seguirías echándole brasas y
+	# no estallaría NUNCA: el estado más vistoso del juego no se vería jamás.
+	var b := Estados.new()
+	b.aplicar("brasa", 4)
+	var dur := Estados.definicion("brasa").duracion
+	var mitad := b.avanzar(dur * 0.5)
+	b.aplicar("brasa", 4)
+	_comprobar("la brasa no hace daño mientras arde", int(mitad["dano"]) == 0)
+	var revienta := b.avanzar(dur * 0.6)
+	_comprobar("la brasa estalla al apagarse, y no antes",
+		int(revienta["dano"]) > 0 and revienta["estallidos"].has("brasa"),
+		"%d de daño" % int(revienta["dano"]))
+	_comprobar("y reaplicar NO le alarga la mecha",
+		not b.tiene("brasa"))
+
+	# LA ESCARCHA FRENA EL RELOJ Y NO LO PARA. Un reloj parado quita la única
+	# presión continua que tiene el juego.
+	var f := Estados.new()
+	_comprobar("sin estados, el reloj va a su ritmo",
+		is_equal_approx(f.factor_reloj(), 1.0))
+	f.aplicar("escarcha", 3)
+	var con_poco := f.factor_reloj()
+	f.aplicar("escarcha", 9999)
+	var con_mucho := f.factor_reloj()
+	_comprobar("la escarcha frena el reloj", con_poco < 1.0 and con_mucho < con_poco,
+		"3 -> %.2f, tope -> %.2f" % [con_poco, con_mucho])
+	_comprobar("pero no lo para nunca", con_mucho > 0.2, "%.2f" % con_mucho)
+
+	# LA MARCA SE GASTA. Si no se gastara, un solo golpe marcado dejaría todo el
+	# combate en crítico y el crítico dejaría de ser un premio.
+	var m := Estados.new()
+	m.aplicar("marca", 2)
+	_comprobar("la marca da critico seguro", m.consumir_critico())
+	_comprobar("y se gasta una por golpe", m.acumulaciones("marca") == 1)
+	m.consumir_critico()
+	_comprobar("hasta agotarse", not m.consumir_critico() and not m.tiene("marca"))
+
+	# EL FRENESÍ SUBE EL CRÍTICO Y TIENE TECHO: es la única realimentación
+	# positiva del juego, o sea lo único que puede dispararse solo.
+	var fr := Estados.new()
+	fr.aplicar("frenesi", 9999)
+	var techo := fr.suma_critico()
+	_comprobar("el frenesi sube el critico pero con techo",
+		techo > 0.0 and techo < 1.0, "+%.0f %%" % (techo * 100.0))
+
+	# UN ESTADO CADUCA. Sin esto se acumularían durante todo el combate y el
+	# primer minuto decidiría el resto.
+	var c := Estados.new()
+	c.aplicar("veneno", 5)
+	c.avanzar(Estados.definicion("veneno").duracion + 1.0)
+	_comprobar("los estados caducan", not c.tiene("veneno"))
+
+	# Y NO CRUZAN DE UN COMBATE A OTRO: heredar veinte de veneno mataría al
+	# siguiente enemigo antes de empezar.
+	var combate := Combate.new()
+	combate.iniciar(Enemigo.new({"nombre": "A", "vida": 500, "ataque": 5}))
+	combate.estados.aplicar("veneno", 10)
+	combate.iniciar(Enemigo.new({"nombre": "B", "vida": 500, "ataque": 5}))
+	_comprobar("los estados no cruzan de un combate a otro",
+		not combate.estados.tiene("veneno"))
+
+	# EL RITMO DEL RELOJ SALE DE UN SOLO SITIO, escarcha incluida. Lo miran tres
+	# —el que sube la barra, el que enseña los segundos y el que dice cuánto robó
+	# el platillo—, y con la cuenta repetida, meter la escarcha en uno dejaría a
+	# los otros dos mintiendo justo en el número que se usa para decidir.
+	var c2 := Combate.new()
+	c2.iniciar(Enemigo.new({"nombre": "C", "vida": 5000, "ataque": 5, "reloj": 8.0}))
+	var seco := c2.reloj_restante()
+	c2.estados.aplicar("escarcha", 5)
+	_comprobar("la escarcha se nota en los segundos que se ENSEÑAN",
+		c2.reloj_restante() > seco + 0.5,
+		"%.1f s -> %.1f s" % [seco, c2.reloj_restante()])
+	_comprobar("y el ritmo del reloj cuenta la escarcha",
+		c2.ritmo_reloj() < 1.0, "%.2f" % c2.ritmo_reloj())
+
+## LA CAPA DE PREPARACIÓN. Todo lo que se configura por datos necesita una
+## prueba que compruebe que alguien LEE esa clave: un cascabel con un efecto mal
+## escrito no da error, deja un cascabel que no hace nada, y eso se diagnostica
+## como "los cascabeles no se notan".
+func _prueba_preparacion() -> void:
+	var cascabeles := Preparacion.cascabeles()
+	var palas := Preparacion.palas_disponibles()
+	_comprobar("la preparacion se carga", cascabeles.size() > 0 and palas.size() > 0,
+		"%d cascabeles, %d palas" % [cascabeles.size(), palas.size()])
+
+	# Los ids de cascabel son los del catálogo de recuperables. Dos listas de
+	# nombres mantenidas a mano se desincronizan siempre, y el día que pasara, la
+	# pantalla de preparación diría una cosa y la carpeta RECUPERADO otra.
+	var huerfanos: Array = []
+	for c in cascabeles:
+		var el_id := str((c as Dictionary).get("id", ""))
+		if CatalogoRecuperable.por_id(el_id) == null:
+			huerfanos.append(el_id)
+	_comprobar("todo cascabel existe tambien en el catalogo de recuperables",
+		huerfanos.is_empty(), str(huerfanos))
+
+	# TODA CLAVE DE EFECTO TIENE QUE LEERLA `Combate`. Y la lista de claves NO se
+	# escribe a mano aquí: se saca leyendo el propio `combate.gd`, porque una
+	# lista copiada se queda vieja en cuanto alguien añada un gancho y entonces
+	# la prueba empieza a dar falsos negativos y se desactiva. Así no puede.
+	var leidas := {}
+	var f := FileAccess.open("res://sim/combate.gd", FileAccess.READ)
+	if f != null:
+		var re := RegEx.new()
+		re.compile("bolsa\\.(?:suma|factor|bandera|azar)\\(\"([a-z_]+)\"")
+		for m in re.search_all(f.get_as_text()):
+			leidas[m.get_string(1)] = true
+		f.close()
+	_comprobar("se ha podido leer que claves lee el combate", leidas.size() > 10,
+		"%d claves" % leidas.size())
+
+	# Y las de estado se construyen EN EJECUCIÓN (`aplica_<estado>_<tiro>`), así
+	# que el escaneo del fichero no puede verlas: se validan por forma. Un
+	# `aplica_veneno_targets` con ese plural de más no daría ningún error, solo
+	# un cascabel que no envenena nunca.
+	var TIROS := ["bumper", "girador", "target", "banco", "orbita", "retorno",
+		"canon", "platillo", "critico", "matar"]
+	var muertas: Array = []
+	for c2 in cascabeles:
+		var efectos: Dictionary = (c2 as Dictionary).get("efectos", {}) as Dictionary
+		for clave in efectos:
+			var base := str(clave).replace(BolsaReliquias.SUFIJO_VICTORIA, "")
+			if leidas.has(base):
+				continue
+			if base.begins_with("aplica_"):
+				var trozos := base.substr(7).split("_", false)
+				var ok := false
+				if trozos.size() == 2:
+					ok = Array(Estados.ids()).has(trozos[0]) and TIROS.has(trozos[1])
+				if ok:
+					continue
+			muertas.append("%s: %s" % [str((c2 as Dictionary).get("id", "")), clave])
+	_comprobar("ningun cascabel tiene un efecto que nadie lee",
+		muertas.is_empty(), str(muertas))
+
+	# EL ELEMENTO QUE ANUNCIA TIENE QUE APLICARLO DE VERDAD. Un cascabel que dice
+	# "VENENO" en su texto y no trae ninguna clave `aplica_veneno_*` es la avería
+	# del dato mal escrito con su peor cara: el jugador lo elige por el texto.
+	var mienten: Array = []
+	for c3 in cascabeles:
+		var elem := str((c3 as Dictionary).get("elemento", ""))
+		if elem == "":
+			continue
+		var def := Estados.definicion(elem)
+		if def == null:
+			mienten.append("%s: elemento '%s' no existe"
+				% [str((c3 as Dictionary).get("id", "")), elem])
+			continue
+		var lo_aplica := false
+		for clave2 in ((c3 as Dictionary).get("efectos", {}) as Dictionary):
+			if str(clave2).begins_with("aplica_%s_" % elem):
+				lo_aplica = true
+		if not lo_aplica:
+			mienten.append("%s dice '%s' y no lo aplica"
+				% [str((c3 as Dictionary).get("id", "")), elem])
+	_comprobar("todo cascabel con elemento lo aplica de verdad",
+		mienten.is_empty(), str(mienten))
+
+	# Y un `cuando` mal escrito apagaría el cascabel para siempre sin dar error.
+	var condiciones_malas: Array = []
+	for c3 in cascabeles:
+		var cuando := str((c3 as Dictionary).get("cuando", ""))
+		if cuando != "" and not BolsaReliquias.CONDICIONES.has(cuando):
+			condiciones_malas.append(cuando)
+	_comprobar("las condiciones de los cascabeles existen",
+		condiciones_malas.is_empty(), str(condiciones_malas))
+
+	# LAS CLAVES DE PALAS TIENEN QUE EXISTIR EN `ParametrosMesa`. Una mal escrita
+	# deja unas palas idénticas a las de fábrica, y eso se diagnostica como "las
+	# palas no se notan", que es la misma avería con otra cara.
+	var pm := ParametrosMesa.new()
+	var claves_malas: Array = []
+	for p in palas:
+		var cambios: Dictionary = (p as Dictionary).get("mesa", {}) as Dictionary
+		for clave2 in cambios:
+			if not (str(clave2) in pm):
+				claves_malas.append("%s: %s" % [str((p as Dictionary).get("id", "")), clave2])
+	for c4 in cascabeles:
+		var cambios2: Dictionary = (c4 as Dictionary).get("mesa", {}) as Dictionary
+		for clave3 in cambios2:
+			if not (str(clave3) in pm):
+				claves_malas.append("%s: %s" % [str((c4 as Dictionary).get("id", "")), clave3])
+	_comprobar("toda clave de mesa (palas y cascabeles) existe en ParametrosMesa",
+		claves_malas.is_empty(), str(claves_malas))
+
+	# EL RADIO NO SE TOCA. El invariante se abrió a rebote, gravedad y rodadura
+	# porque ninguno cambia el hueco entre palas; el radio sí, y ese hueco es la
+	# dificultad entera. Un radio colado en el JSON no daría error: dejaría una
+	# mesa distinta con la misma geometría dibujada.
+	var prohibidas_usadas: Array = []
+	for lista_f in [cascabeles, palas]:
+		for f2 in lista_f:
+			for clave4 in ((f2 as Dictionary).get("mesa", {}) as Dictionary):
+				if Preparacion.PROHIBIDAS.has(str(clave4)):
+					prohibidas_usadas.append("%s: %s"
+						% [str((f2 as Dictionary).get("id", "")), clave4])
+	_comprobar("nadie toca el radio de la bola desde la preparacion",
+		prohibidas_usadas.is_empty(), str(prohibidas_usadas))
+	var colado := Preparacion.new()
+	_comprobar("y el radio queda igual aunque el JSON lo intentara",
+		is_equal_approx(colado.parametros_mesa().radio_bola,
+			ParametrosMesa.new().radio_bola))
+
+	# CADA JUEGO DE PALAS TIENE QUE CAMBIAR ALGO, menos el de fábrica. Dos
+	# entradas que producen la misma mesa son una elección falsa.
+	var iguales: Array = []
+	for i in palas.size():
+		for j in range(i + 1, palas.size()):
+			var a := Preparacion.new()
+			a.palas = str((palas[i] as Dictionary).get("id", ""))
+			var b := Preparacion.new()
+			b.palas = str((palas[j] as Dictionary).get("id", ""))
+			var pa := a.parametros_mesa()
+			var pb := b.parametros_mesa()
+			if is_equal_approx(pa.flipper_longitud, pb.flipper_longitud) \
+					and is_equal_approx(pa.flipper_velocidad_giro, pb.flipper_velocidad_giro) \
+					and is_equal_approx(pa.flipper_longitud_der, pb.flipper_longitud_der):
+				iguales.append("%s == %s" % [a.palas, b.palas])
+	_comprobar("no hay dos juegos de palas que produzcan la misma mesa",
+		iguales.is_empty(), str(iguales))
+
+	# EL CASCABEL DE PARTIDA TIENE QUE SER EXACTAMENTE NEUTRO. Si no lo fuera,
+	# todas las medidas de balance de antes de esta capa dejarían de valer sin
+	# que nada avisara. Se comprueba clave a clave contra una bolsa vacía.
+	var pre := Preparacion.new()
+	var vacia := BolsaReliquias.new()
+	var con_acero := BolsaReliquias.new()
+	con_acero.base = [pre.como_reliquia()]
+	var desvios: Array = []
+	for clave3 in leidas:
+		var k := str(clave3)
+		if k.begins_with("suma_"):
+			if not is_equal_approx(vacia.suma(k), con_acero.suma(k)):
+				desvios.append(k)
+		elif k.begins_with("factor_"):
+			if not is_equal_approx(vacia.factor(k), con_acero.factor(k)):
+				desvios.append(k)
+		elif k.begins_with("bandera_"):
+			if vacia.bandera(k) != con_acero.bandera(k):
+				desvios.append(k)
+	_comprobar("el cascabel de acero es EXACTAMENTE neutro",
+		desvios.is_empty(), str(desvios))
+
+	# Y LA BOLSA BASE TIENE QUE CONTAR DE VERDAD. Si un acumulador se olvidara de
+	# `base`, el cascabel elegido no haría nada: se vería como un balance raro,
+	# nunca como un fallo.
+	# Escrito CONTRA EL CATÁLOGO y no contra un cascabel concreto: la versión
+	# anterior comprobaba que Vidrio subiera `factor_dano_global`, y al
+	# rediseñarlo como brasa la prueba empezó a fallar sin que hubiera nada roto.
+	# Una prueba atada a un dato concreto mide ese dato, no la regla.
+	var cambian := 0
+	var alguno := ""
+	for c5 in cascabeles:
+		var id5 := str((c5 as Dictionary).get("id", ""))
+		if id5 == "casc_acero":
+			continue
+		var pre_n := Preparacion.new()
+		pre_n.cascabel = id5
+		var bolsa_n := BolsaReliquias.new()
+		bolsa_n.base = [pre_n.como_reliquia()]
+		var distinto := false
+		for clave5 in ((c5 as Dictionary).get("efectos", {}) as Dictionary):
+			var k5 := str(clave5)
+			if k5.begins_with("factor_"):
+				distinto = distinto or not is_equal_approx(
+					bolsa_n.factor(k5), vacia.factor(k5))
+			else:
+				distinto = distinto or not is_equal_approx(
+					bolsa_n.suma(k5), vacia.suma(k5))
+		if distinto:
+			cambian += 1
+			alguno = id5
+		# Y ninguno se cuela entre lo que ganas jugando: colado ahí saldría como
+		# icono del escritorio y la ruleta podría volver a ofrecerlo.
+		if not bolsa_n.reliquias.is_empty() or bolsa_n.tiene(id5):
+			alguno = "COLADO: " + id5
+			cambian = -999
+	_comprobar("todos los cascabeles menos Acero cambian algun numero",
+		cambian == cascabeles.size() - 1, "%d de %d (%s)"
+			% [cambian, cascabeles.size() - 1, alguno])
+
+	# Sanear deja la elección en algo que exista: una elección que apunta a la
+	# nada no da error, deja la bola sin dibujo.
+	var g := Guardado.new()
+	CatalogoRecuperable.sembrar(g)
+	var roto := Preparacion.new()
+	roto.cascabel = "no_existe"
+	roto.palas = "tampoco"
+	roto.criatura = "cr_espectro"
+	roto.sanear(g)
+	_comprobar("sanear arregla una preparacion imposible",
+		not Preparacion.ficha_cascabel(roto.cascabel).is_empty()
+		and not Preparacion.ficha_palas(roto.palas).is_empty()
+		and g.tiene(roto.criatura),
+		"%s / %s / %s" % [roto.cascabel, roto.palas, roto.criatura])
+
+## CADA JUEGO DE PALAS TIENE QUE SER JUGABLE, no solo el de por defecto.
+##
+## Es la prueba más importante de la tanda. `flipper_longitud` decide el hueco
+## entre palas y mueve el BARRIDO, y del barrido salieron los slingshots —era el
+## bug que impedía apuntar—. Unas palas más largas pueden meterse dentro del
+## slingshot, y unas más cortas pueden no llegar a la bola. Ninguna de las dos
+## cosas da error: dejan una mesa que se juega mal.
+##
+## Y `CLAUDE.md` avisa del otro lado: "que la bola drene no significa que el
+## juego funcione". Por eso el criterio es **que la bola llegue a una pala**, no
+## que acabe drenando.
+func _prueba_palas_jugables() -> void:
+	var casos: Array = []
+	for f in Preparacion.palas_disponibles():
+		casos.append({"que": "palas", "id": str((f as Dictionary).get("id", ""))})
+	# Y LOS CASCABELES IGUAL, desde que tocan física. Una bola con rebote 0,60 y
+	# gravedad baja puede quedarse botando en un palmo de mesa para siempre, y
+	# una con gravedad 2200 puede colarse por sitios por los que no cabía. Probar
+	# solo el juego por defecto dejaba trece configuraciones sin medir.
+	for f2 in Preparacion.cascabeles():
+		casos.append({"que": "cascabel", "id": str((f2 as Dictionary).get("id", ""))})
+
+	for caso in casos:
+		var el_id := str(caso["id"])
+		var pre := Preparacion.new()
+		if str(caso["que"]) == "palas":
+			pre.palas = el_id
+		else:
+			pre.cascabel = el_id
+		var pm := pre.parametros_mesa()
+
+		# 1. La pala levantada no puede meterse dentro del slingshot. Se recorre
+		# el barrido entero, no solo las dos posturas: el problema aparece a
+		# mitad de recorrido.
+		var choca := ""
+		for lado in [
+				{"eje": pm.flipper_eje_izq, "largo": pm.flipper_longitud,
+					"a": pm.flipper_reposo_izq, "b": pm.flipper_activo_izq},
+				{"eje": pm.flipper_eje_der,
+					"largo": pm.flipper_longitud_der if pm.flipper_longitud_der > 0.0
+						else pm.flipper_longitud,
+					"a": pm.flipper_reposo_der, "b": pm.flipper_activo_der}]:
+			for paso in 25:
+				var t := float(paso) / 24.0
+				var ang := deg_to_rad(lerpf(float(lado["a"]), float(lado["b"]), t))
+				var punta: Vector2 = (lado["eje"] as Vector2) \
+					+ Vector2(cos(ang), sin(ang)) * float(lado["largo"])
+				for s in _slingshots_de(pm):
+					if _distancia_a_segmento(punta, (s as Array)[0], (s as Array)[1]) \
+							< pm.flipper_radio + pm.radio_bola:
+						choca = "punta en %s" % str(punta.round())
+						break
+		_comprobar("%s '%s': la pala no se mete en el slingshot" % [caso["que"], el_id],
+			choca == "", choca)
+
+		# 2. Una bola lanzada a tope llega a una pala. Es el criterio de
+		# `CLAUDE.md`: no vale que acabe drenando, tiene que LLEGAR.
+		var m := Mesa.new(pm)
+		m.rng.seed = SEMILLA
+		m.nueva_bola()
+		m.cargar_lanzador(m.p.tiempo_carga_lanzador)
+		m.soltar_lanzador()
+		var llego := false
+		var t2 := 0.0
+		while m.bola.viva and t2 < 30.0:
+			m.avanzar(DT)
+			t2 += DT
+			if m.bola.en_carril:
+				continue
+			if m.bola.pos.distance_to(pm.flipper_eje_izq) < 80.0 \
+					or m.bola.pos.distance_to(pm.flipper_eje_der) < 80.0:
+				llego = true
+				break
+		_comprobar("%s '%s': una bola lanzada llega a una pala" % [caso["que"], el_id],
+			llego, "acabo en %s tras %.1f s" % [str(m.bola.pos.round()), t2])
+
+		# 3. Y la bola cae en la cuna de la pala levantada y se queda: es el
+		# único tiro repetible que tiene el juego (`ESTADO.md`, "el pilar"), así
+		# que unas palas donde no se pueda atrapar son otras palas distintas, no
+		# unas peores.
+		var m2 := Mesa.new(pm)
+		m2.rng.seed = SEMILLA
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.flipper_izq.pulsado = true
+		var largo_izq := pm.flipper_longitud
+		m2.bola.pos = pm.flipper_eje_izq \
+			+ Vector2(cos(deg_to_rad(pm.flipper_activo_izq)),
+				sin(deg_to_rad(pm.flipper_activo_izq))) * (largo_izq * 0.55) \
+			+ Vector2(0, -pm.radio_bola - pm.flipper_radio - 2.0)
+		var quieta := false
+		for _i in int(2.5 / DT):
+			m2.avanzar(DT)
+			if not m2.bola.viva:
+				break
+			if m2.bola.vel.length() < 60.0 and m2.bola.pos.y < pm.y_drenaje - 40.0:
+				quieta = true
+		_comprobar("%s '%s': la bola se puede atrapar en la cuna" % [caso["que"], el_id],
+			quieta, "acabo a %.0f px/s en %s"
+				% [m2.bola.vel.length(), str(m2.bola.pos.round())])
+
+## Los dos slingshots, sacados de la mesa de verdad y no escritos a mano: si
+## alguien los mueve, esta prueba tiene que moverse con ellos.
+func _slingshots_de(pm: ParametrosMesa) -> Array:
+	var m := Mesa.new(pm)
+	var lista: Array = []
+	for c in m.colisionadores:
+		var col := c as Colisionador
+		if col.empuje > 0.0 and col.a.distance_to(col.b) > 20.0:
+			lista.append([col.a, col.b])
+	return lista
+
+func _distancia_a_segmento(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var largo2 := ab.length_squared()
+	if largo2 <= 0.0:
+		return p.distance_to(a)
+	var t := clampf((p - a).dot(ab) / largo2, 0.0, 1.0)
+	return p.distance_to(a + ab * t)
+
+## EL CATÁLOGO DE LO RECUPERABLE. `CLAUDE.md`: un dato mal escrito en un JSON no
+## da error, deja una pieza que no hace nada. Aquí eso sería una pieza imposible
+## de conseguir, y se diagnosticaría como "el juego no me da nada".
+func _prueba_recuperable() -> void:
+	var piezas := CatalogoRecuperable.cargar()
+	_comprobar("el catalogo de recuperables se carga", piezas.size() > 0,
+		"%d piezas" % piezas.size())
+
+	var ids := {}
+	var sin_campo: Array = []
+	var tipos := {}
+	for p in piezas:
+		var pz := p as CatalogoRecuperable.Pieza
+		if pz.id == "" or pz.nombre == "" or pz.fichero == "" or pz.tipo == "":
+			sin_campo.append(pz.id)
+		ids[pz.id] = int(ids.get(pz.id, 0)) + 1
+		tipos[pz.tipo] = true
+	_comprobar("toda pieza tiene id, tipo, nombre y fichero",
+		sin_campo.is_empty(), str(sin_campo))
+
+	# Un id repetido no da error: hace que dos piezas compartan estado y que una
+	# de las dos no se pueda conseguir nunca.
+	var repetidos: Array = []
+	for k in ids:
+		if int(ids[k]) > 1:
+			repetidos.append(k)
+	_comprobar("ningun id de pieza esta repetido", repetidos.is_empty(),
+		str(repetidos))
+
+	# EL SPRITE DECLARADO TIENE QUE EXISTIR. Es el mismo fallo que dejaba 27
+	# reliquias sin icono: no rompe nada, deja un hueco.
+	var sin_sprite: Array = []
+	for p2 in piezas:
+		var pz2 := p2 as CatalogoRecuperable.Pieza
+		var ruta := pz2.ruta_sprite()
+		if ruta != "" and not ResourceLoader.exists(ruta):
+			sin_sprite.append(ruta)
+	_comprobar("todo sprite declarado en el catalogo existe",
+		sin_sprite.is_empty(), str(sin_sprite))
+
+	# TIENE QUE HABER ALGO QUE GANAR. Si todas las piezas fueran `inicial`, la
+	# carpeta saldría llena el primer día y el gancho de `PROPÓSITO.md` §2 —ver
+	# el hueco— no existiría. No da error: deja el juego sin propósito.
+	_comprobar("hay piezas que NO vienen de fabrica",
+		CatalogoRecuperable.recuperables().size() > 0,
+		"%d recuperables de %d" % [CatalogoRecuperable.recuperables().size(),
+			piezas.size()])
+
+	# El nombre ilegible conserva la longitud y la extensión: ocho interrogantes
+	# donde había ocho letras se lee como un nombre perdido; "???" no.
+	var una := CatalogoRecuperable.recuperables()[0] as CatalogoRecuperable.Pieza
+	var ilegible := una.nombre_ilegible()
+	_comprobar("el nombre ilegible conserva largo y extension",
+		ilegible.length() == una.fichero.length()
+		and ilegible.get_extension() == una.fichero.get_extension(),
+		"%s -> %s" % [una.fichero, ilegible])
+
+	# Sembrar da las iniciales y NO da las otras.
+	var g := Guardado.new()
+	CatalogoRecuperable.sembrar(g)
+	var mal: Array = []
+	for p3 in piezas:
+		var pz3 := p3 as CatalogoRecuperable.Pieza
+		if g.tiene(pz3.id) != pz3.inicial:
+			mal.append(pz3.id)
+	_comprobar("sembrar da exactamente las iniciales", mal.is_empty(), str(mal))
+
+	# Y la siguiente pieza AVANZA: si devolviera siempre la misma, el jugador
+	# ganaría runs sin que la carpeta cambiara nunca.
+	var vistas := {}
+	var repite := false
+	for _i in CatalogoRecuperable.recuperables().size():
+		var sig := CatalogoRecuperable.siguiente_para(g)
+		if sig == "" or vistas.has(sig):
+			repite = true
+			break
+		vistas[sig] = true
+		g.recuperar(sig)
+	_comprobar("la siguiente pieza avanza y no repite", not repite)
+	_comprobar("y al final no queda nada que dar",
+		CatalogoRecuperable.siguiente_para(g) == "")
+
+## Las ventanas que `NodoSistema` sabe abrir. Se escribe UNA vez y la usan las
+## dos comprobaciones de abajo: con la lista repetida, añadir una ventana obliga
+## a acordarse de dos sitios y solo se acuerda uno.
+const VENTANAS := ["preparacion", "recuperado", "maquina", "papelera", "registro"]
+
+## LAS REGIONES DE CLIC. Dos botones solapados no dan error: pulsas uno y
+## responde el otro.
+func _prueba_regiones_clic() -> void:
+	var r := RegionesClic.new()
+	r.registrar(0, func(): return [
+		RegionesClic.Region.new("fondo", Rect2(0, 0, 100, 100)),
+	])
+	r.registrar(10, func(): return [
+		RegionesClic.Region.new("encima", Rect2(20, 20, 30, 30)),
+	])
+	_comprobar("gana la region de la capa de delante",
+		r.en(Vector2(30, 30)) == "encima", r.en(Vector2(30, 30)))
+	_comprobar("y fuera de ella contesta la de detras",
+		r.en(Vector2(80, 80)) == "fondo", r.en(Vector2(80, 80)))
+	_comprobar("fuera de todo no contesta nadie",
+		r.en(Vector2(500, 500)) == "")
+
+	# LAS REGIONES SE CALCULAN AL PREGUNTAR, no al dibujar. Es lo que evita que
+	# el primer clic de cada fotograma conteste con la disposición del fotograma
+	# anterior — un botón que ya no está.
+	var abierto := [false]
+	var r2 := RegionesClic.new()
+	r2.registrar(0, func(): return [] if not abierto[0] else [
+		RegionesClic.Region.new("menu", Rect2(0, 0, 50, 50)),
+	])
+	_comprobar("cerrado, la region no existe", r2.en(Vector2(10, 10)) == "")
+	abierto[0] = true
+	_comprobar("y abierto existe sin haber dibujado nada",
+		r2.en(Vector2(10, 10)) == "menu")
+
+	# SOLTAR FUERA NO ACTIVA. Sin esto no hay forma de arrepentirse de un clic, y
+	# una de las entradas del menú de Inicio cierra el juego.
+	var r3 := RegionesClic.new()
+	r3.registrar(0, func(): return [
+		RegionesClic.Region.new("apagar", Rect2(0, 0, 40, 20)),
+		RegionesClic.Region.new("otro", Rect2(60, 0, 40, 20)),
+	])
+	_comprobar("apretar no activa nada por si solo",
+		r3.pulsar(Vector2(10, 10), true) == "")
+	_comprobar("soltar encima del mismo si activa",
+		r3.pulsar(Vector2(15, 12), false) == "apagar")
+	r3.pulsar(Vector2(10, 10), true)
+	_comprobar("soltar en OTRA region no activa ninguna de las dos",
+		r3.pulsar(Vector2(70, 10), false) == "")
+	r3.pulsar(Vector2(10, 10), true)
+	_comprobar("y soltar fuera de todo tampoco",
+		r3.pulsar(Vector2(300, 300), false) == "")
+
+	# Las entradas del menú de Inicio no se pueden solapar entre ellas.
+	var solapadas: Array = []
+	var caja := Rect2(0, 0, 168, 24)
+	var lista: Array = []
+	var y := 0.0
+	for e in NodoSistema.ENTRADAS:
+		if str(e["id"]) == "":
+			y += NodoSistema.ALTO_SEPARADOR
+			continue
+		lista.append(Rect2(0, y, caja.size.x, NodoSistema.ALTO_ENTRADA))
+		y += NodoSistema.ALTO_ENTRADA
+	for i in lista.size():
+		for j in range(i + 1, lista.size()):
+			if (lista[i] as Rect2).intersects(lista[j] as Rect2):
+				solapadas.append([i, j])
+	_comprobar("las entradas del menu de Inicio no se solapan",
+		solapadas.is_empty(), str(solapadas))
+
+	# Y todo lo que el menú puede abrir tiene que saber abrirse: una entrada con
+	# un id que nadie enruta es un botón que no hace nada, y no da error.
+	var sin_ruta: Array = []
+	for e2 in NodoSistema.ENTRADAS:
+		var el_id := str(e2["id"])
+		if el_id == "" or el_id == "apagar":
+			continue
+		if not VENTANAS.has(el_id):
+			sin_ruta.append(el_id)
+	_comprobar("toda entrada del menu abre algo que existe",
+		sin_ruta.is_empty(), str(sin_ruta))
+
+	# Y todo icono del escritorio que dice abrir algo tiene que abrir una ventana
+	# de las que existen.
+	var iconos_malos: Array = []
+	for k in NodoSistema.ICONO_ABRE:
+		if not NodoCascara.ICONOS_DECORATIVOS.has(k):
+			iconos_malos.append(k)
+		elif not VENTANAS.has(str(NodoSistema.ICONO_ABRE[k])):
+			iconos_malos.append(k)
+	_comprobar("los iconos que abren algo existen y abren algo que existe",
+		iconos_malos.is_empty(), str(iconos_malos))
+
+	# UN IDENTIFICADOR NO ES UN RÓTULO, y esta vez se coló en dos sitios a la
+	# vez: la ventana del registro ponía "log_arranque.log" (la clave del JSON)
+	# en vez de "arranque.log", y la papelera escribía "goblin_carroniero" —sin
+	# tilde, porque las claves van sin tilde por fuerza— al lado de un mapa que
+	# pone "goblin_carroñero". Es la avería del "COMUN" en la tele, que ya está
+	# en `CLAUDE.md`, y sigue colándose: por eso se prueba y no se confía.
+	var s := NodoSistema.new(null, null)
+	s.abierto = "registro"
+	var titulos_malos: Array = []
+	for pz in CatalogoRecuperable.por_tipo("registro"):
+		var p := pz as CatalogoRecuperable.Pieza
+		s.leyendo = p.id
+		if s._titulo_ventana() != p.fichero:
+			titulos_malos.append("%s -> %s" % [p.id, s._titulo_ventana()])
+	_comprobar("la ventana del registro se titula con el FICHERO, no con la clave",
+		titulos_malos.is_empty(), str(titulos_malos))
+
+	var procesos_malos: Array = []
+	for d in CatalogoEnemigos.cargar():
+		var dd := d as Dictionary
+		var id_e := str(dd.get("id", ""))
+		var esperado := str(dd.get("nombre", "")).to_lower().replace(" ", "_") + ".exe"
+		if s._proceso_de(id_e) != esperado:
+			procesos_malos.append("%s -> %s (esperaba %s)"
+				% [id_e, s._proceso_de(id_e), esperado])
+	_comprobar("la papelera escribe el NOMBRE del enemigo, no su clave",
+		procesos_malos.is_empty(), str(procesos_malos))
+	s.free()
 
 func _prueba_giradores() -> void:
 	var m := _nueva_mesa()
@@ -2314,7 +3153,13 @@ func _prueba_ningun_efecto_muerto(catalogo: Array[Reliquia]) -> void:
 ## ellas, y todo se escribe contra los PARÁMETROS: un número a mano aquí mediría
 ## la escala de daño, no la reliquia.
 func _combate_con(ids: Array) -> Combate:
-	var c := Combate.new()
+	# Prob de critico a cero: esta funcion mide DAÑO EXACTO de reliquias, y un
+	# critico de la probabilidad de base (6%) puede colarse en cualquier golpe
+	# y doblarlo, igual que ya se cuida en `_prueba_criticos`. El crítico se
+	# prueba aparte; aquí solo estorbaría.
+	var params := ParametrosCombate.new()
+	params.prob_critico = 0.0
+	var c := Combate.new(params)
 	for el_id in ids:
 		var r := CatalogoReliquias.por_id(str(el_id))
 		if r != null:
@@ -2982,7 +3827,7 @@ func _prueba_cascara() -> void:
 	_comprobar("un marco mas grande que su caja no da tamanos negativos",
 		enano.size.x >= 0.0 and enano.size.y >= 0.0, str(enano))
 
-	_prueba_huecos_de_la_cascara()
+	await _prueba_huecos_de_la_cascara()
 
 ## Los huecos: la franja de la mesa y las bandas de escritorio. Son los 280 px
 ## por lado que `PLAN.md` reservó desde la Fase 1, y lo que puede romperse es
@@ -2991,9 +3836,22 @@ func _prueba_huecos_de_la_cascara() -> void:
 	# Sin `VistaMesa`: montarla aquí arrancaría un run entero y cargaría todos
 	# los sprites para medir cuatro rectángulos. La cáscara aguanta sin ella,
 	# que además es lo que hace que se pueda probar.
+	#
+	# `get_root()` es la raíz de la batería (`--script`), que no le da a los
+	# nodos un viewport de verdad: `pantalla()` devolvía ceros y toda esta
+	# prueba medía sobre un escritorio de 0x0. Un `SubViewport` propio, del
+	# mismo tamaño que juega el juego, sí resuelve `get_viewport_rect()`.
+	var sub := SubViewport.new()
+	sub.size = Vector2i(960, 540)
+	get_root().add_child(sub)
 	var cascara := NodoCascara.new(null, ParametrosCamara.new(),
 		ParametrosAnimacion.new())
-	get_root().add_child(cascara)
+	sub.add_child(cascara)
+	# `add_child()` sobre la raíz de la batería no mete el nodo en el árbol
+	# de verdad hasta el siguiente frame (medido: `is_inside_tree()` da falso
+	# hasta entonces). Sin este frame, `_lienzo.get_viewport()` sigue
+	# devolviendo null y `pantalla()` revienta igual que con `get_root()`.
+	await process_frame
 
 	var franja := cascara.franja_mesa()
 	var ventana := cascara.ventana_mesa()
@@ -3024,7 +3882,7 @@ func _prueba_huecos_de_la_cascara() -> void:
 
 	_prueba_paneles_de_la_cascara(cascara, ventana, der)
 	_prueba_fondos_por_acto(cascara)
-	cascara.free()
+	sub.free()
 
 ## LOS PANELES DE LA BANDA DERECHA, que es donde vive el HUD desde que dejó de
 ## estar encima de la mesa. Lo que puede romperse aquí es exactamente lo mismo

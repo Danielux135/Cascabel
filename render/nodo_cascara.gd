@@ -127,6 +127,12 @@ const ICONOS_DECORATIVOS := ["mi_maquina", "papelera", "carpeta", "disquete",
 var _tex_iconos_decorativos: Array[Texture2D] = []
 ## Sobre qué icono está el ratón, para el tooltip. −1 = ninguno.
 var _icono_marcado: int = -1
+## Y sobre qué icono DECORATIVO, que ahora algunos sí abren cosas. Lo escribe
+## `NodoSistema`, que es quien enruta el ratón: aquí solo se dibuja.
+var icono_decorativo_marcado: int = -1
+## Si el botón Inicio se dibuja hundido. Lo pone `NodoSistema` cuando su menú
+## está abierto.
+var inicio_hundido := false
 
 func _init(la_vista: VistaMesa, parametros: ParametrosCamara,
 		animacion: ParametrosAnimacion) -> void:
@@ -308,6 +314,33 @@ func caja_icono(i: int) -> Rect2:
 			+ float(fila) * (LADO_ICONO + SEPARACION_ICONO + 22.0)),
 		LADO_ICONO, LADO_ICONO)
 
+## LA BARRA DE TAREAS Y EL BOTÓN INICIO, como geometría y no como números dentro
+## del dibujo. Ahora hay dos que preguntan —quien la pinta y quien decide si el
+## ratón la ha pulsado— y con el número copiado en los dos, el botón se pulsaría
+## donde estaba antes en cuanto cambie de sitio, sin dar ningún error.
+func caja_barra_tareas() -> Rect2:
+	var p := pantalla()
+	return Rect2(0.0, p.y - ALTO_BARRA, p.x, ALTO_BARRA)
+
+func caja_inicio() -> Rect2:
+	var c := caja_barra_tareas()
+	return Rect2(4.0, c.position.y + 4.0, 64.0, ALTO_BARRA - 8.0)
+
+## Dónde cae el icono decorativo `i`. Cuelgan desde ABAJO de la banda izquierda
+## para no chocar con las reliquias, que ocupan la misma banda desde arriba.
+func caja_icono_decorativo(i: int) -> Rect2:
+	var banda := banda_izquierda()
+	var por_columna := maxi(int((banda.size.y - MARGEN_ESCRITORIO * 2.0)
+		/ (LADO_ICONO + SEPARACION_ICONO + 10.0)), 1)
+	var col := i / por_columna
+	var fila := i % por_columna
+	return Rect2(
+		roundf(banda.end.x - MARGEN_ESCRITORIO - LADO_ICONO
+			- float(col) * (LADO_ICONO + SEPARACION_ICONO)),
+		roundf(banda.end.y - MARGEN_ESCRITORIO - LADO_ICONO
+			- float(fila) * (LADO_ICONO + SEPARACION_ICONO + 10.0)),
+		LADO_ICONO, LADO_ICONO)
+
 func _icono_en(punto: Vector2) -> int:
 	if vista == null or vista.run == null or vista.run.bolsa == null:
 		return -1
@@ -346,6 +379,16 @@ func dibujar_panel(en: CanvasItem, caja: Rect2, titulo_texto: String,
 	en.draw_string(_fuente, Vector2(barra.position.x + 6.0, barra.position.y + 12.0),
 		titulo_texto, HORIZONTAL_ALIGNMENT_LEFT, barra.size.x - 12.0, 8,
 		C_BLANCO if activo else C_TEXTO_TENUE)
+
+## Solo el marco, SIN barra de título. Un menú de Inicio no tiene barra de
+## título, y dibujarle una no es solo feo: la barra mide 16 px y se come la
+## primera entrada del menú entera, así que la de arriba no se puede ni pulsar
+## ni leer. No daba error: parecía que la primera opción salía resaltada.
+func dibujar_marco(en: CanvasItem, caja: Rect2) -> void:
+	if _ventana.completo():
+		_ventana.dibujar(en, caja)
+	else:
+		en.draw_rect(caja, C_VACIO)
 
 ## El marco de diálogo, para lo que INTERRUMPE. Devuelve el hueco de dentro.
 func dibujar_dialogo(en: CanvasItem, caja: Rect2) -> Rect2:
@@ -537,7 +580,7 @@ func _dibujar_paneles() -> void:
 ## lo único que se perdía era el mueble del medio.
 func dibujar_barra_tareas(en: CanvasItem) -> void:
 	var p := pantalla()
-	var caja := Rect2(0.0, p.y - ALTO_BARRA, p.x, ALTO_BARRA)
+	var caja := caja_barra_tareas()
 	if _barra.completo():
 		_barra.dibujar(en, caja)
 	else:
@@ -545,9 +588,12 @@ func dibujar_barra_tareas(en: CanvasItem) -> void:
 
 	# El botón de Inicio. Con sprite propio, el cascabel de la esquina es su
 	# logo: es lo único de toda la barra con identidad, así que va primero.
-	var inicio := Rect2(4.0, caja.position.y + 4.0, 64.0, ALTO_BARRA - 8.0)
-	if _tex_inicio != null:
-		en.draw_texture_rect(_tex_inicio, inicio, false)
+	# Y AHORA ABRE UN MENÚ DE VERDAD: hundido mientras el menú está abierto, que
+	# es lo que hace un botón Inicio y lo que dice que el menú sale de ahí.
+	var inicio := caja_inicio()
+	var tex_inicio := _tex_inicio_pulsado if inicio_hundido and _tex_inicio_pulsado != null else _tex_inicio
+	if tex_inicio != null:
+		en.draw_texture_rect(tex_inicio, inicio, false)
 	elif _boton.completo():
 		_boton.dibujar(en, inicio)
 	en.draw_string(_fuente, Vector2(inicio.position.x + 24.0,
@@ -644,29 +690,18 @@ func _dibujar_iconos() -> void:
 func _dibujar_iconos_decorativos() -> void:
 	if _tex_iconos_decorativos.is_empty():
 		return
-	var banda := banda_izquierda()
-	var col := 0
-	var fila := 0
-	var por_columna := maxi(int((banda.size.y - MARGEN_ESCRITORIO * 2.0)
-		/ (LADO_ICONO + SEPARACION_ICONO + 10.0)), 1)
-	for tex in _tex_iconos_decorativos:
+	for i in _tex_iconos_decorativos.size():
+		var tex := _tex_iconos_decorativos[i]
 		if tex == null:
-			fila += 1
-			if fila >= por_columna:
-				fila = 0
-				col += 1
 			continue
-		var caja := Rect2(
-			roundf(banda.end.x - MARGEN_ESCRITORIO - LADO_ICONO
-				- float(col) * (LADO_ICONO + SEPARACION_ICONO)),
-			roundf(banda.end.y - MARGEN_ESCRITORIO - LADO_ICONO
-				- float(fila) * (LADO_ICONO + SEPARACION_ICONO + 10.0)),
-			LADO_ICONO, LADO_ICONO)
-		_lienzo.draw_texture_rect(tex, caja, false, Color(1, 1, 1, 0.9))
-		fila += 1
-		if fila >= por_columna:
-			fila = 0
-			col += 1
+		var caja := caja_icono_decorativo(i)
+		# El que tiene el ratón encima se enciende. Es lo que dice que un icono
+		# se puede pulsar: sin eso, los que hacen algo y los que no se ven igual.
+		var marcado := icono_decorativo_marcado == i
+		if marcado:
+			_lienzo.draw_rect(caja.grow(2.0), Color(C_BLANCO, 0.18))
+		_lienzo.draw_texture_rect(tex, caja, false,
+			Color(1, 1, 1, 1.0 if marcado else 0.9))
 
 ## El tooltip amarillo, que es el sitio donde por fin se lee qué hace una
 ## reliquia después de haberla cogido. Sin esto, lo que hace tu build solo se

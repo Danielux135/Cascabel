@@ -217,8 +217,13 @@ func _construir() -> void:
 	flipper_izq = Flipper.new(
 		p.flipper_eje_izq, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
+	# La derecha puede medir distinto (palas "desiguales" de la preparación). A
+	# 0 —lo normal— vale la misma que la izquierda, así que ajustar
+	# `flipper_longitud` sigue moviendo las dos como siempre.
 	flipper_der = Flipper.new(
-		p.flipper_eje_der, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
+		p.flipper_eje_der,
+		p.flipper_longitud_der if p.flipper_longitud_der > 0.0 else p.flipper_longitud,
+		p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
 
 	# El rozamiento se reparte aquí, al final y en un solo sitio: cada superficie

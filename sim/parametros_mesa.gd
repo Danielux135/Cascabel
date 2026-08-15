@@ -37,6 +37,17 @@ var flipper_rebote: float = 0.25
 ## hueco central medía 22 px y con 64 mide 47, o sea que drenar por el medio
 ## deja de ser un objetivo diminuto.
 var flipper_longitud: float = 64.0
+## Largo de la pala DERECHA, si es distinto. 0 = la misma que la izquierda, que
+## es lo normal. Existe para las palas "desiguales" de la capa de Preparación
+## (`DISEÑO.md` §5): una mesa asimétrica hay que volver a aprenderla, y eso es
+## una elección de partida, no un desequilibrio.
+##
+## OJO: cambiar cualquiera de los dos largos mueve el barrido de la pala, y el
+## barrido es de donde se sacaron los slingshots —era el bug que impedía
+## apuntar—. Hay una prueba que recorre TODOS los juegos de palas comprobando
+## que ninguno mete la pala dentro del slingshot ni deja de llegar a la bola:
+## probar solo el juego por defecto dejaría los otros tres sin medir.
+var flipper_longitud_der: float = 0.0
 var flipper_radio: float = 8.0
 ## La pala levantada estaba a -32°, o sea muy empinada, y eso rompía la cuna por
 ## dos sitios a la vez. Medido:

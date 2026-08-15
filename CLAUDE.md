@@ -17,6 +17,10 @@ qué toca ahora. No empieces nada sin leerlo.
 `DISEÑO.md` tiene el diseño de la capa roguelike: el pilar, los ejes de
 build, los ganchos de reliquia. **Ábrelo antes de tocar reliquias, enemigos
 o estructura de run.**
+`PROPÓSITO.md` tiene la capa que falta: por qué alguien vuelve a abrir el juego.
+Preparación (cascabeles y palas), selector de dificultad, rampas fallables con
+su barra de carga, y la cáscara como metajuego. **Ábrelo antes de tocar
+desbloqueos, dificultad o la capa de Preparación.**
 `CONTEXTO.md` tiene la referencia densa: paleta, assets, proporciones,
 estética. **Ábrelo solo para buscar un dato concreto**, no por costumbre, y
 no es fuente de verdad para parámetros ni geometría: esos viven en el
@@ -102,8 +106,22 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
 - **El daño se aplica al golpear, no al drenar.** No hay cuenta de bolas:
   hay vida, y drenar cuesta vida.
 - **Los enemigos normales viven fuera del campo de juego.**
-- **La bola es el bloque de stats del jugador, solo en efectos.** Nunca en
-  tamaño ni masa: descuadra el hueco entre palas.
+- **La bola es el bloque de stats del jugador. NUNCA el radio.** El invariante
+  decía "solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
+  descuadra el hueco entre palas: **eso solo lo toca el radio**. Fátima lo abrió
+  (ago-2026) a **rebote, gravedad y rodadura**, que no tocan el hueco, y ahí es
+  donde viven "ligera", "pesada" y "rebotona". `radio_bola` sigue cerrado, con
+  una lista de claves prohibidas en `Preparacion` y dos pruebas. **Y toda
+  configuración de bola pasa las tres pruebas de jugabilidad** —llega a una pala,
+  se puede atrapar en la cuna, no se queda encerrada rebotando—: una gravedad
+  baja con rebote alto deja la bola botando en un palmo de mesa para siempre, y
+  eso no da ningún error.
+- **Un modificador NO es una mecánica.** Los nueve cascabeles se montaron como
+  bolsa de modificadores —reutilizando el sistema de reliquias— y salieron
+  medidos, equilibrados y **completamente invisibles**: un ×1,19 al daño no se ve
+  jugando. **Una bolsa de modificadores solo sabe producir porcentajes; para que
+  pasen cosas hacen falta EVENTOS** (`sim/estados.gd`). Cuando algo "no se nota"
+  y los números dicen que está bien, mira la forma antes que el número.
 - **La cáscara va en PIXELART, con marcos de nueve trozos.** Misma rejilla y
   misma paleta que el resto. Se acabó dibujarla por código con degradados y
   biselados en resolución nativa: era más cara y peleaba con el arte.
@@ -153,6 +171,7 @@ donde no se ve.
 | 8 | `NodoPanelEnemigo` | el enemigo y sus partículas, dentro de su panel |
 | 10 | `NodoHud` | lo que se escribe dentro de los paneles, y el cartel del centro |
 | 20 | `NodoPantallaMapa` | el explorador de carpetas, maximizado |
+| 30 | `NodoSistema` | el menú de Inicio y las ventanas del sistema |
 | 40 | `NodoTilt` | la pantalla azul |
 | 100 | `NodoCursor` | el puntero |
 
@@ -372,6 +391,97 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
   de la mesa va en `NodoCascaraFrente` (capa 5), no en `NodoCascara` (−10)**, y
   lo que se queda detrás es solo lo que nunca la pisa: fondo, iconos de las dos
   bandas y paneles de la derecha.
+- **Un ternario deja el `Array` sin tipar, y eso falla EN EJECUCIÓN.**
+  `bolsa.base = [casc] if casc != null else []` compila sin decir nada y revienta
+  al correr con "Invalid assignment... value of type 'Array'": las dos ramas
+  juntas no infieren `Array[Reliquia]`. El juego seguía corriendo **como si no
+  existiera la capa de preparación**, que es lo peor: no se cae, solo deja de
+  hacer una cosa. Para una propiedad tipada, la lista se construye a mano con su
+  tipo declarado.
+- **Una clave de COMBO no da identidad de tiro: el multiplicador paga todo.**
+  Óxido decía empujar a los recorridos y llevaba `suma_golpes_por_recorrido`,
+  que no es una recompensa de recorrido —es un empujón al MULTIPLICADOR que
+  dispara un recorrido, y el multiplicador cobra en todo lo que golpees después,
+  bumpers incluidos—. Medido: subía más al jugador de racimo (x1,36) que al de
+  recorridos (x1,31), justo lo contrario de lo que prometía su texto. **Para dar
+  identidad de tiro hay que usar `factor_dano_<tiro>`, que solo toca ese tiro.**
+- **Comparar perfiles de jugador en crudo no mide nada: hay que dividir por el
+  neutro.** Los tres perfiles del cruce de tiros hacen 265, 1551 y 1999 de daño
+  por bola, porque los recorridos son el tiro difícil y pagan concentrado. En
+  números crudos gana SIEMPRE la misma columna y la tabla no dice nada del
+  cascabel. Lo que informa es cuánto sube cada uno sobre Acero **dentro de su
+  propia columna**.
+- **Más daño hace el juego MÁS FÁCIL, y esto ya no es una sospecha.** El coste de
+  un combate es `tiempo/reloj × ataque + bolas × drenaje`, así que subir el daño
+  acorta el combate y un combate corto come menos relojes. Medido en los
+  cascabeles: Vidrio pega un 46 % más que Acero y **acaba el run con más vida**
+  (80 % contra 71 %), aunque drenar le cueste dos veces y media. **Un efecto que
+  suba el daño tiene que pagarse en RELOJ, no en drenaje ni en vida**, o lo que
+  parece un riesgo es un descuento.
+- **Un `O` mayúsculo comprimido es una `o` minúscula.** Las mayúsculas con tilde
+  llevan el cuerpo a cinco filas para que quepa el acento, y con la `Á` cuela
+  porque conserva el travesaño. La `O` no tiene ningún rasgo que sobreviva a la
+  compresión, así que `Ó` y `ó` se leen igual. **Al comprimir un glifo hay que
+  preguntarse qué rasgo lo hace reconocible**, no cuántas filas quedan.
+- **Lo que se dibuja en una capa TAPADA sigue siendo pulsable.** La barra de
+  tareas va en la capa 5 y el mapa (20) y TILT (40) se dibujan maximizados
+  encima. En cuanto el botón Inicio hizo algo, pulsar donde el mapa no enseña
+  nada abría el menú: **un clic que responde donde no hay nada dibujado**. No da
+  error y no se ve en una captura, porque en la captura no hay nada raro. La
+  regla: **toda región pulsable tiene que preguntar si lo que la dibuja se está
+  viendo**, no solo si existe (`NodoSistema.disponible()`). Es la misma familia
+  que el resto de esta lista: algo que responde donde no se ve.
+- **Las regiones de clic se calculan AL PREGUNTAR, no al dibujar.** La tentación
+  es que cada nodo apunte sus rectángulos dentro de `_draw` y que el ratón lea
+  esa lista. Godot procesa el input ANTES del dibujo, así que el primer clic de
+  cada fotograma contesta con la disposición del fotograma ANTERIOR: con menús
+  que se abren y se cierran, eso es un clic que cae en un botón que ya no está.
+  `RegionesClic` guarda funciones, no listas, y las llama al preguntar.
+- **Un guardado se escribe a un temporal y se renombra encima, nunca directo.**
+  Escribir sobre el bueno abre una ventana en la que un cierre a destiempo deja
+  medio JSON en disco, y medio JSON es un guardado ilegible, o sea la partida
+  entera. Y al leer, cualquier cosa que no cuadre —sin fichero, JSON roto,
+  versión del futuro— tiene que dejar un guardado VACÍO Y VÁLIDO y decirlo
+  (`Guardado.ilegible`): un juego que no arranca por el guardado es peor que uno
+  que empieza de cero, y un progreso que desaparece sin explicación se
+  diagnostica como "el juego no guarda".
+- **`draw_string` no sabe rotar.** El parámetro que lo parece es la DIRECCIÓN del
+  texto (`TextServer.Direction`), no un ángulo, y pasarle un float es un error de
+  compilación que tumba el fichero entero. Para texto vertical, una letra por
+  llamada hacia abajo: además queda en píxel entero, que girar una fuente de
+  rejilla no lo deja.
+- **Un icono se dibuja a un tamaño que DIVIDA al del PNG.** En la carpeta
+  `RECUPERADO` los iconos van a 16, así que la fuente tiene que ser 32 (÷2) o 64
+  (÷4). `assets/bolas/` mide 24 y ahí no vale: 24→16 es ×0,66 y el sprite
+  hierve. Por eso las cáscaras se leen de `bolas_64/` aunque la mesa use
+  `bolas/`.
+- **Comprobar la función PURA no comprueba el estado que se VE.** La batería
+  probaba `CamaraMesa.objetivo()` —las cuatro reglas, una por una, todas en
+  verde— y nadie miraba dónde acaba `y_actual`, que es lo único que se dibuja.
+  Debajo vivían dos averías a la vez y las dos las cazó Fátima jugando: la zona
+  muerta estaba escrita como DESTINO en vez de como disparador, así que la
+  cámara se quedaba parada a 45 px del ancla **para siempre** y los últimos
+  45 px de mesa —los del drenaje— no se veían nunca; y la garantía dura
+  prometía que la BOLA estuviera en pantalla, cosa que se cumple dejándola
+  pegada al canto de abajo con nada debajo, así que **el 57 % de los fotogramas
+  con la bola bajo la línea de seguridad no tenían la punta del flipper en
+  plano**, y a 1900 px/s el borde se quedaba 456 px por encima de ella. **Una
+  función pura dice lo que el sistema QUIERE; el estado dice lo que hace.** Si
+  hay un `objetivo()` y un `avanzar()`, hay que probar los dos.
+- **Un adelanto de cámara medido en píxeles miente a alta velocidad.** 110 px
+  fijos son 366 ms a 300 px/s y 58 ms a 1900: la cámara enseñaba el sitio donde
+  la bola ya estaba. El adelanto de una cosa que se mueve se mide en SEGUNDOS y
+  se multiplica por la velocidad. Y el techo no lo pone el gusto, lo pone la
+  ventana: con 540 px de alto, pasar de 0,18 s mete a la bola rápida detrás de
+  la barra de título en la bajada.
+- **Cuando dos garantías de encuadre no caben, hay que decidir cuál manda y
+  escribirlo.** "La bola visible" y "los flippers visibles" no caben las dos en
+  540 px con la bola a media mesa: son 540 px de separación y el marco se come
+  40. Manda ver dónde CAE la bola —el orden de los recortes en `avanzar` es esa
+  decisión, y por eso la garantía de abajo va después de la de arriba—, y la de
+  arriba se conserva porque está medido que con estos números no llegan a
+  pelearse: lo más arriba que sale la bola son 48 px de pantalla contra los 24
+  que mide el marco.
 - **Un patrón de prueba con un agujero deja pasar exactamente lo que buscaba.**
   La prueba que impide tamaños de fuente sueltos buscaba `, 11, C_ALGO` o
   `, 11, Color(`, así que un `draw_string(..., 11, col)` con el color en una
@@ -485,6 +595,12 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
   tooltip "GOLPE UNICO". Ahora hay dos tablas: `NOMBRE_*` es la clave —no se
   toca, rompería los datos— y `ROTULO_*` es lo que se lee. **Si una cadena se
   dibuja, no puede ser la misma que se parsea.**
+  **Y ha vuelto a pasar dos veces en la tanda del sistema operativo**, así que
+  no basta con saberlo: la ventana del registro se titulaba `log_arranque.log`
+  —la clave del JSON— en vez de `arranque.log`, y la papelera escribía
+  `goblin_carroniero.exe`, sin tilde porque las claves van sin tilde por fuerza,
+  al lado de un mapa que pone `goblin_carroñero.dll`. **Cada vez que una clave
+  llegue a un `draw_string`, hay que probarlo**: hay dos pruebas para estos dos.
 - **Un error dentro del MENSAJE de una comprobación revienta la batería sin que
   ninguna prueba salga en rojo.** `prueba_sim.gd` construía un mensaje con
   `reliquia.nombre_rareza()`, que no existía en `Reliquia`; GDScript evalúa el
@@ -533,6 +649,15 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 - **Los criterios de salida se comprueban jugando, no leyendo el código.**
   Cuando algo dependa del tacto, exponlo como parámetro y pregunta. No
   decidas desde el código lo que solo se sabe con las manos.
+- **Prueban y juzgan LOS DOS, Daniel y Fátima.** El apartado "Que pruebe Daniel"
+  de `ESTADO.md` se llama así por costumbre, no porque el juicio sea de uno
+  solo: las preguntas de tacto, de arte y de si algo se lee van a los dos, y
+  cualquiera de los dos puede cerrar una. **Y está demostrado que hace falta:**
+  los textos cortados de la cáscara y las dos averías de la cámara —45 px de
+  mesa sin verse nunca y el 57 % de fotogramas sin flipper en plano— los cazó
+  Fátima jugando, encima de una batería en verde. Al escribir una pregunta, di
+  a quién le toca **solo si de verdad le toca a uno** (el tacto de la pala es de
+  quien juega más), y si vale cualquiera de los dos, no pongas nombre.
 - **Di siempre qué modelo y qué nivel de razonamiento usas para cada tarea**,
   antes de empezarla, para que Daniel pueda ver dónde se va el presupuesto.
   Guía por tipo de trabajo:

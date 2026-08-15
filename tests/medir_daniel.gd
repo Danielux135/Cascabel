@@ -56,8 +56,21 @@ func _initialize() -> void:
 	print("  catálogo: %d enemigos · %d reliquias · %d misiones"
 		% [enemigos.size(), reliquias.size(), misiones.size()])
 	print("")
-	_calibrar(enemigos, reliquias, misiones)
-	_barrido(enemigos, reliquias, misiones)
+	# QUÉ SE MIDE. El barrido entero tarda trece minutos, y tocar balance es
+	# darle vueltas al mismo mando: medir las tres secciones cada vez convierte
+	# una iteración de un minuto en una de trece, y entonces se deja de medir y
+	# se ajusta a ojo, que es exactamente como la tabla de enemigos se fue al
+	# traste dos veces. Con `SOLO=cascabeles` (o `calibrar`, o `barrido`) se
+	# lanza solo lo que se está tocando.
+	var solo := OS.get_environment("SOLO")
+	if solo == "" or solo == "calibrar":
+		_calibrar(enemigos, reliquias, misiones)
+	if solo == "" or solo == "barrido":
+		_barrido(enemigos, reliquias, misiones)
+	if solo == "" or solo == "cascabeles":
+		_barrido_cascabeles(enemigos, reliquias, misiones)
+	if solo == "tiros":
+		_cruce_de_tiros(enemigos, reliquias, misiones)
 	quit(0)
 
 ## El barrido de verdad: vida y ataque a la vez, CON reliquias puestas. Es lo
@@ -176,7 +189,8 @@ func _dano_por_bola(perfil: Dictionary, base: ParametrosCombate) -> int:
 ## leer en su pantalla, para poder compararlos de tú a tú.
 func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 		misiones: Array[Mision], semillas: Array,
-		escala_vida: float, escala_ataque: float) -> Dictionary:
+		escala_vida: float, escala_ataque: float,
+		cascabel: String = "") -> Dictionary:
 	var catalogo := _escalar(enemigos, escala_vida, escala_ataque)
 	var acabados := 0
 	var nodos := 0
@@ -189,6 +203,17 @@ func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 	for semilla in semillas:
 		var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(), catalogo,
 			int(semilla), reliquias, misiones)
+		# EL CASCABEL ELEGIDO, si lo hay. Va en la bolsa BASE, igual que en la
+		# partida: mete sus modificadores en el combate sin contar como reliquia
+		# ganada. Con "" no se toca nada y el modelo mide exactamente lo que
+		# medía antes de que existiera la capa de preparación, que es lo que hace
+		# que las medidas viejas sigan siendo comparables.
+		if cascabel != "":
+			var pre := Preparacion.new()
+			pre.cascabel = cascabel
+			var casc := pre.como_reliquia()
+			if casc != null:
+				r.bolsa.base = [casc]
 		while not r.terminada():
 			var opciones := r.opciones()
 			if opciones.is_empty():
@@ -354,3 +379,163 @@ func _drenar(c: Combate) -> void:
 func _avanzar(c: Combate, segundos: float) -> void:
 	for _i in int(segundos / DT):
 		c.avanzar(DT)
+
+
+# ------------------------------------------------------- la capa de preparación
+
+## QUÉ LE HACE CADA CASCABEL AL RUN.
+##
+## `PROPÓSITO.md` §4 pone la regla: **un cascabel cambia qué tiro te compensa, no
+## cuánto pegas.** Esta tabla es la que dice si eso se ha cumplido o si lo que
+## hay son nueve variantes de "+X de daño" con nombres distintos.
+##
+## Cómo se lee, y esto importa más que los números sueltos:
+##
+## - **`casc_acero` tiene que salir CLAVADO al barrido de arriba.** Es el neutro,
+##   así que si se desvía, algo de la capa de preparación no es neutro y todas
+##   las medidas anteriores han dejado de valer sin avisar.
+## - **La columna que interesa NO es el daño, es la DISPERSIÓN.** Nueve
+##   cascabeles que acaban el run con la misma vida son nueve cascabeles que no
+##   cambian nada, por muy distinto que suene su texto.
+## - Un cascabel que acabe SIEMPRE el run es demasiado fuerte, y uno que no lo
+##   acabe nunca no es una elección, es una trampa.
+##
+## Ojo con lo que esto NO mide: **las palas no salen aquí y no pueden salir.**
+## Un perfil describe lo que una bola PRODUCE, no juega con las palas: dentro no
+## hay física. Así que el efecto de unas palas cortas —más drenajes— es
+## exactamente lo que este modelo no ve. Para eso están las tres pruebas de
+## `_prueba_palas_jugables` en la batería y, después, jugarlo.
+func _barrido_cascabeles(enemigos: Array, reliquias: Array[Reliquia],
+		misiones: Array[Mision]) -> void:
+	var perfil: Dictionary = CANDIDATOS[0]
+	print("")
+	print("CASCABELES  ·  el mismo run, %d semillas, cambiando solo el cascabel"
+		% SEMILLAS.size())
+	print("  %-14s %9s %9s %8s %7s  %s"
+		% ["cascabel", "daño/bola", "s/combate", "vida fin", "acaba", "a qué tiro empuja"])
+	# Y se puede filtrar a unos pocos: `CASCABELES=casc_vidrio,casc_oxido`. Nueve
+	# cascabeles son quince minutos, y ajustar tres de ellos no necesita volver a
+	# medir los seis que no se tocan. Acero entra SIEMPRE aunque no se pida: es el
+	# neutro, y una medida sin su control no se puede comparar con la anterior.
+	var filtro := OS.get_environment("CASCABELES")
+	var pedidos: Array = [] if filtro == "" else Array(filtro.split(",", false))
+	var vidas: Array[float] = []
+	for ficha in Preparacion.cascabeles():
+		var el_id := str((ficha as Dictionary).get("id", ""))
+		if not pedidos.is_empty() and el_id != "casc_acero" \
+				and not pedidos.has(el_id):
+			continue
+		var r := _runs(perfil, enemigos, reliquias, misiones, SEMILLAS, 1.0, 1.0, el_id)
+		var pre := Preparacion.new()
+		pre.cascabel = el_id
+		if int(r["acabados"]) > 0:
+			vidas.append(float(r["vida_frac"]))
+		print("  %-14s %9.0f %9.1f %8s %5d/%d  %s" % [
+			pre.nombre_cascabel(), float(r["dano_bola"]), float(r["seg_combate"]),
+			("%.0f%%" % (float(r["vida_frac"]) * 100.0)) if int(r["acabados"]) > 0 else "—",
+			int(r["acabados"]), SEMILLAS.size(),
+			str((ficha as Dictionary).get("tiro", ""))])
+	if vidas.size() >= 2:
+		var lo := vidas[0]
+		var hi := vidas[0]
+		for v in vidas:
+			lo = minf(lo, v)
+			hi = maxf(hi, v)
+		print("")
+		print("  Dispersión de vida al acabar: %.0f puntos (del %.0f %% al %.0f %%)."
+			% [(hi - lo) * 100.0, lo * 100.0, hi * 100.0])
+		print("  Poca dispersión = los cascabeles no cambian la partida, solo el texto.")
+	print("")
+
+
+## ¿DE VERDAD CAMBIA UN CASCABEL A QUÉ TIRO VAS?
+##
+## Es el pilar entero (`DISEÑO.md` §1, `PROPÓSITO.md` §4) y hasta ahora NADIE lo
+## comprobaba. La tabla de cascabeles dice cuánto pega cada uno con UN jugador;
+## esta dice si cada uno prefiere un jugador distinto, que es lo que separa
+## "nueve modificadores" de "nueve formas de jugar".
+##
+##     godot --headless --path . --script tests/medir_daniel.gd   (con SOLO=tiros)
+##
+## Cómo se lee: **en cada fila hay que ganar con el perfil que dice su `tiro`.**
+## Si Piedra —"targets y cañón"— rinde igual con el racimero que con el puntero,
+## su tradeoff no existe y es un modificador plano con un texto bonito. Y si
+## TODOS los cascabeles prefieren al mismo perfil, lo que hay no son nueve
+## elecciones, es un ranking.
+##
+## Tres semillas y no cinco a propósito: son nueve casillas y con cinco esto
+## tarda veinte minutos, o sea que se deja de lanzar. Con tres el ruido sube,
+## así que lo que se mira es QUÉ COLUMNA GANA cada fila, no el número exacto.
+const PERFILES_TIRO := [
+	{
+		"nombre": "racimero", "segundos": 15.5,
+		"golpes": 16, "targets": 1, "bancos": 0,
+		"orbitas": 0, "retornos": 1, "canones": 0, "platillos": 0,
+	},
+	{
+		"nombre": "puntero", "segundos": 15.5,
+		"golpes": 6, "targets": 6, "bancos": 1,
+		"orbitas": 0, "retornos": 1, "canones": 2, "platillos": 0,
+	},
+	{
+		"nombre": "corredor", "segundos": 15.5,
+		"golpes": 6, "targets": 1, "bancos": 0,
+		"orbitas": 3, "retornos": 4, "canones": 2, "platillos": 1,
+	},
+]
+
+## El daño por bola de Acero en cada columna. Es la vara con la que se miden los
+## demás: sin ella, la tabla mide qué perfil pega más, que ya se sabe.
+var _referencia_tiros: Array[float] = []
+
+func _cruce_de_tiros(enemigos: Array, reliquias: Array[Reliquia],
+		misiones: Array[Mision]) -> void:
+	var filtro := OS.get_environment("CASCABELES")
+	var pedidos: Array = [] if filtro == "" else Array(filtro.split(",", false))
+	var semillas := [13, 271, 4242]
+	print("")
+	print("CASCABEL x TIRO  ·  daño por bola, %d semillas" % semillas.size())
+	print("  %-10s %10s %10s %10s   %s"
+		% ["cascabel", "racimero", "puntero", "corredor", "a qué tiro dice empujar"])
+	for ficha in Preparacion.cascabeles():
+		var el_id := str((ficha as Dictionary).get("id", ""))
+		# Acero entra SIEMPRE: es la vara con la que se dividen las demás filas,
+		# y sin él los ratios saldrían contra 1,0 —o sea, en crudo— sin que nada
+		# avisara de que la tabla ha dejado de significar lo que dice.
+		if not pedidos.is_empty() and el_id != "casc_acero" \
+				and not pedidos.has(el_id):
+			continue
+		var pre := Preparacion.new()
+		pre.cascabel = el_id
+		var fila: Array[float] = []
+		for perfil in PERFILES_TIRO:
+			var r := _runs(perfil, enemigos, reliquias, misiones, semillas,
+				1.0, 1.0, el_id)
+			fila.append(float(r["dano_bola"]))
+		# CONTRA ACERO, NO EN CRUDO. Los tres perfiles no pegan ni parecido —el
+		# corredor hace 1999 por bola y el racimero 265, porque los recorridos
+		# son el tiro difícil y pagan concentrado—, así que en números crudos
+		# GANA SIEMPRE la columna del corredor y la tabla no dice nada del
+		# cascabel. Lo que informa es cuánto sube cada uno SOBRE el neutro dentro
+		# de su propia columna.
+		if el_id == "casc_acero":
+			_referencia_tiros = fila.duplicate()
+		var celdas: Array[String] = []
+		var mejor := 0
+		var ratios: Array[float] = []
+		for i in fila.size():
+			var base: float = 1.0 if i >= _referencia_tiros.size() \
+				else maxf(_referencia_tiros[i], 0.001)
+			ratios.append(fila[i] / base)
+			if ratios[i] > ratios[mejor]:
+				mejor = i
+		for i in fila.size():
+			celdas.append("x%.2f%s" % [ratios[i], " <<" if i == mejor
+				and el_id != "casc_acero" else ""])
+		print("  %-10s %10s %10s %10s   %s" % [pre.nombre_cascabel(),
+			celdas[0], celdas[1], celdas[2],
+			str((ficha as Dictionary).get("tiro", ""))])
+	print("")
+	print("  Si todas las filas ganan por la misma columna, no hay nueve")
+	print("  elecciones: hay un ranking con nueve nombres.")
+	print("")

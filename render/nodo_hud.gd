@@ -127,6 +127,52 @@ func _panel_enemigo(combate: Combate) -> void:
 		float(e.vida) / float(maxi(e.vida_maxima, 1)), col_enemigo)
 	_texto(Vector2(d.position.x, y + 30.0), "%d/%d" % [e.vida, e.vida_maxima],
 		8, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, d.size.x)
+	_estados_del_enemigo(combate, d, y + 44.0)
+
+## LOS ESTADOS, DEBAJO DE LA BARRA DE VIDA. Sin esto el sistema entero no
+## existe: `CLAUDE.md` tiene anotado que un efecto que el jugador no ve se
+## diagnostica como que falta, y ya costó un run entero de confusión con el
+## platillo. Aquí además hace falta el NÚMERO, no solo el icono, porque la gracia
+## del veneno es verlo subir mientras aguantas la bola.
+##
+## Se dibuja donde se MIDE: pegado a la barra de vida del enemigo, que es sobre
+## quien actúan, y no en un rincón del escritorio.
+func _estados_del_enemigo(combate: Combate, d: Rect2, y: float) -> void:
+	var lista := combate.estados.lista()
+	if lista.is_empty():
+		return
+	var x := d.position.x + 8.0
+	for a in lista:
+		var act := a as Estados.Activo
+		if act.def.sobre != "enemigo":
+			continue
+		var col := _color_de_estado(act.def.color)
+		# La barrita se vacía con lo que le queda de vida al estado: es lo que
+		# convierte la brasa en una cuenta atrás que se puede jugar.
+		var caja := Rect2(x, y - 8.0, 34.0, 12.0)
+		_lienzo.draw_rect(caja, Color(col, 0.18))
+		var resto := clampf(act.restante / maxf(act.def.duracion, 0.001), 0.0, 1.0)
+		_lienzo.draw_rect(
+			Rect2(caja.position.x, caja.end.y - 2.0, caja.size.x * resto, 2.0),
+			Color(col, 0.9))
+		_texto(Vector2(x + 1.0, y), act.def.simbolo, 8, col)
+		_texto(Vector2(x, y), str(act.acumulaciones), 8, C_TEXTO,
+			HORIZONTAL_ALIGNMENT_RIGHT, 33.0)
+		x += 38.0
+		if x > d.end.x - 34.0:
+			return
+
+## Los colores salen de `Paleta` por NOMBRE, que es lo que trae el JSON de
+## estados. Un color suelto aquí sería un `Color("...")` fuera de la paleta, y
+## hay una prueba que lo prohíbe.
+func _color_de_estado(nombre: String) -> Color:
+	match nombre:
+		"verde": return C_VERDE
+		"azul": return Paleta.AZUL_LUZ
+		"fuego": return C_FUEGO
+		"oro": return C_ORO_CLARO
+		"arcano": return C_ARCANO
+	return C_TEXTO
 
 ## `jugador.sys`. Vida, lo que llevas hecho con esta bola y la probabilidad de
 ## crítico. Las tres cosas que antes ocupaban la franja de arriba de la mesa.

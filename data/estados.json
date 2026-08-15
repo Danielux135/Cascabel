@@ -1,0 +1,76 @@
+{
+  "_nota": "LOS ESTADOS: lo que le pasa al enemigo y dura en el tiempo. Es el motor de builds que faltaba. Hasta ahora el daño era instantáneo y un cascabel solo podía ser un porcentaje, así que ninguno se notaba jugando: una bolsa de modificadores solo sabe producir números, y para que PASEN COSAS hacen falta eventos.",
+
+  "_como_se_aplican": "Nadie escribe un `if` por estado. `Combate._apuntar(tiro)` ya sabe qué tiro acaba de pasar —es lo que alimenta las misiones— y ahí pregunta a la bolsa por la clave `aplica_<estado>_<tiro>`. Un cascabel o una reliquia que traiga `aplica_veneno_target: 2` envenena dos veces por target, y no hace falta tocar código. Los tiros son los de siempre (bumper, girador, target, banco, orbita, retorno, canon, platillo) más dos que no son tiros: `critico`, que salta al hacer un crítico, y `matar`.",
+
+  "_por_que_acumulan": "Porque es lo que convierte aguantar la bola en algo que se VE crecer. DISEÑO.md §2 dice que aguantar la bola es lo mejor que puede hacer el jugador, y hasta ahora eso solo se notaba en el multiplicador. Con acumulaciones, una bola larga deja al enemigo con veinte de veneno encima y el número sube en pantalla mientras juegas.",
+
+  "estados": [
+    {
+      "id": "veneno",
+      "nombre": "veneno",
+      "simbolo": "VNO",
+      "color": "verde",
+      "sobre": "enemigo",
+      "texto": "Daño cada medio segundo por cada acumulación. Refresca al reaplicar.",
+      "duracion": 6.0,
+      "refresca": true,
+      "periodo": 0.5,
+      "dano_tick": 3.0,
+      "max_acumulaciones": 40
+    },
+    {
+      "id": "escarcha",
+      "nombre": "escarcha",
+      "simbolo": "ESC",
+      "color": "azul",
+      "sobre": "enemigo",
+      "texto": "Cada acumulación frena el reloj del enemigo un 6 %, hasta la mitad.",
+      "duracion": 8.0,
+      "refresca": true,
+      "factor_reloj_por_acumulacion": -0.06,
+      "factor_reloj_suelo": 0.5,
+      "max_acumulaciones": 10
+    },
+    {
+      "id": "brasa",
+      "nombre": "brasa",
+      "simbolo": "BRA",
+      "color": "fuego",
+      "sobre": "enemigo",
+      "texto": "No hace daño mientras arde: ESTALLA al apagarse, y cuanto más hayas acumulado, más fuerte.",
+      "duracion": 4.0,
+      "refresca": false,
+      "dano_al_expirar": 26.0,
+      "max_acumulaciones": 30
+    },
+    {
+      "id": "marca",
+      "nombre": "marca",
+      "simbolo": "MRC",
+      "color": "oro",
+      "sobre": "enemigo",
+      "texto": "Los siguientes golpes son críticos seguros. Cada golpe gasta una.",
+      "duracion": 12.0,
+      "refresca": true,
+      "critico_garantizado": true,
+      "max_acumulaciones": 6
+    },
+    {
+      "id": "frenesi",
+      "nombre": "frenesí",
+      "simbolo": "FRN",
+      "color": "arcano",
+      "sobre": "jugador",
+      "texto": "Cada acumulación sube la probabilidad de crítico. Se gana criticando: cuanto más crítico haces, más críticas.",
+      "duracion": 5.0,
+      "refresca": true,
+      "suma_critico_por_acumulacion": 0.035,
+      "max_acumulaciones": 15
+    }
+  ],
+
+  "_el_que_hay_que_vigilar": "`brasa` es el único que NO refresca su duración al reaplicarse, y es a propósito: si refrescara, seguirías echándole brasas y no estallaría nunca, o sea que el estado más vistoso del juego no se vería jamás. Sin refresco, la cuenta atrás empieza con la primera brasa y lo que decides es cuántas metes antes de que reviente. Ese es el bucle.",
+
+  "_el_que_puede_romperse": "`frenesi` se gana criticando y sube la probabilidad de crítico: es una realimentación positiva, o sea la única cosa de este fichero que puede dispararse sola. El tope de acumulaciones es lo que lo sujeta (15 x 0,035 = +52 % como techo), y la duración corta obliga a mantenerlo. Si al medir sale que un run se convierte en críticos encadenados, lo que se toca es `max_acumulaciones`, no el daño."
+}

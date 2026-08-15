@@ -25,16 +25,35 @@ var ancho_visible: float = 960.0
 var alto_visible: float = 540.0
 
 ## REGLA 1 — nunca persigue a una bola que cae: se adelanta.
-## Cuántos píxeles mira POR DEBAJO de la bola mientras desciende. Con esto la
-## bola sale en la mitad de arriba de la pantalla y siempre ves adónde va.
+## Cuántos píxeles mira POR DEBAJO de la bola mientras desciende. Este es el
+## adelanto de una bola LENTA: el que manda de verdad es el de abajo.
 var adelanto: float = 110.0
 ## Subiendo no hace falta adelantarse. Lo que no puede pasar es perder los
 ## flippers de vista por irse detrás de una bola que sube.
 var adelanto_subiendo: float = 0.0
-## Y por si el suavizado se queda corto: la bola nunca puede acercarse a menos
-## de esto del borde de la pantalla. Si pasa, la cámara salta en vez de
-## quedarse atrás. Es la garantía dura de la regla 1.
-var margen_bola: float = 24.0
+
+## EL ADELANTO SE MIDE EN TIEMPO, NO EN PÍXELES, y esta es la mitad del arreglo
+## de "con la bola rápida no llegas a ver el flipper".
+##
+## Con un adelanto fijo de 110 px la cámara miraba siempre lo mismo por debajo
+## de la bola, cayera a 300 o a 1900 px/s. A 1900 esos 110 px son 58 ms de
+## juego: la cámara enseñaba el sitio donde la bola ya estaba, no aquel al que
+## iba. Medido: el borde inferior de la pantalla llegaba a quedarse 456 px por
+## encima de la punta del flipper, o sea que la bola llegaba a una pala que no
+## estaba en plano.
+##
+## Multiplicando por la velocidad, el adelanto ES el sitio donde va a estar la
+## bola dentro de este tiempo, que es lo que hace falta ver. 0,18 s está elegido
+## contra el techo de la pantalla, no a ojo: con la ventana de 540 px, un valor
+## mayor mete a la bola rápida detrás de la barra de título en la bajada.
+var tiempo_anticipacion: float = 0.18
+
+## GARANTÍA DURA, y es la otra mitad del arreglo. La vieja prometía que la BOLA
+## estuviera en pantalla, y eso se cumplía dejándola pegada al canto de abajo
+## con nada debajo: se veía la bola y no se veía adónde caía. Esta promete lo
+## contrario y es lo que de verdad se juega: **el borde inferior de la pantalla
+## tiene que llegar por debajo de donde la bola va a estar**, con este margen.
+var margen_debajo_bola: float = 150.0
 
 ## Lo que hay dibujado encima de la mesa por arriba, y por debajo de lo cual la
 ## bola no puede subir sin esconderse.
@@ -58,6 +77,13 @@ var margen_superior: float = 16.0
 var margen_ancla: float = 300.0
 
 ## REGLA 4 — zona muerta, o la cámara tiembla con cada rebote.
+##
+## OJO CON CÓMO SE USA, que aquí estaba la otra avería. La zona muerta decide si
+## la cámara ARRANCA, no dónde se para. Estaba escrita como destino —se movía
+## hacia el borde de la zona en vez de hacia el objetivo— y eso la dejaba
+## parada a 45 px del ancla PARA SIEMPRE: los últimos 45 px de mesa, que son los
+## del drenaje, no se veían nunca. Ahora es una histéresis: por debajo de la
+## zona no arranca, y una vez arrancada llega hasta el final.
 var zona_muerta: float = 45.0
 var suavizado: float = 5.0
 ## Sin bola en juego (resolviendo, victoria) la cámara vuelve abajo, despacio.

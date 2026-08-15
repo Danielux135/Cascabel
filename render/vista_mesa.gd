@@ -150,6 +150,11 @@ var cascara_frente: NodoCascaraFrente
 var panel_enemigo: NodoPanelEnemigo
 ## El puntero del sistema falso, dibujado en la rejilla de píxeles del juego.
 var cursor: NodoCursor
+## Lo que sobrevive a cerrar el juego, y el sistema operativo que lo enseña.
+var guardado: Guardado
+var sistema: NodoSistema
+## Lo elegido antes del run: cascabel, criatura y palas (`DISEÑO.md` §5).
+var preparacion: Preparacion
 ## La pantalla azul de derrota. Es lo último que ve el jugador de un run, así
 ## que es donde salen los dos números que hacen falta para cuadrar el balance.
 var tilt: NodoTilt
@@ -219,7 +224,85 @@ func _ready() -> void:
 	_tex_girador = Girador.generar(load("res://assets/mesa/girador.png"),
 		anim.girador_fotogramas, TAMANO_GIRADOR)
 
-	combate = Combate.new()
+	_montar_combate(ParametrosMesa.new())
+	impactos = Impactos.new(impacto)
+	_sonido = NodoSonido.new()
+	add_child(_sonido)
+	cascara = NodoCascara.new(self, cam, anim)
+	add_child(cascara)
+	_nodo_suelo = NodoSuelo.new(self)
+	add_child(_nodo_suelo)
+	# LA CÁMARA MIDE CONTRA LA CÁSCARA, no contra un número escrito a mano. Lo
+	# que puede tapar la bola por arriba es el marco de la ventana de la mesa con
+	# su barra de título, y eso lo sabe la cáscara. Con el número copiado aquí,
+	# cambiar el grosor del marco dejaría a la cámara midiendo el marco viejo y
+	# la bola volvería a esconderse en lo alto de la órbita sin que nada avisara.
+	cam.alto_franja_hud = NodoCascara.chrome_superior()
+	cascara_frente = NodoCascaraFrente.new(cascara)
+	add_child(cascara_frente)
+	panel_enemigo = NodoPanelEnemigo.new(cascara, anim, impacto)
+	add_child(panel_enemigo)
+
+	camara = CamaraMesa.new(cam, Mesa.ALTO, Mesa.ANCHO * 0.5)
+	add_child(camara)
+	camara.make_current()
+	add_child(NodoHud.new(self, cam))
+	tilt = NodoTilt.new(self, cam)
+	add_child(tilt)
+	cursor = NodoCursor.new(self)
+	add_child(cursor)
+
+	# EL GUARDADO, y va antes que el sistema porque el sistema lo enseña. Cargar
+	# NUNCA falla: si no hay fichero, o no se entiende, sale uno vacío y válido.
+	# Sembrar después de cargar y no al crear es lo que hace que una pieza que
+	# mañana pase a ser inicial llegue también a los guardados que ya existen.
+	guardado = Guardado.cargar()
+	CatalogoRecuperable.sembrar(guardado)
+	# LA PREPARACIÓN SALE DEL GUARDADO, para que lo que elegiste siga elegido
+	# mañana. `sanear` la deja en algo que exista: un guardado viejo puede traer
+	# una criatura que ya no está, y una elección que apunta a la nada no da
+	# error, deja la bola sin dibujo.
+	preparacion = Preparacion.new()
+	preparacion.cascabel = guardado.pre_cascabel
+	preparacion.criatura = guardado.pre_criatura
+	preparacion.palas = guardado.pre_palas
+	preparacion.sanear(guardado)
+	sistema = NodoSistema.new(self, guardado)
+	add_child(sistema)
+
+	# EL TAMAÑO REAL DE LA PANTALLA, antes que nada. Con `aspect = expand` el
+	# viewport crece en una pantalla que no sea 16:9 exacto, y si `cam` se queda
+	# en 960x540 la cáscara mide contra el viewport de verdad mientras el HUD, el
+	# mapa y la cámara miden contra 960x540: dos sistemas de coordenadas para la
+	# misma pantalla, y todo desalineado por la diferencia.
+	_medir_pantalla()
+	get_viewport().size_changed.connect(_medir_pantalla)
+
+	_catalogo = CatalogoEnemigos.cargar()
+	if _catalogo.is_empty():
+		push_error("Sin enemigos en data/enemigos.json")
+		return
+	# Sin reliquias el run se juega igual, solo que sin ellas: un fichero que
+	# falte no puede tumbar la partida.
+	_catalogo_reliquias = CatalogoReliquias.cargar()
+	_catalogo_misiones = CatalogoMisiones.cargar()
+	_nuevo_run()
+
+
+## MONTA EL COMBATE Y SU MESA CON UNOS PARÁMETROS CONCRETOS.
+##
+## Existe porque **las palas no se pueden cambiar sobre una mesa ya hecha**:
+## `Mesa.new()` copia los parámetros dentro de cada colisionador en el
+## constructor, así que tocar `m.p.flipper_longitud` después no hace nada. Es una
+## trampa de `CLAUDE.md` y ya se llevó por delante un barrido entero, que midió
+## seis veces lo mismo. Elegir palas en la preparación obliga, por tanto, a
+## rehacer la mesa, y eso es lo que hace esta función.
+##
+## Se llama al arrancar y al empezar cada run. Lo viejo se suelta sin más: `Mesa`
+## y `Combate` son `RefCounted`, así que al perder la referencia se van solos con
+## todas sus conexiones detrás.
+func _montar_combate(pm: ParametrosMesa) -> void:
+	combate = Combate.new(null, Mesa.new(pm))
 	mesa = combate.mesa
 	mesa.slingshot_golpeado.connect(_al_golpear_slingshot)
 	mesa.poste_golpeado.connect(_al_golpear_poste)
@@ -251,64 +334,53 @@ func _ready() -> void:
 	_giro.resize(mesa.giradores.size())
 	_giro_velocidad.resize(mesa.giradores.size())
 	_flash_bumper.resize(mesa.bumpers.size())
-	impactos = Impactos.new(impacto)
-	_sonido = NodoSonido.new()
-	add_child(_sonido)
-	cascara = NodoCascara.new(self, cam, anim)
-	add_child(cascara)
-	_nodo_suelo = NodoSuelo.new(self)
-	add_child(_nodo_suelo)
-	# LA CÁMARA MIDE CONTRA LA CÁSCARA, no contra un número escrito a mano. Lo
-	# que puede tapar la bola por arriba es el marco de la ventana de la mesa con
-	# su barra de título, y eso lo sabe la cáscara. Con el número copiado aquí,
-	# cambiar el grosor del marco dejaría a la cámara midiendo el marco viejo y
-	# la bola volvería a esconderse en lo alto de la órbita sin que nada avisara.
-	cam.alto_franja_hud = NodoCascara.chrome_superior()
-	cascara_frente = NodoCascaraFrente.new(cascara)
-	add_child(cascara_frente)
-	panel_enemigo = NodoPanelEnemigo.new(cascara, anim, impacto)
-	add_child(panel_enemigo)
-
-	camara = CamaraMesa.new(cam, Mesa.ALTO, Mesa.ANCHO * 0.5)
-	add_child(camara)
-	camara.make_current()
-	add_child(NodoHud.new(self, cam))
-	tilt = NodoTilt.new(self, cam)
-	add_child(tilt)
-	cursor = NodoCursor.new(self)
-	add_child(cursor)
-
-	# EL TAMAÑO REAL DE LA PANTALLA, antes que nada. Con `aspect = expand` el
-	# viewport crece en una pantalla que no sea 16:9 exacto, y si `cam` se queda
-	# en 960x540 la cáscara mide contra el viewport de verdad mientras el HUD, el
-	# mapa y la cámara miden contra 960x540: dos sistemas de coordenadas para la
-	# misma pantalla, y todo desalineado por la diferencia.
-	_medir_pantalla()
-	get_viewport().size_changed.connect(_medir_pantalla)
-
-	_catalogo = CatalogoEnemigos.cargar()
-	if _catalogo.is_empty():
-		push_error("Sin enemigos en data/enemigos.json")
-		return
-	# Sin reliquias el run se juega igual, solo que sin ellas: un fichero que
-	# falte no puede tumbar la partida.
-	_catalogo_reliquias = CatalogoReliquias.cargar()
-	_catalogo_misiones = CatalogoMisiones.cargar()
-	_nuevo_run()
 
 # ------------------------------------------------------------------- el run
 
+## Empieza un run con lo que haya elegido la preparación. Lo llama el botón
+## "Empezar" de `NodoSistema`, y es público por eso: la tecla R hace lo mismo.
+func nueva_partida() -> void:
+	_nuevo_run()
+
 func _nuevo_run() -> void:
+	# LAS PALAS SE PONEN REHACIENDO LA MESA, y tiene que ser aquí: la mesa copia
+	# sus parámetros dentro de los colisionadores al construirse, así que no hay
+	# forma de cambiar de palas a mitad de run aunque quisiéramos. Y no la hay
+	# tampoco a propósito: `DISEÑO.md` §5 dice que la mesa y las palas se eligen
+	# ANTES, porque cambiarle a alguien las manos en el combate siete es
+	# castigarle por haber aprendido a jugar.
+	if preparacion != null:
+		preparacion.sanear(guardado)
+		_montar_combate(preparacion.parametros_mesa())
 	run = Run.new(ParametrosRun.new(), combate.p, _catalogo,
 		int(Time.get_unix_time_from_system()), _catalogo_reliquias,
 		_catalogo_misiones)
 	# Las reliquias del run entran en el combate por aquí, y es el único sitio
 	# donde se cruzan las dos capas: `Combate` no sabe que existe un run.
 	combate.bolsa = run.bolsa
+	# Y EL CASCABEL entra por la bolsa BASE, separado de lo que ganes jugando.
+	# Colado entre las reliquias saldría como un icono más del escritorio y la
+	# ruleta podría volver a ofrecerlo.
+	if preparacion != null:
+		var casc := preparacion.como_reliquia()
+		# La lista va tipada A MANO y no con un ternario: `[casc] if ... else []`
+		# deja un `Array` sin tipo y la asignación falla en tiempo de ejecución,
+		# no al compilar. Ahí el cascabel no llegaba a la bolsa y el juego seguía
+		# corriendo como si no hubiera capa de preparación.
+		var puesto: Array[Reliquia] = []
+		if casc != null:
+			puesto.append(casc)
+		run.bolsa.base = puesto
 	if _pantalla_mapa != null:
 		_pantalla_mapa.queue_free()
 	if tele != null:
 		tele.queue_free()
+	# ES AQUÍ DONDE PERDER EMPIEZA A COSTAR ALGO. Hasta ahora, acabar un run no
+	# dejaba ni un número: no existía ninguna frase que empezara por "la próxima
+	# vez" (`PROPÓSITO.md` §1). Ahora el run cierra contra el guardado, paga lo
+	# que haya ganado y lo escribe a disco. Se conecta aquí y no en `_ready`
+	# porque cada `_nuevo_run` crea un `Run` nuevo.
+	run.run_terminada.connect(_al_terminar_run)
 	_pantalla_mapa = NodoPantallaMapa.new(run, cam)
 	add_child(_pantalla_mapa)
 	tele = NodoTele.new(self, run)
@@ -395,6 +467,20 @@ func _empezar_combate(nodo: NodoMapa) -> void:
 	impactos.limpiar()
 	_numeros.clear()
 
+## Se acabó el run, se gane o se pierda. Es el único sitio donde se escribe a
+## disco: guardar en cada golpe sería escribir cientos de veces por combate, y
+## guardar solo al ganar dejaría sin premio justo al run que más falta le hace.
+func _al_terminar_run(victoria: bool) -> void:
+	if guardado == null:
+		return
+	var nuevas := guardado.cerrar_run(victoria, run)
+	if not guardado.guardar():
+		# Que no se pueda escribir no puede tumbar la partida, pero tampoco se
+		# calla: un progreso que no se guarda y no lo dice es lo peor de los dos.
+		push_error("No se ha podido guardar la partida")
+	if not nuevas.is_empty() and sistema != null:
+		sistema.anunciar(str(nuevas[0]))
+
 ## Cierra el combate contra el run y vuelve al mapa. La vida que quede es la que
 ## sigues teniendo: es el único sitio donde se traspasa.
 func _cerrar_combate() -> void:
@@ -403,8 +489,21 @@ func _cerrar_combate() -> void:
 	run.resolver_combate(combate.fase == Combate.Fase.VICTORIA, combate.vida_jugador)
 	_volver_al_mapa()
 
+## Si el mapa está delante. Lo pregunta `NodoSistema` para no dejar pulsar los
+## iconos del escritorio cuando están tapados por el explorador maximizado: un
+## icono que responde debajo de una ventana es un clic que hace lo que no ves.
+func mapa_visible() -> bool:
+	return _en_mapa
+
 func _physics_process(delta: float) -> void:
 	if _en_mapa:
+		return
+	# UNA VENTANA DEL SISTEMA CONGELA LA MESA, igual que la ruleta. Una ventana
+	# de 520 px encima del tablero tapa justo la bola, así que dejarla viva sería
+	# perderla mientras lees. La cámara sí sigue, como en la ruleta: congelarla
+	# también dejaría la vuelta descuadrada.
+	if sistema != null and sistema.congela_la_mesa():
+		camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, false)
 		return
 	# Durante la ruleta la simulación NO corre y las palas no mueven nada, pero
 	# la cámara sí: baja hasta el ancla de abajo, que es donde está la tele.
@@ -521,7 +620,13 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 		KEY_F1:
 			_depuracion = not _depuracion
 		KEY_ESCAPE:
-			get_tree().quit()
+			# ESC cierra lo que haya abierto ANTES de salir del juego. Antes
+			# salía siempre, y con un menú de Inicio delante eso es cerrar la
+			# partida por querer cerrar un menú. Para salir está "Apagar".
+			if sistema != null and sistema.hay_algo():
+				sistema.cerrar()
+			else:
+				get_tree().quit()
 		KEY_LEFT, KEY_A:
 			# Durante la ruleta las palas piden otra tirada. Es la única entrada
 			# que ya tienes en la mano, así que no hay que aprender nada nuevo.
@@ -768,6 +873,10 @@ func _al_terminar_combate(victoria: bool) -> void:
 	# Lo justo para que se vea morir al enemigo. Luego la ruleta, sola.
 	_espera_victoria = 1.2 if victoria else 0.0
 	if victoria:
+		# A LA PAPELERA. `DISEÑO.md` §3 dice que los monstruos son procesos: al
+		# matarlos, el sistema los manda donde manda los procesos muertos.
+		if guardado != null and combate.enemigo != null:
+			guardado.apuntar_muerte(combate.enemigo.id)
 		_sonido.reproducir("muerte")
 		panel_enemigo.enemigo.morir()
 		# LOS EFECTOS DE LA MUERTE VAN EN EL PANEL, no en `impactos`, que dibuja

@@ -32,6 +32,18 @@ extends RefCounted
 const SUFIJO_VICTORIA := "_por_victoria"
 
 var reliquias: Array[Reliquia] = []
+## LO QUE LLEVAS PUESTO DE ANTES DE EMPEZAR: el cascabel elegido en la
+## preparación (`DISEÑO.md` §5). Cuenta para los modificadores exactamente igual
+## que una reliquia —misma acumulación, mismas condiciones— pero **no está en
+## `reliquias`**, y esa separación es a propósito: `reliquias` es lo que has
+## GANADO jugando, y es lo que se dibuja como iconos del escritorio, lo que
+## cuenta la tele y lo que se ofrece en la ruleta. Un cascabel colado ahí saldría
+## como una reliquia más y podría ofrecerse dos veces.
+##
+## Vacía es EXACTAMENTE neutra, igual que `reliquias`: con `casc_acero`, que no
+## tiene efectos, un combate se comporta igual que antes de que existiera esta
+## capa, y por eso todas las medidas viejas siguen valiendo.
+var base: Array[Reliquia] = []
 ## Combates ganados en el run. Lo lleva `Run`, y es de lo único que depende el
 ## eje de escalado.
 var victorias: int = 0
@@ -107,11 +119,23 @@ func _igual(clave: String, valor: float) -> bool:
 
 # ------------------------------------------------------------- acumulación
 
+## El cascabel y las reliquias, en una sola lista. Todo lo que acumula pasa por
+## aquí: si un acumulador se olvidara de `base`, el cascabel elegido no haría
+## nada y no daría ningún error — se diagnosticaría como "los cascabeles no se
+## notan", que es la avería del platillo con otra cara.
+func _todas() -> Array:
+	if base.is_empty():
+		return reliquias
+	var lista: Array = []
+	lista.append_array(base)
+	lista.append_array(reliquias)
+	return lista
+
 ## Todo lo que suma esta clave, contando el escalado por victorias y saltándose
 ## las reliquias apagadas.
-func suma(clave: String, base: float = 0.0) -> float:
-	var total := base
-	for r in reliquias:
+func suma(clave: String, inicial: float = 0.0) -> float:
+	var total := inicial
+	for r in _todas():
 		if not activa(r):
 			continue
 		total += float(r.efectos.get(clave, 0.0))
@@ -122,7 +146,7 @@ func suma(clave: String, base: float = 0.0) -> float:
 func factor(clave: String) -> float:
 	var f := 1.0
 	var extra := 0.0
-	for r in reliquias:
+	for r in _todas():
 		if not activa(r):
 			continue
 		f *= float(r.efectos.get(clave, 1.0))
@@ -130,7 +154,7 @@ func factor(clave: String) -> float:
 	return maxf(f + extra, 0.0)
 
 func bandera(clave: String) -> bool:
-	for r in reliquias:
+	for r in _todas():
 		if activa(r) and bool(r.efectos.get(clave, false)):
 			return true
 	return false
@@ -138,8 +162,11 @@ func bandera(clave: String) -> bool:
 ## Tira un dado contra una probabilidad acumulada. Con probabilidad 0 no se
 ## consume azar: sin reliquias de caos la simulación sigue siendo determinista,
 ## que es lo que permite comparar dos medidas.
-func azar(clave: String, base: float = 0.0) -> bool:
-	var prob := suma(clave, base)
+## El parámetro se llama `inicial` y no `base` a propósito: `base` es ahora el
+## cascabel, y una local con ese nombre lo taparía. Una variable que tapa a otra
+## no da error, hace lo que no querías.
+func azar(clave: String, inicial: float = 0.0) -> bool:
+	var prob := suma(clave, inicial)
 	if prob <= 0.0:
 		return false
 	return rng.randf() < prob

@@ -42,8 +42,8 @@ no tienen `.import`, así que hasta que se importen no existen para el juego y
 **dos pruebas nuevas van a salir en rojo diciendo exactamente eso**. Si salen
 en rojo después de importar, entonces sí es un fallo de verdad.
 
-**Está todo sin commitear**, y también lo de la sesión de assets anterior. El
-commit se hace cuando la batería pase, no antes.
+**La batería ya está en verde (321/321)**, así que el candado del commit se ha
+soltado. Falta commitear `tests/prueba_sim.gd` (el arreglo de la batería).
 
 **Ficheros nuevos de la última sesión** (`render/`): `nodo_cascara_frente.gd`,
 `nodo_panel_enemigo.gd`, `nodo_cursor.gd`. Borrado: ninguno salvo un
@@ -62,6 +62,230 @@ dos molesta, se deshace; no hay nada construido encima.
 orden del plan: ver la sección de abajo. Lo que manda ahora es la **Fase 6**.
 
 ---
+
+## LOS CASCABELES SON ELEMENTOS, NO PORCENTAJES (tanda 2b)
+
+**Fátima:** *"cambiar de cascabel es MUY inútil, esto tiene que ser un roguelike
+progresivo frenético: builds de crítico, veneno, hielo... cascabeles más ligeros,
+que rebotan más, que pesan más"*. Y tenía razón por una razón de arquitectura,
+no de números: los cascabeles se montaron como **bolsa de modificadores** —
+reutilizando el sistema de reliquias, que encajaba limpio y no pedía tocar
+`Combate`— y salieron **medidos, equilibrados y completamente invisibles**. Un
+×1,19 al daño no se ve mientras juegas. **Una bolsa de modificadores solo sabe
+producir porcentajes; para que PASEN COSAS hacen falta eventos.**
+
+### Lo que se ha montado
+
+**`sim/estados.gd` — la capa de eventos que faltaba.** Cinco estados que duran en
+el tiempo y acumulan: **veneno** (tictaquea daño por acumulación), **escarcha**
+(frena el reloj del enemigo hasta la mitad), **brasa** (no hace nada mientras
+arde: ESTALLA a los cuatro segundos, y cuanto más hayas metido más fuerte),
+**marca** (críticos seguros, se gasta uno por golpe) y **frenesí** (cada crítico
+sube la probabilidad del siguiente).
+
+**Y no hay un solo `if` por estado.** `Combate._apuntar(tiro)` ya sabía qué tiro
+acababa de pasar —es lo que alimenta las misiones— y ahí pregunta a la bolsa por
+`aplica_<estado>_<tiro>`. Un estado nuevo es una fila en `data/estados.json`; una
+build nueva, una clave en una reliquia. **Ahí es donde vive la build de verdad:
+el cascabel planta el elemento y las 45 reliquias lo escalan.**
+
+**Física de bola, con el invariante abierto por Fátima.** `CLAUDE.md` decía "la
+bola solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
+descuadra el hueco entre palas — **eso solo lo toca el radio**. Abierto a rebote,
+gravedad y rodadura; `radio_bola` sigue intocable y hay dos pruebas que lo
+comprueban. Ahora Piedra cae a plomo (gravedad 2200, rebote 0,28) y Vidrio flota
+y rebota como una canica (1520 / 0,60).
+
+**Y se VEN**, que es lo que decide si el sistema existe: insignias bajo la barra
+de vida del enemigo con su símbolo, su número de acumulaciones y una barrita de
+cuenta atrás. Un efecto que el jugador no ve se diagnostica como que falta — es
+la avería del platillo, y ya costó un run entero de confusión.
+
+**Batería: 429/429**, con `_prueba_estados` entera (que el veneno escale, que la
+brasa no refresque y estalle, que la escarcha no pueda parar el reloj, que la
+marca se gaste, que el frenesí tenga techo, que nada cruce de un combate a otro)
+y las trece configuraciones —4 palas + 9 cascabeles— pasando las tres pruebas de
+jugabilidad.
+
+### Y la misma lección, otra vez — y ya corregida
+
+Al medir los elementos la primera vez, casi todos acababan el run **por encima**
+de Acero: Hueso 88 %, Hierro 86 %, Plata 85 %, Vidrio 82 %. Es el agujero de la
+tanda anterior con otra cara — **daño sin coste de reloj abarata el run**— y el
+impuesto estaba puesto en Óxido y no en los demás. Corregido con la regla que ya
+está escrita en `preparacion.json`: *si un cascabel baja los segundos por
+combate, sube `factor_carga_reloj` en la misma proporción inversa.*
+
+| cascabel | elemento | daño/bola | s/combate | vida fin | acaba |
+|---|---|---|---|---|---|
+| Vidrio | brasa | 987 | 96,8 | **58 %** (era 82) | 3/5 |
+| Hueso | veneno | 1013 | 94,9 | **61 %** (era 88) | 3/5 |
+| Plata | frenesí | 1044 | 90,9 | **64 %** (era 85) | 3/5 |
+| Óxido | marca | 733 | 125,0 | **65 %** | 2/5 |
+| Hierro | escarcha | 721 | 138,5 | **70 %** (era 86) | 3/5 |
+| **Acero** | — | **729** | **137,1** | **71 %** | **3/5** |
+
+Los cinco elementales quedan en la banda 58-70 %, todos en o por debajo del
+neutro, y con el daño por bola entre 721 y 1044: **pegan mucho más y el run sale
+más caro, que es la forma que tenía que tener.**
+
+**Lo que NO está medido, dicho claro:** Piedra (77 %), Bronce (66 %) y Runas
+(59 %) traen los números de la tanda anterior. A Piedra solo le cambió la física
+—que el modelo no puede ver, porque dentro no hay física— y a Bronce nada; a
+**Runas se le añadió `aplica_escarcha_orbita`, así que su 59 % está desactualizado
+hacia abajo**: ahora será más seguro. Vuelve a medirse con
+`CASCABELES=casc_runas`.
+
+### Lo que NO está y es lo siguiente
+
+**Multibola.** Es lo que de verdad significa "frenético" y `DISEÑO.md` §8 ya lo
+tiene como eje de build ("Caos"), pero `Mesa` tiene UNA bola (`var bola :=
+Bola.new()`): pasar a N toca el solver, el drenaje, la búsqueda de bola y la
+cámara —a cuál sigue—. Es la tanda siguiente y ahora el motor de estados ya está
+puesto debajo.
+
+## TANDA 2 DE `PROPÓSITO.md`: LA CAPA DE PREPARACIÓN, HECHA Y MEDIDA
+
+**Nueve cascabeles y cuatro juegos de palas, todo abierto desde el primer día**
+(`DISEÑO.md` §5). Batería **381/381**, y medido con `medir_daniel.gd`, que es el
+único que reproduce a Daniel.
+
+Un cascabel **no es código**: es una bolsa de modificadores con nombre, igual
+que una reliquia, y entra por `BolsaReliquias.base` usando los 31 ganchos que
+`Combate` ya leía. **Ni un `if` nuevo.** Las palas sí tocan la física, y por eso
+`_montar_combate()` rehace la mesa entera al empezar el run: `Mesa.new()` copia
+los parámetros dentro de los colisionadores, así que cambiar de palas sobre una
+mesa hecha no hace nada.
+
+### La medida, y ha cambiado el diseño a mitad
+
+La primera versión destapó algo incómodo: **pegar más hacía el juego más fácil.**
+Vidrio pegaba un 46 % más que Acero y acababa el run con MÁS vida (80 % contra
+71 %), aunque drenar le costara dos veces y media. La causa lleva escrita en
+`CLAUDE.md` desde el rebalance: el coste de un combate es `tiempo/reloj × ataque
++ bolas × drenaje`, así que más daño acorta el combate y un combate corto come
+menos relojes. **El drenaje se paga una vez por bola; el reloj se paga
+continuamente.**
+
+Así que la regla de `PROPÓSITO.md` §4 se ha ampliado y los tres cascabeles de
+daño se han rediseñado: **lo que suba el daño se paga en RELOJ, nunca en
+drenaje.**
+
+| cascabel | daño/bola | s/combate | vida al acabar | acaba |
+|---|---|---|---|---|
+| Vidrio | 961 | 91,7 | **58 %** (era 80) | **2/5** |
+| Óxido | 912 | 106,5 | **59 %** (era 86) | 3/5 |
+| Runas | 906 | 108,9 | 59 % | 3/5 |
+| Bronce | 825 | 119,1 | **66 %** (era 75) | 3/5 |
+| Hueso | 829 | 125,7 | 73 % | 3/5 |
+| **Acero** | **729** | **137,1** | **71 %** | **3/5** |
+| Piedra | 795 | 129,5 | 77 % | 3/5 |
+| Plata | 805 | 129,6 | 77 % | 3/5 |
+| Hierro | 663 | 158,1 | 78 % | 3/5 |
+
+**Acero sale clavado al barrido neutro** (729 · 137 · 71 % · 3/5): la prueba de
+que la capa nueva no ha movido nada por su cuenta. Y ahora la tabla tiene la
+forma que debía: los que pegan más quedan POR DEBAJO del neutro y los seguros
+por encima. Vidrio acaba 2 de 5 runs contra los 3 de Acero, que es lo que
+significa "todos, con miedo".
+
+### Y por fin está medido el pilar
+
+`DISEÑO.md` §1 dice que la mesa es un menú de tiros y que un cascabel cambia a
+qué tiro vas. **Eso no lo comprobaba nadie.** Ahora hay un cruce de tres
+jugadores distintos —racimero, puntero y corredor— contra cada cascabel
+(`SOLO=tiros`), y se lee **dividiendo por Acero dentro de cada columna**: en
+crudo los tres perfiles hacen 265, 1551 y 1999 de daño por bola, así que gana
+siempre la misma columna y la tabla no diría nada.
+
+| cascabel | racimero | puntero | corredor | dice empujar a |
+|---|---|---|---|---|
+| Bronce | **×1,19** | ×1,10 | ×1,02 | el racimo ✓ |
+| Piedra | ×0,93 | **×1,12** | ×1,04 | targets y cañón ✓ |
+| Óxido | ×1,20 | ×1,17 | **×1,50** | órbita, retorno y cañón ✓ |
+
+Piedra es el único que **pierde** con el jugador de racimo (×0,93), que es
+exactamente su tradeoff. Y de aquí salió el tercer arreglo: Óxido llevaba
+`suma_golpes_por_recorrido` y ganaba MÁS con el racimero (×1,36) que con el
+corredor (×1,31), o sea lo contrario de lo que promete. **Una clave de combo no
+da identidad de tiro: el multiplicador cobra en todo lo que golpees después.**
+Cambiada por `factor_dano_recorrido` a secas, y ahora sí (×1,50 al corredor).
+
+### Lo que sigue flojo, dicho sin adornos
+
+Piedra y Plata acaban al 77 %, por encima de Acero, o sea que siguen siendo algo
+gratis. Los dos son suaves (+9 % de daño) y su identidad está validada arriba,
+así que no los he tocado: **subirles el reloj sin haber medido que hace falta
+sería ajustar a ojo**, y así se fue al traste la tabla de enemigos dos veces.
+
+**Cómo iterar esto sin perder la tarde:** el barrido entero son trece minutos.
+`SOLO=cascabeles|barrido|calibrar|tiros` lanza una sección, y
+`CASCABELES=casc_vidrio,casc_oxido` filtra a los que estés tocando (Acero entra
+siempre, que es la vara).
+
+## TANDA 1 DE `PROPÓSITO.md`, HECHA
+
+**Guardado + clics + menú de Inicio + `RECUPERADO/`.** Es la espina dorsal del
+propósito: hasta ahora, acabar un run no dejaba absolutamente nada, así que no
+existía ninguna frase que empezara por "la próxima vez". **Escrito Y EJECUTADO**:
+todo lo de abajo está mirado en el juego de verdad con display virtual, no
+deducido. Batería en **358/358**.
+
+| Pieza nueva | Qué hace |
+|---|---|
+| `sim/guardado.gd` | `user://cascabel.guardado.json`, escritura atómica y lectura a prueba de balas |
+| `data/recuperable.json` + `data/catalogo_recuperable.gd` | las 22 piezas de `RECUPERADO`: 9 cáscaras, 9 criaturas, 4 registros |
+| `render/regiones_clic.gd` | qué hay bajo el ratón, con histéresis de apretar/soltar |
+| `render/nodo_sistema.gd` | capa 30: menú de Inicio, `RECUPERADO`, `mi_maquina`, papelera y registro |
+
+**Lo que se gana y cómo.** Al cerrar un run —**se gane o se pierda**— se paga
+`1 + nodos_superados/5` piezas, en el orden del JSON. Que un run perdido en el
+primer combate también pague es la decisión de toda la tanda: con cero, perder
+sigue sin costar nada y el agujero queda igual. Las cáscaras vienen todas de
+fábrica (son capa de Preparación, no desbloqueo) y lo que se recupera son
+**criaturas, que son skin pura, y registros, que son texto**: así entra la
+meta-progresión sin reabrir `DISEÑO.md` §13.
+
+**Tres averías cazadas mirando el juego, y ninguna daba error:**
+
+- El menú de Inicio llevaba **barra de título**, que mide 16 px y se comía la
+  primera entrada entera. Parecía que la opción de arriba salía resaltada.
+- La ventana del registro se titulaba **`log_arranque.log`**, que es la clave del
+  JSON, y la papelera escribía **`goblin_carroniero`** sin la ñ. Es la avería del
+  "COMUN" de la Fase 4, otra vez. Las dos tienen prueba ahora.
+- El botón Inicio seguía siendo **pulsable debajo del mapa**, que lo tapa
+  entero: un clic que abría un menú donde no había nada dibujado.
+
+**Y una pregunta abierta que sale de arreglar la tercera:** el escritorio solo se
+puede tocar DURANTE EL COMBATE, porque el mapa y TILT se dibujan maximizados y
+tapan la barra de tareas. Ver "Abierto".
+
+## Lo de la sesión anterior (Fátima)
+
+**La cámara tenía dos averías y las dos están arregladas y medidas.** Las cazó
+Fátima jugando; la batería estaba en verde encima de las dos porque solo
+comprobaba `objetivo()`, que es pura, y nadie miraba `y_actual`, que es lo que
+se ve. El detalle está en `CLAUDE.md`, "Trampas".
+
+| | antes | ahora |
+|---|---|---|
+| Cámara en reposo | y=985 con el ancla en 1030 | **y=1030** |
+| Mesa que no se veía nunca | los últimos **45 px** (el drenaje) | **0** |
+| Bola de verdad, fotogramas sin flipper en plano | **57 %** | **0 %** |
+| A 1900 px/s, borde por encima de la punta | **456 px** | **0** |
+
+Qué se tocó: la zona muerta pasa a ser histéresis (decide si arranca, no dónde
+para), el adelanto pasa de 110 px fijos a `0,18 s × velocidad`, y la garantía
+dura pasa de "que la bola esté en pantalla" a "que se vea DÓNDE CAE".
+`tests/medir_camara.gd` es nuevo y mide `y_actual`, no la intención. Tres
+pruebas nuevas en la batería.
+
+**Y está escrito `PROPÓSITO.md`**, que es la capa que faltaba: por qué alguien
+vuelve a abrir el juego. Reordena "Siguiente" — decisión de Fátima, no de la
+medida: el barrido sigue diciendo que la Fase 6 es lo que arregla la banda de
+dificultad. Hallazgo que cambia el coste de media propuesta: **`assets/bolas/`
+son 9 cáscaras y `assets/criaturas_64/` son 9 criaturas, o sea 81 cascabeles ya
+dibujados** y sin que ningún código los cargue.
 
 ## Fase actual
 
@@ -291,10 +515,20 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 | `prob_critico` | 0,06 | Cuántos críticos salen. Las reliquias lo suben |
 | `factor_critico` | 2,0 | Por cuánto multiplica un crítico |
 | `golpes_tramo_extra` | 12 | Lo que pide el tramo que añade una reliquia. Menos y el x5 sale regalado |
+| `tiempo_anticipacion` | 0,18 s | Cuánto se adelanta la cámara. Techo real ~0,20: por encima, la bola rápida se mete tras la barra de título |
+| `margen_debajo_bola` | 150 | Cuánta mesa se ve POR DEBAJO de donde va a caer la bola |
+| `zona_muerta` | 45 | Cuánto tiene que irse el objetivo para que la cámara arranque. Ya no es un error permanente |
 
 **Orden para aflojar la dificultad:** outlanes primero, flipper después.
 
-## Que pruebe Daniel
+## Que prueben Daniel y Fátima
+
+**Prueban los dos y cualquiera de los dos puede cerrar una pregunta.** Donde
+ponga un nombre, es porque esa en concreto depende de quién juega más horas; el
+resto son de quien las mire. La lista se llamaba "Que pruebe Daniel" y eso ya no
+era verdad: los textos cortados de la cáscara y las dos averías de la cámara las
+encontró Fátima jugando, con la batería en verde encima de las dos.
+
 
 **Primero importar y luego la batería. En ese orden, y nada de esto se ha
 ejecutado:**
@@ -304,6 +538,36 @@ ejecutado:**
 
 **Lo de esta sesión, por orden de lo que más puede haber salido mal:**
 
+S1. **EL SISTEMA OPERATIVO, que es lo nuevo.** Pulsa Inicio durante un combate.
+    **(a)** ¿Se entiende que `RECUPERADO` es lo que te falta por conseguir, sin
+    que nadie lo explique? Es la apuesta entera de `PROPÓSITO.md` §2: los
+    ficheros de 0 KB con el nombre en interrogantes tienen que leerse como "aquí
+    había algo", no como una lista de logros bloqueados. **(b)** ¿Congelar la
+    mesa al abrir una ventana se agradece o desorienta al volver? Está medido que
+    la bola se queda exactamente donde estaba. **(c)** ¿El aviso de "Recuperado:
+    ..." al acabar un run se ve, o pasa desapercibido? Dura 6 s abajo a la
+    derecha. **(d)** Los iconos a 16 px de la carpeta: ¿se distinguen unos de
+    otros o son manchas?
+
+S2. **EL PAGO POR RUN, que es el dial delicado.** Ahora un run paga
+    `1 + nodos/5` piezas. Con 22 piezas y 11 de fábrica, quedan 11 por ganar.
+    ¿Se siente a tragaperras —una pieza cada vez que respiras— o a que cuesta?
+    **Si sobra, el dial es `NODOS_POR_PIEZA` hacia arriba, NO `PIEZAS_MINIMO`
+    hacia abajo:** quitarle el pago al run perdido devuelve el problema de
+    partida, que es que perder no costaba nada.
+
+C1. **LA CÁMARA, que es lo único de código que cambia esta sesión.** Está medido
+    que ya no se queda corta y que el flipper está siempre en plano bajo la
+    línea de seguridad, pero lo que se mide no es lo que se siente. Tres cosas:
+    **(a)** ¿se ven ahora los últimos píxeles de mesa cuando la bola drena, o
+    sobra tanto que la mesa parece más pequeña? **(b)** con un bolazo de los
+    fuertes cayendo, ¿la cámara **pega un tirón** al bajar? Si lo pega, el dial
+    es `suavizado`, y si el tirón es al cruzar la línea de seguridad, es
+    `margen_ancla`. **(c)** ¿la bola se te esconde detrás de la barra de título
+    en alguna bajada rápida? Está medido que llega a 48 px del borde contra los
+    24 del marco: es poco margen y es lo que más fácil se me escapa. El dial es
+    `tiempo_anticipacion` (0,18): bajarlo separa la bola del borde y acerca la
+    cámara a la bola.
 N1. **¿SE VE LA BOLA EN LO ALTO DE LA ÓRBITA?** Es la prueba de que quitar el
     HUD ha servido para algo. Antes tenía 58 px opacos encima; ahora 24. Lanza a
     tope diez veces y mira si la bola sale por arriba del todo sin esconderse.
@@ -464,22 +728,47 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
 ## Siguiente
 
 **Por tandas. Una por sesión, y el modelo de cada una entre paréntesis.**
+**El orden lo manda ahora `PROPÓSITO.md` §11**, que es donde está entero y con
+el porqué de cada puesto. Resumen: guardado + clics + `RECUPERADO/` → capa de
+Preparación → la cáscara reacciona → dopamina de mesa → rampas fallables →
+selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 
-1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto). **Sube a
-   la cabeza por medida, no por gusto:** el barrido dice que con un solo ataque
-   por reloj no existe ninguna tabla que deje el run en la banda de dificultad
-   que se busca. `DISEÑO.md` §11 tiene los seis (bloquear un recorrido, curarse,
-   reflejar, blindaje, castigar el combo, acelerar el reloj). Y con combates de
-   137 s, un enemigo que solo tiene vida se nota que es un saco
-1a. **PONER LA BATERÍA EN VERDE** (Sonnet, razonamiento alto). **Va antes que
-   la Fase 6 aunque la Fase 6 sea más importante**, porque es el candado: la
-   regla del repo es que no se commitea con la batería en rojo, y son 13 rojos
-   que ya están diagnosticados y ninguno es un fallo del juego. Dos trabajos
-   distintos: darle a `NodoCascara` un viewport de verdad dentro de la prueba
-   (seis) y reescribir siete comprobaciones contra los parámetros en vez de
-   contra números escritos a mano. Alto porque el riesgo es tapar un rojo
-   verdadero cambiando el número que lo destapaba: cada una hay que
-   reproducirla antes de tocarla
+0. ~~**Guardado + clics + menú de Inicio + `RECUPERADO/`**~~ **HECHA Y
+   EJECUTADA.** Batería 358/358. Ver arriba.
+
+0b. ~~**La capa de Preparación**~~ **HECHA Y MEDIDA.** 381/381. Ver arriba.
+
+0c. ~~**Los cascabeles pagan en RELOJ, no en daño**~~ **HECHO Y MEDIDO.** Ver
+   arriba. Y de paso ha quedado medido el pilar de `DISEÑO.md` §1, que no lo
+   comprobaba nadie.
+
+0e. **Siguiente tarea: MULTIBOLA** (Opus, razonamiento **alto**). Es lo que
+   significa "frenético" y es el eje "Caos" de `DISEÑO.md` §8, que lleva escrito
+   desde el principio y sin implementar. `Mesa` tiene UNA bola: pasar a N toca el
+   solver, el drenaje, el ball search y la cámara (a cuál sigue, y qué pasa
+   cuando se separan). **Lo caro no es lanzar tres bolas, es decidir qué mira la
+   cámara**, y eso hay que decidirlo con Fátima y Daniel antes de escribir nada.
+   Con multibola, `aplica_<estado>_<tiro>` ya permite builds del tipo "cada bola
+   extra envenena".
+
+0f. **Y después: `PROPÓSITO.md` §8, la dopamina de mesa** (el campo de
+   pines con **Opus + alto**, porque es geometría nueva y cada rincón es un
+   sitio donde la bola se acuña; los props y placas ya recortados con **Sonnet +
+   medio**). Sube de puesto por lo que ha salido midiendo: **el jugador de
+   racimo hace 265 de daño por bola contra los 1999 del de recorridos**, o sea
+   que el racimo paga 7,5 veces menos. Que el tiro difícil pague más es
+   `DISEÑO.md` §7, pero 7,5× no es una pendiente, es que la mitad de la mesa no
+   compensa — y es justo la mitad que Fátima quiere llenar de sitios donde pegar.
+
+1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto). **Baja de
+   puesto por decisión de Fátima, no porque la medida haya cambiado:** el
+   barrido sigue diciendo que con un solo ataque por reloj no existe ninguna
+   tabla que deje el run en la banda de dificultad que se busca. `DISEÑO.md` §11
+   tiene los seis (bloquear un recorrido, curarse, reflejar, blindaje, castigar
+   el combo, acelerar el reloj). Y con combates de 137 s, un enemigo que solo
+   tiene vida se nota que es un saco
+1a. ~~**PONER LA BATERÍA EN VERDE**~~ **HECHA. 321/321.** Ver el detalle en
+   "Abierto". Falta el commit.
 1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes:
    con comportamientos dentro, `tests/medir_daniel.gd` vuelve a barrer y la
    banda del 25-60 % pasa a ser alcanzable. Hasta entonces, tocar la tabla es
@@ -503,7 +792,21 @@ cuna, reloj-como-carrera, cañón, outlanes y drenaje están bien).
    ejecutar. Lo que queda no se lee, se juega: las preguntas N1-N8 de arriba. Si
    N2 o N4 salen mal, lo que vuelve a la mesa es reversible en un rato
 7. **Animación fotograma a fotograma de enemigos/criaturas/jefes** (Opus,
-   razonamiento alto). Pedida por Daniel. **Los prompts ya están escritos** en
+   razonamiento alto). Pedida por Daniel y por Fátima. **Los prompts ya están
+   escritos, y ahora también la guía de estilo de la que dependían**: los tres
+   ficheros de prompts empiezan por "Following the style guide above" y esa guía
+   no estaba en el repo, así que ninguno generaba lo que decía. Está en
+   `assets/GUIA_ESTILO.md`, **y es la original que pasó Fátima, no una
+   reconstrucción**: bloque A el suyo tal cual (la línea que más trabaja es "in
+   the style of Peglin"), bloque B tres líneas añadidas contra fallos ya
+   medidos —el magenta que se comió el 22 % del espectro, el contorno redondeado
+   que no se puede reparar, y las celdas con hueco que descuadran la hoja—.
+   **La paleta va en palabras y NO en hex a propósito**: `procesar.py` cuantiza
+   después, así que los códigos no aportan. Y de paso queda recuperado el prompt
+   que generó `assets/mesa/`, con sus nueve objetos mapeados. **Y el prompt del cascabel estaba mal de diseño**:
+   dibujaba campana y criatura juntas, que no se puede rotar (`DISEÑO.md` §4
+   pide dos capas). Reescrito: las 9 criaturas van solas, 8 fotogramas, celda
+   64, piloto `cr_brasa`. El orden de las hojas está al final de
    `assets/prompts_animacion.md`: hoja 4×4 por bicho (idle, golpe, ataque,
    muerte), las nueve descripciones con escala común, los jefes a 4×5, el
    cascabel de fuego, y el subsistema que hace falta. Hoy todo bicho es UN
@@ -601,21 +904,20 @@ de geometría fina y se hace jugando, no midiendo.
   fuente de reserva no sabía dibujar acentos —el motivo por el que existe
   `fuente.py`— y ese motivo ya no está. `enemigos.json` sí los usa, así que en
   la misma pantalla conviven "goblin_carroñero" bien escrito y "Cuerda de mas".
-- **LA BATERÍA ESTÁ EN ROJO: 13 de 312, y el commit está atado a que pase.**
-  Medido lanzándola, no leído. La primera ya está diagnosticada y arreglada (la
-  del crítico, un lambda que capturaba por valor) y era **falsa**: el juego
-  estaba bien. Las otras 13 se parten en dos montones y **ninguna es un fallo
-  visible jugando**:
-  · **Seis son de pantalla**: la batería corre con `--script`, así que
-    `NodoCascara` no tiene viewport y `pantalla()` devuelve ceros — de ahí los
-    "−208 y −208" y los `[0, 0, 0]` de fondos. En el juego de verdad esos
-    paneles y esos fondos se dibujan bien; está mirado en captura.
-  · **Siete son constantes viejas contra la escala nueva.** Confirmada una:
-    "quedarse sin vida es derrota" monta un enemigo con `ataque: 1000` para
-    matar de un drenaje, pero con `vida_jugador` a 1080 y `factor_ataque_
-    drenaje` 0,5 el drenaje quita 500 y quedan 580. Es exactamente la trampa
-    que ya está escrita en `CLAUDE.md`: **las pruebas se escriben contra los
-    parámetros, no contra constantes.**
+- ~~LA BATERÍA ESTÁ EN ROJO~~ **HECHO: 321/321 en verde.** Los seis de pantalla
+  se arreglaron dándole a `NodoCascara` un `SubViewport` de verdad dentro de la
+  prueba — pero eso solo no bastó: `get_root().add_child(...)` en modo
+  `--script` NO mete el nodo en el árbol de forma síncrona
+  (`is_inside_tree()` da falso hasta el siguiente frame), así que hacía falta
+  además un `await process_frame` antes de medir, propagado por los tres
+  niveles de llamada (`_prueba_huecos_de_la_cascara` → `_prueba_cascara` →
+  `_initialize`). Los siete de constantes viejas eran dos causas: el ataque de
+  `_prueba_derrota` se calcula ahora contra `c.p.vida_jugador /
+  c.p.factor_ataque_drenaje` en vez de un `1000` fijo, y las cuatro pruebas de
+  daño exacto (combo y reliquias) fuerzan `prob_critico = 0.0` —igual que ya
+  hacía `_prueba_criticos`— porque un crítico de la probabilidad de base podía
+  colarse y doblar cualquier golpe medido. Nada de esto era un fallo del
+  juego, medido jugando.
 - **`assets/ui_marco/` no lo carga nadie.** Nueve piezas de marco de piedra
   remachada, 28 000 px, con alfa parcial (fleco antialiaseado, que en pixelart
   con escalado entero es fleco borroso) y un halo de magenta de los gordos. No
@@ -629,6 +931,56 @@ de geometría fina y se hace jugando, no midiendo.
   esto otro no estaba anotado. No es un bug, pero explica por qué la mesa se ve
   más pelada que la carpeta de assets.
 
+- **LA `Ó` MAYÚSCULA SE LEE COMO UNA `ó` MINÚSCULA, y ahora se ve porque "Óxido"
+  es un cascabel.** No es un fallo de `fuente.py`, es que la salida elegida no
+  puede funcionar para esa letra en concreto. Las mayúsculas con tilde llevan el
+  cuerpo comprimido a cinco filas para que la tilde quepa encima, y eso funciona
+  con la `Á` porque conserva el travesaño —sigue siendo una A sin discusión—,
+  pero **un `O` de cinco filas ES, píxel a píxel, una `o` minúscula**: no le
+  queda ningún rasgo con el que distinguirse. Comprobado sacando los dos glifos
+  del atlas y comparándolos.
+
+      O          Ó          ó
+      .###.      ..##.      ..#..
+      #...#      .....      .#...
+      #...#      .###.      .###.
+      #...#      #...#      #...#
+      #...#      #...#      #...#
+      #...#      #...#      #...#
+      .###.      .###.      .###.
+
+  **La salida barata: dejar que las mayúsculas con tilde usen también la fila 7**,
+  que hoy está vacía en todos los glifos. Eso da un cuerpo de SEIS filas en vez
+  de cinco, y un O de seis filas ya no se confunde con uno de cinco. Es un cambio
+  en `fuente.py`. **No lo he tocado por dos razones**: lanzar `fuente.py` destruye
+  los cinco marcos de la cáscara (está en Trampas, hay que restaurarlos con `git
+  checkout` justo después), y el estilo de las tildes lo decidiste tú.
+- **EL ESCRITORIO SOLO SE PUEDE TOCAR DURANTE EL COMBATE, y hay que decidir si
+  eso vale.** El mapa (capa 20) y TILT (40) se dibujan MAXIMIZADOS y tapan la
+  barra de tareas, que va en la 5. Mientras están delante, el sistema se apaga
+  entero a propósito: si no, el botón Inicio seguiría siendo pulsable debajo del
+  mapa y sería un clic que abre un menú donde no hay nada dibujado. Pero eso deja
+  `RECUPERADO` accesible solo con un combate empezado, que es raro. **Dos
+  salidas, y las dos son trabajo de otro sitio:** (a) que el mapa deje 24 px de
+  hueco abajo y la barra de tareas se dibuje encima de él —lo correcto, y es
+  geometría de `NodoPantallaMapa`, que hoy pone su propia barra de estado justo
+  ahí—; o (b) que TILT y el mapa tengan su propio botón de "Recuperado". **La (a)
+  es la buena**: una barra de tareas de verdad está siempre encima de todo.
+- **Los iconos de `RECUPERADO` van a 16 px y se ven pequeños.** Es lo que hace un
+  explorador de verdad, pero la cáscara viene de `bolas_64` y bajar de 64 a 16
+  tira tres de cada cuatro píxeles. Si al mirarlo no se distinguen unas de otras,
+  lo que falta es un juego de 16 —como `reliquias_32` se hizo para el
+  escritorio—, no escalar distinto.
+- **LA MESA ESTÁ EN OTRA PERSPECTIVA QUE EL RESTO DEL JUEGO, y hay que decidirlo
+  antes de generar más arte de mesa.** El prompt que generó `assets/mesa/`
+  —recuperado en `assets/GUIA_ESTILO.md`— pide *"seen from DIRECTLY ABOVE... no
+  three-quarter angle, no sides visible"*, o sea cenital pura. Y `CONTEXTO.md`,
+  "Perspectiva", dice de todo lo demás: *"los objetos están de pie hacia la
+  cámara. No es cenital puro, y es a propósito: es lo que hace Peglin"*. Las dos
+  posturas son defendibles —un bumper de una máquina real sí se ve desde
+  arriba—, pero `PROPÓSITO.md` §8 pide arte de mesa nuevo (pines, segundo
+  racimo, postes de outlane) y tiene que ir en la misma que el que se quede.
+  **Decisión de Fátima.** Lo único que no vale es que la mesa tenga las dos.
 - **Los dos carriles de retorno no miden lo mismo**: 34 px de boca el
   izquierdo, 27 el derecho, porque el carril lanzador come sitio a la
   derecha. Si se nota al jugar hay que replantear el lado derecho entero, no

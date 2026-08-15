@@ -1,0 +1,36 @@
+{
+  "_nota": "Lo que se puede RECUPERAR del disco, o sea el contenido de la carpeta RECUPERADO del escritorio. PROPÓSITO.md §2: el propósito del juego es terminar de reconstruir el juego que nunca se terminó, y esta es la lista de piezas de ese juego. Lo que NO tienes también sale en la carpeta, como un fichero de 0 bytes con el nombre ilegible: ver el hueco es el gancho.",
+
+  "_lo_que_puede_y_no_puede_dar": "NINGUNA pieza de aquí da poder, y eso es lo que permite que la meta-progresión entre sin reabrir DISEÑO.md §13. Las cáscaras vienen todas puestas de fábrica (`inicial: true`) porque son la capa de Preparación y esa se elige antes del run, no se desbloquea. Lo que se recupera de verdad son CRIATURAS, que DISEÑO.md §5 define como skin pura, y REGISTROS, que son texto. El día que se reabra §13 y las cáscaras pasen a ganarse, lo único que cambia es su `inicial`.",
+
+  "_tipos": "cascabel = la cáscara que rueda. criatura = lo que vive dentro, no gira, solo skin. registro = un fichero de texto del sistema, puro contenido. pala = reservado para la tanda de Preparación.",
+
+  "_la_extension_importa": "El nombre de fichero es lo que se lee en la carpeta, así que dice de qué tipo es sin tener que explicarlo: .dat las cáscaras, .cr las criaturas, .log los registros, .sys las palas. Un jugador que abre RECUPERADO tiene que poder agrupar de un vistazo.",
+
+  "piezas": [
+    {"id": "casc_acero",  "tipo": "cascabel", "nombre": "Acero",  "fichero": "casc_acero.dat",  "sprite": "casc_acero",  "inicial": true, "texto": "La de fábrica. Ni pesa ni rebota de más: es la vara de medir."},
+    {"id": "casc_hierro", "tipo": "cascabel", "nombre": "Hierro", "fichero": "casc_hierro.dat", "sprite": "casc_hierro", "inicial": true, "texto": "Basta. No le entra nada de lo que el sistema le eche encima."},
+    {"id": "casc_bronce", "tipo": "cascabel", "nombre": "Bronce", "fichero": "casc_bronce.dat", "sprite": "casc_bronce", "inicial": true, "texto": "Suena distinto en cada golpe. El racimo la carga."},
+    {"id": "casc_piedra", "tipo": "cascabel", "nombre": "Piedra", "fichero": "casc_piedra.dat", "sprite": "casc_piedra", "inicial": true, "texto": "Pesa. Cae más rápido y pega concentrado; las rampas le cuestan."},
+    {"id": "casc_vidrio", "tipo": "cascabel", "nombre": "Vidrio", "fichero": "casc_vidrio.dat", "sprite": "casc_vidrio", "inicial": true, "texto": "Pega el doble y se rompe al segundo tropiezo."},
+    {"id": "casc_hueso",  "tipo": "cascabel", "nombre": "Hueso",  "fichero": "casc_hueso.dat",  "sprite": "casc_hueso",  "inicial": true, "texto": "Se astilla en cada caída, y astillada pega más."},
+    {"id": "casc_oxido",  "tipo": "cascabel", "nombre": "Óxido",  "fichero": "casc_oxido.dat",  "sprite": "casc_oxido",  "inicial": true, "texto": "Deja rastro. Lo que toca vale doble la siguiente vez."},
+    {"id": "casc_plata",  "tipo": "cascabel", "nombre": "Plata",  "fichero": "casc_plata.dat",  "sprite": "casc_plata",  "inicial": true, "texto": "No pierde velocidad. Va más rápido de lo que se controla."},
+    {"id": "casc_runas",  "tipo": "cascabel", "nombre": "Runas",  "fichero": "casc_runas.dat",  "sprite": "casc_runas",  "inicial": true, "texto": "Guarda el multiplicador al caer, y el reloj corre más."},
+
+    {"id": "cr_rata",      "tipo": "criatura", "nombre": "Rata",      "fichero": "cr_rata.cr",      "sprite": "cr_rata",      "inicial": true,  "texto": "Lo primero vivo que encontró el gestor de excepciones."},
+    {"id": "cr_brasa",     "tipo": "criatura", "nombre": "Brasa",     "fichero": "cr_brasa.cr",     "sprite": "cr_brasa",     "inicial": false, "texto": "Arde desde antes de que la metieran ahí. Nadie apagó el proceso."},
+    {"id": "cr_sapo",      "tipo": "criatura", "nombre": "Sapo",      "fichero": "cr_sapo.cr",      "sprite": "cr_sapo",      "inicial": false, "texto": "Estaba en una tabla de criaturas que el juego nunca llegó a usar."},
+    {"id": "cr_gusano",    "tipo": "criatura", "nombre": "Gusano",    "fichero": "cr_gusano.cr",    "sprite": "cr_gusano",    "inicial": false, "texto": "Se movía por la memoria antes de que lo encerraran."},
+    {"id": "cr_musgo",     "tipo": "criatura", "nombre": "Musgo",     "fichero": "cr_musgo.cr",     "sprite": "cr_musgo",     "inicial": false, "texto": "Creció encima de un sector que llevaba años sin leerse."},
+    {"id": "cr_diablillo", "tipo": "criatura", "nombre": "Diablillo", "fichero": "cr_diablillo.cr", "sprite": "cr_diablillo", "inicial": false, "texto": "Venía en el juego original. Era el protagonista, dice el registro."},
+    {"id": "cr_calavera",  "tipo": "criatura", "nombre": "Calavera",  "fichero": "cr_calavera.cr",  "sprite": "cr_calavera",  "inicial": false, "texto": "El anterior. No terminó su run."},
+    {"id": "cr_sombra",    "tipo": "criatura", "nombre": "Sombra",    "fichero": "cr_sombra.cr",    "sprite": "cr_sombra",    "inicial": false, "texto": "No tiene entrada en ninguna tabla. Está y no debería."},
+    {"id": "cr_espectro",  "tipo": "criatura", "nombre": "Espectro",  "fichero": "cr_espectro.cr",  "sprite": "cr_espectro",  "inicial": false, "texto": "Se recuperó de un sector dañado. Le falta un trozo y no se sabe cuál."},
+
+    {"id": "log_arranque", "tipo": "registro", "nombre": "arranque",  "fichero": "arranque.log",  "inicial": true,  "texto": "> cargando cascabel.exe\n> falta el protagonista\n> el gestor de excepciones coge lo primero vivo\n> continuando"},
+    {"id": "log_mesa",     "tipo": "registro", "nombre": "mesa",      "fichero": "mesa.log",      "inicial": false, "texto": "La mazmorra está a medio programar sobre el cableado de la máquina. Las palas son la única parte real: hardware atornillado. Todo lo demás son procesos."},
+    {"id": "log_tilt",     "tipo": "registro", "nombre": "tilt",      "fichero": "tilt.log",      "inicial": false, "texto": "TILT no es una derrota, es lo que hace una máquina cuando alguien la empuja. El sistema lo trata como un fallo y reinicia el nivel."},
+    {"id": "log_autor",    "tipo": "registro", "nombre": "leeme",     "fichero": "leeme.txt",     "inicial": false, "texto": "Lo dejé a medias. Si alguien lo encuentra: la parte del rol nunca funcionó, pero la bola sí. Quedaos con la bola."}
+  ]
+}
