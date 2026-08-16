@@ -14,7 +14,8 @@ extends RefCounted
 
 ## Qué paga completar este recorrido. La mesa dice QUÉ es cada rampa y
 ## ParametrosCombate cuánto vale: geometría aquí, balance allí.
-enum Premio { DANO, DANO_FUERTE, MULTIPLICADOR }
+## CAZA va el último: los ordinales de los otros tres no se tocan.
+enum Premio { DANO, DANO_FUERTE, MULTIPLICADOR, CAZA }
 var premio: int = Premio.DANO
 var nombre := ""
 

@@ -129,6 +129,21 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   batería: por todos los huecos tiene que caber la bola, y ningún pin puede tapar
   una boca de recorrido ni el platillo. Un pin que empujara sería un bumper
   pequeño y la bola se quedaría a vivir arriba.
+- **LA MESA TIENE DOS PISOS, y no se comunican por gravedad.** Encima del arco
+  está la arena de caza (`DISEÑO.md` §5 y §7): su propio techo, sus paredes y su
+  propio suelo, con 12 px de nada entre el fondo de su embudo y el arco de abajo.
+  Se sube por el **umbral** y se baja por el **regreso**, y las dos son curvas.
+  Los dos números que lo cierran: la bola sube 643 px por sus medios —desde las
+  palas, hasta y=557— así que a la arena no llega sola; y una caída libre desde
+  ahí arriba llega a las palas a **1500 px/s, o sea 67 ms**, cuando el cañón ya
+  se tuvo que ablandar porque 900 px/s era incazable. Abrir el arco y dejar caer
+  la bola es regalar ese tiro en cada visita.
+- **El regreso NO TIENE BOCA, y el umbral no traga con multibola.** Lo primero
+  porque una boca en el suelo del piso de arriba haría que la caza durase lo que
+  tarda la bola en encontrarla, no lo que dice `caza_tiempo`: al acabarse el
+  tiempo, la arena METE la bola en el regreso. Lo segundo porque la cámara sigue
+  a la bola más baja, así que con una bola arriba y otra abajo la caza pasaría
+  entera fuera de plano.
 - **Los enemigos normales viven fuera del campo de juego.**
 - **La bola es el bloque de stats del jugador. NUNCA el radio.** El invariante
   decía "solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
@@ -203,6 +218,20 @@ La regla que sale de la tabla: **la capa −2 tapa todo lo que haya detrás dent
 de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 
 ## Trampas que ya nos han costado tiempo
+
+### Dar por bueno el techo que hay (ago-2026)
+
+El campo de pines de la tanda 0f se montó debajo del arco porque el arco era el
+límite de la mesa. Lo era en el código y no en el diseño: `DISEÑO.md` llevaba
+desde el principio un tiro llamado "umbral alto" que abre un modo de caza en la
+zona alta, y una frase que lo decía entero — *"y le da sentido a la zona alta,
+que hasta ahora era un pasillo"*. Lo cazó Daniel leyendo el resultado.
+
+La regla: **antes de optimizar dentro de un límite, comprueba si el límite es
+una decisión de diseño o una consecuencia de no haber construido nada ahí.** Un
+techo que nadie escribió en `DISEÑO.md` ni en `PLAN.md` no es un invariante, es
+una obra pendiente.
+
 
 ### Medir por la cara que no es (ago-2026)
 

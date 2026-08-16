@@ -204,6 +204,119 @@ var pin_cedazo_filas: int = 0
 ## 3 px de aire por lado sobre los 18 que mide.
 var pin_holgura: float = 24.0
 
+# --- LA ZONA ALTA: LA ARENA DE CAZA ---
+#
+# `DISEÑO.md` §7 lista un tiro llamado **umbral alto** que "abre el modo de
+# caza", y §5 dice que los monstruos de la zona alta sueltan material de
+# desbloqueo, que el modo dura un tiempo limitado, que el reloj del enemigo sigue
+# corriendo mientras estás arriba, y que eso es lo que **"le da sentido a la zona
+# alta, que hasta ahora era un pasillo"**.
+#
+# Pasillo era literal: por encima del arco (y=660) no había un solo colisionador.
+# 530 px de mesa que solo cruzaban splines.
+#
+# POR QUÉ ES UNA ARENA CERRADA Y NO CAMPO ABIERTO, y esto es aritmética, no
+# gusto: una bola que cae libre desde la altura de las rampas llega a las palas a
+# 1500 px/s, o sea 67 ms de ventana. El cañón ya se tuvo que ablandar a la mitad
+# porque 900 px/s —111 ms— era "un tiro imposible, o sea perder la bola con pasos
+# extra". Quitar el arco y ya está sería regalar esa caída en cada visita. La
+# arena tiene su propio suelo y devuelve la bola por un carril, que es como se
+# baja de una planta alta en una máquina de verdad.
+#
+# Y LA BOLA NO PUEDE SUBIR SOLA: el tope de 1500 px/s con gravedad 1750 da 643 px
+# de subida, y desde las palas eso se queda en y=557. A la arena solo se entra
+# enganchado al umbral.
+
+## El techo de la arena: elipse de radio `arena_techo_rx` × `arena_techo_ry` con
+## el centro en el hombro. Igual que el arco de abajo, para que las dos mitades
+## de la mesa se lean como la misma mesa.
+var arena_techo_ry: float = 70.0
+## Donde el techo se encuentra con las paredes laterales, o sea el punto más alto
+## al que llega una pared recta.
+var arena_hombro_y: float = 220.0
+## Donde las paredes dejan de ser verticales y empieza el embudo.
+var arena_suelo_y: float = 600.0
+## El fondo del embudo. Entre este y el arco de la mesa de abajo (y=660) quedan
+## 12 px de nada: la arena es un piso aparte, no se comunica por gravedad.
+var arena_fondo_y: float = 648.0
+## Ancho del rellano del fondo, donde la bola se posa cuando se acaba el tiempo.
+var arena_rellano: float = 12.0
+
+## EL EMBUDO ES UN TRAMPOLÍN, y es lo que hace que la caza sea caza y no una
+## visita de medio segundo. Las dos paredes inclinadas del fondo son gomas que
+## devuelven la bola al campo: sin ellas la bola cae, se posa, y ya está.
+##
+## Va por debajo del slingshot de abajo (700) a propósito: aquí no hay palas que
+## corrijan nada, así que una goma fuerte deja la bola rebotando de techo a suelo
+## sin tocar un solo pin.
+var arena_empuje: float = 520.0
+var arena_rebote: float = 0.55
+var arena_velocidad_minima: float = 70.0
+
+## Cuánto dura el modo. `DISEÑO.md` §5: "el modo dura un tiempo limitado y el
+## reloj del enemigo sigue corriendo mientras estás arriba. Sin eso, cazar sería
+## gratis." Doce segundos son casi una bola entera de las de abajo.
+var caza_tiempo: float = 12.0
+
+## LA BOCA DEL UMBRAL, Y ESTÁ DONDE LA PUSO LA MEDIDA, NO DONDE QUEDABA BONITO.
+##
+## Empezó en el centro, (200,690), debajo del vértice del arco. Cero entradas en
+## 240: **el bumper de arriba del racimo está en (200,769) y tapa el pasillo
+## central entero.** Medido subiendo por el centro (x=200±26), la mejor de 240
+## bolas se quedó en y=708 y la mediana en y=840.
+##
+## Repartido por bandas, de 240 entradas al racimo, cuántas suben por encima de:
+##
+##     banda x     y<700  y<730  y<760  y<790
+##     20..90          0      0      0      1
+##     90..150         0      0      3      4
+##     150..250        1      1      1      1     <- el centro, tapado
+##     250..310        0      0      3      3
+##     310..380        0      8      9     10     <- por aquí se sube
+##
+## O sea que el único sitio por el que la bola sube de verdad es **el flanco
+## derecho**, porque el bumper de abajo a la derecha del racimo la escupe hacia
+## allí. Ahí va la boca.
+##
+## Y NO SE PUEDE PONER EN LA LÍNEA DE TIRO DE UNA PALA, aunque sea lo que pide
+## `DISEÑO.md` §7 ("boca alta, solo llega un tiro muy limpio"): medido, el mejor
+## tiro desde la cuna izquierda muere en (104,751) y el de la derecha en
+## (296,751), y **las dos líneas ya acaban en una boca** —el retorno en (95,790)
+## y el cañón en (305,790)—. Una boca por encima de esas no se alcanza nunca,
+## porque la de abajo se traga la bola primero.
+##
+## Así que el umbral es literalmente **el tiro que hay más allá de los bumpers**:
+## no se apunta, se gana con una entrada buena al racimo. Medido, 2-3 de cada 100
+## entradas. Es raro a propósito, pero **este es el número que hay que mirar
+## después de jugar**: si la arena no se ve nunca, los diales son esta posición,
+## `umbral_entrada_radio` y `umbral_velocidad_minima`, por ese orden.
+var umbral_boca := Vector2(340.0, 730.0)
+## Y hay que llegar CON FUERZA, no de rebote agotado. Una bola que apenas alcanza
+## la boca llega a 0 px/s: sin umbral de velocidad, el tiro difícil se ganaría
+## por accidente.
+var umbral_velocidad_minima: float = 150.0
+## Con cuánta velocidad se suelta la bola dentro de la arena. Baja: entras a
+## jugar arriba, no a estrellarte contra el techo.
+var umbral_factor_salida: float = 0.45
+## La boca del umbral es MÁS ANCHA que las demás (18). Con 18 se abría la caza
+## en 1 de cada 240 entradas al racimo: eso no es difícil, es que no existe.
+var umbral_entrada_radio: float = 30.0
+
+## EL REGRESO. No tiene boca: no se entra en él, la arena te mete cuando se acaba
+## el tiempo. Por eso la bola se lanza a una velocidad fija en vez de con la que
+## traía — si no, una caza que acaba con la bola parada tardaría siglos en bajar.
+var regreso_velocidad: float = 700.0
+## Y sale despacio. Vuelves de estar arriba y la bola te llega posada a la pala:
+## el precio de la caza es el reloj del enemigo, no perder la bola al bajar.
+## A 700 × 0,35 son 245 px/s, o sea 408 ms de ventana contra los 250 que tarda un
+## humano en reaccionar.
+var regreso_factor_salida: float = 0.35
+
+## El campo de pines de la arena. Mismo generador y mismo recorte que la bóveda:
+## `pin_paso`, `pin_alto_fila` y `pin_holgura` mandan también aquí.
+var pin_arena_y: float = 310.0
+var pin_arena_filas: int = 5
+
 ## (*) Outlanes: los dos carriles que van directos al drenaje, por fuera de los
 ## carriles de retorno. Son la válvula de dificultad de la mesa: sin ellos solo
 ## se pierde la bola por el hueco entre palas, que es un objetivo pequeño.

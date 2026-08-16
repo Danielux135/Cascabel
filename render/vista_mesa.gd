@@ -316,6 +316,13 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	mesa.poste_golpeado.connect(_al_golpear_poste)
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
 	mesa.pin_golpeado.connect(_al_golpear_pin)
+	# La caza no estrena sonido: entra con el de recorrido gordo y sale con el
+	# del banco. Un sonido nuevo por cada cosa nueva acaba en un banco que nadie
+	# distingue, y estos dos ya significan "algo grande" y "algo se ha cerrado".
+	mesa.caza_empezada.connect(func(_pt: Vector2) -> void:
+		_sonido.reproducir("rampa_fuerte"))
+	mesa.caza_terminada.connect(func(_pt: Vector2) -> void:
+		_sonido.reproducir("banco"))
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
 	mesa.target_abatido.connect(_al_abatir_target)

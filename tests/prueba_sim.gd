@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_prueba_impactos()
 	_prueba_racimo()
 	_prueba_campo_pines()
+	_prueba_zona_alta()
 	_prueba_sin_rebote_encerrado()
 	_prueba_slingshot_tiene_espalda()
 	_prueba_outlanes()
@@ -98,7 +99,11 @@ func _simular(m: Mesa, segundos: float) -> Dictionary:
 		var pos := m.bola.pos
 		if not m.bola.libre():
 			continue
-		if pos.x < 20.0 or pos.x > 380.0 or pos.y < 655.0 or pos.y > 1301.0:
+		# EL TECHO YA NO ES EL ARCO. Estaba en 655 —el arco de la mesa de abajo—
+		# porque encima no había nada; ahora encima está la arena de caza, que es
+		# mesa jugable de verdad desde y=150. Con el 655 puesto, cada fotograma
+		# de una caza contaba como "la bola se ha salido".
+		if pos.x < 20.0 or pos.x > 380.0 or pos.y < 140.0 or pos.y > 1301.0:
 			escapes += 1
 		if m.bola.velocidad() < 12.0:
 			quieta += DT
@@ -767,7 +772,13 @@ func _prueba_racimo() -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEMILLA
 	var total := 0
-	var intentos := 24
+	var contadas := 0
+	# SESENTA, NO VEINTICUATRO. Los golpes por entrada son una cuenta de cola
+	# larga —la mayoría de entradas dan dos o tres y alguna da catorce—, así que
+	# con 24 muestras la media se mueve casi un golpe entero solo por qué semilla
+	# toque. Medido con 120 entradas y otra semilla: 3,5. Con 24 salía 3,0 y
+	# rozaba el umbral sin que nada estuviera roto.
+	var intentos := 60
 	for _i in intentos:
 		var m2 := _nueva_mesa()
 		m2.nueva_bola()
@@ -785,11 +796,12 @@ func _prueba_racimo() -> void:
 				break
 			m2.avanzar(DT)
 		total += golpes[0]
-	var media := float(total) / float(intentos)
+		contadas += 1
+	var media := float(total) / float(maxi(contadas, 1))
 	# Medido: 3,9 de media subiendo, con el racimo girado. De espaldas eran 1,0.
 	# El umbral va en 3 para dejar margen sin perder el diente.
 	_comprobar("subiendo al racimo, la bola encadena golpes",
-		media >= 3.0, "%.1f bumpers por entrada" % media)
+		media >= 3.0, "%.1f bumpers por entrada en %d entradas" % [media, contadas])
 
 	# Y LA CARA DE ENTRADA TIENE QUE SER LA DE ABAJO. Es lo que se rompería sin
 	# enterarse si alguien vuelve a poner `bumper_giro` a 0 "por simetría": los
@@ -840,7 +852,13 @@ func _prueba_campo_pines() -> void:
 			if v.distance_to(pl.centro) < pl.radio + m.p.pin_radio + 1.0:
 				pisa = "platillo"
 		for r in m.rampas:
-			for boca in [r.puntos[0], r.puntos[r.puntos.size() - 1]]:
+			# Solo las bocas que TRAGAN. El final de un recorrido de un solo
+			# sentido es una salida: `sentido_entrada` ni lo mira, y un pin al
+			# lado no tapa nada.
+			var bocas: Array[Vector2] = [r.puntos[0]]
+			if r.bidireccional:
+				bocas.append(r.puntos[r.puntos.size() - 1])
+			for boca in bocas:
 				if v.distance_to(boca) < r.entrada_radio + m.p.pin_radio + 1.0:
 					pisa = r.nombre
 	_comprobar("ningún pin tapa una boca ni el platillo", pisa == "",
@@ -905,6 +923,129 @@ func _prueba_campo_pines() -> void:
 	_comprobar("y no regala combo",
 		c.golpes == golpes_antes or c.p.pin_suma_combo,
 		"%d golpes de más" % (c.golpes - golpes_antes))
+
+## LA ZONA ALTA. `DISEÑO.md` §5 y §7: un tiro difícil abre el modo de caza, subes,
+## juegas arriba un tiempo limitado con el reloj del enemigo corriendo, y bajas.
+##
+## Lo que hay que asegurar no es que la arena exista: es que **se pueda entrar,
+## que no sea una trampa, y sobre todo que BAJAR NO CUESTE LA BOLA**. Una caída
+## libre desde ahí llega a las palas a 1500 px/s, o sea 67 ms, y el cañón ya se
+## tuvo que ablandar porque 900 px/s era incazable.
+func _prueba_zona_alta() -> void:
+	var m := _nueva_mesa()
+	_comprobar("la arena tiene sus dos recorridos", m.umbral >= 0 and m.regreso >= 0)
+	_comprobar("y pines dentro, que si no es una habitación vacía",
+		_pines_arriba(m) >= 10, "%d pines arriba" % _pines_arriba(m))
+
+	# EL REGRESO NO TIENE BOCA. Si la tuviera sería un agujero en el suelo del
+	# piso de arriba y la caza duraría lo que tarda la bola en encontrarlo, no lo
+	# que dice `caza_tiempo`.
+	_comprobar("el regreso no se puede coger por su boca",
+		(m.rampas[m.regreso] as Rampa).sentido_entrada(
+			(m.rampas[m.regreso] as Rampa).puntos[0], Vector2(0, 900)) == 0)
+
+	# LA ARENA ESTÁ CERRADA. Una bola suelta ahí dentro no puede acabar en la
+	# mesa de abajo por gravedad: entre el fondo del embudo y el arco no hay
+	# comunicación, y salir es el regreso o nada.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	var escapes := 0
+	var muertas := 0
+	for _i in 30:
+		var m2 := _nueva_mesa()
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.bola.pos = Vector2(rng.randf_range(60.0, 340.0), rng.randf_range(260.0, 560.0))
+		m2.bola.vel = Vector2(rng.randf_range(-600.0, 600.0), rng.randf_range(-600.0, 600.0))
+		var t := 0.0
+		while t < 6.0 and m2.bola.viva:
+			m2.avanzar(DT)
+			t += DT
+			if m2.bola.libre() and m2.bola.pos.y > 700.0:
+				escapes += 1
+				break
+		if not m2.bola.viva:
+			muertas += 1
+	_comprobar("la arena está cerrada: nada se cae al piso de abajo",
+		escapes == 0, "%d de 30 se escaparon" % escapes)
+	_comprobar("y no se pierde ninguna bola ahí dentro",
+		muertas == 0, "%d de 30 desaparecieron" % muertas)
+
+	# LA CAZA DURA LO QUE DICE, y devuelve la bola.
+	var m3 := _nueva_mesa()
+	m3.nueva_bola()
+	m3.bola.en_carril = false
+	m3.bola.pos = m3.p.umbral_boca
+	m3.bola.vel = Vector2(0, -(m3.p.umbral_velocidad_minima + 200.0))
+	var abierta := [0]
+	var cerrada := [0]
+	m3.caza_empezada.connect(func(_p: Vector2) -> void: abierta[0] += 1)
+	m3.caza_terminada.connect(func(_p: Vector2) -> void: cerrada[0] += 1)
+	var t3 := 0.0
+	var t_abre := -1.0
+	var t_cierra := -1.0
+	while t3 < m3.p.caza_tiempo + 8.0 and m3.bola.viva:
+		m3.avanzar(DT)
+		t3 += DT
+		if abierta[0] > 0 and t_abre < 0.0:
+			t_abre = t3
+		if cerrada[0] > 0 and t_cierra < 0.0:
+			t_cierra = t3
+	_comprobar("el umbral abre la caza", abierta[0] == 1, "%d veces" % abierta[0])
+	_comprobar("y la caza dura lo que dice el parámetro",
+		t_cierra > 0.0 and absf((t_cierra - t_abre) - m3.p.caza_tiempo) < 0.5,
+		"duró %.1f s y pide %.1f" % [t_cierra - t_abre, m3.p.caza_tiempo])
+
+	# Y LA QUE PUEDE TIRAR EL MODO ENTERO: al bajar, ¿se caza la bola?
+	var m4 := _nueva_mesa()
+	m4.nueva_bola()
+	m4.bola.en_carril = false
+	m4.bola.pos = m4.p.umbral_boca
+	m4.bola.vel = Vector2(0, -(m4.p.umbral_velocidad_minima + 200.0))
+	var v_salida := [0.0]
+	m4.rampa_salida.connect(func(_p: Vector2, i: int) -> void:
+		if i == m4.regreso:
+			v_salida[0] = 1.0)
+	var t4 := 0.0
+	var llega := false
+	var rapidez := 0.0
+	while t4 < m4.p.caza_tiempo + 12.0 and m4.bola.viva:
+		m4.avanzar(DT)
+		t4 += DT
+		if v_salida[0] > 0.0:
+			if rapidez <= 0.0:
+				rapidez = m4.bola.velocidad()
+			if m4.bola.pos.distance_to(m4.p.flipper_eje_izq) < 80.0 \
+					or m4.bola.pos.distance_to(m4.p.flipper_eje_der) < 80.0:
+				llega = true
+				break
+	_comprobar("al volver de la caza, la bola llega a una pala", llega)
+	# 650 px/s son 154 ms para cruzar la zona de pala, y un humano reacciona en
+	# 250. Por encima de eso, bajar de la arena sería perder la bola con pasos
+	# extra, que es literalmente lo que se dijo del cañón antes de ablandarlo.
+	_comprobar("y llega CAZABLE, no escupida", rapidez > 0.0 and rapidez < 650.0,
+		"sale a %.0f px/s" % rapidez)
+
+	# EL UMBRAL NO TRAGA CON MULTIBOLA: la cámara sigue a la bola más baja, así
+	# que la caza pasaría entera fuera de plano.
+	var m5 := _nueva_mesa()
+	m5.nueva_bola()
+	m5.bola.en_carril = false
+	m5.soltar_bola_extra()
+	m5.bola.pos = m5.p.umbral_boca
+	m5.bola.vel = Vector2(0, -(m5.p.umbral_velocidad_minima + 200.0))
+	var abierta5 := [0]
+	m5.caza_empezada.connect(func(_p: Vector2) -> void: abierta5[0] += 1)
+	for _i in int(1.0 / DT):
+		m5.avanzar(DT)
+	_comprobar("con dos bolas en juego el umbral no traga", abierta5[0] == 0)
+
+func _pines_arriba(m: Mesa) -> int:
+	var n := 0
+	for v in m.pines:
+		if v.y < 660.0:
+			n += 1
+	return n
 
 ## Los outlanes son la válvula de dificultad: sin ellos solo se pierde la bola
 ## por el hueco entre palas, que es un objetivo pequeño.
@@ -1148,17 +1289,25 @@ func _prueba_no_se_queda_pegada() -> void:
 	_comprobar("y no tarda una eternidad en hacerlo",
 		salio > 0.0 and salio < 2.0, "tardo %.2f s" % salio)
 
-## Los tres recorridos tienen que pagar cosas distintas, o son un tiro repetido.
+## Cada recorrido tiene que pagar una cosa distinta, o son un tiro repetido.
+##
+## Ojo con contarlos: el REGRESO no es un tiro. No tiene boca —te mete la arena
+## cuando se acaba la caza— así que ni se apunta ni se elige, y pedirle identidad
+## propia sería pedirle identidad a la puerta de salida.
 func _prueba_identidad_recorridos() -> void:
 	var m := _nueva_mesa()
 	var premios := {}
 	var nombres: Array[String] = []
-	for r in m.rampas:
-		premios[r.premio] = true
-		nombres.append(r.nombre)
-	_comprobar("los tres recorridos pagan tres cosas distintas",
-		premios.size() == 3 and nombres.size() == 3,
+	for i in m.rampas.size():
+		if i == m.regreso:
+			continue
+		premios[(m.rampas[i] as Rampa).premio] = true
+		nombres.append((m.rampas[i] as Rampa).nombre)
+	_comprobar("cada recorrido que se apunta paga una cosa distinta",
+		premios.size() == nombres.size(),
 		"%d premios distintos en %s" % [premios.size(), str(nombres)])
+	_comprobar("y son los cuatro que hay: órbita, retorno, cañón y umbral",
+		nombres.size() == 4, str(nombres))
 
 	# La órbita sube el multiplicador de tramo, sin encadenar golpes.
 	var c := Combate.new()
@@ -1792,8 +1941,11 @@ func _prueba_sonido() -> void:
 ## se quede a medias.
 func _prueba_rampas() -> void:
 	var m := _nueva_mesa()
-	_comprobar("hay tres recorridos y un platillo",
-		m.rampas.size() == 3 and m.platillos.size() == 1,
+	# Tres abajo (órbita, retorno, cañón) y dos de la zona alta (umbral y
+	# regreso), que son las dos mitades de la misma idea: a la arena no se sube
+	# ni se baja por gravedad.
+	_comprobar("hay cinco recorridos y un platillo",
+		m.rampas.size() == 5 and m.platillos.size() == 1,
 		"%d rampas, %d platillos" % [m.rampas.size(), m.platillos.size()])
 	var r: Rampa = m.rampas[0]
 	_comprobar("la orbita llega a la zona alta",

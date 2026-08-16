@@ -166,6 +166,8 @@ func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	mesa.banco_completado.connect(_al_completar_banco)
 	mesa.girador_girado.connect(_al_girar_girador)
 	mesa.pin_golpeado.connect(_al_golpear_pin)
+	mesa.caza_empezada.connect(_al_empezar_caza)
+	mesa.caza_terminada.connect(_al_terminar_caza)
 	mesa.rampa_salida.connect(_al_salir_de_rampa)
 	mesa.platillo_expulsado.connect(_al_salir_del_platillo)
 	mesa.bola_drenada.connect(_al_drenar)
@@ -511,6 +513,20 @@ func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
 ## El pin es relleno, como el bumper y el girador: paga poco y no escala con el
 ## combo salvo que una reliquia lo encienda. Lo que decide si además SUMA combo
 ## es `pin_suma_combo`, y por qué está ahí y no aquí lo cuenta ese parámetro.
+## LA CAZA NO PARA EL RELOJ, y por eso estos dos ganchos no tocan `_temporizador`
+## ni la fase. `DISEÑO.md` §5: "el modo dura un tiempo limitado y el reloj del
+## enemigo sigue corriendo mientras estás arriba. Sin eso, cazar sería gratis."
+##
+## O sea que subir es una DECISIÓN, no una recompensa: doce segundos arriba son
+## doce segundos de barra que el enemigo se come, y lo que se gana allí no sirve
+## para este combate. Están aquí para que la tele pueda decir qué toca —que es su
+## trabajo principal— y para que el sonido y el aviso salgan.
+func _al_empezar_caza(_punto: Vector2) -> void:
+	mision_cambiada.emit(mision())
+
+func _al_terminar_caza(_punto: Vector2) -> void:
+	mision_cambiada.emit(mision())
+
 func _al_golpear_pin(punto: Vector2, _fuerza: float) -> void:
 	_apuntar("pin")
 	_golpear(p.dano_pin, punto, p.pin_suma_combo, _escala_relleno(),
@@ -583,6 +599,12 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 	_premio_de_recorrido()
 	var comun := bolsa.factor("factor_dano_recorrido")
 	match (mesa.rampas[indice] as Rampa).premio:
+		Rampa.Premio.CAZA:
+			# El umbral NO paga daño, y es a propósito: lo que da es el modo, y
+			# el modo cuesta reloj. Si además pagara como el cañón sería el tiro
+			# obligatorio y la decisión de `DISEÑO.md` §5 —"¿juego para ganar
+			# este run o para desbloquear?"— dejaría de ser una decisión.
+			_apuntar("umbral")
 		Rampa.Premio.MULTIPLICADOR:
 			_apuntar("orbita")
 			_subir_tramo(punto, comun * bolsa.factor("factor_dano_orbita"))

@@ -12,6 +12,10 @@ signal poste_golpeado(punto: Vector2, fuerza: float)
 signal flipper_golpeado(punto: Vector2, fuerza: float)
 signal target_abatido(punto: Vector2, banco: int)
 signal pin_golpeado(punto: Vector2, fuerza: float)
+## La caza: se abre al salir del umbral, se cierra sola cuando se acaba el
+## tiempo. `Combate` las escucha para el aviso y para no parar el reloj.
+signal caza_empezada(punto: Vector2)
+signal caza_terminada(punto: Vector2)
 signal girador_girado(punto: Vector2, indice: int, fuerza: float)
 signal banco_completado(punto: Vector2, banco: int)
 ## Ha caído LA ÚLTIMA bola: esto es un drenaje de verdad, con su vida y su combo.
@@ -88,6 +92,12 @@ var _reset_banco: Array[float] = []
 var giradores: Array[Vector2] = []
 ## Rampas y platillos: no son colisionadores, son curvas y trampas.
 var rampas: Array[Rampa] = []
+## Índices de los dos recorridos de la zona alta. -1 si no están montados.
+var umbral: int = -1
+var regreso: int = -1
+## El modo de caza está abierto, y cuánto le queda.
+var en_caza := false
+var caza_restante: float = 0.0
 var platillos: Array[Platillo] = []
 
 var carga_lanzador: float = 0.0
@@ -249,6 +259,11 @@ func _construir() -> void:
 	# escupe hacia el campo.
 	_platillo(_v(70, 170), Vector2(0.75, 1.0))
 
+	# --- LA ZONA ALTA: la arena de caza ---
+	# Va antes que los pines porque los pines se recortan contra ella.
+	_arena()
+	_umbral_y_regreso()
+
 	# --- El campo de pines, y va EL ÚLTIMO a propósito ---
 	# Se coloca contra lo que ya hay: cada pin mide su hueco contra todos los
 	# colisionadores, platillos y bocas puestos antes, y si no llega no se pone.
@@ -398,6 +413,158 @@ func _platillo(centro: Vector2, direccion: Vector2) -> void:
 func _girador(centro: Vector2) -> void:
 	giradores.append(centro)
 
+# --------------------------------------------------------- la zona alta
+
+## LA ARENA DE CAZA. `DISEÑO.md` §5 y §7: un tiro difícil abre el umbral, subes,
+## juegas arriba un tiempo limitado con el reloj del enemigo corriendo, y bajas.
+##
+## Es un PISO APARTE, no la misma mesa estirada, y la razón es aritmética: una
+## bola que cae libre desde aquí llega a las palas a 1500 px/s, o sea 67 ms de
+## ventana, y el cañón ya se tuvo que ablandar porque 900 px/s era incazable. La
+## arena tiene su propio techo, sus paredes y su propio suelo, y se sale de ella
+## por un carril, no cayendo.
+##
+## Entre el fondo del embudo (y=648) y el arco de la mesa de abajo (y=660) quedan
+## 12 px de nada. No se comunican: la única forma de bajar es el regreso.
+func _arena() -> void:
+	var rx := ANCHO * 0.5 - 20.0
+	var cx := ANCHO * 0.5
+	# El techo, teselado igual que el arco de abajo para que las dos mitades de
+	# la mesa se lean como la misma mesa.
+	for i in SEGMENTOS_ARCO:
+		var t0 := PI * float(i) / float(SEGMENTOS_ARCO)
+		var t1 := PI * float(i + 1) / float(SEGMENTOS_ARCO)
+		_pared(
+			Vector2(cx + rx * cos(t0), p.arena_hombro_y - p.arena_techo_ry * sin(t0)),
+			Vector2(cx + rx * cos(t1), p.arena_hombro_y - p.arena_techo_ry * sin(t1)))
+	# Las paredes rectas.
+	_pared(Vector2(20.0, p.arena_hombro_y), Vector2(20.0, p.arena_suelo_y))
+	_pared(Vector2(ANCHO - 20.0, p.arena_hombro_y), Vector2(ANCHO - 20.0, p.arena_suelo_y))
+	# EL EMBUDO ES UN TRAMPOLÍN. Si fuera pared, la bola caería, se posaría y la
+	# caza duraría medio segundo: aquí arriba no hay palas que la levanten.
+	var media := p.arena_rellano * 0.5
+	_trampolin(Vector2(20.0, p.arena_suelo_y), Vector2(cx - media, p.arena_fondo_y))
+	_trampolin(Vector2(ANCHO - 20.0, p.arena_suelo_y), Vector2(cx + media, p.arena_fondo_y))
+	# Y el rellano del fondo, que es donde la bola se posa cuando se le acaba el
+	# tiempo. Pared normal: si también empujara, no se posaría nunca.
+	_pared(Vector2(cx - media, p.arena_fondo_y), Vector2(cx + media, p.arena_fondo_y))
+
+## Goma de la arena. Mira SIEMPRE hacia arriba, y esa es la diferencia con
+## `_slingshot`: aquel orienta la cara hacia el centro horizontal de la mesa,
+## que es lo que quiere una banda vertical y lo contrario de lo que quiere un
+## suelo. Con la cara hacia el centro, el embudo escupiría la bola de lado
+## contra la pared en vez de devolverla al campo.
+func _trampolin(a: Vector2, b: Vector2) -> Colisionador:
+	var c := Colisionador.new(a, b, 0.0, Colisionador.Tipo.SLINGSHOT,
+		p.arena_rebote, p.arena_empuje, p.arena_velocidad_minima)
+	var d := (b - a).normalized()
+	var perp := Vector2(-d.y, d.x)
+	if perp.y > 0.0:
+		perp = -perp
+	c.cara = perp
+	colisionadores.append(c)
+	return c
+
+## EL UMBRAL Y EL REGRESO, y son las dos mitades de la misma idea: a la arena no
+## se llega ni se sale por gravedad, porque la bola no sube 540 px por sus medios
+## (el tope da 643 px desde las palas, o sea y=557) y bajarlos cayendo llega a
+## 1500 px/s, que no se caza.
+func _umbral_y_regreso() -> void:
+	# EL UMBRAL. Boca pegada a la banda derecha, que es el único sitio por el que
+	# la bola sube de verdad: el bumper de abajo a la derecha del racimo la
+	# escupe hacia allí. El porqué entero, con la tabla por bandas, está en
+	# `umbral_boca`. Sube pegado a la banda y cruza el techo de la arena para
+	# soltar la bola arriba a la izquierda, apuntando hacia dentro: así la visita
+	# empieza cayendo por los pines y no pegada a una pared.
+	umbral = rampas.size()
+	var r := Rampa.new(PackedVector2Array([
+		p.umbral_boca,
+		Vector2(348, 660), Vector2(344, 580), Vector2(330, 500),
+		Vector2(300, 420), Vector2(255, 350), Vector2(200, 300),
+		Vector2(145, 280), Vector2(110, 300),
+	]))
+	r.entrada_radio = p.umbral_entrada_radio
+	r.velocidad_minima = p.umbral_velocidad_minima
+	r.bidireccional = false
+	r.nombre = "umbral"
+	r.premio = Rampa.Premio.CAZA
+	r.factor_salida = p.umbral_factor_salida
+	rampas.append(r)
+
+	# EL REGRESO, y NO TIENE BOCA a propósito: `velocidad_minima` imposible, así
+	# que `sentido_entrada` no lo coge nunca. No se entra en él, te mete la arena
+	# cuando se acaba el tiempo (`_terminar_caza`). Una boca aquí sería un agujero
+	# en el suelo del piso de arriba, y entonces la caza duraría lo que tarda la
+	# bola en encontrarlo.
+	regreso = rampas.size()
+	var g := Rampa.new(PackedVector2Array([
+		# Arranca 24 px por encima del rellano: una boca a 8 px dejaría el punto
+		# de partida DENTRO del colisionador del suelo —la bola mide 9 de radio—
+		# y la bola aparecería empotrada. Hay una prueba que lo vigila.
+		Vector2(ANCHO * 0.5, p.arena_fondo_y - 24.0),
+		Vector2(170, 700), Vector2(130, 780), Vector2(95, 860),
+		Vector2(72, 940), Vector2(66, 1010), Vector2(70, 1060),
+	]))
+	g.entrada_radio = p.rampa_entrada_radio
+	g.velocidad_minima = INF
+	g.bidireccional = false
+	g.nombre = "regreso"
+	g.premio = Rampa.Premio.DANO
+	g.factor_salida = p.regreso_factor_salida
+	rampas.append(g)
+
+## Se abre al SALIR del umbral, no al entrar: el viaje por la curva no se le come
+## al jugador el tiempo que ha ganado.
+func _empezar_caza(punto: Vector2) -> void:
+	if en_caza:
+		return
+	en_caza = true
+	caza_restante = p.caza_tiempo
+	caza_empezada.emit(punto)
+
+## Se acaba el tiempo: todo lo que esté en la arena se va por el regreso. Se
+## empuja en vez de esperar a que la bola encuentre la salida, y por dos razones:
+## el modo tiene que durar LO QUE DICE, y una bola dando botes en un embudo con
+## gomas puede tardar en pasar por un agujero lo que le dé la gana.
+func _terminar_caza() -> void:
+	if not en_caza:
+		return
+	en_caza = false
+	caza_restante = 0.0
+	var punto := Vector2(ANCHO * 0.5, p.arena_fondo_y)
+	for b in bolas:
+		if b.viva and b.libre() and en_la_arena(b):
+			punto = b.pos
+			_meter_en_regreso(b)
+	caza_terminada.emit(punto)
+
+func _meter_en_regreso(b: Bola) -> void:
+	if regreso < 0:
+		return
+	var r := rampas[regreso]
+	b.rampa = regreso
+	b.rampa_sentido = 1
+	# Velocidad FIJA, no la que traía: una caza que acaba con la bola posada en
+	# el rellano tardaría siglos en bajar los 400 px del carril.
+	b.rampa_velocidad = p.regreso_velocidad
+	b.rampa_distancia = 0.0
+	b.pos = r.punto_en(0.0)
+	b.vel = Vector2.ZERO
+	rampa_entrada.emit(b.pos, regreso)
+
+## Una bola está arriba si está por encima del arco de la mesa de abajo. Es la
+## frontera de verdad: entre el fondo del embudo y el arco no hay nada, así que
+## cualquier bola libre por encima de ahí solo puede estar en la arena.
+func en_la_arena(b: Bola) -> bool:
+	return b.pos.y < p.arena_fondo_y + 6.0
+
+func _avanzar_caza(h: float) -> void:
+	if not en_caza:
+		return
+	caza_restante -= h
+	if caza_restante <= 0.0:
+		_terminar_caza()
+
 # ------------------------------------------------------------ campo de pines
 
 ## LA BÓVEDA. Rejilla al tresbolillo bajo el arco y por encima del racimo: la
@@ -433,6 +600,11 @@ func _campo_pines() -> void:
 		_fila_de_pines(p.pin_y + float(f) * p.pin_alto_fila, f % 2 == 1)
 	for f in p.pin_cedazo_filas:
 		_fila_de_pines(p.pin_cedazo_y + float(f) * p.pin_alto_fila, f % 2 == 1)
+	# Y LA ARENA, con el mismo generador y el mismo recorte. Aquí sí paga: es el
+	# único sitio de la mesa con hueco de sobra y sin pasillos de tiro que tapar,
+	# porque arriba no se apunta a nada, se traquetea.
+	for f in p.pin_arena_filas:
+		_fila_de_pines(p.pin_arena_y + float(f) * p.pin_alto_fila, f % 2 == 1)
 
 func _fila_de_pines(y: float, desplazada: bool) -> void:
 	var desfase: float = p.pin_paso * 0.5 if desplazada else 0.0
@@ -476,10 +648,15 @@ func hueco_libre(centro: Vector2, radio: float) -> float:
 	for r in rampas:
 		if r.puntos.is_empty():
 			continue
+		# SOLO LAS BOCAS QUE TRAGAN. El final de un recorrido de un solo sentido
+		# es una SALIDA, no una boca: `sentido_entrada` ni lo mira. Guardarlo
+		# también costaba catorce pines de la arena por proteger un sitio por el
+		# que no se entra.
 		menor = minf(menor,
 			centro.distance_to(r.puntos[0]) - r.entrada_radio - radio)
-		menor = minf(menor,
-			centro.distance_to(r.puntos[r.puntos.size() - 1]) - r.entrada_radio - radio)
+		if r.bidireccional:
+			menor = minf(menor,
+				centro.distance_to(r.puntos[r.puntos.size() - 1]) - r.entrada_radio - radio)
 	return menor
 
 ## EL INVARIANTE DE LA BÓVEDA, en un número: el hueco de paso más estrecho que
@@ -719,6 +896,7 @@ func _subpaso(h: float) -> void:
 		if b.viva:
 			_avanzar_bola(b, h)
 	_colisionar_bolas()
+	_avanzar_caza(h)
 	if (flipper_atrapando != null) != _atrapada_antes:
 		_atrapada_antes = flipper_atrapando != null
 		atrape_cambiado.emit(_atrapada_antes)
@@ -838,15 +1016,29 @@ func _avanzar_rampa(b: Bola, h: float) -> void:
 		* b.rampa_velocidad * r.factor_salida
 	b.rampa = -1
 	rampa_salida.emit(b.pos, indice)
+	if indice == umbral:
+		_empezar_caza(b.pos)
 
 ## Dos bolas SÍ pueden ir por la misma rampa a la vez, y a propósito: el recorrido
 ## lo lleva cada bola en sus propios `rampa_*`, no la rampa, así que no hay estado
 ## que compartir. En una mesa de verdad se solaparían; aquí ni se ven, porque el
 ## que va por la curva se dibuja como sombra.
+## EL UMBRAL NO TRAGA CON MULTIBOLA, y es una decisión de cámara, no de balance.
+## La cámara sigue a la bola MÁS BAJA (invariante de `CLAUDE.md`), así que con
+## una bola arriba y otra abajo la caza pasaría entera fuera de plano. Con una
+## sola bola, la cámara sube con ella y ya está: no hay que tocar ninguna de las
+## cuatro reglas ni el escalado entero.
+##
+## Y tampoco traga si ya estás cazando: no se apilan dos visitas.
+func _umbral_abierto() -> bool:
+	return not en_caza and bolas_vivas() == 1
+
 func _comprobar_rampas(b: Bola) -> void:
 	if not b.libre():
 		return
 	for i in rampas.size():
+		if i == umbral and not _umbral_abierto():
+			continue
 		var sentido := rampas[i].sentido_entrada(b.pos, b.vel)
 		if sentido == 0:
 			continue

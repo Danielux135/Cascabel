@@ -243,6 +243,14 @@ func _dibujar_mensaje(combate: Combate) -> void:
 			if combate.reloj_restante() <= combate.p.reloj_aviso:
 				texto = "ATAQUE EN %d" % int(ceil(combate.reloj_restante()))
 				col = C_ORO_CLARO
+			elif mesa.en_caza:
+				# Y VA DESPUÉS DEL AVISO DEL RELOJ A PROPÓSITO: el reloj sigue
+				# corriendo mientras cazas (`DISEÑO.md` §5), así que si el golpe
+				# está a punto de caer eso manda. La cuenta atrás de la caza
+				# tiene que verse o el modo no existe: un tiempo limitado que no
+				# se ve es la avería del platillo otra vez.
+				texto = "CAZA  ·  %d" % int(ceil(mesa.caza_restante))
+				col = C_ARCANO
 			elif mesa.flipper_atrapando != null:
 				texto = "BOLA ATRAPADA  ·  SUELTA PARA TIRAR"
 				col = C_TEXTO_TENUE
