@@ -13,12 +13,13 @@ pasa de una pantalla, sobra algo.
 
 Lo mínimo que hay que saber si esta conversación empieza de cero.
 
-**Dónde estamos.** La mesa ya tiene **multibola**: `Mesa` pasa de una bola a N,
-la cámara sigue a la más baja, y el eje de Caos de `DISEÑO.md` §8 —que llevaba
-escrito desde el principio y sin implementar— existe por fin como mecánica y no
-como porcentajes. Escrito **y ejecutado**: batería **414/435 en la caja de la
-sesión**, y los 21 que faltan son todos "no existe tal PNG", porque en la caja
-no está `assets/`. En el equipo de Daniel tienen que salir los 435.
+**Dónde estamos.** El racimo de bumpers llevaba desde siempre **puesto de
+espaldas**, y esta tanda lo ha girado. La mesa tiene además un **campo de pines**
+bajo el arco. Batería **426/447 en la caja de la sesión**, y los 21 que faltan
+son todos "no existe tal PNG", porque en la caja no está `assets/`. En el equipo
+de Daniel tienen que salir los 447 — **y para eso hay que generar `pin.wav`**,
+que es sonido nuevo (`python3 sonidos.py`), o el wav que falta pone una prueba
+en rojo.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
@@ -27,18 +28,107 @@ no está `assets/`. En el equipo de Daniel tienen que salir los 435.
 
 **En una sesión remota se puede lanzar Godot, y CON VENTANA**: con un display
 virtual se abre el juego de verdad, se le mandan teclas y se guardan capturas.
-La receta entera está en `CLAUDE.md`, "Godot", y así se cazaron el halo de
-magenta y el reloj cortado, que no salían en la batería. **Lo visual se mira, no
-se deduce.** Para la batería basta con copiar `sim/`, `data/`, `tests/` y
-`render/` y un `project.godot` sin `main_scene`.
+La receta entera está en `CLAUDE.md`, "Godot". **Lo visual se mira, no se
+deduce.** Para la batería basta con copiar `sim/`, `data/`, `tests/` y `render/`
+y un `project.godot` sin `main_scene`.
 
-**Lo que manda ahora** es `PROPÓSITO.md` §8, la dopamina de mesa: el campo de
-pines. Ver "Siguiente".
+**Lo que manda ahora** es lo que ha destapado esta tanda y no arregla: **a la
+zona alta no se apunta**. Ver "Siguiente" 0g.
 
-**Las dos decisiones de la multibola, y las dos son de Daniel:** la cámara sigue
-a la bola más baja, y perder una bola con otras vivas no cuesta absolutamente
-nada. Las dos se deshacen en un rato si al jugar molestan; no hay nada
-construido encima.
+## EL RACIMO ESTABA DE ESPALDAS (tanda 0f)
+
+`PROPÓSITO.md` §8 pedía un campo de pines en la zona alta porque "la mesa se ve
+más pelada que la carpeta de assets". El campo está puesto y funciona. Pero
+medirlo contestó a una pregunta que nadie había hecho, y esa es la tanda.
+
+### El campo de pines: hecho, medido y barato
+
+Once pines en dos filas al tresbolillo bajo el arco, entre y=707 y y=736. **La
+rejilla se genera**, no se escribe a mano: sale de `pin_paso` y `pin_alto_fila`,
+y `_cabe_pin` tira todo pin que no deje 24 px de aire contra lo que ya hay. Por
+eso la fila de abajo se abre justo encima del racimo y el campo es simétrico o no
+es. La batería vigila el invariante que importa —**por todos los huecos cabe la
+bola**, el más estrecho mide 24,1 y la bola 18—, porque tocar un número rehace
+la rejilla entera y eso se rompe sin dar error.
+
+- Los pines **no empujan**. Un bumper es un actuador y ya fabricó energía una vez
+  (`bumper_rebote`); un pin solo quita, así que la bóveda se vacía sola. Medido:
+  600 bolas soltadas dentro **con el ball search apagado**, ninguna atascada,
+  salida media 0,72 s
+- Pagan 2 de daño, son relleno como el bumper y el girador, y **no suman combo**.
+  `pin_suma_combo` está expuesto y apagado: doce toques de una tacada te ponen el
+  combo a ×4, y la brecha entre jugar mal y jugar bien es casi toda multiplicador
+- Sonido propio, `pin`: 35 ms, el más corto de la mesa, y el que más desafine
+  lleva (0,16). Es el que más veces suena de todo el juego
+
+### Y midiendo eso salió lo otro, que es más gordo
+
+El racimo son tres bumpers en triángulo, **dos en una cara y uno en la otra**. Su
+comentario decía "esto está medido, no elegido": con uno en la cara de entrada
+salían 1,4 golpes por entrada y con dos, 3,7. El número era bueno. **La bola con
+la que se midió, no**: se dejaba caer DESDE ARRIBA, y a esta mesa no le llega
+nada de arriba. El racimo está en lo más alto que se alcanza, así que todo lo que
+entra, entra subiendo.
+
+Medido otra vez, por las dos caras, 40 entradas de cada:
+
+| orientación | de dónde | bumpers por entrada | lo más alto |
+|---|---|---|---|
+| dos arriba (como estaba) | **desde abajo** | **1,0** | y=863 |
+| dos arriba | desde arriba | 4,1 | y=669 |
+| **dos abajo (ahora)** | **desde abajo** | **6,3** | **y=704** |
+| dos abajo | desde arriba | 1,9 | y=669 |
+
+O sea que una bola que subía al racimo chocaba de frente contra el bumper de
+abajo y se volvía por donde había venido. **Un manotazo y a la calle.** Girado
+60°, se cuela entre los dos de abajo y rebota contra el de arriba.
+
+Y arrastra la mitad del campo de pines: con el racimo girado la bola sale de él
+hasta y=669, o sea que **por fin entra en la bóveda**. Con el racimo como estaba,
+no llegaba ninguna ruta de la mesa.
+
+Lo que cuesta, medido en la misma ejecución y con las mismas semillas: la bola
+pasa de 1,51 s a 1,67 s por entrada al racimo (+11 %) y el reparto del drenaje se
+mueve de 8/92 a 9/91 entre outlane y centro. Nada que toque la tabla.
+
+### LO QUE ESTA TANDA DESTAPA Y NO ARREGLA, y manda en lo siguiente
+
+**A la zona alta no se apunta.** El único tiro repetible de la mesa es el de la
+bola atrapada en la cuna, y medido con las dos palas y 21 posiciones de cuna:
+
+- sube a **y=893** de media, y el mejor de 42 llega a **y=751**
+- toca **0,1 bumpers por tiro**, o sea ninguno: sube por las bandas, y el racimo
+  está en el centro
+- y ninguna de las cuatro rutas de recorrido llega tampoco: la órbita saca la
+  bola a y=845, el cañón a y=985, el retorno a y=1085 y el platillo a y=784
+
+O sea que el racimo y la bóveda están montados, medidos y equilibrados **en una
+parte de la mesa a la que no se puede tirar a propósito**. Eso explica el 265
+contra 1999 de daño por bola mucho mejor que el reparto de premios: el perfil
+"racimero" da por hechos 16 golpes de bumper por bola, y la mesa entrega uno por
+entrada y casi ninguna entrada. **Nadie puede ser el racimero.**
+
+No se arregla midiendo: es geometría fina, y `ESTADO.md` ya dice lo mismo de las
+bocas ("alinear cada boca con la línea de tiro de su pala se hace jugando"). Va
+de primero en "Siguiente".
+
+### El cedazo, probado y apagado
+
+Antes de llegar a lo del racimo se probó bajar una fila de pines a y=875, que es
+la banda que cruza todo lo que baja. Cobraba —10 de 21 tiros tocaban pin— pero
+**el precio era tapar dos tiros**: los pines de los extremos caen justo debajo de
+las bocas del retorno y del cañón (y=790), y el mejor tiro pasaba de y=751 a
+y=884. Se queda `pin_cedazo_filas` en 0. Para encenderlo haría falta que
+`_cabe_pin` sepa de **pasillos de tiro** y no solo de bocas.
+
+### Lo que NO está y hay que saberlo antes de jugar
+
+- **`pin.wav` no está generado en el repo de Daniel**: `python3 sonidos.py`
+- Los pines se dibujan **por código**, tres rectángulos, sin sprite. Con 10 px de
+  diámetro un sprite no daría más, y el campo se genera: el arte tendría que
+  volver a cortarse cada vez que se toca un número
+- **Nadie ha jugado esto.** El racimo girado cambia el tacto de la mitad de
+  arriba de la mesa, y eso no se lee, se juega
 
 ## MULTIBOLA: LA MESA YA TIENE N BOLAS (tanda 0e)
 
@@ -762,14 +852,19 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    nueve porcentajes. Ver arriba. Lo que queda de esta tanda son las preguntas
    M1-M5, y M1 puede tirar la decisión de cámara entera.
 
-0f. **Y después: `PROPÓSITO.md` §8, la dopamina de mesa** (el campo de
-   pines con **Opus + alto**, porque es geometría nueva y cada rincón es un
-   sitio donde la bola se acuña; los props y placas ya recortados con **Sonnet +
-   medio**). Sube de puesto por lo que ha salido midiendo: **el jugador de
-   racimo hace 265 de daño por bola contra los 1999 del de recorridos**, o sea
-   que el racimo paga 7,5 veces menos. Que el tiro difícil pague más es
-   `DISEÑO.md` §7, pero 7,5× no es una pendiente, es que la mitad de la mesa no
-   compensa — y es justo la mitad que Fátima quiere llenar de sitios donde pegar.
+0f. ~~**`PROPÓSITO.md` §8, la dopamina de mesa: el campo de pines**~~ **HECHA Y
+   MEDIDA.** 426/447. Campo de once pines, y de paso el racimo girado 60°
+   porque llevaba desde siempre puesto de espaldas: 1,0 golpes por entrada
+   pasan a 3,9. Ver arriba. Lo que queda de esta tanda es jugarla.
+
+0g. **QUE A LA ZONA ALTA SE PUEDA APUNTAR** (Opus, alto, y con Daniel jugando).
+   Sube al primer puesto porque lo ha destapado la tanda anterior y porque
+   invalida a medias todo lo que se decida encima: el tiro desde la cuna sube a
+   y=893 de media y toca 0,1 bumpers, y ninguna salida de recorrido pasa de
+   y=784. El racimo y la bóveda están equilibrados en una parte de la mesa a la
+   que no se puede tirar. Es geometría fina y no se mide, se juega: alinear la
+   línea de tiro de cada pala con algo que merezca la pena arriba. **Y hasta
+   que esto no esté, el 265 contra 1999 no se arregla tocando premios.**
 
 1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto). **Baja de
    puesto por decisión de Fátima, no porque la medida haya cambiado:** el
@@ -849,6 +944,13 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 | Motor de multibola, una bola: antes → después | 71 % / 3-5 runs → **idéntico** |
 | Con las 5 reliquias de Caos dentro (modelo, no veredicto) | 97 % de vida, 835 d/bola, 128 s |
 | Tope de bolas a la vez | 4 (`bolas_maximas`, elegido a ojo) |
+| **Racimo: golpes por entrada, de espaldas → girado** | **1,0 → 3,9** |
+| Tiro desde la cuna: sube a | y=893 de media, y=751 el mejor de 42 |
+| Y toca | 0,1 bumpers por tiro |
+| Salidas de recorrido: lo más alto | órbita 845 · cañón 985 · retorno 1085 · platillo 784 |
+| Campo de pines: paso más estrecho | 24,1 px (bola 18) |
+| Coste del racimo girado: duración de bola | 1,51 s → 1,67 s por entrada |
+| Coste del racimo girado: drenaje outlane/centro | 8/92 → 9/91 |
 | Brecha entre jugar mal y jugar bien | 20× (8,4× sin multiplicador) |
 | Vida de enemigos | 225-660, salida del barrido |
 | Runs acabados: malo / normal / bueno | 0/5 · 2/5 · 5/5 |

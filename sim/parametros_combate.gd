@@ -120,6 +120,27 @@ var pausa_ataque: float = 0.9    # enseñando el contraataque
 ## que un bumper, pero pega menos porque es mucho más fácil de encadenar.
 var dano_girador: int = 3
 
+## El pin de la bóveda. Es el golpe más pequeño de la mesa a propósito: no se
+## apunta a un pin, se cae en él, y lo que paga es que caen muchos seguidos.
+## Uno solo no se nota; una entrada buena encadena diez o doce.
+var dano_pin: int = 2
+
+## SI EL PIN CUENTA PARA EL COMBO, Y ESTE ES EL DIAL DE LA TANDA.
+##
+## Los tramos de combo van a 5, 10 y 20 golpes, y una entrada a la bóveda son
+## diez o doce toques de una tacada. Con esto encendido, cualquiera llega a ×4
+## traqueteando, y eso no sube el suelo: BAJA EL TECHO, porque la brecha entre
+## jugar mal y jugar bien —medida en 20×, y 8,4× sin el multiplicador— es casi
+## toda multiplicador. Regalarlo es cobrarle al que juega bien.
+##
+## Apagado, el pin es lo que dice ser: daño pequeño y constante que arregla que
+## la mitad de arriba de la mesa no compense, sin tocar la escala de habilidad.
+##
+## Se queda expuesto porque esto se decide jugando, no leyendo: encendido se
+## siente mucho mejor —los números suben mientras traquetea— y puede que ese
+## regalo valga lo que cuesta. Está medido por las dos ramas en ESTADO.md.
+var pin_suma_combo: bool = false
+
 # --- Críticos ---
 ## Todo golpe puede salir crítico. Es de las cosas más baratas que se le pueden
 ## poner a un juego de números: no cambia la media casi nada y cambia mucho cómo

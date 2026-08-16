@@ -107,6 +107,103 @@ var bumper_velocidad_minima: float = 40.0   # (*) umbral del interruptor
 var bumper_hueco: float = 24.0
 var bumper_centro := Vector2(200.0, 805.0)
 
+## HACIA DÓNDE MIRA EL TRIÁNGULO, en grados. Y esto es la corrección de un error
+## de medida, no un gusto.
+##
+## El racimo estaba en 0 —dos bumpers arriba y uno abajo— y su comentario decía
+## "esto está medido, no elegido": con uno arriba salían 1,4 golpes por entrada
+## y con dos, 3,7. El número era bueno; **la bola con la que se midió, no**. Se
+## dejaba caer DESDE ARRIBA, y en esta mesa a la bola no le llega nada de
+## arriba: el racimo está en lo más alto que se alcanza, así que todo lo que
+## entra, entra SUBIENDO.
+##
+## Medido otra vez, ahora por las dos caras, 40 entradas de cada:
+##
+##     orientación   de dónde        bumpers   lo más alto
+##     dos arriba    desde abajo         1,0        y=863
+##     dos arriba    desde arriba        4,1        y=669
+##     dos abajo     desde abajo         6,3        y=704
+##     dos abajo     desde arriba        1,9        y=669
+##
+## O sea que el racimo llevaba todo este tiempo puesto de espaldas: una bola que
+## sube choca de frente contra el bumper de abajo y se vuelve por donde vino.
+## Girado 60°, la bola que sube se cuela entre los dos de abajo y rebota contra
+## el de arriba, que es el 3,7 de la medida original pero por la cara buena.
+##
+## Y arrastra la otra mitad de la tanda: con dos abajo la bola sale del racimo
+## hasta y=704, o sea que POR FIN entra en la bóveda de pines. Con el racimo
+## como estaba, no llegaba ninguna ruta de la mesa.
+var bumper_giro: float = 60.0
+
+# --- Campo de pines (*) ---
+# Pachinko: la bola sale disparada del racimo, traquetea por la bóveda que hay
+# bajo el arco y vuelve a caer al racimo. No venían del prototipo.
+#
+# LOS PINES NO EMPUJAN, Y ESO ES EL DISEÑO ENTERO. Un bumper es un actuador y
+# fabrica energía si te descuidas —ya pasó, ver `bumper_rebote`—; un pin solo
+# recibe. Cada toque le quita algo a la bola, así que la bóveda se vacía sola y
+# no puede convertirse en un bucle que se sostiene sin las palas, que es lo que
+# `PLAN.md` §3B prohíbe.
+#
+# Y VAN DONDE NO ESTORBAN: la bóveda está por encima del racimo, fuera de los
+# carriles por los que la bola BAJA. Meter pines en las bandas haría el descenso
+# aleatorio, y con el outlane ahí abajo eso es perder la bola sin jugarla.
+var pin_radio: float = 5.0
+## Metal, y sin actuador: el rebote es de pared larga. Con más, la bola se queda
+## viviendo arriba; con menos, cruza la bóveda sin traquetear.
+var pin_rebote: float = 0.55
+## Umbral del aviso, no de la física. Es lo que separa "esto ha sido un golpe"
+## de "la bola está rozando el pin": sin él, una bola apoyada emitiría un aviso
+## por subpaso, que es la trampa que ya cazamos con los bumpers (480 golpes por
+## segundo). Una bola apoyada llega al contacto con lo que le da la gravedad en
+## un subpaso —1750/480 = 3,6 px/s—, o sea que 70 la deja fuera de sobra.
+var pin_velocidad_minima: float = 70.0
+## Rejilla al tresbolillo: `pin_paso` de separación entre centros de la misma
+## fila y `pin_alto_fila` entre filas, con las impares desplazadas medio paso.
+##
+## LOS DOS NÚMEROS SON UN INVARIANTE DISFRAZADO. El hueco por el que pasa la
+## bola es `paso − 2·radio` en horizontal y `hipotenusa(paso/2, alto) − 2·radio`
+## en diagonal, y la bola mide 18. Con 36 y 29 salen 26 y 24,1: pasa por los dos
+## con holgura. El suelo es paso > 28; y con ese paso, alto > 21,4. Por debajo
+## la bóveda deja de ser un campo de pines y pasa a ser una trampa de acuñar.
+## Lo comprueba la batería, no la buena voluntad.
+var pin_paso: float = 36.0
+var pin_alto_fila: float = 29.0
+## Dónde empieza la primera fila. 707 la deja bajo el arco (que en el centro
+## abre hasta y=660) y por encima de los bumpers de arriba (y=787 menos 19 de
+## radio = 768).
+var pin_y: float = 707.0
+## Tres filas pedidas, dos colocadas: la tercera cae encima del racimo y el
+## filtro de holgura la tira entera. Se deja en 3 a propósito, para que apretar
+## `pin_alto_fila` la recupere sin tocar nada más.
+var pin_filas: int = 3
+
+## EL CEDAZO, Y ESTÁ AQUÍ PORQUE LO PIDIÓ LA MEDIDA. La bóveda sola no la toca
+## nadie: el tiro desde la cuna —el único tiro repetible de la mesa— sube a
+## y=894 de media, y el mejor de 42 se queda en y=751, quince píxeles por debajo
+## de la fila de abajo de la bóveda. Cero pines tocados en 42 tiros.
+##
+## Esta fila iba en y=875, que es la banda que cruza TODO lo que baja de la zona
+## alta. Y SE QUEDA APAGADA, porque medirla contestó a una pregunta que no
+## habíamos hecho: esa banda no es hueco libre, **es el pasillo de tiro**.
+##
+## Encendida, los tiros desde la cuna tocaban pin (10 de 21 por la izquierda, 9
+## de 21 por la derecha) pero dejaban de subir: el mejor pasaba de y=751 a
+## y=884. Y los dos pines de los extremos caen justo debajo de las bocas del
+## retorno y del cañón, que están en y=790: o sea que el precio de que la bola
+## traquetee era tapar dos de los seis tiros de `DISEÑO.md` §4.
+##
+## Se deja el parámetro, no el apaño: a 1 vuelve, y lo que haría falta antes es
+## que `_cabe_pin` sepa de PASILLOS DE TIRO y no solo de bocas. Está apuntado en
+## ESTADO.md.
+var pin_cedazo_y: float = 875.0
+var pin_cedazo_filas: int = 0
+## Hueco mínimo que un pin tiene que dejar contra TODO lo que ya está puesto
+## —arco, paredes, bumpers, platillo y bocas de recorrido— para que se coloque.
+## Por debajo del diámetro de la bola sería un sitio donde acuñarse; 24 deja
+## 3 px de aire por lado sobre los 18 que mide.
+var pin_holgura: float = 24.0
+
 ## (*) Outlanes: los dos carriles que van directos al drenaje, por fuera de los
 ## carriles de retorno. Son la válvula de dificultad de la mesa: sin ellos solo
 ## se pierde la bola por el hueco entre palas, que es un objetivo pequeño.

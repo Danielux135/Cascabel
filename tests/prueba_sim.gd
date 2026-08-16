@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_prueba_sonido()
 	_prueba_impactos()
 	_prueba_racimo()
+	_prueba_campo_pines()
 	_prueba_sin_rebote_encerrado()
 	_prueba_slingshot_tiene_espalda()
 	_prueba_outlanes()
@@ -736,6 +737,13 @@ func _prueba_adornos() -> void:
 ## El racimo estaba tan abierto que la bola pasaba por el medio sin tocar nada:
 ## medido, 0,0 bumpers por bola lanzada. Lo que hay que asegurar es el hueco y,
 ## sobre todo, que al entrar rebote varias veces seguidas.
+##
+## Y ESTA PRUEBA MEDÍA POR LA CARA QUE NO ERA. Dejaba caer la bola DESDE ARRIBA,
+## y en esta mesa a la bola no le llega nada de arriba: el racimo está en lo más
+## alto que se alcanza, así que todo lo que entra, entra subiendo. Con la bola
+## subiendo, el racimo tal y como estaba daba 1,0 golpes por entrada —o sea, un
+## manotazo y a la calle— mientras esta prueba lo daba por bueno con 3,7.
+## Girado 60° da 3,9 subiendo. La tabla entera está en `bumper_giro`.
 func _prueba_racimo() -> void:
 	var m := _nueva_mesa()
 	_comprobar("el racimo son tres bumpers", m.bumpers.size() == 3)
@@ -754,7 +762,8 @@ func _prueba_racimo() -> void:
 		huecos.min() > m.p.radio_bola * 2.0,
 		"hueco %.1f px, bola %.1f" % [huecos.min(), m.p.radio_bola * 2.0])
 
-	# Lo que de verdad importa: entrar por el medio tiene que dar cadena.
+	# Lo que de verdad importa: entrar por el medio tiene que dar cadena, Y
+	# ENTRANDO POR DONDE SE ENTRA DE VERDAD, que es subiendo.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEMILLA
 	var total := 0
@@ -763,11 +772,11 @@ func _prueba_racimo() -> void:
 		var m2 := _nueva_mesa()
 		m2.nueva_bola()
 		m2.bola.en_carril = false
-		# Entrando de verdad por el hueco de arriba, no rozando el racimo de
-		# refilón: con un cono ancho la mitad de las bolas ni entran, y lo que
-		# se quiere medir es qué pasa cuando SÍ entra.
-		m2.bola.pos = m2.p.bumper_centro + Vector2(rng.randf_range(-14, 14), -120)
-		m2.bola.vel = Vector2(rng.randf_range(-60, 60), 480)
+		# Entrando de verdad por el hueco, no rozando el racimo de refilón: con
+		# un cono ancho la mitad de las bolas ni entran, y lo que se quiere
+		# medir es qué pasa cuando SÍ entra.
+		m2.bola.pos = m2.p.bumper_centro + Vector2(rng.randf_range(-14, 14), 120)
+		m2.bola.vel = Vector2(rng.randf_range(-60, 60), -rng.randf_range(700, 1100))
 		var golpes := [0]
 		m2.bumper_golpeado.connect(func(_pt: Vector2, _f: float) -> void:
 			golpes[0] += 1)
@@ -777,10 +786,125 @@ func _prueba_racimo() -> void:
 			m2.avanzar(DT)
 		total += golpes[0]
 	var media := float(total) / float(intentos)
-	# Medido: 3,7 de media con hueco 24 y dos bumpers arriba. Con uno arriba
-	# eran 1,4. El umbral va en 3 para dejar margen sin perder el diente.
-	_comprobar("cayendo dentro del racimo, la bola encadena golpes",
+	# Medido: 3,9 de media subiendo, con el racimo girado. De espaldas eran 1,0.
+	# El umbral va en 3 para dejar margen sin perder el diente.
+	_comprobar("subiendo al racimo, la bola encadena golpes",
 		media >= 3.0, "%.1f bumpers por entrada" % media)
+
+	# Y LA CARA DE ENTRADA TIENE QUE SER LA DE ABAJO. Es lo que se rompería sin
+	# enterarse si alguien vuelve a poner `bumper_giro` a 0 "por simetría": los
+	# huecos seguirían bien, el triángulo seguiría siendo un triángulo, y la
+	# bola volvería a rebotar una vez y marcharse.
+	var arriba := 0
+	for c in m.bumpers:
+		if (c as Vector2).y < m.p.bumper_centro.y:
+			arriba += 1
+	_comprobar("y hay DOS bumpers en la cara por la que sube la bola",
+		arriba == 1, "%d de 3 por encima del centro del racimo" % arriba)
+
+## EL CAMPO DE PINES. Pachinko bajo el arco: la bola sale del racimo, traquetea
+## y vuelve a caer al racimo. Lo que hay que asegurar no es que haya pines, es
+## que NO SE PUEDA ACUÑAR LA BOLA en ellos y que no tapen ningún tiro: el campo
+## se GENERA desde `pin_paso` y `pin_alto_fila`, así que tocar un número rehace
+## la rejilla entera y las dos cosas se rompen sin dar error.
+func _prueba_campo_pines() -> void:
+	var m := _nueva_mesa()
+	_comprobar("hay campo de pines", m.pines.size() >= 6,
+		"%d pines" % m.pines.size())
+
+	# EL INVARIANTE. Todo hueco de paso tiene que dejar pasar la bola; si no,
+	# la bóveda es una trampa de acuñar con forma de adorno.
+	var paso := m.paso_minimo_pines()
+	_comprobar("por todos los huecos del campo cabe la bola",
+		paso > m.p.radio_bola * 2.0,
+		"el más estrecho mide %.1f px y la bola %.0f" % [paso, m.p.radio_bola * 2.0])
+
+	# Simétrico o ninguno: un campo torcido se lee como un fallo.
+	var espejo := true
+	for v in m.pines:
+		var hay := false
+		for w in m.pines:
+			if absf(w.x - (Mesa.ANCHO - v.x)) < 0.5 and absf(w.y - v.y) < 0.5:
+				hay = true
+				break
+		if not hay:
+			espejo = false
+			break
+	_comprobar("el campo es simétrico", espejo)
+
+	# Ningún pin puede tapar una boca de recorrido ni el platillo: taparla
+	# quitaría un tiro de la mesa sin que nada diera error.
+	var pisa := ""
+	for v in m.pines:
+		for pl in m.platillos:
+			if v.distance_to(pl.centro) < pl.radio + m.p.pin_radio + 1.0:
+				pisa = "platillo"
+		for r in m.rampas:
+			for boca in [r.puntos[0], r.puntos[r.puntos.size() - 1]]:
+				if v.distance_to(boca) < r.entrada_radio + m.p.pin_radio + 1.0:
+					pisa = r.nombre
+	_comprobar("ningún pin tapa una boca ni el platillo", pisa == "",
+		"tapado: %s" % pisa)
+
+	# Y LA BÓVEDA SE VACÍA SOLA. Con el ball search apagado a propósito: con él
+	# puesto, una bola acuñada saldría a los 2 s y la prueba diría que todo va
+	# bien tapando justo lo que se quiere ver.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = SEMILLA
+	var peor := 0.0
+	for _i in 40:
+		var m2 := _nueva_mesa()
+		m2.p.busqueda_tiempo = 1e9
+		m2.nueva_bola()
+		m2.bola.en_carril = false
+		m2.bola.pos = Vector2(rng.randf_range(70.0, 330.0), rng.randf_range(690.0, 750.0))
+		m2.bola.vel = Vector2(rng.randf_range(-400.0, 400.0), rng.randf_range(-500.0, 200.0))
+		var t := 0.0
+		while t < 15.0 and m2.bola.viva and m2.bola.pos.y < 800.0:
+			m2.avanzar(DT)
+			t += DT
+		peor = maxf(peor, t)
+	_comprobar("una bola suelta en la bóveda siempre acaba saliendo",
+		peor < 15.0, "la peor tardó %.1f s" % peor)
+
+	# El aviso sale UNA vez por golpe, no una por subpaso. Es la trampa que ya
+	# costó tiempo con los bumpers: 480 golpes por segundo con la bola apoyada.
+	var m3 := _nueva_mesa()
+	m3.p.busqueda_tiempo = 1e9
+	m3.nueva_bola()
+	m3.bola.en_carril = false
+	var avisos := [0]
+	m3.pin_golpeado.connect(func(_p: Vector2, _f: float) -> void: avisos[0] += 1)
+	var pin: Vector2 = m3.pines[0]
+	m3.bola.pos = pin - Vector2(0.0, m3.p.pin_radio + m3.p.radio_bola - 0.4)
+	m3.bola.vel = Vector2.ZERO
+	for _i in int(1.0 / DT):
+		m3.avanzar(DT)
+	_comprobar("una bola apoyada en un pin no avisa por subpaso",
+		avisos[0] <= 2, "%d avisos en 1 s" % avisos[0])
+
+	# Y lo que cobra: relleno, y sin tocar el combo mientras `pin_suma_combo`
+	# esté apagado. Un traqueteo de doce toques poniéndote el combo a tope
+	# regalaría el multiplicador, que es casi toda la brecha por habilidad.
+	# Sin críticos: con 12 toques y un 6 % por golpe salta uno de cada dos
+	# intentos y la prueba se pondría roja sola. Los críticos tienen la suya.
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var c := Combate.new(pc)
+	c.iniciar(Enemigo.new({"nombre": "Prueba", "vida": 500, "ataque": 10}))
+	_en_juego(c)
+	# La vida se lee AQUÍ, no se da por 500: sacar el combate de la fase de
+	# lanzamiento ya cuesta un golpe, y esta prueba mide lo que paga el pin.
+	var vida_antes := c.enemigo.vida
+	var golpes_antes := c.golpes
+	for _i in 12:
+		c.mesa.pin_golpeado.emit(Vector2(200, 720), 300.0)
+	_comprobar("el pin paga poco y paga siempre",
+		c.enemigo.vida == vida_antes - c.p.dano_pin * 12,
+		"ha quitado %d, esperado %d" % [vida_antes - c.enemigo.vida, c.p.dano_pin * 12])
+	_comprobar("y no regala combo",
+		c.golpes == golpes_antes or c.p.pin_suma_combo,
+		"%d golpes de más" % (c.golpes - golpes_antes))
 
 ## Los outlanes son la válvula de dificultad: sin ellos solo se pierde la bola
 ## por el hueco entre palas, que es un objetivo pequeño.

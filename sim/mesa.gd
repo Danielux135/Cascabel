@@ -11,6 +11,7 @@ signal slingshot_golpeado(punto: Vector2, fuerza: float)
 signal poste_golpeado(punto: Vector2, fuerza: float)
 signal flipper_golpeado(punto: Vector2, fuerza: float)
 signal target_abatido(punto: Vector2, banco: int)
+signal pin_golpeado(punto: Vector2, fuerza: float)
 signal girador_girado(punto: Vector2, indice: int, fuerza: float)
 signal banco_completado(punto: Vector2, banco: int)
 ## Ha caído LA ÚLTIMA bola: esto es un drenaje de verdad, con su vida y su combo.
@@ -75,6 +76,9 @@ var _drenadas: Array[Bola] = []
 var arco := PackedVector2Array()
 ## Solo para dibujar: centros y radios de bumpers y postes.
 var bumpers: Array[Vector2] = []
+## Los pines de la bóveda, en el orden en el que se colocaron. Solo para dibujar
+## y para que las pruebas puedan medir el campo.
+var pines: Array[Vector2] = []
 var postes: Array[Vector2] = []
 ## Targets abatibles, agrupados en bancos. `activo` dice si están en pie.
 var targets: Array[Colisionador] = []
@@ -245,6 +249,12 @@ func _construir() -> void:
 	# escupe hacia el campo.
 	_platillo(_v(70, 170), Vector2(0.75, 1.0))
 
+	# --- El campo de pines, y va EL ÚLTIMO a propósito ---
+	# Se coloca contra lo que ya hay: cada pin mide su hueco contra todos los
+	# colisionadores, platillos y bocas puestos antes, y si no llega no se pone.
+	# Construirlo antes obligaría a repetir aquí la geometría de media mesa.
+	_campo_pines()
+
 	flipper_izq = Flipper.new(
 		p.flipper_eje_izq, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
@@ -304,15 +314,19 @@ func _bumper(centro: Vector2) -> Colisionador:
 ## hueco, así que tocar el parámetro reordena el racimo entero sin recolocar
 ## nada a mano.
 ##
-## DOS ARRIBA Y UNO ABAJO, y esto está medido, no elegido: con uno arriba la
-## bola que cae rebota en él y sale disparada hacia fuera, 1,4 golpes por
-## entrada. Con dos arriba se cuela entre ellos, pega en el de abajo y vuelve
-## hacia arriba: 3,7 golpes por entrada con el mismo hueco.
+## DOS EN LA CARA POR LA QUE ENTRA LA BOLA, y aquí está medido pero se midió mal
+## una vez: la regla no es "dos arriba", es **dos en la cara de entrada**. La
+## bola tiene que colarse entre dos y rebotar contra el tercero; si el tercero es
+## el primero que se encuentra, se la devuelve de un manotazo y se acabó.
+##
+## En esta mesa el racimo está en lo más alto que se alcanza, así que la bola
+## entra SUBIENDO y la cara de entrada es la de abajo. `bumper_giro` lo cuenta
+## entero, con la tabla.
 func _racimo_bumpers() -> void:
 	var lado := p.bumper_hueco + p.bumper_radio * 2.0
 	var radio_racimo := lado / sqrt(3.0)          # del centro a cada vértice
 	for i in 3:
-		var ang := PI * 0.5 + float(i) * TAU / 3.0
+		var ang := PI * 0.5 + deg_to_rad(p.bumper_giro) + float(i) * TAU / 3.0
 		_bumper(p.bumper_centro + Vector2(cos(ang), sin(ang)) * radio_racimo)
 
 ## Cada target es una PLANCHA, no un bolo: una cápsula tumbada a lo largo de la
@@ -383,6 +397,124 @@ func _platillo(centro: Vector2, direccion: Vector2) -> void:
 
 func _girador(centro: Vector2) -> void:
 	giradores.append(centro)
+
+# ------------------------------------------------------------ campo de pines
+
+## LA BÓVEDA. Rejilla al tresbolillo bajo el arco y por encima del racimo: la
+## bola sale disparada de un bumper, traquetea entre los pines y vuelve a caer
+## al racimo, que la vuelve a subir. Es lo de Peglin y lo del pachinko, y es el
+## sitio más barato de la mesa donde pasan muchas cosas seguidas.
+##
+## POR QUÉ NO SE VA DE LAS MANOS, que era el miedo: los pines no empujan. Un
+## bumper con `bumper_rebote` por encima de 1 fabricaba energía y la bola se
+## quedaba a vivir arriba (está en el comentario de ese parámetro); aquí cada
+## toque QUITA, así que la bóveda se vacía sola por gravedad.
+##
+## La rejilla se genera, no se escribe a mano, y se recorta con `_cabe_pin`: un
+## pin que no deje `pin_holgura` px de aire contra lo que ya hay no se coloca.
+## Por eso la fila de en medio se abre justo encima del racimo —ahí no cabe— y
+## queda el embudo que devuelve la bola a los bumpers.
+##
+## SIMÉTRICO O NINGUNO. Si un lado no cabe, su espejo tampoco se pone. Un campo
+## de pines torcido no se lee como una decisión, se lee como un fallo, y la
+## asimetría de esta mesa la ponen el platillo y las bocas, que ya están.
+## Y SON DOS GRUPOS, NO UNO, Y ESO LO DECIDIÓ LA MEDIDA. La bóveda sola era
+## decoración: el tiro desde la cuna —el único repetible que tiene la mesa—
+## sube a y=894 de media y a y=751 el mejor de todos, o sea que no llega a la
+## fila de abajo de la bóveda ni en su mejor día. Medido con las dos palas y 21
+## posiciones de cuna: 0 de 42 tiros tocaban un pin.
+##
+## El cedazo va donde la bola SÍ pasa: la banda de y=875, que la cruza todo lo
+## que baja de la zona alta. La bóveda se queda igualmente porque cuesta cero y
+## sí se toca desde el racimo y desde las salidas de recorrido, pero quien paga
+## las cuentas es el cedazo.
+func _campo_pines() -> void:
+	for f in p.pin_filas:
+		_fila_de_pines(p.pin_y + float(f) * p.pin_alto_fila, f % 2 == 1)
+	for f in p.pin_cedazo_filas:
+		_fila_de_pines(p.pin_cedazo_y + float(f) * p.pin_alto_fila, f % 2 == 1)
+
+func _fila_de_pines(y: float, desplazada: bool) -> void:
+	var desfase: float = p.pin_paso * 0.5 if desplazada else 0.0
+	var k := 0
+	while true:
+		var dx := desfase + float(k) * p.pin_paso
+		var izq := ANCHO * 0.5 - dx
+		var der := ANCHO * 0.5 + dx
+		if izq <= 0.0 or der >= ANCHO:
+			break
+		if _cabe_pin(Vector2(izq, y)) and _cabe_pin(Vector2(der, y)):
+			_pin(Vector2(izq, y))
+			if dx > 0.0:
+				_pin(Vector2(der, y))
+		k += 1
+
+func _pin(centro: Vector2) -> Colisionador:
+	var c := Colisionador.new(centro, centro, p.pin_radio, Colisionador.Tipo.PIN,
+		p.pin_rebote, 0.0, p.pin_velocidad_minima)
+	colisionadores.append(c)
+	pines.append(centro)
+	return c
+
+func _cabe_pin(centro: Vector2) -> bool:
+	return hueco_libre(centro, p.pin_radio) >= p.pin_holgura
+
+## Cuánto aire queda entre un círculo de radio `radio` puesto en `centro` y lo
+## más cercano que ya haya en la mesa. Negativo si se solapan.
+##
+## Cuenta los colisionadores, los platillos y las BOCAS de los recorridos. Las
+## bocas no son colisionadores —una rampa es una curva— pero capturan la bola,
+## así que tapar una con un pin sería quitar un tiro de la mesa sin que nada
+## diera error.
+func hueco_libre(centro: Vector2, radio: float) -> float:
+	var menor := INF
+	for c in colisionadores:
+		menor = minf(menor,
+			centro.distance_to(c.punto_mas_cercano(centro)) - c.radio - radio)
+	for pl in platillos:
+		menor = minf(menor, centro.distance_to(pl.centro) - pl.radio - radio)
+	for r in rampas:
+		if r.puntos.is_empty():
+			continue
+		menor = minf(menor,
+			centro.distance_to(r.puntos[0]) - r.entrada_radio - radio)
+		menor = minf(menor,
+			centro.distance_to(r.puntos[r.puntos.size() - 1]) - r.entrada_radio - radio)
+	return menor
+
+## EL INVARIANTE DE LA BÓVEDA, en un número: el hueco de paso más estrecho que
+## deja el campo, contra otro pin y contra cualquier otra cosa sólida de la
+## mesa. Si baja de los 18 que mide la bola, la bóveda deja de ser un campo de
+## pines y pasa a ser un sitio donde acuñarse. Lo vigila la batería, porque el
+## campo se GENERA y tocar `pin_paso` o `pin_alto_fila` lo rehace entero.
+##
+## No entran ni platillos ni bocas: por ahí la bola no pasa, se la tragan. Que
+## un pin no las tape ya lo decide `_cabe_pin` al colocarlo.
+func paso_minimo_pines() -> float:
+	var menor := INF
+	for i in pines.size():
+		var pin: Vector2 = pines[i]
+		for j in range(i + 1, pines.size()):
+			menor = minf(menor,
+				pin.distance_to(pines[j]) - p.pin_radio * 2.0)
+		for c in colisionadores:
+			if c.tipo == Colisionador.Tipo.PIN:
+				continue
+			menor = minf(menor,
+				pin.distance_to(c.punto_mas_cercano(pin)) - c.radio - p.pin_radio)
+	return menor
+
+## El pin más cercano a un punto de contacto, para que la vista sepa cuál
+## encender. -1 si no hay ninguno cerca.
+func pin_mas_cercano(punto: Vector2) -> int:
+	var mejor := -1
+	var mejor_d := INF
+	for i in pines.size():
+		var d: float = (pines[i] as Vector2).distance_squared_to(punto)
+		if d < mejor_d:
+			mejor_d = d
+			mejor = i
+	return mejor
 
 ## Los giradores no colisionan: la bola los atraviesa. Se disparan al ENTRAR,
 ## una vez por pasada, así que mientras la bola siga dentro no vuelven a avisar.
@@ -889,6 +1021,14 @@ func _avisar(c: Contacto, fuerza: float, empuje: float) -> void:
 		Colisionador.Tipo.BUMPER:
 			if empuje > 0.0:
 				bumper_golpeado.emit(c.punto, fuerza)
+		Colisionador.Tipo.PIN:
+			# El pin no empuja, así que el filtro no puede ser el empuje como en
+			# el bumper: es la velocidad de llegada. Y hace la misma faena, que
+			# es lo que importa: una bola apoyada en un pin llega al contacto
+			# con lo que le da la gravedad en un subpaso —1750/480 = 3,6 px/s—,
+			# muy por debajo del umbral, así que no repite el aviso.
+			if fuerza >= c.velocidad_minima:
+				pin_golpeado.emit(c.punto, fuerza)
 		Colisionador.Tipo.SLINGSHOT:
 			if empuje > 0.0:
 				slingshot_golpeado.emit(c.punto, fuerza)

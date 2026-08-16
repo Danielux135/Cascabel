@@ -116,6 +116,19 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   cuatro reglas y el escalado entero siguen intactos. Alejar la cámara para que
   quepan todas rompe el escalado entero del pixelart; si hace falta saber dónde
   están las otras, lo que se añade son flechas en el borde, no zoom.
+- **El racimo tiene DOS bumpers en la cara por la que ENTRA la bola.** No "dos
+  arriba": dos en la cara de entrada. La bola tiene que colarse entre dos y
+  rebotar contra el tercero; si el tercero es el primero que se encuentra, se la
+  devuelve de un manotazo. En esta mesa el racimo está en lo más alto que se
+  alcanza, así que la bola entra SUBIENDO y la cara de entrada es la de abajo
+  (`bumper_giro`, ago-2026). Estuvo del revés desde el principio con un
+  comentario que decía "esto está medido": lo estaba, contra una bola que caía.
+- **Los pines NO empujan, y la bóveda se recorta sola.** El campo de pines se
+  genera desde `pin_paso` y `pin_alto_fila`, y `_cabe_pin` tira todo pin que no
+  deje aire contra lo que ya hay. Dos invariantes, y los dos los vigila la
+  batería: por todos los huecos tiene que caber la bola, y ningún pin puede tapar
+  una boca de recorrido ni el platillo. Un pin que empujara sería un bumper
+  pequeño y la bola se quedaría a vivir arriba.
 - **Los enemigos normales viven fuera del campo de juego.**
 - **La bola es el bloque de stats del jugador. NUNCA el radio.** El invariante
   decía "solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
@@ -190,6 +203,20 @@ La regla que sale de la tabla: **la capa −2 tapa todo lo que haya detrás dent
 de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 
 ## Trampas que ya nos han costado tiempo
+
+### Medir por la cara que no es (ago-2026)
+
+El racimo de bumpers llevaba desde el principio puesto de espaldas, y lo tapaba
+una medida buena: "con uno en la cara de entrada 1,4 golpes, con dos 3,7". El
+número era correcto. La bola con la que se sacó, no: se dejaba caer desde
+arriba, y a esta mesa no le llega nada de arriba. Medido por la cara buena, el
+racimo daba **1,0 golpes por entrada** en vez de 3,7.
+
+Es la misma avería que la tabla de balance medida contra el jugador equivocado,
+y se caza igual: **antes de fiarse de una medida, mirar de dónde viene la bola
+con la que se hizo.** Si la prueba escoge ella misma la dirección del impacto,
+la prueba está eligiendo el resultado.
+
 
 - **Rejilla de píxeles.** Nada se mueve, escala ni rota en fracciones de
   píxel: la cámara, la respiración y las rotaciones van en pasos enteros o
