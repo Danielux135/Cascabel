@@ -301,6 +301,66 @@ Windows y web, página de itch.io.
 
 ---
 
+## Fase 1c — Capas de altura
+
+*Escrita en agosto de 2026, después de que la primera planta alta saliera mal
+dos veces. No está empezada.*
+
+La mesa tiene dos plantas y las dos son mesa jugable. Lo que falta —y lo que
+Daniel pidió con estas palabras— son **capas de altura, como plataformas, y
+físicas de rampas que no llegan**.
+
+Hoy la mesa es plana: todo colisiona con todo y una rampa es un spline por el que
+la bola pasa entera. Con capas, la bola tiene un NIVEL, un colisionador solo
+existe en el suyo, y las cosas que hacen que un pinball se lea en tres
+dimensiones salen casi solas:
+
+| Pieza | Qué es con capas |
+|---|---|
+| **Plataforma** | una región elevada con borde. Salirte del borde es caer a la capa de abajo |
+| **Túnel** | el mismo spline de siempre, pero por DEBAJO del tablero: se dibuja oscuro y la bola desaparece |
+| **Rampa que no llega** | `PROPÓSITO.md` §6 ya lo tiene escrito: entras por debajo de la velocidad de escape y la bola corona a medias. Con capas, además, **se cae de la rampa al tablero**, que es lo que se siente de verdad |
+| **Cruces** | una rampa puede pasar por encima de otra sin tocarla, que hoy es imposible |
+
+**Y la altura de la mesa puede crecer.** Los 1300 px no son un invariante: si las
+capas piden más, se sube. Lo que no se puede tocar sin volver a medir todo es la
+ANCHURA (400), porque de ella cuelga el hueco entre palas.
+
+**Orden, y lo decidió Daniel:** primero el SISTEMA —nivel en la bola,
+colisionadores por capa, caída de una capa a otra, velocidad de escape en las
+rampas—, medido y en verde. La geometría se rediseña encima, después. Es lo único
+que no se puede hacer al revés.
+
+**Criterio de salida:** una rampa fallada te tira al tablero y sabes por qué; y
+dos recorridos se cruzan sin tocarse.
+
+---
+
+## Fase 1d — La planta alta, rediseñada
+
+**LA PLANTA ALTA DE HOY NO VALE Y HAY QUE REHACERLA.** Está montada como una
+COPIA de la de abajo —misma zona de palas, mismos slingshots, mismos carriles— y
+Daniel la rechazó por eso: *"el mapa de arriba no puede ser una réplica, ha de
+sentirse diferente"*.
+
+Lo que pidió, con sus palabras: **"diferente diseño, bumpers, zonas,
+plataformas, túneles"**.
+
+Va DESPUÉS de las capas, porque plataformas y túneles son capas.
+
+Y arrastra lo que sigue sin usarse: **los márgenes de los lados**. Medido con la
+mesa de hoy, las dos franjas de 20 px de fuera de las bandas solo están ocupadas
+por tramos —el umbral sube por la derecha de y=730 a 258, el regreso baja por la
+izquierda de 672 a 1030— y queda **libre la izquierda de y=150 a 670 y de 1030
+abajo, y la derecha de 150 a 258 y de 730 abajo**. Son unos 1.470 px de carril
+muerto, más de lo que hay usado. Una bola mide 18 y la franja 20: es carril
+exacto, no margen.
+
+**Criterio de salida:** alguien que juegue las dos plantas las distingue por cómo
+se juegan, no por cómo se ven.
+
+---
+
 ## Decisiones cerradas
 
 Reabrirlas cuesta más de lo que aportan.
@@ -316,6 +376,16 @@ Reabrirlas cuesta más de lo que aportan.
   puede ocupar la mesa como obstáculo físico.
 - **El daño se aplica al golpear, no al drenar.**
 - **No hay cuenta de bolas.** Hay vida, y drenar te cuesta vida.
+- **La mesa tiene DOS PLANTAS**, y no se comunican por gravedad: la bola sube
+  643 px por sus medios y una caída libre desde arriba llega a las palas a
+  1500 px/s, o sea 67 ms. Se sube y se baja por recorrido.
+- **La planta alta NO puede ser una réplica de la de abajo.** La de hoy lo es y
+  está pendiente de rehacer (Fase 1d).
+- **El ALTO de la mesa no es invariante; el ANCHO sí.** 400 px de ancho sostienen
+  el hueco entre palas y toda la física medida. Los 1300 de alto se pueden subir
+  si las capas lo piden.
+- **Las franjas de 20 px de fuera de las bandas son CARRIL, no margen.** La bola
+  mide 18.
 - **Las rampas son curvas, no física simulada.**
 - **La cáscara va en pixelart con marcos de nueve trozos**, no dibujada por
   código.

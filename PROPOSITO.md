@@ -223,6 +223,22 @@ Es exactamente el Pokémon Pinball: a veces no llegas, y no llegar **no es un
 castigo, es información**. Y sigue siendo determinista y sin atascos, que era la
 razón de que las rampas fueran splines.
 
+### Y con capas de altura, fallar es CAERSE
+
+*Añadido ago-2026, cuando Daniel pidió capas de altura y plataformas.*
+
+Tal y como está escrito arriba, una rampa fallada devuelve la bola por donde
+entró: la curva la baja sola. Eso está bien y se puede construir hoy mismo.
+
+Pero con el sistema de capas de `PLAN.md` §1c, una rampa fallada puede hacer algo
+mejor: **la bola se cae de la rampa al tablero de abajo**. No vuelve por donde
+vino, se desprende. Es lo que se siente de verdad en una máquina y es gratis en
+cuanto exista la capa, porque caer de una rampa y caer de una plataforma son el
+mismo evento.
+
+Las dos formas conviven: una rampa cerrada (un tubo) te devuelve; una abierta
+(un carril) te tira. Es una propiedad por rampa, no una decisión global.
+
 ### La barra de CARGA
 
 Y aquí está lo que pedías: algo que se cargue en función de la velocidad a la
@@ -389,7 +405,9 @@ comportamientos de enemigo no hay tabla que valga.
 | ~~1~~ | ~~Guardado + clics + menú de Inicio + `RECUPERADO/`~~ | ~~Opus, alto~~ | **HECHA Y EJECUTADA.** Batería 358/358. Lo que se recupera son criaturas (skin) y registros (texto), así que §13 sigue en pie. Detalle en `ESTADO.md` |
 | ~~2~~ | ~~Capa de Preparación: 9 cascabeles + 4 palas~~ | ~~Opus, alto~~ | **HECHA Y MEDIDA.** 381/381. Un cascabel es una bolsa de modificadores, sin un solo `if` nuevo en `Combate`. La medida destapó que pegar más hace el juego más fácil: ver `ESTADO.md` |
 | 3 | **La cáscara reacciona a la mesa** | Sonnet, medio | Forma conocida, coste bajo, y es lo que más sube la sensación por hora |
-| 4 | **Dopamina de mesa**: pines, segundo racimo, props conectados | Sonnet, medio para el arte; **Opus, alto** para los pines | Los pines son geometría nueva y cada rincón es un sitio donde la bola se acuña |
+| ~~4~~ | ~~**Dopamina de mesa**: pines, segundo racimo~~ | — | **HECHA Y DESHECHA.** El racimo girado se queda (era un error de medida de años). **Los pines salen del juego entero**: Daniel los tumbó jugándolos — *"el pachinko es literalmente que caiga la bola, y que luego no pase de la primera línea"*. Una rejilla es un comedor de energía pasivo |
+| 4b | **Capas de altura** (`PLAN.md` §1c) | Opus, alto | El sistema: nivel en la bola, colisionadores por capa, caída entre capas, velocidad de escape. **Primero esto y luego la geometría**, decisión de Daniel: es lo único que no se puede hacer al revés |
+| 4c | **La planta alta, rediseñada** (`PLAN.md` §1d) | Opus, alto + Daniel | Hoy es una réplica de la de abajo y por eso no vale. "Diferente diseño, bumpers, zonas, plataformas, túneles". Y ocupar los 1.470 px de carril muerto de los márgenes |
 | 5 | **Rampas fallables + barra de CARGA** | Opus, alto | `sim/` puro, y la descarga puede cargarse la tabla de balance. Medir antes de escribir |
 | 6 | **Selector de dificultad** | Opus, alto | Necesita la Fase 6 dentro para que los niveles altos añadan reglas |
 | 7 | **Tapar agujeros**: kickback y recuperación de sector | Opus, alto | Cambia el drenaje, que es el corazón del balance |

@@ -126,13 +126,24 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
 - **LA MESA TIENE DOS PLANTAS Y LAS DOS SON MESAS, con sus palas.** La planta
   alta tiene dos palas —con las MISMAS teclas que las de abajo, como un flipper
   superior de verdad—, racimo, bancos de targets, slingshots, giradores y órbita
-  propia. La primera versión era un campo de pines y Daniel la tumbó jugándola:
-  *"el pachinko es literalmente que caiga la bola, y que luego no pase de la
-  primera línea"*. **Una rejilla de pines es un comedor de energía pasivo**: la
-  primera fila se lleva la velocidad y el resto es caída, así que no hay tiro,
-  hay embudo. Lo que hace que una zona de pinball se juegue son palas.
-  Y su zona de palas está CALCADA de la de abajo a propósito: esa zona costó tres
-  sesiones de averías y copiarla es heredar los arreglos.
+  propia.
+- **UNA REJILLA DE PINES ES UN COMEDOR DE ENERGÍA PASIVO.** La primera versión de
+  la planta alta era un campo de pines y Daniel la tumbó jugándola: *"el pachinko
+  es literalmente que caiga la bola, y que luego no pase de la primera línea"*.
+  La primera fila se lleva la velocidad y el resto es caída, así que no hay tiro,
+  hay embudo. **Lo que hace que una zona de pinball se juegue son palas.**
+- **PERO LA PLANTA ALTA DE HOY ES UNA RÉPLICA, Y ESO NO VALE.** Su zona de palas
+  está calcada de la de abajo —se hizo así para heredar tres sesiones de
+  arreglos— y Daniel la rechazó por eso: *"el mapa de arriba no puede ser una
+  réplica, ha de sentirse diferente"*. Lo que pidió: **"diferente diseño,
+  bumpers, zonas, plataformas, túneles"**. Está pendiente en `PLAN.md` §1d, y va
+  DESPUÉS del sistema de capas de altura (§1c) porque plataformas y túneles son
+  capas. **No la des por buena porque esté medida y en verde: está medida y
+  rechazada.**
+- **El ALTO de la mesa no es invariante; el ANCHO sí.** Los 400 px de ancho
+  sostienen el hueco entre palas y toda la física medida. Los 1300 de alto se
+  suben si las capas lo piden — lo dijo Daniel: *"si ha de aumentarse la altura
+  máxima del pinball, se aumenta"*.
 - **Las dos franjas de 20 px de fuera de las bandas son CARRIL, no margen.** Una
   bola mide 18. Ahí van el umbral (sube por la derecha) y el regreso (baja por la
   izquierda), como los habitrails de una máquina real. Un recorrido que cruza el

@@ -26,6 +26,11 @@ está `assets/`.
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+**Y LA PLANTA ALTA DE HOY ESTÁ RECHAZADA, aunque la batería esté en verde.** Es
+una réplica de la de abajo y Daniel la tumbó mirándola: *"el mapa de arriba no
+puede ser una réplica, ha de sentirse diferente"*. Lo que toca ahora es el
+sistema de capas de altura y luego rehacerla. Ver "Siguiente" 0h y 0i.
+
 **Y NADIE HA VISTO ESTO DIBUJADO.** La receta para lanzar Godot con ventana en
 sesión remota está en `CLAUDE.md`, "Godot". Es lo primero de la próxima sesión.
 
@@ -101,6 +106,37 @@ aguantar la bola en la planta alta es la misma habilidad que abajo, y el tiempo
 Ojo con el 292: con la salida a 0,35 y la boca 20 px más abajo salían **197 ms**,
 por debajo del umbral humano, que es exactamente el fallo que tenía el cañón
 antes de ablandarlo. Está ajustado contra el cronómetro, no a ojo.
+
+### Y lo que Daniel decidió después de verla
+
+Tres cosas, y las tres mandan sobre lo siguiente:
+
+1. **La planta alta no puede ser una réplica.** Lo es: su zona de palas está
+   calcada de la de abajo. Lo que pidió: *"diferente diseño, bumpers, zonas,
+   plataformas, túneles"*
+2. **Capas de altura**, como plataformas, y **físicas de rampas que no llegan**.
+   Lo segundo ya está diseñado y sin construir en `PROPÓSITO.md` §6
+   (`velocidad_escape`); lo primero es un sistema nuevo y está escrito ahora en
+   `PLAN.md` §1c
+3. **La altura de la mesa se puede subir** si hace falta: *"si ha de aumentarse
+   la altura máxima del pinball, se aumenta"*. El ANCHO no, que de él cuelga el
+   hueco entre palas
+
+Y el orden lo decidió él: **primero el sistema de capas, después la geometría.**
+Es lo único que no se puede hacer al revés.
+
+### Los márgenes, medidos
+
+Siguen sin usarse, y esto es lo medido sobre la mesa de hoy. Las franjas de 20 px
+de fuera de las bandas solo están ocupadas por tramos:
+
+| Franja | Ocupado por | Libre |
+|---|---|---|
+| Izquierda | el regreso, de y=672 a 1030 | **y=150 a 670 y de 1030 abajo** |
+| Derecha | el umbral, de y=730 a 258 | **y=150 a 258 y de 730 abajo** |
+
+Son unos **1.470 px de carril muerto, más de lo que hay usado**. Una bola mide 18
+y la franja 20: es carril exacto, no margen.
 
 ### Lo que NO está
 
@@ -941,20 +977,37 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    era que **la zona de las rampas tenía que ser jugable**. Hay arena de caza.
    437/458. Ver arriba.
 
-0h. **JUGAR LA CAZA Y MIRARLA** (Daniel, y luego Opus + alto para lo que salga).
-   El código está escrito entero y sin ver. Las preguntas: ¿se entra alguna vez
-   en un combate de verdad, o el 2 % es cero en la práctica? ¿La cámara sube bien
-   o se pierde la bola al cruzar los dos pisos? ¿Doce segundos son largos o
-   cortos? ¿Volver posado a la pala se siente a recompensa o a castigo? Si el
-   2 % es muy poco, los diales están en ESTADO arriba.
+0h. **CAPAS DE ALTURA: EL SISTEMA** (Opus, razonamiento alto). `PLAN.md` §1c, y
+   va la primera por decisión de Daniel. Lo que hay que montar, sin tocar
+   geometría:
+   - **nivel de altura en la bola** (`Bola.capa`)
+   - **colisionadores por capa**, con máscara: por defecto "todas las capas", que
+     es lo que deja intacta la mesa de hoy y toda la física medida
+   - **caída de una capa a otra**: salirte del borde de una plataforma es un
+     evento, y es el mismo que caerse de una rampa
+   - **`velocidad_escape` en las rampas** (`PROPÓSITO.md` §6): entras por debajo
+     del 60 %, la bola corona a medias y se para. Cerrada, te devuelve por donde
+     entraste; abierta, **te tira al tablero**
+   - **túneles**: el mismo spline por debajo del tablero
+   Y lo que hay que medir antes de darlo por bueno: que la mesa de hoy con
+   máscaras a "todas" produce EXACTAMENTE los mismos números que ahora
+   (duración de bola, reparto de drenaje, golpes por entrada al racimo), o el
+   balance entero deja de valer sin avisar.
 
-0i. **BICHOS EN LA ARENA** (Opus, alto). Hoy la caza es un campo de pines con
-   temporizador. `DISEÑO.md` §5 dice que ahí arriba se caza material de
-   desbloqueo, y sin eso el modo es bonito y no sirve para nada: subir cuesta
-   reloj y no da nada a cambio. Va después de 0h porque si la arena no se siente
-   bien, llenarla de bichos no lo arregla.
+0i. **LA PLANTA ALTA, REHECHA** (Opus, alto + Daniel). `PLAN.md` §1d. Va después
+   de 0h porque plataformas y túneles SON capas. "Diferente diseño, bumpers,
+   zonas, plataformas, túneles", y de paso ocupar los 1.470 px de carril muerto
+   de los márgenes. La de hoy se tira: no se retoca una réplica hasta que deje de
+   serlo.
 
-0j. ~~lo que decía este puesto~~ (Opus, alto, y con Daniel jugando).
+0j. **JUGAR LA CAZA Y MIRARLA** (Daniel). Baja de puesto: no tiene sentido
+   afinar el 3 % de entrada ni los 20 s de la caza sobre una planta que se va a
+   rehacer entera. Lo que sí vale la pena mirar ya es **la cámara cruzando las
+   dos plantas**, que es lo único que no depende de la geometría.
+
+0k. **BICHOS EN LA ARENA** (Opus, alto). `DISEÑO.md` §5: ahí arriba se caza
+   material de desbloqueo, y sin eso el modo es bonito y no sirve para nada —
+   subir cuesta reloj y no da nada a cambio. Después de 0i.
    Sube al primer puesto porque lo ha destapado la tanda anterior y porque
    invalida a medias todo lo que se decida encima: el tiro desde la cuna sube a
    y=893 de media y toca 0,1 bumpers, y ninguna salida de recorrido pasa de
