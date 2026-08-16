@@ -371,9 +371,19 @@ func _rampa(c: Combate, cual: String, punto: Vector2) -> void:
 			c.mesa.rampa_salida.emit(punto, i)
 			return
 
+## Drenar de mentira: el perfil no juega con las palas, así que la bola no se
+## pierde sola. RETIRA TODAS LAS BOLAS, no solo la principal: con multibola,
+## apagar `mesa.bola` dejaba las extra vivas para siempre, y eso hacía dos
+## trampas a la vez —seguían pegando en los bumpers y dejaban `bolas` a más de
+## uno, o sea `cuando: multibola` encendido el run entero—. El resultado medido
+## de ese fallo: 97 % de vida al acabar contra el 71 % de verdad.
+##
+## OJO, Y ESTO NO LO ARREGLA: el perfil sigue sin saber JUGAR con varias bolas,
+## porque no hay física dentro. Así que la multibola aquí se cuenta con todo su
+## coste y ninguna de sus ventajas. Es el lado conservador, que es el bueno para
+## calibrar, pero significa que **el eje de Caos no está medido**.
 func _drenar(c: Combate) -> void:
-	c.mesa.bola.viva = false
-	c.mesa.bola.vel = Vector2.ZERO
+	c.mesa.retirar_bolas()
 	c.mesa.bola_drenada.emit()
 
 func _avanzar(c: Combate, segundos: float) -> void:

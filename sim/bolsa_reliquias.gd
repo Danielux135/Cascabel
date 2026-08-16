@@ -13,6 +13,7 @@ extends RefCounted
 ##   suma_*    se suman
 ##   factor_*  se multiplican, partiendo de 1,0
 ##   bandera_* basta con que una la lleve
+##   azar_*    se suman como probabilidades y `azar()` tira el dado contra el total
 ##
 ## Y dos sufijos/campos que evitan escribir código por reliquia:
 ##
@@ -99,14 +100,19 @@ func activa(r: Reliquia) -> bool:
 		"enemigo_tocado": return _menor("enemigo", r.umbral)
 		"enemigo_intacto": return _mayor("enemigo", r.umbral)
 		"sin_drenar": return _igual("drenajes", 0.0)
+		"multibola": return _mayor("bolas", maxf(r.umbral, 2.0))
+		"bola_sola": return _menor("bolas", 1.0)
 	return false
 
 ## Las condiciones son la única parte del sistema que puede equivocarse en
 ## silencio: un `cuando` mal escrito apagaría la reliquia para siempre sin dar
 ## error. Por eso hay una lista cerrada y una prueba que la comprueba.
+## `multibola` tiene el umbral en el suelo a 2 a propósito: escrito sin umbral
+## —que es lo normal en el JSON— significa "con dos bolas o más", que es lo que
+## quiere decir la palabra. Con umbral se puede pedir más.
 const CONDICIONES := ["vida_baja", "vida_alta", "combo_alto", "sin_combo",
 	"reloj_cargado", "reloj_frio", "enemigo_tocado", "enemigo_intacto",
-	"sin_drenar"]
+	"sin_drenar", "multibola", "bola_sola"]
 
 func _menor(clave: String, umbral: float) -> bool:
 	return contexto.has(clave) and float(contexto[clave]) <= umbral

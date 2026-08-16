@@ -105,6 +105,17 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   recorre un spline y vuelve con la velocidad tangente.
 - **El daño se aplica al golpear, no al drenar.** No hay cuenta de bolas:
   hay vida, y drenar cuesta vida.
+- **Con multibola, drenar es que caiga LA ÚLTIMA.** Perder una bola mientras
+  quedan otras en la mesa no cuesta ni vida, ni combo, ni contraataque: la señal
+  `bola_drenada` solo salta con la última, y las demás salen por `bola_perdida`,
+  que existe para el sonido y para nada más. Decisión de Daniel (ago-2026), y es
+  lo que hace que la multibola sea un eje de build y no un adorno. Si dos caen en
+  el mismo subpaso se cierra UN turno, no dos.
+- **La cámara sigue a la BOLA MÁS BAJA, y no hay zoom.** Decisión de Daniel
+  (ago-2026): a la cámara se le pasa UNA bola —`Mesa.bola_en_peligro()`— y así las
+  cuatro reglas y el escalado entero siguen intactos. Alejar la cámara para que
+  quepan todas rompe el escalado entero del pixelart; si hace falta saber dónde
+  están las otras, lo que se añade son flechas en el borde, no zoom.
 - **Los enemigos normales viven fuera del campo de juego.**
 - **La bola es el bloque de stats del jugador. NUNCA el radio.** El invariante
   decía "solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
@@ -183,6 +194,21 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 - **Rejilla de píxeles.** Nada se mueve, escala ni rota en fracciones de
   píxel: la cámara, la respiración y las rotaciones van en pasos enteros o
   la imagen hierve.
+- **EL OBJETIVO DE LA CÁMARA TIENE QUE SER CONTINUO, Y ESO MANDA SOBRE TODO LO
+  DEMÁS.** Un objetivo que salta no se puede suavizar sin perder la garantía: o
+  llega a tiempo dando un corte, o va suave y se pierde el flipper. Por eso
+  `tiempo_anticipacion` está en 0: el suelo garantizado dependía de `vy`, y `vy`
+  salta entera en cada salida de rampa. Lo que se deja de pagar en predicción se
+  paga en `margen_debajo_bola`, que depende solo de la posición. **Y lo que se
+  nota no es el salto, es la ACELERACIÓN** — se midió el salto dos veces, se
+  arregló dos veces, y hasta que no se midió la aceleración no se encontró.
+- **Toda garantía dura de la cámara tiene que pasar por el tope de velocidad.**
+  `CamaraMesa.avanzar` acaba con un `move_toward` desde donde estaba: eso es la
+  REGLA 5 y va LA ÚLTIMA de todas a propósito. Escrita regla a regla, el
+  suavizado y la garantía se suman y entre las dos se saltan el tope. Las
+  garantías siguen mandando sobre el objetivo —eso no cambia—, pero llegan
+  moviéndose. Sin esto, el suelo garantizado depende de `vy`, `vy` cambia de
+  golpe en cada salida de rampa, y la cámara daba saltos de 113 px medidos.
 - **La cámara va en `_physics_process`**, pegada a la simulación. En
   `_process` se queda un fotograma por detrás y a 720 px/s eso pierde la
   bola. Y una sola llamada: ya se duplicó una vez.
@@ -193,6 +219,27 @@ de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
   caducidad arrastra miles en una partida larga.
 - **Cada rincón nuevo de la mesa es un sitio donde la bola se acuña.**
   Prueba cada zona nueva contra atascos y no toques el ball search.
+- **Lo que se dibuje pegado al canto de la pantalla queda DETRÁS de la cáscara.**
+  La mesa va en la capa 0 y el marco de su ventana en la 5, así que un aviso a
+  10 px del borde superior no se ve: lo tapa la barra de título. Es la misma
+  trampa que escondía la bola en lo alto de la órbita, y ya ha vuelto una vez
+  (las flechas de bola fuera de plano). El margen bueno sale de
+  `cam.alto_franja_hud`, que es lo que mide la cáscara de verdad.
+- **`mesa.bola` NO es la bola que hay que mirar: es `bolas[0]`.** Existe porque
+  con una sola bola es exactamente lo que era y así la multibola no obligó a
+  reescribir la vista, el combate ni cuatrocientas pruebas. Pero con varias bolas
+  en juego, la cámara quiere `bola_en_peligro()` y el que dibuja quiere `bolas`
+  entera. Escribir `mesa.bola` en código nuevo que tenga que aguantar multibola
+  no da ningún error: hace lo que no querías, y solo con dos bolas.
+- **Todo estado que sea DE UNA BOLA vive en `Bola`, no en `Mesa`.** El
+  temporizador del ball search y el "estoy dentro del girador" estaban en la
+  mesa, y con dos bolas eso significa que la que estás jugando le reinicia el
+  reloj a la que se ha quedado dormida en un rincón —que no se despierta nunca— y
+  que la segunda bola que cruza un girador no cobra. Lo que sí es de la mesa se
+  reinicia UNA vez por subpaso y antes del bucle de bolas: `flipper_atrapando` se
+  reiniciaba dentro de `_colisionar`, y ahí mandaba la última bola de la lista,
+  o sea que una bola volando por arriba le apagaba el aviso de atrape a la que
+  estaba posada en la pala.
 - **Quedarse encerrada rebotando NO es un atasco, y el ball search no la
   saca.** En un atasco la bola se para; encerrada va a toda velocidad en un
   palmo de mesa, así que el ball search nunca salta y el jugador mira sin

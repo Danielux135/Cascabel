@@ -21,6 +21,13 @@ const C_CARRIL      := Paleta.CARRIL
 const C_GOMA        := Paleta.GOMA
 const C_GOMA_LUZ    := Paleta.GOMA_LUZ
 const C_ORO         := Paleta.ORO
+## Los avisos de bola fuera de plano. `MARGEN` es lo que se separan del borde de
+## la pantalla para no quedar pegados al canto, y `ALCANCE` es a qué distancia la
+## flecha llega a su transparencia mínima: es la altura de una pantalla, o sea
+## que una bola a más de una pantalla de distancia se ve igual de tenue que a
+## dos, que es lo correcto — a esa distancia lo único que importa es por dónde.
+const AVISO_MARGEN := 10.0
+const AVISO_ALCANCE := 540.0
 const C_ORO_CLARO   := Paleta.ORO_CLARO
 const C_TEXTO       := Paleta.TEXTO
 const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
@@ -317,6 +324,8 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
 	mesa.bola_drenada.connect(_al_drenar_bola)
+	mesa.bola_perdida.connect(_al_perder_bola)
+	mesa.bola_extra.connect(_al_entrar_bola_extra)
 	mesa.atrape_cambiado.connect(_al_cambiar_atrape)
 	combate.dano_infligido.connect(_al_infligir_dano)
 	combate.combo_cambiado.connect(_al_cambiar_combo)
@@ -503,7 +512,8 @@ func _physics_process(delta: float) -> void:
 	# perderla mientras lees. La cámara sí sigue, como en la ruleta: congelarla
 	# también dejaría la vuelta descuadrada.
 	if sistema != null and sistema.congela_la_mesa():
-		camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, false)
+		var quieta := mesa.bola_en_peligro()
+		camara.avanzar(delta, quieta.pos.y, quieta.vel.y, false)
 		return
 	# Durante la ruleta la simulación NO corre y las palas no mueven nada, pero
 	# la cámara sí: baja hasta el ancla de abajo, que es donde está la tele.
@@ -540,7 +550,15 @@ func _physics_process(delta: float) -> void:
 	combate.avanzar(delta)
 	# La cámara se mueve AQUÍ, pegada a la física: en `_process` iba un
 	# fotograma por detrás de la bola y en la órbita eso la metía tras el HUD.
-	camara.avanzar(delta, mesa.bola.pos.y, mesa.bola.vel.y, mesa.bola.viva)
+	#
+	# CON VARIAS BOLAS MIRA LA MÁS BAJA (decisión de Daniel). A la cámara se le
+	# sigue pasando UNA bola, así que las cuatro reglas y el escalado entero no se
+	# tocan: no hay zoom, y sin zoom el pixelart no hierve. El efecto secundario
+	# es parte de la elección — con dos bolas casi siempre hay una abajo, así que
+	# durante una multibola la cámara vive anclada en la banda de las palas, que
+	# es donde se juega.
+	var seguida := mesa.bola_en_peligro()
+	camara.avanzar(delta, seguida.pos.y, seguida.vel.y, mesa.bolas_vivas() > 0)
 
 ## Le dice a todo el mundo cuánta pantalla hay de verdad. Es un solo sitio a
 ## propósito: en cuanto haya dos, uno se queda viejo y vuelve el desalineado.
@@ -619,6 +637,14 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 			_nuevo_run()
 		KEY_F1:
 			_depuracion = not _depuracion
+		KEY_F2:
+			# SUELTA UNA BOLA EXTRA A MANO, y solo con la depuración encendida
+			# (F1 primero). Es banco de pruebas, no un atajo del juego: por el
+			# camino normal la multibola sale de las reliquias de Caos, que son 5
+			# de 50, o sea una de cada diez tiradas de ruleta, y con eso no se
+			# puede juzgar si la multibola se juega bien.
+			if _depuracion and combate != null and not combate.terminado():
+				mesa.soltar_bola_extra()
 		KEY_ESCAPE:
 			# ESC cierra lo que haya abierto ANTES de salir del juego. Antes
 			# salía siempre, y con un menú de Inicio delante eso es cerrar la
@@ -676,6 +702,19 @@ func _al_drenar_bola() -> void:
 	_sonido.reproducir("drenaje")
 	impactos.polvo(Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 26.0),
 		Vector2.UP, C_PIEDRA, 1.4)
+
+## Ha caído una bola pero quedan otras. NO SUENA COMO UN DRENAJE, y esa es toda
+## la gracia: el sonido de drenar es el que dice "has perdido el turno", y aquí
+## no has perdido nada. Se queda en polvo, en el sitio, y sin sacudida.
+func _al_perder_bola(_restantes: int, punto: Vector2) -> void:
+	impactos.polvo(Vector2(punto.x, mesa.p.y_drenaje - 26.0), Vector2.UP,
+		C_PIEDRA, 0.7)
+
+## Ha entrado una bola extra. Se anuncia en el carril, que es de donde sale: si
+## no se ve salir, aparece una bola de la nada en mitad de la pantalla.
+func _al_entrar_bola_extra(punto: Vector2, _total: int) -> void:
+	_sonido.reproducir("combo")
+	impactos.polvo(punto, Vector2.UP, C_ORO_CLARO, 1.2)
 
 func _bumper_mas_cercano(punto: Vector2) -> int:
 	var mejor := -1
@@ -914,6 +953,7 @@ func _draw() -> void:
 	_dibujar_objetos()
 	impactos.dibujar(self)
 	_dibujar_bola()
+	_dibujar_bolas_fuera()
 	_dibujar_atrape()
 	_dibujar_numeros()
 	_dibujar_lanzador()
@@ -943,11 +983,64 @@ func _dibujar_velo() -> void:
 ## Y aunque no mintiera, no diría nada: está medido que la bola se asienta
 ## SIEMPRE en el mismo punto de la pala, así que la línea sería idéntica cada
 ## vez. Una ayuda que enseña siempre lo mismo no ayuda a elegir nada.
+## El halo va en LA BOLA MÁS BAJA y no en `mesa.bola`: una bola atrapada en una
+## cuna es, por definición, la que está más abajo de todas.
 func _dibujar_atrape() -> void:
-	if mesa.flipper_atrapando == null or not mesa.bola.viva:
+	if mesa.flipper_atrapando == null:
 		return
-	draw_circle(mesa.bola.pos, mesa.p.radio_bola + 4.0, Color(C_ORO_CLARO, 0.55),
+	var b := mesa.bola_en_peligro()
+	if not b.viva:
+		return
+	draw_circle(b.pos, mesa.p.radio_bola + 4.0, Color(C_ORO_CLARO, 0.55),
 		false, 1.0)
+
+## AVISOS DE LAS BOLAS QUE NO SE VEN, y esto no es un adorno: está medido.
+##
+## La mesa mide 1300 de alto y por la ventana caben 540, así que con la cámara
+## siguiendo a UNA bola las demás se salen por definición. Mirándolo de verdad
+## con el display virtual, **el 90 % de los fotogramas con dos o más bolas tenía
+## alguna fuera de plano**, y casi siempre por arriba: la que está dando la
+## vuelta a la órbita.
+##
+## Con una bola esto no podía pasar y por eso no existía. La salida NO es alejar
+## la cámara —rompe el escalado entero y la mesa hierve, ver `CLAUDE.md`—: es
+## decir DÓNDE está lo que no se ve, que es lo que hace una mesa de verdad con
+## sus luces. Una punta de flecha pegada al borde por el que se ha ido, en la x
+## de la bola, y del tamaño de la bola para que se lea como "una bola ahí".
+func _dibujar_bolas_fuera() -> void:
+	if mesa.bolas.size() < 2:
+		return
+	var rect := camara.rect_visible()
+	# Por arriba hay que bajar lo que mide el marco de la ventana de la mesa: la
+	# cáscara se dibuja en la capa 5 y la mesa en la 0, así que una flecha pegada
+	# al canto de la pantalla queda DETRÁS de la barra de título y no se ve. Es la
+	# misma trampa que escondía la bola en lo alto de la órbita, y por eso el
+	# número sale del mismo sitio que usa la cámara y no de una constante nueva.
+	var arriba := rect.position.y + cam.alto_franja_hud + AVISO_MARGEN
+	var abajo := rect.position.y + rect.size.y - AVISO_MARGEN
+	var r := mesa.p.radio_bola
+	for b in mesa.bolas:
+		if not b.viva:
+			continue
+		var sube := b.pos.y < rect.position.y
+		var baja := b.pos.y > rect.position.y + rect.size.y
+		if not (sube or baja):
+			continue
+		# En píxeles enteros como todo lo demás: en fracciones, la flecha
+		# tirita contra la rejilla mientras la bola se mueve.
+		var x := roundf(clampf(b.pos.x, 20.0 + r, Mesa.ANCHO - 20.0 - r))
+		var y := roundf(arriba if sube else abajo)
+		var dir := -1.0 if sube else 1.0
+		# Cuanto más lejos está la bola, más pálida la flecha: así el borde
+		# distingue "se acaba de salir" de "está en lo alto de la órbita".
+		var lejos := absf(b.pos.y - (rect.position.y if sube
+			else rect.position.y + rect.size.y))
+		var alfa := clampf(1.0 - lejos / AVISO_ALCANCE, 0.25, 1.0)
+		draw_colored_polygon(PackedVector2Array([
+			Vector2(x - r, y - r * dir),
+			Vector2(x + r, y - r * dir),
+			Vector2(x, y + r * dir),
+		]), Color(C_ORO, alfa))
 
 ## El medidor de carga del lanzador va pegado al carril, en el mundo: es parte
 ## de la mesa, no del HUD.
@@ -1124,17 +1217,22 @@ func _dibujar_flipper(f: Flipper) -> void:
 	draw_circle(f.eje + Vector2(-1, -1), r * 0.18, C_METAL_LUZ)
 
 ## La bola NO se pega a la rejilla: a 1500 px/s tiritaría de forma horrible.
+##
+## Se dibujan TODAS las que haya. Todas iguales y a propósito: una bola extra no
+## es una bola de segunda, pega lo mismo y se pierde igual, y pintarla distinta
+## haría creer que sí.
 func _dibujar_bola() -> void:
-	if not mesa.bola.viva:
-		return
-	if mesa.bola.rampa >= 0:
-		# Va por encima de la mesa: una sombra debajo lo cuenta sin texto.
-		draw_circle(mesa.bola.pos + Vector2(3, 6), mesa.p.radio_bola * 0.8,
-			Color(C_CABINA, 0.5))
 	var escala := mesa.p.radio_bola * 2.0 / 20.0
 	var mitad := Vector2(_tex_bola.get_width(), _tex_bola.get_height()) * 0.5
-	draw_set_transform(mesa.bola.pos, 0.0, Vector2(escala, escala))
-	draw_texture(_tex_bola, -mitad)
+	for b in mesa.bolas:
+		if not b.viva:
+			continue
+		if b.rampa >= 0:
+			# Va por encima de la mesa: una sombra debajo lo cuenta sin texto.
+			draw_circle(b.pos + Vector2(3, 6), mesa.p.radio_bola * 0.8,
+				Color(C_CABINA, 0.5))
+		draw_set_transform(b.pos, 0.0, Vector2(escala, escala))
+		draw_texture(_tex_bola, -mitad)
 	draw_set_transform_matrix(Transform2D.IDENTITY)
 
 
@@ -1167,6 +1265,8 @@ func _dibujar_depuracion() -> void:
 		draw_line(f.eje, f.punta(), C_ARCANO, 1.0)
 		draw_circle(f.eje, f.radio, C_ARCANO, false, 1.0)
 		draw_circle(f.punta(), f.radio, C_ARCANO, false, 1.0)
-	if mesa.bola.viva:
-		draw_circle(mesa.bola.pos, mesa.p.radio_bola, C_ORO, false, 1.0)
-		draw_line(mesa.bola.pos, mesa.bola.pos + mesa.bola.vel * 0.08, C_ORO, 1.0)
+	for b in mesa.bolas:
+		if not b.viva:
+			continue
+		draw_circle(b.pos, mesa.p.radio_bola, C_ORO, false, 1.0)
+		draw_line(b.pos, b.pos + b.vel * 0.08, C_ORO, 1.0)

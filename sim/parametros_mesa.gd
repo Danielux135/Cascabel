@@ -13,6 +13,17 @@ var radio_bola: float = 9.0
 var rozamiento: float = 0.20          # v *= exp(-rozamiento * dt)
 var velocidad_maxima: float = 1500.0
 
+# --- Multibola ---
+## Cuántas bolas caben a la vez. El tope no es de rendimiento —el solver aguanta
+## de sobra—, es de LEGIBILIDAD: con la cámara siguiendo a la más baja, a partir
+## de cierto número lo que pasa arriba deja de existir para el jugador y las
+## bolas de más son daño que cae solo. Cuatro es lo que cabe en el plano.
+var bolas_maximas: int = 4
+## Rebote de bola contra bola. Acero contra acero es casi elástico, pero no 1: con
+## 1 dos bolas encerradas en el racimo se pasan el impulso para siempre y nunca se
+## calman. (*)
+var rebote_bola: float = 0.65
+
 # --- Flippers ---
 ## Subida de 22 a 30 para cerrar el alcance del tiro desde la cuna, que es lo
 ## que hacía que la mesa no fuese un menú de tiros: la velocidad que la pala le

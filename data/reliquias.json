@@ -1,5 +1,5 @@
 {
-  "_nota": "Cuarenta y cinco reliquias, nueve por eje (DISENO.md §8). Las claves de 'efectos' las interpreta sim/bolsa_reliquias.gd por su prefijo: suma_ se suma, factor_ se multiplica, bandera_ basta con una, y el sufijo _por_victoria las aplica una vez por combate ganado. 'cuando' + 'umbral' apagan y encienden la reliquia segun el estado del combate: las palabras validas estan en BolsaReliquias.CONDICIONES y hay una prueba que lo comprueba, porque un 'cuando' mal escrito apagaria la reliquia para siempre sin dar error.",
+  "_nota": "Cincuenta reliquias (DISENO.md §8). Nueve por eje mas las cinco de multibola, que suben el eje de Caos a catorce: es el unico eje que tenia su mecanica escrita y sin implementar. Las claves de 'efectos' las interpreta sim/bolsa_reliquias.gd por su prefijo: suma_ se suma, factor_ se multiplica, bandera_ basta con una, y el sufijo _por_victoria las aplica una vez por combate ganado. 'cuando' + 'umbral' apagan y encienden la reliquia segun el estado del combate: las palabras validas estan en BolsaReliquias.CONDICIONES y hay una prueba que lo comprueba, porque un 'cuando' mal escrito apagaria la reliquia para siempre sin dar error.",
   "_por_que_45_y_no_15": "El plan decia quince. Con tres ofrecidas por combate y doce combates ves ~36, o sea que con quince las veias TODAS y dos runs se parecian. Con cuarenta y cinco, cada run ensena la mitad del cajon y la siguiente partida trae otra cosa. La cifra que importa no es cuantas hay, es cuantas NO ves.",
   "reliquias": [
     {
@@ -540,6 +540,64 @@
       "texto": "Por debajo del 25% de vida pegas dos veces y media.",
       "efectos": {
         "factor_dano_global": 2.5
+      }
+    },
+    {
+      "id": "bifurcacion",
+      "nombre": "Bifurcación",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "al completar un recorrido",
+      "texto": "Uno de cada ocho recorridos completados suelta otra bola.",
+      "efectos": {
+        "azar_bola_extra_recorrido": 0.125
+      }
+    },
+    {
+      "id": "proceso_hijo",
+      "nombre": "Proceso hijo",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "al cerrar un banco",
+      "texto": "Cerrar un banco de targets suelta otra bola una de cada tres veces.",
+      "efectos": {
+        "azar_bola_extra_banco": 0.34
+      }
+    },
+    {
+      "id": "bomba_de_procesos",
+      "nombre": "Bomba de procesos",
+      "eje": "caos",
+      "rareza": "arcana",
+      "gancho": "al empezar la bola",
+      "texto": "Te sirven dos bolas en vez de una, pero drenar duele mucho más.",
+      "efectos": {
+        "suma_bolas_al_servir": 1,
+        "factor_drenaje": 1.8
+      }
+    },
+    {
+      "id": "condicion_de_carrera",
+      "nombre": "Condición de carrera",
+      "eje": "caos",
+      "rareza": "rara",
+      "gancho": "pasivo condicional",
+      "cuando": "multibola",
+      "texto": "Mientras haya más de una bola en la mesa, pegas un 60% más.",
+      "efectos": {
+        "factor_dano_global": 1.6
+      }
+    },
+    {
+      "id": "hilo_unico",
+      "nombre": "Hilo único",
+      "eje": "caos",
+      "rareza": "comun",
+      "gancho": "pasivo condicional",
+      "cuando": "bola_sola",
+      "texto": "Con una sola bola en la mesa, uno de cada seis golpes es crítico.",
+      "efectos": {
+        "suma_prob_critico": 0.17
       }
     }
   ],

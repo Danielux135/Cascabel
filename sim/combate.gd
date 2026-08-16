@@ -16,6 +16,8 @@ extends RefCounted
 
 signal dano_infligido(dano: int, multiplicador: int, punto: Vector2)
 signal combo_cambiado(multiplicador: int, golpes: int)
+## Han entrado bolas extra en juego. `total` son las que hay vivas ya contándolas.
+signal bola_extra_soltada(cuantas: int, total: int)
 signal enemigo_ataca(dano: int)
 ## El reloj entra en la cuenta atrás. `segundos` va 3, 2, 1 y salta una sola vez
 ## por número: el aviso es para que el golpe no llegue de la nada.
@@ -204,6 +206,7 @@ func iniciar(el_enemigo: Enemigo, vida_inicial: int = -1,
 	_publicar_contexto()
 	mesa.reiniciar_targets()
 	mesa.nueva_bola()
+	_soltar_bolas(int(round(bolsa.suma("suma_bolas_al_servir"))))
 	combo_cambiado.emit(multiplicador(), golpes)
 	mision_cambiada.emit(mision())
 
@@ -299,6 +302,11 @@ func _publicar_contexto() -> void:
 	bolsa.contexto["enemigo"] = 1.0 if enemigo == null \
 		else float(enemigo.vida) / float(maxi(enemigo.vida_maxima, 1))
 	bolsa.contexto["multiplicador"] = float(multiplicador())
+	# CUÁNTAS BOLAS HAY. Es la clave que hace que el eje de Caos sea un eje y no
+	# tres reliquias sueltas: con esto una reliquia puede decir "mientras haya más
+	# de una bola" sin que `Combate` sepa que existe. Soltar bolas es la mitad de
+	# la build; que las bolas de más CAMBIEN algo es la otra.
+	bolsa.contexto["bolas"] = float(mesa.bolas_vivas())
 
 ## La vida máxima del jugador, con lo que le sumen las reliquias.
 func vida_maxima() -> int:
@@ -361,7 +369,7 @@ func reloj_carga() -> float:
 
 func avanzar(dt: float) -> void:
 	mesa.avanzar(dt)
-	if fase == Fase.LANZANDO and mesa.bola.viva and not mesa.bola.en_carril:
+	if fase == Fase.LANZANDO and mesa.hay_bola_en_juego():
 		fase = Fase.BOLA_VIVA
 	# El reloj corre solo mientras se juega. En las pausas de resolución el
 	# jugador no tiene la bola, y cobrarle ahí sería cobrarle por esperar.
@@ -373,7 +381,7 @@ func avanzar(dt: float) -> void:
 		var paso := estados.avanzar(dt)
 		for id_estallado in paso["estallidos"]:
 			estallido_de_estado.emit(str(id_estallado))
-		_dano_de_estados(int(paso["dano"]), mesa.bola.pos)
+		_dano_de_estados(int(paso["dano"]), mesa.bola_en_peligro().pos)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
@@ -489,6 +497,7 @@ func _al_abatir_target(punto: Vector2, _banco: int) -> void:
 func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 	_apuntar("banco")
 	_robar_reloj(bolsa.suma("suma_robo_reloj_banco"))
+	_tirar_por_bola_extra("azar_bola_extra_banco")
 	_sumar_golpes(int(round(bolsa.suma("suma_golpes_banco"))))
 	_golpear(p.dano_banco + int(round(bolsa.suma("suma_dano_banco"))), punto, false,
 		true, bolsa.factor("factor_dano_banco"))
@@ -503,12 +512,50 @@ func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
 ## sube el combo— y meterlas en `_golpear` obligaría a un argumento por cada una.
 func _premio_de_recorrido() -> void:
 	_sumar_golpes(int(round(bolsa.suma("suma_golpes_por_recorrido"))))
+	_tirar_por_bola_extra("azar_bola_extra_recorrido")
 	var cura := int(round(bolsa.suma("suma_vida_por_recorrido")))
 	if cura > 0:
 		var antes := vida_jugador
 		vida_jugador = mini(vida_jugador + cura, vida_maxima())
 		if vida_jugador > antes:
-			curado.emit(vida_jugador - antes, mesa.bola.pos)
+			curado.emit(vida_jugador - antes, mesa.bola_en_peligro().pos)
+
+## ------------------------------------------------------------- el eje de Caos
+##
+## LAS BOLAS EXTRA SON EL EJE "CAOS" DE `DISEÑO.md` §8, y son lo primero de ese
+## eje que existe de verdad. Van por los mismos ganchos que todo lo demás: la
+## reliquia trae una probabilidad con nombre, `Combate` tira el dado donde ya
+## tomaba una decisión, y aquí no hay un solo `if` por reliquia.
+##
+## Los tres sitios donde se puede soltar una bola, y son tres a propósito:
+##   `azar_bola_extra_recorrido`  al completar cualquier recorrido (rampa o platillo)
+##   `azar_bola_extra_banco`      al cerrar un banco de targets
+##   `suma_bolas_al_servir`       de salida, cada vez que te sirven bola
+##
+## Las dos primeras piden habilidad —hay que meter el tiro— y la tercera no, y por
+## eso la tercera es la cara: `DISEÑO.md` §2 dice que el skill se recompensa, así
+## que la multibola regalada tiene que costar algo en otro sitio.
+func _tirar_por_bola_extra(clave: String) -> void:
+	if not _en_juego():
+		return
+	_publicar_contexto()
+	if bolsa.azar(clave):
+		_soltar_bolas(1)
+
+## Suelta bolas y avisa. Devuelve cuántas han entrado de verdad: la mesa tiene
+## tope (`ParametrosMesa.bolas_maximas`) y pedir más no da error, simplemente no
+## las mete.
+func _soltar_bolas(cuantas: int) -> int:
+	var puestas := 0
+	for _i in maxi(cuantas, 0):
+		var b := mesa.soltar_bola_extra()
+		if b == null:
+			break
+		puestas += 1
+	if puestas > 0:
+		_publicar_contexto()
+		bola_extra_soltada.emit(puestas, mesa.bolas_vivas())
+	return puestas
 
 ## Suma golpes al combo sin pegar. Es lo que hace que "cerrar un banco sube el
 ## combo" no tenga que ser un caso especial dentro de `_golpear`.
@@ -596,10 +643,10 @@ func curacion_al_ganar() -> int:
 func _ganar() -> void:
 	fase = Fase.VICTORIA
 	_temporizador = 0.0
-	# Se retira la bola: el combate ha terminado y no tiene sentido que siga
-	# rodando y sumando golpes contra un enemigo muerto.
-	mesa.bola.viva = false
-	mesa.bola.vel = Vector2.ZERO
+	# Se retiran las bolas: el combate ha terminado y no tiene sentido que sigan
+	# rodando y sumando golpes contra un enemigo muerto. Y son TODAS, que con
+	# multibola apagar solo la principal dejaba dos rodando después del final.
+	mesa.retirar_bolas()
 	combate_terminado.emit(true)
 
 ## Drenar la bola es lo que cierra el turno: se pierde el combo y el enemigo
@@ -651,8 +698,7 @@ func _atacar(dano: int, por_reloj: bool) -> void:
 	if vida_jugador <= 0:
 		fase = Fase.DERROTA
 		_temporizador = 0.0
-		mesa.bola.viva = false
-		mesa.bola.vel = Vector2.ZERO
+		mesa.retirar_bolas()
 		combate_terminado.emit(false)
 
 ## Drenar pega menos que el reloj: ya no es la única presión del combate.
@@ -678,4 +724,5 @@ func _siguiente_fase() -> void:
 			# la bola perdonada por la red de seguridad también lo reciba.
 			_sumar_golpes(maxi(int(round(bolsa.suma("suma_golpes_inicio"))) - golpes, 0))
 			mesa.nueva_bola()
+			_soltar_bolas(int(round(bolsa.suma("suma_bolas_al_servir"))))
 			bola_servida.emit()

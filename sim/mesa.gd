@@ -13,7 +13,13 @@ signal flipper_golpeado(punto: Vector2, fuerza: float)
 signal target_abatido(punto: Vector2, banco: int)
 signal girador_girado(punto: Vector2, indice: int, fuerza: float)
 signal banco_completado(punto: Vector2, banco: int)
+## Ha caído LA ÚLTIMA bola: esto es un drenaje de verdad, con su vida y su combo.
 signal bola_drenada()
+## Ha caído una bola pero quedan otras en la mesa. NO es un drenaje: no cuesta
+## nada. Existe para que la vista y el sonido puedan decirlo, nada más.
+signal bola_perdida(restantes: int, punto: Vector2)
+## Ha entrado una bola extra en juego.
+signal bola_extra(punto: Vector2, total: int)
 signal busqueda_bola(punto: Vector2)
 signal rampa_entrada(punto: Vector2, indice: int)
 signal rampa_salida(punto: Vector2, indice: int)
@@ -37,7 +43,33 @@ var rng := RandomNumberGenerator.new()
 var colisionadores: Array[Colisionador] = []
 var flipper_izq: Flipper
 var flipper_der: Flipper
-var bola := Bola.new()
+
+## LAS BOLAS QUE HAY EN LA MESA. Nunca está vacía: cuando no hay bola en juego
+## queda una sola, con `viva = false`, que es exactamente el estado que había
+## antes de que existiera la multibola.
+##
+## Las bolas que caen mientras quedan otras SE BORRAN de la lista. La última no:
+## se queda ella sola y muerta, porque medio juego lee `mesa.bola.viva` para
+## saber que no hay bola en juego y ese estado tiene que seguir existiendo.
+var bolas: Array[Bola] = [Bola.new()]
+
+## La bola de siempre, o sea `bolas[0]`.
+##
+## CON UNA SOLA BOLA ESTO ES EXACTAMENTE LO QUE ERA, y de ahí sale que la
+## multibola no haya obligado a reescribir la vista, el combate ni las pruebas:
+## `bolas` tiene un elemento, `bolas[0]` es esa bola, y todo lo escrito contra
+## `mesa.bola` sigue diciendo lo mismo palabra por palabra.
+##
+## Con varias bolas en juego NO es la que hay que mirar. La cámara quiere
+## `bola_en_peligro()` y el que dibuja quiere `bolas` entera. Se deja porque
+## quitarla obligaría a tocar cien sitios que están bien, no porque sea la buena.
+var bola: Bola:
+	get:
+		return bolas[0]
+
+## Las que han caído en este subpaso, para decidir DESPUÉS de haber movido a
+## todas si la que cayó era la última. Dentro del bucle no se puede saber.
+var _drenadas: Array[Bola] = []
 
 ## Solo para dibujar: la polilínea del arco superior.
 var arco := PackedVector2Array()
@@ -50,7 +82,6 @@ var bancos: Array[Array] = []
 var _reset_banco: Array[float] = []
 ## Giradores: no colisionan, la bola los atraviesa y los hace girar.
 var giradores: Array[Vector2] = []
-var _girador_dentro: Array[bool] = []
 ## Rampas y platillos: no son colisionadores, son curvas y trampas.
 var rampas: Array[Rampa] = []
 var platillos: Array[Platillo] = []
@@ -59,8 +90,6 @@ var carga_lanzador: float = 0.0
 var cargando := false
 
 var _contactos: Array[Contacto] = []
-var _temporizador_busqueda: float = 0.0
-var _tocando_flipper_sostenido := false
 ## La pala que tiene la bola atrapada en su cuna ahora mismo, o null. Es estado
 ## de la simulación, no de la vista: hace falta para poder avisar de que la bola
 ## está atrapada, que es LA técnica con la que se elige un tiro.
@@ -71,6 +100,8 @@ func _init(parametros: ParametrosMesa = null) -> void:
 	p = parametros if parametros != null else ParametrosMesa.new()
 	rng.randomize()
 	_construir()
+	# Después de `_construir`, que es quien sabe cuántos giradores hay.
+	_preparar_bola(bolas[0])
 
 # ---------------------------------------------------------------- construcción
 
@@ -352,18 +383,20 @@ func _platillo(centro: Vector2, direccion: Vector2) -> void:
 
 func _girador(centro: Vector2) -> void:
 	giradores.append(centro)
-	_girador_dentro.append(false)
 
 ## Los giradores no colisionan: la bola los atraviesa. Se disparan al ENTRAR,
 ## una vez por pasada, así que mientras la bola siga dentro no vuelven a avisar.
-func _avanzar_giradores() -> void:
+## El "estoy dentro" es POR BOLA (`Bola.girador_dentro`): con un registro por
+## mesa, la segunda bola que cruza el mismo girador se lo encontraría marcado y
+## no cobraría.
+func _avanzar_giradores(b: Bola) -> void:
 	for i in giradores.size():
-		var dentro := bola.viva \
-			and bola.pos.distance_to(giradores[i]) < p.girador_radio
-		if dentro and not _girador_dentro[i] \
-				and bola.velocidad() >= p.girador_velocidad_minima:
-			girador_girado.emit(giradores[i], i, bola.velocidad())
-		_girador_dentro[i] = dentro
+		var dentro := b.viva \
+			and b.pos.distance_to(giradores[i]) < p.girador_radio
+		if dentro and not b.girador_dentro[i] \
+				and b.velocidad() >= p.girador_velocidad_minima:
+			girador_girado.emit(giradores[i], i, b.velocidad())
+		b.girador_dentro[i] = dentro
 
 ## Vuelve a poner todos los targets en pie. Para empezar un combate nuevo.
 func reiniciar_targets() -> void:
@@ -405,19 +438,120 @@ func _poste(centro: Vector2) -> Colisionador:
 
 # ------------------------------------------------------------------- bola/juego
 
+## Deja una bola lista para usarse: sin rampa, sin platillo, sin temporizadores y
+## con un hueco de girador por cada girador de la mesa.
+func _preparar_bola(b: Bola) -> void:
+	b.vel = Vector2.ZERO
+	b.rampa = -1
+	b.platillo = -1
+	b.platillo_espera = 0.0
+	b.busqueda = 0.0
+	b.tocando_flipper = false
+	b.girador_dentro.clear()
+	for _i in giradores.size():
+		b.girador_dentro.append(false)
+
+## Empieza una bola: se queda UNA en la mesa, en el carril, y las extra que
+## hubiera desaparecen. Reutiliza el objeto de `bolas[0]` a propósito, porque hay
+## quien se guarda la referencia (la vista, para dibujarla) entre bola y bola.
 func nueva_bola() -> void:
-	bola.pos = p.inicio_bola
-	bola.vel = Vector2.ZERO
-	bola.viva = true
-	bola.en_carril = true
-	bola.rampa = -1
-	bola.platillo = -1
+	var b := bolas[0]
+	bolas.clear()
+	bolas.append(b)
+	_preparar_bola(b)
+	b.pos = p.inicio_bola
+	b.viva = true
+	b.en_carril = true
 	carga_lanzador = 0.0
 	cargando = false
-	_temporizador_busqueda = 0.0
+	_drenadas.clear()
+
+## Mete una bola más en juego, y devuelve null si ya se ha llegado al tope.
+##
+## ENTRA POR EL CARRIL LANZADOR Y SALE DISPARADA A TOPE. No aparece en mitad del
+## campo, que es lo barato y lo que se ve regalado: un lanzamiento a tope engancha
+## la órbita siempre, así que la bola extra entra en juego por arriba, dando la
+## vuelta, igual que la bola con la que empiezas. Es la única entrada que la mesa
+## ya tiene, y así la multibola no pide geometría nueva.
+##
+## Si ya hay alguien esperando en el carril, la nueva se pone por delante: dos
+## bolas en el mismo punto se empujarían con toda la fuerza de la separación.
+func soltar_bola_extra() -> Bola:
+	if bolas.size() >= p.bolas_maximas:
+		return null
+	var en_carril := 0
+	for otra in bolas:
+		if otra.viva and otra.en_carril:
+			en_carril += 1
+	var b := Bola.new()
+	_preparar_bola(b)
+	b.pos = p.inicio_bola - Vector2(0.0, p.radio_bola * 2.4 * float(en_carril))
+	b.vel = Vector2(0.0, -p.impulso_lanzador)
+	b.viva = true
+	b.en_carril = true
+	bolas.append(b)
+	bola_extra.emit(b.pos, bolas.size())
+	return b
+
+## Retira todas las bolas SIN que cuente como drenaje. Es lo que pasa al ganar y
+## al perder: el combate ha terminado y no tiene sentido que las bolas sigan
+## rodando y sumando golpes contra un enemigo muerto.
+func retirar_bolas() -> void:
+	var b := bolas[0]
+	bolas.clear()
+	bolas.append(b)
+	b.viva = false
+	b.vel = Vector2.ZERO
+	_drenadas.clear()
+
+## ¿Hay alguna bola jugándose, o sea viva y fuera del carril lanzador? Es lo que
+## arranca el reloj del combate, y con multibola no puede preguntarse por
+## `mesa.bola`: una bola extra ya lanzada mientras la principal sigue esperando
+## en el carril es una bola en juego, y el reloj tiene que correr.
+func hay_bola_en_juego() -> bool:
+	for b in bolas:
+		if b.viva and not b.en_carril:
+			return true
+	return false
+
+func bolas_vivas() -> int:
+	var n := 0
+	for b in bolas:
+		if b.viva:
+			n += 1
+	return n
+
+## La bola que mira la cámara: LA MÁS BAJA de las vivas, o sea la que está más
+## cerca del drenaje. Decisión de Daniel, y es la que no toca las cuatro reglas
+## de la cámara ni el escalado entero del pixelart: se le sigue pasando UNA bola.
+##
+## Tiene un efecto secundario que es la mitad del motivo de elegirla: con dos
+## bolas en juego casi siempre hay una abajo, así que la cámara vive anclada en
+## la banda de las palas, que es donde se juega una multibola.
+func bola_en_peligro() -> Bola:
+	var elegida: Bola = bolas[0]
+	var encontrada := false
+	for b in bolas:
+		if not b.viva:
+			continue
+		if not encontrada or b.pos.y > elegida.pos.y:
+			elegida = b
+			encontrada = true
+	return elegida
+
+## La bola que está esperando en el carril lanzador, o null. Con varias, la de
+## más abajo: es la que tiene el muelle detrás.
+func _bola_en_carril() -> Bola:
+	var elegida: Bola = null
+	for b in bolas:
+		if not (b.viva and b.en_carril):
+			continue
+		if elegida == null or b.pos.y > elegida.pos.y:
+			elegida = b
+	return elegida
 
 func cargar_lanzador(dt: float) -> void:
-	if not (bola.viva and bola.en_carril):
+	if _bola_en_carril() == null:
 		return
 	cargando = true
 	carga_lanzador = minf(carga_lanzador + dt / p.tiempo_carga_lanzador, 1.0)
@@ -426,9 +560,10 @@ func soltar_lanzador() -> void:
 	if not cargando:
 		return
 	cargando = false
-	if bola.viva and bola.en_carril:
+	var b := _bola_en_carril()
+	if b != null:
 		var ratio := p.ratio_minimo_lanzador + (1.0 - p.ratio_minimo_lanzador) * carga_lanzador
-		bola.vel.y -= p.impulso_lanzador * ratio
+		b.vel.y -= p.impulso_lanzador * ratio
 	carga_lanzador = 0.0
 
 # ---------------------------------------------------------------------- avance
@@ -442,109 +577,207 @@ func _subpaso(h: float) -> void:
 	flipper_izq.avanzar(h)
 	flipper_der.avanzar(h)
 	_avanzar_bancos(h)
-	if not bola.viva:
-		return
-
-	# Enganchada a una curva o capturada en un platillo: aquí no hay física.
-	if bola.rampa >= 0:
-		_avanzar_rampa(h)
-		return
-	if bola.platillo >= 0:
-		_avanzar_platillo(h)
-		return
-
-	bola.vel.y += p.gravedad * h
-	bola.vel *= exp(-p.rozamiento * h)
-	_limitar_velocidad()
-	bola.pos += bola.vel * h
-
-	_colisionar(h)
+	# EL ATRAPE ES DE LA MESA, NO DE UNA BOLA: se reinicia una vez por subpaso y
+	# lo enciende cualquier bola que esté posada en una cuna. Antes se reiniciaba
+	# dentro de `_colisionar`, y ahí con varias bolas mandaría la última de la
+	# lista: una bola volando por arriba le apagaría el aviso a la que está
+	# atrapada en la pala.
+	flipper_atrapando = null
+	for b in bolas:
+		if b.viva:
+			_avanzar_bola(b, h)
+	_colisionar_bolas()
 	if (flipper_atrapando != null) != _atrapada_antes:
 		_atrapada_antes = flipper_atrapando != null
 		atrape_cambiado.emit(_atrapada_antes)
-	_avanzar_giradores()
-	_comprobar_rampas()
-	_comprobar_platillos()
-	_actualizar_estado()
-	_ball_search(h)
+	_recoger_drenadas()
+
+func _avanzar_bola(b: Bola, h: float) -> void:
+	# Se apaga aquí y no en `_colisionar`, que no llega a correr cuando la bola va
+	# por una rampa: si no, una bola se quedaría con el "apoyada en la pala" del
+	# subpaso anterior y el ball search no la despertaría nunca.
+	b.tocando_flipper = false
+
+	# Enganchada a una curva o capturada en un platillo: aquí no hay física.
+	if b.rampa >= 0:
+		_avanzar_rampa(b, h)
+		return
+	if b.platillo >= 0:
+		_avanzar_platillo(b, h)
+		return
+
+	b.vel.y += p.gravedad * h
+	b.vel *= exp(-p.rozamiento * h)
+	_limitar_velocidad(b)
+	b.pos += b.vel * h
+
+	_colisionar(b, h)
+	_avanzar_giradores(b)
+	_comprobar_rampas(b)
+	_comprobar_platillos(b)
+	_actualizar_estado(b)
+	_ball_search(b, h)
+
+## Choque entre bolas. Sin esto la multibola son dos bolas que se atraviesan, y
+## con sprites de 18 px encima eso se ve roto a la primera.
+##
+## SOLO CHOCAN LAS BOLAS LIBRES, y no es pereza: una bola enganchada a una rampa
+## o dormida en el platillo está en otro plano —las rampas son elevadas—, así que
+## atravesarla es lo correcto. Es la misma razón por la que una rampa no
+## colisiona con nada.
+##
+## Masas iguales, así que el reparto es mitad y mitad y no hace falta llevar masa
+## por bola. El rebote no es 1: dos bolas encerradas en el racimo con rebote
+## perfecto no se calman nunca.
+func _colisionar_bolas() -> void:
+	if bolas.size() < 2:
+		return
+	var diametro := p.radio_bola * 2.0
+	for i in bolas.size() - 1:
+		var a := bolas[i]
+		if not (a.viva and a.libre()):
+			continue
+		for j in range(i + 1, bolas.size()):
+			var b := bolas[j]
+			if not (b.viva and b.libre()):
+				continue
+			var delta := b.pos - a.pos
+			var dist := delta.length()
+			if dist >= diametro:
+				continue
+			# Dos bolas exactamente encima la una de la otra no tienen normal. Se
+			# separan en horizontal: en una mesa vertical es la única dirección
+			# que no vuelve a meter una dentro de la otra en cuanto caigan.
+			var n := (delta / dist) if dist > 1e-4 else Vector2.RIGHT
+			var correccion := (diametro - dist) * 0.5
+			a.pos -= n * correccion
+			b.pos += n * correccion
+			var vn := (b.vel - a.vel).dot(n)
+			if vn >= 0.0:
+				continue        # ya se separan
+			var impulso := -(1.0 + p.rebote_bola) * vn * 0.5
+			a.vel -= n * impulso
+			b.vel += n * impulso
+			_limitar_velocidad(a)
+			_limitar_velocidad(b)
+
+## Qué significa lo que ha caído en este subpaso.
+##
+## LA REGLA: mientras quede una bola en la mesa NO PASA NADA — ni vida, ni combo,
+## ni contraataque. Solo cuenta la última. Por eso esto no puede vivir dentro del
+## bucle de bolas: hasta que no se han movido todas no se sabe si la que acaba de
+## caer era la última.
+func _recoger_drenadas() -> void:
+	if _drenadas.is_empty():
+		return
+	var ultima: Bola = null
+	if bolas_vivas() == 0:
+		# Si caen dos en el mismo subpaso, la que manda es la de después: solo se
+		# avisa de UN drenaje, porque solo hay un turno que cerrar.
+		ultima = _drenadas[_drenadas.size() - 1]
+	for b in _drenadas:
+		if b == ultima:
+			continue
+		bolas.erase(b)
+		bola_perdida.emit(bolas.size(), b.pos)
+	_drenadas.clear()
+	if ultima == null:
+		return
+	bolas.clear()
+	bolas.append(ultima)
+	bola_drenada.emit()
 
 # ------------------------------------------------------------ rampas
 
 ## La bola recorre la curva a la velocidad con la que entró, constante. Es a
 ## propósito: determinista, sabes cuánto tarda y no hay forma de que se atasque
 ## a mitad de rampa.
-func _avanzar_rampa(h: float) -> void:
-	var r := rampas[bola.rampa]
-	bola.rampa_distancia += bola.rampa_velocidad * float(bola.rampa_sentido) * h
-	if bola.rampa_distancia > 0.0 and bola.rampa_distancia < r.largo:
-		bola.pos = r.punto_en(bola.rampa_distancia)
+func _avanzar_rampa(b: Bola, h: float) -> void:
+	var r := rampas[b.rampa]
+	b.rampa_distancia += b.rampa_velocidad * float(b.rampa_sentido) * h
+	if b.rampa_distancia > 0.0 and b.rampa_distancia < r.largo:
+		b.pos = r.punto_en(b.rampa_distancia)
 		return
 	# Salida: vuelve a la física con la velocidad tangente.
-	var d := clampf(bola.rampa_distancia, 0.0, r.largo)
-	var indice := bola.rampa
-	bola.pos = r.punto_en(d)
-	bola.vel = r.tangente_en(d) * float(bola.rampa_sentido) \
-		* bola.rampa_velocidad * r.factor_salida
-	bola.rampa = -1
-	rampa_salida.emit(bola.pos, indice)
+	var d := clampf(b.rampa_distancia, 0.0, r.largo)
+	var indice := b.rampa
+	b.pos = r.punto_en(d)
+	b.vel = r.tangente_en(d) * float(b.rampa_sentido) \
+		* b.rampa_velocidad * r.factor_salida
+	b.rampa = -1
+	rampa_salida.emit(b.pos, indice)
 
-func _comprobar_rampas() -> void:
-	if not bola.libre():
+## Dos bolas SÍ pueden ir por la misma rampa a la vez, y a propósito: el recorrido
+## lo lleva cada bola en sus propios `rampa_*`, no la rampa, así que no hay estado
+## que compartir. En una mesa de verdad se solaparían; aquí ni se ven, porque el
+## que va por la curva se dibuja como sombra.
+func _comprobar_rampas(b: Bola) -> void:
+	if not b.libre():
 		return
 	for i in rampas.size():
-		var sentido := rampas[i].sentido_entrada(bola.pos, bola.vel)
+		var sentido := rampas[i].sentido_entrada(b.pos, b.vel)
 		if sentido == 0:
 			continue
-		bola.rampa = i
-		bola.rampa_sentido = sentido
-		bola.rampa_velocidad = bola.velocidad()
-		bola.rampa_distancia = 0.0 if sentido > 0 else rampas[i].largo
-		bola.pos = rampas[i].punto_en(bola.rampa_distancia)
-		bola.vel = Vector2.ZERO
-		rampa_entrada.emit(bola.pos, i)
+		b.rampa = i
+		b.rampa_sentido = sentido
+		b.rampa_velocidad = b.velocidad()
+		b.rampa_distancia = 0.0 if sentido > 0 else rampas[i].largo
+		b.pos = rampas[i].punto_en(b.rampa_distancia)
+		b.vel = Vector2.ZERO
+		rampa_entrada.emit(b.pos, i)
 		return
 
 # ------------------------------------------------------------ platillos
 
-func _avanzar_platillo(h: float) -> void:
-	bola.platillo_espera -= h
-	if bola.platillo_espera > 0.0:
+func _avanzar_platillo(b: Bola, h: float) -> void:
+	b.platillo_espera -= h
+	if b.platillo_espera > 0.0:
 		return
-	var pl := platillos[bola.platillo]
-	var indice := bola.platillo
-	bola.vel = pl.direccion * pl.impulso
-	bola.pos = pl.centro + pl.direccion * (pl.radio + p.radio_bola + 1.0)
-	bola.platillo = -1
+	var pl := platillos[b.platillo]
+	var indice := b.platillo
+	b.vel = pl.direccion * pl.impulso
+	b.pos = pl.centro + pl.direccion * (pl.radio + p.radio_bola + 1.0)
+	b.platillo = -1
 	platillo_expulsado.emit(pl.centro, indice)
 
-func _comprobar_platillos() -> void:
-	if not bola.libre():
+## En un platillo cabe UNA bola. La segunda que llega rebota como si fuera mesa
+## —o sea, sigue de largo— en vez de meterse encima de la que ya está dentro: dos
+## bolas en el mismo agujero saldrían disparadas a la vez desde el mismo punto,
+## que es la forma más rápida de que se queden acuñadas la una contra la otra.
+func _platillo_ocupado(indice: int, salvo: Bola) -> bool:
+	for otra in bolas:
+		if otra != salvo and otra.platillo == indice:
+			return true
+	return false
+
+func _comprobar_platillos(b: Bola) -> void:
+	if not b.libre():
 		return
 	for i in platillos.size():
-		if not platillos[i].captura(bola.pos):
+		if _platillo_ocupado(i, b):
 			continue
-		bola.platillo = i
-		bola.platillo_espera = platillos[i].tiempo_captura
-		bola.pos = platillos[i].centro
-		bola.vel = Vector2.ZERO
+		if not platillos[i].captura(b.pos):
+			continue
+		b.platillo = i
+		b.platillo_espera = platillos[i].tiempo_captura
+		b.pos = platillos[i].centro
+		b.vel = Vector2.ZERO
 		platillo_capturado.emit(platillos[i].centro, i)
 		return
 
-func _limitar_velocidad() -> void:
-	var v := bola.vel.length()
+func _limitar_velocidad(b: Bola) -> void:
+	var v := b.vel.length()
 	if v > p.velocidad_maxima:
-		bola.vel *= p.velocidad_maxima / v
+		b.vel *= p.velocidad_maxima / v
 
-func _colisionar(h: float) -> void:
-	# Se reinician ANTES de la salida temprana: si no, sin contactos se quedaban
-	# con el valor del subpaso anterior.
-	_tocando_flipper_sostenido = false
-	flipper_atrapando = null
+func _colisionar(b: Bola, h: float) -> void:
+	# `flipper_atrapando` NO se reinicia aquí: es de la mesa y lo reinicia
+	# `_subpaso` una vez para todas las bolas.
 	_contactos.clear()
 	for c in colisionadores:
-		c.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
-	flipper_izq.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
-	flipper_der.consultar(bola.pos, bola.vel, p.radio_bola, _contactos)
+		c.consultar(b.pos, b.vel, p.radio_bola, _contactos)
+	flipper_izq.consultar(b.pos, b.vel, p.radio_bola, _contactos)
+	flipper_der.consultar(b.pos, b.vel, p.radio_bola, _contactos)
 	if _contactos.is_empty():
 		return
 
@@ -556,11 +789,11 @@ func _colisionar(h: float) -> void:
 			continue
 		var f := c.origen as Flipper
 		if f.pulsado:
-			_tocando_flipper_sostenido = true
+			b.tocando_flipper = true
 			# Atrapada: la pala ya ha terminado de subir y la bola está posada
 			# y quieta encima. Es el momento en el que se puede apuntar.
 			if absf(f.omega) < p.flipper_omega_quieta \
-					and bola.velocidad() < p.velocidad_atrapada:
+					and b.velocidad() < p.velocidad_atrapada:
 				flipper_atrapando = f
 
 	# --- ARREGLO 2: resolver POSICIÓN solo contra el contacto más profundo ---
@@ -569,7 +802,7 @@ func _colisionar(h: float) -> void:
 	# `tolerancia_posicion` px de penetración sin corregir, no hay pelea ni
 	# vibración en reposo. Los impulsos de todos los contactos van después.
 	if mas_profundo.profundidad > p.tolerancia_posicion:
-		bola.pos += mas_profundo.normal * (mas_profundo.profundidad - p.tolerancia_posicion)
+		b.pos += mas_profundo.normal * (mas_profundo.profundidad - p.tolerancia_posicion)
 
 	_contactos.sort_custom(func(x: Contacto, y: Contacto) -> bool:
 		return x.profundidad > y.profundidad)
@@ -577,7 +810,7 @@ func _colisionar(h: float) -> void:
 	for c in _contactos:
 		# Impulso contra la velocidad RELATIVA a la superficie. Esto es lo que
 		# hace que un flipper en movimiento lance en vez de rebotar.
-		var v_rel := bola.vel - c.velocidad_superficie
+		var v_rel := b.vel - c.velocidad_superficie
 		var vn := v_rel.dot(c.normal)
 		if vn >= 0.0:
 			continue    # ya se separa: no dupliques el rebote en las juntas
@@ -604,15 +837,15 @@ func _colisionar(h: float) -> void:
 		# la bola hace contra la superficie, y contarlo frenaría en seco toda
 		# bola que roce un bumper.
 		var jn := -(1.0 + e) * vn
-		bola.vel += c.normal * (jn + empuje)
+		b.vel += c.normal * (jn + empuje)
 		if velocidad >= p.velocidad_rebote_minima:
-			_aplicar_friccion(c, jn, c.friccion)      # es un choque
-		elif bola.velocidad() <= p.velocidad_rodando:
-			_aplicar_friccion(c, jn, c.friccion)      # casi parada: que se pare
+			_aplicar_friccion(b, c, jn, c.friccion)   # es un choque
+		elif b.velocidad() <= p.velocidad_rodando:
+			_aplicar_friccion(b, c, jn, c.friccion)   # casi parada: que se pare
 		else:
-			_aplicar_rodadura(c, h)                   # rodando
+			_aplicar_rodadura(b, c, h)                # rodando
 		_avisar(c, velocidad, empuje)
-	_limitar_velocidad()
+	_limitar_velocidad(b)
 
 ## Rozamiento de Coulomb: un impulso a lo largo de la superficie, en contra del
 ## deslizamiento y limitado a `friccion` veces el impulso normal.
@@ -631,22 +864,22 @@ func _colisionar(h: float) -> void:
 ## soltar la pala la bola bajaba a velocidad constante en vez de acelerar, y se
 ## veía falso. Con la rodadura floja la límite se va a varios cientos de px/s,
 ## que la bola no alcanza en los 60 px de una pala: baja acelerando de verdad.
-func _aplicar_rodadura(c: Contacto, h: float) -> void:
+func _aplicar_rodadura(b: Bola, c: Contacto, h: float) -> void:
 	if p.rodadura <= 0.0:
 		return
-	var v_rel := bola.vel - c.velocidad_superficie
+	var v_rel := b.vel - c.velocidad_superficie
 	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
-	bola.vel -= tangente * (1.0 - exp(-p.rodadura * h))
+	b.vel -= tangente * (1.0 - exp(-p.rodadura * h))
 
-func _aplicar_friccion(c: Contacto, jn: float, mu: float) -> void:
+func _aplicar_friccion(b: Bola, c: Contacto, jn: float, mu: float) -> void:
 	if mu <= 0.0 or jn <= 0.0:
 		return
-	var v_rel := bola.vel - c.velocidad_superficie
+	var v_rel := b.vel - c.velocidad_superficie
 	var tangente := v_rel - c.normal * v_rel.dot(c.normal)
 	var vt := tangente.length()
 	if vt < 1e-4:
 		return
-	bola.vel -= (tangente / vt) * minf(mu * jn, vt)
+	b.vel -= (tangente / vt) * minf(mu * jn, vt)
 
 ## Los avisos son la fuente del daño del combate, así que tienen que salir UNA
 ## vez por golpe de verdad. Sin el filtro, una bola rodando apoyada en un bumper
@@ -671,34 +904,40 @@ func _avisar(c: Contacto, fuerza: float, empuje: float) -> void:
 			if col.activo and fuerza >= col.velocidad_minima:
 				_abatir(col)
 
-func _actualizar_estado() -> void:
-	if bola.en_carril and bola.pos.y < _v(0, 295).y:
-		bola.en_carril = false
-	var fuera := bola.pos.x < -60.0 or bola.pos.x > ANCHO + 60.0 \
-		or bola.pos.y < -60.0 or bola.pos.y > p.y_drenaje
+## No avisa aquí de que la bola ha caído: la apunta en `_drenadas` y lo decide
+## `_recoger_drenadas`, que es el único que sabe si quedaban más bolas.
+func _actualizar_estado(b: Bola) -> void:
+	if b.en_carril and b.pos.y < _v(0, 295).y:
+		b.en_carril = false
+	var fuera := b.pos.x < -60.0 or b.pos.x > ANCHO + 60.0 \
+		or b.pos.y < -60.0 or b.pos.y > p.y_drenaje
 	if fuera:
-		bola.viva = false
-		bola.vel = Vector2.ZERO
-		bola_drenada.emit()
+		b.viva = false
+		b.vel = Vector2.ZERO
+		_drenadas.append(b)
 
 # --- ARREGLO 3: ball search ---
 # Si la bola se queda por debajo de `busqueda_velocidad` durante
 # `busqueda_tiempo`, empujón automático. Las máquinas reales lo hacen.
-func _ball_search(h: float) -> void:
-	if not bola.viva or bola.en_carril:
-		_temporizador_busqueda = 0.0
+#
+# El temporizador es POR BOLA. Con uno solo para la mesa, la bola que estás
+# jugando le reiniciaba el reloj a la que se había quedado dormida en un rincón,
+# y esa no se despertaba nunca.
+func _ball_search(b: Bola, h: float) -> void:
+	if not b.viva or b.en_carril:
+		b.busqueda = 0.0
 		return
-	if p.busqueda_ignora_flipper_sostenido and _tocando_flipper_sostenido:
-		_temporizador_busqueda = 0.0
+	if p.busqueda_ignora_flipper_sostenido and b.tocando_flipper:
+		b.busqueda = 0.0
 		return
-	if bola.vel.length() >= p.busqueda_velocidad:
-		_temporizador_busqueda = 0.0
+	if b.vel.length() >= p.busqueda_velocidad:
+		b.busqueda = 0.0
 		return
-	_temporizador_busqueda += h
-	if _temporizador_busqueda < p.busqueda_tiempo:
+	b.busqueda += h
+	if b.busqueda < p.busqueda_tiempo:
 		return
-	_temporizador_busqueda = 0.0
+	b.busqueda = 0.0
 	var ang := -PI * 0.5 + rng.randf_range(-p.busqueda_dispersion, p.busqueda_dispersion)
-	bola.vel += Vector2(cos(ang), sin(ang)) * p.busqueda_impulso
-	_limitar_velocidad()
-	busqueda_bola.emit(bola.pos)
+	b.vel += Vector2(cos(ang), sin(ang)) * p.busqueda_impulso
+	_limitar_velocidad(b)
+	busqueda_bola.emit(b.pos)

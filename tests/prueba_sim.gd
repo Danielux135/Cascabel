@@ -50,6 +50,7 @@ func _initialize() -> void:
 	_prueba_reliquias()
 	_prueba_misiones()
 	_prueba_criticos()
+	_prueba_multibola()
 	_prueba_fuente()
 	await _prueba_cascara()
 	_prueba_paleta()
@@ -1830,6 +1831,8 @@ func _prueba_camara() -> void:
 	var cp := ParametrosCamara.new()
 	var camara := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
 
+	_prueba_camara_sin_saltos(cp)
+
 	# REGLA 1: con la bola cayendo, la cámara mira por DEBAJO de ella.
 	var cayendo := camara.objetivo(400.0, 800.0, true)
 	var subiendo := camara.objetivo(400.0, -800.0, true)
@@ -2951,14 +2954,26 @@ func _prueba_reliquias() -> void:
 	_comprobar("todas dicen lo que hacen y hacen algo", sin_texto.is_empty(),
 		str(sin_texto))
 
-	# DISEÑO.md §8: los cinco ejes, repartidos por igual. Es lo que impide que
+	# DISEÑO.md §8: los cinco ejes, todos con fondo de sobra. Es lo que impide que
 	# sean cuarenta y cinco variantes de "+2 de daño".
+	#
+	# ANTES ESTO EXIGÍA QUE FUERAN EXACTAMENTE LOS MISMOS, Y SE HA AFLOJADO A
+	# PROPÓSITO (decisión de Daniel) al entrar la multibola: el eje de Caos es el
+	# único que tenía su mecánica escrita en `DISEÑO.md` §8 y sin implementar, así
+	# que sus cinco reliquias nuevas son mecánica nueva, no relleno, y la
+	# alternativa era tirar cinco reliquias ya medidas para hacer sitio.
+	#
+	# LO QUE SE PAGA, dicho para que se pueda deshacer sabiendo qué se deshace: la
+	# ruleta sortea por RAREZA y no por eje, así que un eje con más reliquias sale
+	# más. Con 14 de 50, Caos pasa del 20 % al 28 % de lo que se ofrece. Si al
+	# jugar se nota que sale Caos demasiado, la salida NO es volver a cerrar esta
+	# prueba: es sortear por eje, o subir los otros cuatro.
+	var minimo := 9
 	var reparto_ok := por_eje.size() == Reliquia.NOMBRE_EJE.size()
-	var por_lado := catalogo.size() / maxi(Reliquia.NOMBRE_EJE.size(), 1)
 	for eje in por_eje:
-		if int(por_eje[eje]) != por_lado:
+		if int(por_eje[eje]) < minimo:
 			reparto_ok = false
-	_comprobar("los cinco ejes tienen las mismas reliquias cada uno", reparto_ok,
+	_comprobar("los cinco ejes tienen al menos nueve reliquias cada uno", reparto_ok,
 		str(por_eje))
 	_comprobar("y cubren al menos seis ganchos distintos", ganchos.size() >= 6,
 		"%d ganchos" % ganchos.size())
@@ -3144,7 +3159,7 @@ func _prueba_ningun_efecto_muerto(catalogo: Array[Reliquia]) -> void:
 		for clave in r.efectos:
 			var c := str(clave)
 			if not (c.begins_with("suma_") or c.begins_with("factor_")
-					or c.begins_with("bandera_")):
+					or c.begins_with("bandera_") or c.begins_with("azar_")):
 				raras.append("%s: %s" % [r.id, c])
 	_comprobar("todas las claves llevan un prefijo conocido", raras.is_empty(),
 		str(raras))
@@ -3579,6 +3594,64 @@ func _comprobar_una_vez(nombre: String, condicion: bool, detalle: String = "") -
 	_una_vez[nombre] = condicion
 	_comprobar(nombre, condicion, detalle)
 
+## REGLA 5: LA CÁMARA NO SE TELETRANSPORTA.
+##
+## Lo dijo Daniel jugando —*"se siente super mal a la hora de ponerse abajo"*— y
+## la avería estaba en que las dos garantías duras de `avanzar` no pasaban por
+## ningún suavizado: eran un `minf` y un `maxf` que se aplicaban enteros en un
+## fotograma, y el suelo garantizado depende de `vy`, que cambia de golpe cada
+## vez que la bola sale de una rampa o toca una pala. Medido: 113 px en un
+## fotograma, o sea 13.616 px/s.
+##
+## Se comprueba con una bola de VERDAD y no con números inventados, porque el
+## salto salía justo de los cambios bruscos de `vy` que solo produce la mesa. Y
+## se comprueba a la vez que no se ha perdido lo que costó arreglar la sesión
+## pasada: con la bola en el tercio de abajo, el flipper en pantalla.
+func _prueba_camara_sin_saltos(cp: ParametrosCamara) -> void:
+	var cam := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
+	var m := _nueva_mesa()
+	cam.y_actual = cam.limite_abajo()
+	var tope := cp.velocidad_maxima * DT
+	var peor := 0.0
+	var peor_acel := 0.0
+	var v_antes := 0.0
+	var sin_flipper := 0
+	var bajo_ancla := 0
+	for _bola in 4:
+		m.nueva_bola()
+		m.cargar_lanzador(1.0)
+		m.soltar_lanzador()
+		for _i in int(30.0 / DT):
+			if not m.bola.viva:
+				break
+			m.avanzar(DT)
+			var antes := cam.y_actual
+			cam.avanzar(DT, m.bola.pos.y, m.bola.vel.y, m.bola.viva)
+			peor = maxf(peor, absf(cam.y_actual - antes))
+			var v := (cam.y_actual - antes) / DT
+			peor_acel = maxf(peor_acel, absf(v - v_antes) / DT)
+			v_antes = v
+			if m.bola.pos.y > Mesa.ALTO - cp.margen_ancla:
+				bajo_ancla += 1
+				if cam.y_actual + cp.alto_visible * 0.5 < 1240.0:
+					sin_flipper += 1
+	# El +1 es el redondeo a píxeles enteros de `_colocar`, no holgura.
+	_comprobar("regla 5: la camara nunca salta mas de su velocidad maxima",
+		peor <= tope + 1.0,
+		"peor salto %.1f px, el tope es %.1f" % [peor, tope])
+	# Y LO QUE DE VERDAD SE NOTA, que es lo que costó dos intentos entender: el
+	# ojo no lee el salto, lee la ACELERACIÓN. Con el adelanto por velocidad
+	# puesto —el objetivo saltaba con cada `vy`— el pico medido era de 1.244.744
+	# px/s². El techo de aquí está una orden de magnitud por encima de lo que
+	# sale hoy (~68.000) a propósito: es una alarma de que ha vuelto un objetivo
+	# discontinuo, no un ajuste de tacto.
+	_comprobar("y su aceleracion tampoco pega tirones",
+		peor_acel < 300000.0, "pico de %.0f px/s2" % peor_acel)
+	_comprobar("y limitarla no le ha quitado el flipper de plano",
+		sin_flipper == 0 and bajo_ancla > 0,
+		"%d de %d fotogramas sin flipper" % [sin_flipper, bajo_ancla])
+	cam.free()
+
 ## Los críticos. Lo que puede romperse: que la probabilidad no llegue al golpe,
 ## o que una reliquia de crítico no sume nada.
 func _prueba_criticos() -> void:
@@ -3721,6 +3794,260 @@ func _tiro_de_mision(c: Combate, tiro: String) -> void:
 ## todo cogía la fuente de reserva de Godot, que solo trae ASCII, así que
 ## "MANTÉN" salía como "MANTN". Un glifo que falta no da error: deja un hueco, y
 ## nadie mira un hueco. Por eso esto se comprueba y no se supone.
+## LA MULTIBOLA. Lo que puede romperse, y todo esto ha sido un fallo de verdad
+## en algún juego de pinball: que una bola le apague el ball search a otra, que
+## el drenaje de una cueste el turno entero, que dos bolas se atraviesen, que dos
+## caigan en el mismo platillo, o que al ganar se queden bolas rodando.
+func _prueba_multibola() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	_comprobar("una mesa recien servida tiene UNA bola",
+		m.bolas.size() == 1 and m.bola.viva and m.bolas_vivas() == 1)
+
+	# --- el tope ---
+	var puestas := 0
+	for _i in 10:
+		if m.soltar_bola_extra() != null:
+			puestas += 1
+	_comprobar("soltar bolas extra respeta el tope de la mesa",
+		m.bolas.size() == m.p.bolas_maximas
+			and puestas == m.p.bolas_maximas - 1,
+		"%d bolas, %d puestas" % [m.bolas.size(), puestas])
+
+	# --- la bola que mira la camara es la mas baja ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.soltar_bola_extra()
+	m.bolas[0].pos = Vector2(200, 700)
+	m.bolas[1].pos = Vector2(200, 1100)
+	_comprobar("la camara sigue a la bola mas baja",
+		m.bola_en_peligro() == m.bolas[1])
+	m.bolas[1].viva = false
+	_comprobar("y si la de abajo se muere, a la que queda viva",
+		m.bola_en_peligro() == m.bolas[0])
+
+	# --- caer con otra viva NO es drenar ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.soltar_bola_extra()
+	m.bolas[1].en_carril = false
+	var drenajes := [0]
+	var perdidas := [0]
+	m.bola_drenada.connect(func() -> void: drenajes[0] += 1)
+	m.bola_perdida.connect(func(_r: int, _pt: Vector2) -> void: perdidas[0] += 1)
+	m.bolas[1].pos = Vector2(200, m.p.y_drenaje + 40.0)
+	m.bolas[1].vel = Vector2.ZERO
+	m.avanzar(DT)
+	_comprobar("cae una bola con otra viva y NO cuenta como drenaje",
+		drenajes[0] == 0 and perdidas[0] == 1 and m.bolas.size() == 1,
+		"%d drenajes, %d perdidas, %d bolas"
+			% [drenajes[0], perdidas[0], m.bolas.size()])
+	_comprobar("y la que sigue viva es la que se queda en la lista",
+		m.bolas.size() == 1 and m.bola.viva)
+
+	# --- la ultima si ---
+	m.bola.pos = Vector2(200, m.p.y_drenaje + 40.0)
+	m.bola.vel = Vector2.ZERO
+	m.avanzar(DT)
+	_comprobar("y cuando cae la ULTIMA si es un drenaje",
+		drenajes[0] == 1 and m.bolas.size() == 1 and not m.bola.viva,
+		"%d drenajes" % drenajes[0])
+
+	# --- dos a la vez avisan UNA vez ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.soltar_bola_extra()
+	m.bolas[1].en_carril = false
+	var dobles := [0]
+	m.bola_drenada.connect(func() -> void: dobles[0] += 1)
+	for b in m.bolas:
+		b.pos = Vector2(200, m.p.y_drenaje + 40.0)
+		b.vel = Vector2.ZERO
+	m.avanzar(DT)
+	_comprobar("dos bolas que caen a la vez cierran UN solo turno",
+		dobles[0] == 1 and m.bolas.size() == 1 and m.bolas_vivas() == 0,
+		"%d drenajes, %d bolas" % [dobles[0], m.bolas.size()])
+
+	# --- chocan entre ellas ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.soltar_bola_extra()
+	m.bolas[1].en_carril = false
+	var izq := m.bolas[0]
+	var der := m.bolas[1]
+	izq.pos = Vector2(150, 800)
+	izq.vel = Vector2(400, 0)
+	der.pos = Vector2(250, 800)
+	der.vel = Vector2(-400, 0)
+	var solapada := 0.0
+	var minima := INF
+	# El rebote se mira EN EL FOTOGRAMA DEL CHOQUE y no al final del bucle: un
+	# segundo despues las dos han tocado bandas y gravedad, y la prueba estaria
+	# midiendo la mesa entera en vez del choque.
+	var rebotan := false
+	for _i in 120:
+		m.avanzar(DT)
+		if not (izq.viva and der.viva and izq.libre() and der.libre()):
+			break
+		var d := izq.pos.distance_to(der.pos)
+		minima = minf(minima, d)
+		if d < m.p.radio_bola * 2.0 - 0.5:
+			solapada += DT
+		if not rebotan and izq.vel.x < 0.0 and der.vel.x > 0.0:
+			rebotan = true
+			break
+	_comprobar("dos bolas no se atraviesan", solapada <= DT * 2.0,
+		"%.3f s solapadas, minima %.1f px (diametro %.0f)"
+			% [solapada, minima, m.p.radio_bola * 2.0])
+	_comprobar("y el choque las manda cada una para su lado", rebotan,
+		"izq %.0f, der %.0f" % [izq.vel.x, der.vel.x])
+
+	# --- el ball search es por bola ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.soltar_bola_extra()
+	var dormida := m.bolas[0]
+	var volando := m.bolas[1]
+	volando.en_carril = false
+	var rescates := [0]
+	m.busqueda_bola.connect(func(_pt: Vector2) -> void: rescates[0] += 1)
+	for _i in int((m.p.busqueda_tiempo + 0.5) / DT):
+		# La dormida se queda clavada a mano en un rincon del arco; la otra da
+		# vueltas a toda velocidad, que es lo que antes le reiniciaba el reloj.
+		dormida.pos = Vector2(200, 700)
+		dormida.vel = Vector2.ZERO
+		volando.pos = Vector2(200, 900)
+		volando.vel = Vector2(0, -900)
+		m.avanzar(DT)
+	_comprobar("una bola dormida se rescata aunque otra este volando",
+		rescates[0] >= 1, "%d rescates" % rescates[0])
+
+	# --- en un platillo cabe una ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.soltar_bola_extra()
+	m.bolas[1].en_carril = false
+	if not m.platillos.is_empty():
+		for b in m.bolas:
+			b.pos = (m.platillos[0] as Platillo).centro
+			b.vel = Vector2.ZERO
+		m.avanzar(DT)
+		var dentro := 0
+		for b in m.bolas:
+			if b.platillo >= 0:
+				dentro += 1
+		_comprobar("en un platillo no caben dos bolas", dentro <= 1,
+			"%d dentro" % dentro)
+
+	# --- cuatro bolas sueltas por la mesa no rompen nada ---
+	m = _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	for _i in m.p.bolas_maximas - 1:
+		m.soltar_bola_extra()
+	var raro := 0
+	for _i in int(8.0 / DT):
+		m.avanzar(DT)
+		for b in m.bolas:
+			if not b.viva:
+				continue
+			if not is_finite(b.pos.x) or not is_finite(b.pos.y) \
+					or b.velocidad() > m.p.velocidad_maxima + 1.0:
+				raro += 1
+	_comprobar("ocho segundos con la mesa llena de bolas sin nada raro",
+		raro == 0, "%d fotogramas raros" % raro)
+
+	_prueba_multibola_en_combate()
+
+## La multibola vista desde el combate: lo que cuesta, lo que no, y las reliquias
+## del eje de Caos, que es lo primero de ese eje que existe de verdad.
+func _prueba_multibola_en_combate() -> void:
+	var c := _combate_con([])
+	c.mesa.soltar_bola_extra()
+	var vida := c.vida_jugador
+	var antes_golpes := c.golpes
+	c.golpes = 12
+	c.mesa.bolas[1].en_carril = false
+	c.mesa.bolas[1].pos = Vector2(200, c.mesa.p.y_drenaje + 40.0)
+	c.mesa.bolas[1].vel = Vector2.ZERO
+	c.avanzar(DT)
+	_comprobar("perder una bola de la multibola no cuesta vida ni combo",
+		c.vida_jugador == vida and c.golpes == 12 and c.fase == Combate.Fase.BOLA_VIVA,
+		"vida %d/%d, golpes %d" % [c.vida_jugador, vida, c.golpes])
+	c.golpes = antes_golpes
+
+	# Ganar retira TODAS: con multibola, apagar solo la principal dejaba dos
+	# rodando y sumando golpes contra un enemigo ya muerto.
+	c = _combate_con([])
+	c.mesa.soltar_bola_extra()
+	c.mesa.soltar_bola_extra()
+	c.enemigo.vida = 1
+	c.mesa.bumper_golpeado.emit(Vector2(200, 800), 500.0)
+	_comprobar("al ganar se retiran TODAS las bolas",
+		c.mesa.bolas.size() == 1 and c.mesa.bolas_vivas() == 0,
+		"%d bolas, %d vivas" % [c.mesa.bolas.size(), c.mesa.bolas_vivas()])
+
+	# El reloj tiene que correr con una bola extra en juego aunque la principal
+	# siga esperando en el carril: si no, la multibola de salida regalaba tiempo.
+	c = _combate_con([])
+	c.mesa.nueva_bola()
+	c.fase = Combate.Fase.LANZANDO
+	c.mesa.soltar_bola_extra()
+	c.mesa.bolas[1].en_carril = false
+	c.avanzar(DT)
+	_comprobar("con la principal en el carril y una extra fuera, el reloj corre",
+		c.fase == Combate.Fase.BOLA_VIVA)
+
+	# --- las reliquias ---
+	var cat := CatalogoReliquias.cargar()
+	var caos: Array[String] = []
+	for r in cat:
+		if r.eje == Reliquia.Eje.CAOS:
+			caos.append(r.id)
+	for necesaria in ["bifurcacion", "proceso_hijo", "bomba_de_procesos",
+			"condicion_de_carrera", "hilo_unico"]:
+		_comprobar_una_vez("las cinco reliquias de multibola estan en el catalogo",
+			caos.has(necesaria), str(necesaria))
+
+	var b := _combate_con(["bomba_de_procesos"])
+	_comprobar("Bomba de procesos sirve DOS bolas de salida",
+		b.mesa.bolas.size() == 2, "%d bolas" % b.mesa.bolas.size())
+
+	# La condicional del eje: apagada con una bola, encendida con dos. Es lo que
+	# convierte "soltar bolas" en una build y no en tres reliquias sueltas.
+	var cc := _combate_con(["condicion_de_carrera"])
+	var solo := _dano_de(cc, "bumper")
+	cc.mesa.soltar_bola_extra()
+	cc.mesa.bolas[1].en_carril = false
+	cc.avanzar(DT)
+	var doble := _dano_de(cc, "bumper")
+	_comprobar("Condicion de carrera esta apagada con una bola y encendida con dos",
+		doble > solo, "%d con una, %d con dos" % [solo, doble])
+
+	# Y la de azar: con la reliquia puesta, completar recorridos acaba soltando
+	# bolas. Sin ella no se toca el dado, que es lo que mantiene deterministas
+	# las medidas de balance.
+	var sin_ella := _combate_con([])
+	for _i in 60:
+		sin_ella.mesa.banco_completado.emit(Vector2(200, 800), 0)
+	_comprobar("sin reliquias de caos no aparece ni una bola extra",
+		sin_ella.mesa.bolas.size() == 1,
+		"%d bolas" % sin_ella.mesa.bolas.size())
+
+	var con_ella := _combate_con(["proceso_hijo"])
+	var vistas := 0
+	for _i in 60:
+		con_ella.mesa.banco_completado.emit(Vector2(200, 800), 0)
+		vistas = maxi(vistas, con_ella.mesa.bolas.size())
+		con_ella.mesa.nueva_bola()
+	_comprobar("Proceso hijo acaba soltando bolas al cerrar bancos", vistas >= 2,
+		"maximo %d bolas" % vistas)
+
 func _prueba_fuente() -> void:
 	_comprobar("la fuente sabe escribir acentos y enes",
 		FuenteUI.tiene_castellano(),

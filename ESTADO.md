@@ -13,361 +13,339 @@ pasa de una pantalla, sobra algo.
 
 Lo mínimo que hay que saber si esta conversación empieza de cero.
 
-**Dónde estamos.** La Fase 5 (la cáscara) está **escrita entera y sin ejecutar
-ni una vez**: se escribió en remoto y allí no se podía lanzar el juego.
-
-**Y eso último ya no es verdad, que es lo que más ahorra saber:** en una sesión
-remota **sí se puede lanzar Godot, y desde esta sesión además CON VENTANA**:
-con un display virtual se abre el juego de verdad, se le mandan teclas y se
-guardan capturas. La receta entera está en `CLAUDE.md`, "Godot". Así se cazaron
-el halo de magenta de los iconos y el reloj cortado de la barra de tareas, y
-**ninguno de los dos salía en la batería**. Se baja el binario de Linux de la misma
-versión y se corre en la caja de la sesión:
-
-    curl -sSL -o g.zip https://github.com/godotengine/godot/releases/download/4.7.1-stable/Godot_v4.7.1-stable_linux.x86_64.zip
-    unzip -q g.zip && chmod +x Godot_v4.7.1-stable_linux.x86_64
-    ./Godot_v4.7.1-stable_linux.x86_64 --headless --path <copia> --import
-
-Con `sim/`, `data/` y `tests/` copiados y un `project.godot` sin `main_scene`
-basta: los medidores no tocan `render/` ni assets. **Todo el rebalance de esta
-sesión se ha medido así, ejecutando de verdad**, no calculando.
+**Dónde estamos.** La mesa ya tiene **multibola**: `Mesa` pasa de una bola a N,
+la cámara sigue a la más baja, y el eje de Caos de `DISEÑO.md` §8 —que llevaba
+escrito desde el principio y sin implementar— existe por fin como mecánica y no
+como porcentajes. Escrito **y ejecutado**: batería **414/435 en la caja de la
+sesión**, y los 21 que faltan son todos "no existe tal PNG", porque en la caja
+no está `assets/`. En el equipo de Daniel tienen que salir los 435.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-El `--import` no es opcional: los 5 fondos bugueados nuevos de `assets/shell/`
-no tienen `.import`, así que hasta que se importen no existen para el juego y
-**dos pruebas nuevas van a salir en rojo diciendo exactamente eso**. Si salen
-en rojo después de importar, entonces sí es un fallo de verdad.
+**En una sesión remota se puede lanzar Godot, y CON VENTANA**: con un display
+virtual se abre el juego de verdad, se le mandan teclas y se guardan capturas.
+La receta entera está en `CLAUDE.md`, "Godot", y así se cazaron el halo de
+magenta y el reloj cortado, que no salían en la batería. **Lo visual se mira, no
+se deduce.** Para la batería basta con copiar `sim/`, `data/`, `tests/` y
+`render/` y un `project.godot` sin `main_scene`.
 
-**La batería ya está en verde (321/321)**, así que el candado del commit se ha
-soltado. Falta commitear `tests/prueba_sim.gd` (el arreglo de la batería).
+**Lo que manda ahora** es `PROPÓSITO.md` §8, la dopamina de mesa: el campo de
+pines. Ver "Siguiente".
 
-**Ficheros nuevos de la última sesión** (`render/`): `nodo_cascara_frente.gd`,
-`nodo_panel_enemigo.gd`, `nodo_cursor.gd`. Borrado: ninguno salvo un
-`nodo_marco_mesa.gd` intermedio que no llegó a durar. Reescritos a fondo:
-`nodo_cascara.gd`, `nodo_hud.gd`, `nodo_pantalla_mapa.gd`. Tocados:
-`vista_mesa.gd`, `parametros_camara.gd`, `nodo_enemigo.gd`, `nodo_tele.gd`,
-`tests/prueba_sim.gd`. **El mapa de capas está en `CLAUDE.md`** y conviene
-mirarlo antes de dibujar nada.
+**Las dos decisiones de la multibola, y las dos son de Daniel:** la cámara sigue
+a la bola más baja, y perder una bola con otras vivas no cuesta absolutamente
+nada. Las dos se deshacen en un rato si al jugar molestan; no hay nada
+construido encima.
 
-**Las dos decisiones que pueden caerse al jugar, y las dos son reversibles en
-un rato:** el reloj dentro de la barra de título (pregunta N2) y la vida en un
-panel lateral en vez de encima de la mesa (pregunta N4). Si cualquiera de las
-dos molesta, se deshace; no hay nada construido encima.
+## MULTIBOLA: LA MESA YA TIENE N BOLAS (tanda 0e)
 
-**El REBALANCE (tanda 1) está hecho y medido**, y lo que ha destapado cambia el
-orden del plan: ver la sección de abajo. Lo que manda ahora es la **Fase 6**.
-
----
-
-## LOS CASCABELES SON ELEMENTOS, NO PORCENTAJES (tanda 2b)
-
-**Fátima:** *"cambiar de cascabel es MUY inútil, esto tiene que ser un roguelike
-progresivo frenético: builds de crítico, veneno, hielo... cascabeles más ligeros,
-que rebotan más, que pesan más"*. Y tenía razón por una razón de arquitectura,
-no de números: los cascabeles se montaron como **bolsa de modificadores** —
-reutilizando el sistema de reliquias, que encajaba limpio y no pedía tocar
-`Combate`— y salieron **medidos, equilibrados y completamente invisibles**. Un
-×1,19 al daño no se ve mientras juegas. **Una bolsa de modificadores solo sabe
-producir porcentajes; para que PASEN COSAS hacen falta eventos.**
+`DISEÑO.md` §8 lista cinco ejes de build y el quinto es **Caos: multibola, bolas
+extra, aleatoriedad**. Estaba escrito desde el principio y era el único eje sin
+una sola línea de código: las nueve reliquias de Caos que había eran nueve
+porcentajes con nombre gracioso. **Ahora la mesa tiene bolas de verdad.**
 
 ### Lo que se ha montado
 
-**`sim/estados.gd` — la capa de eventos que faltaba.** Cinco estados que duran en
-el tiempo y acumulan: **veneno** (tictaquea daño por acumulación), **escarcha**
-(frena el reloj del enemigo hasta la mitad), **brasa** (no hace nada mientras
-arde: ESTALLA a los cuatro segundos, y cuanto más hayas metido más fuerte),
-**marca** (críticos seguros, se gasta uno por golpe) y **frenesí** (cada crítico
-sube la probabilidad del siguiente).
+**`Mesa.bolas`, un array que nunca está vacío.** Cuando no hay bola en juego
+queda UNA, muerta, que es exactamente el estado de antes; por eso `mesa.bola`
+sigue existiendo como `bolas[0]` y **ni la vista, ni el combate, ni las 400
+pruebas viejas han tenido que reescribirse**. Lo que sí se ha movido de sitio es
+el estado que estaba mal puesto: el temporizador del ball search y el "estoy
+dentro del girador" eran de la mesa, y con dos bolas eso significa que una le
+apaga el aviso a la otra. Viven en `Bola`.
 
-**Y no hay un solo `if` por estado.** `Combate._apuntar(tiro)` ya sabía qué tiro
-acababa de pasar —es lo que alimenta las misiones— y ahí pregunta a la bolsa por
-`aplica_<estado>_<tiro>`. Un estado nuevo es una fila en `data/estados.json`; una
-build nueva, una clave en una reliquia. **Ahí es donde vive la build de verdad:
-el cascabel planta el elemento y las 45 reliquias lo escalan.**
+**Choque bola contra bola** (`_colisionar_bolas`), masas iguales y rebote 0,65.
+Sin él, la multibola son dos sprites de 18 px atravesándose. **Solo chocan las
+bolas libres**: una enganchada a una rampa está en otro plano, igual que las
+rampas no colisionan con nada. Y **en un platillo cabe una**: dos dentro salían
+disparadas desde el mismo punto y se acuñaban.
 
-**Física de bola, con el invariante abierto por Fátima.** `CLAUDE.md` decía "la
-bola solo en efectos, nunca en tamaño ni masa", y su razón escrita es que
-descuadra el hueco entre palas — **eso solo lo toca el radio**. Abierto a rebote,
-gravedad y rodadura; `radio_bola` sigue intocable y hay dos pruebas que lo
-comprueban. Ahora Piedra cae a plomo (gravedad 2200, rebote 0,28) y Vidrio flota
-y rebota como una canica (1520 / 0,60).
+**La cámara sigue a la BOLA MÁS BAJA** (`Mesa.bola_en_peligro`). Es lo que no
+toca las cuatro reglas ni el escalado entero: se le sigue pasando UNA bola, así
+que no hay zoom y el pixelart no hierve. `medir_camara.gd` sigue dando 0 % de
+fotogramas sin flipper en plano. **El efecto secundario es la mitad del motivo
+de elegirla**: con dos bolas casi siempre hay una abajo, así que durante una
+multibola la cámara vive anclada en la banda de las palas.
 
-**Y se VEN**, que es lo que decide si el sistema existe: insignias bajo la barra
-de vida del enemigo con su símbolo, su número de acumulaciones y una barrita de
-cuenta atrás. Un efecto que el jugador no ve se diagnostica como que falta — es
-la avería del platillo, y ya costó un run entero de confusión.
+**Perder una bola con otras vivas no cuesta NADA** —ni vida, ni combo, ni
+contraataque—. La señal `bola_drenada` solo salta con la última; las demás
+salen por `bola_perdida`, que existe para el sonido y el polvo y para nada más.
+Y si caen dos en el mismo subpaso, se cierra UN turno, no dos.
 
-**Batería: 429/429**, con `_prueba_estados` entera (que el veneno escale, que la
-brasa no refresque y estalle, que la escarcha no pueda parar el reloj, que la
-marca se gaste, que el frenesí tenga techo, que nada cruce de un combate a otro)
-y las trece configuraciones —4 palas + 9 cascabeles— pasando las tres pruebas de
-jugabilidad.
+### El eje de Caos, por fin como mecánica
 
-### Y la misma lección, otra vez — y ya corregida
+Tres ganchos nuevos, ni un `if` por reliquia, y un prefijo nuevo (`azar_*`:
+probabilidades que se suman y contra las que se tira un dado).
 
-Al medir los elementos la primera vez, casi todos acababan el run **por encima**
-de Acero: Hueso 88 %, Hierro 86 %, Plata 85 %, Vidrio 82 %. Es el agujero de la
-tanda anterior con otra cara — **daño sin coste de reloj abarata el run**— y el
-impuesto estaba puesto en Óxido y no en los demás. Corregido con la regla que ya
-está escrita en `preparacion.json`: *si un cascabel baja los segundos por
-combate, sube `factor_carga_reloj` en la misma proporción inversa.*
-
-| cascabel | elemento | daño/bola | s/combate | vida fin | acaba |
-|---|---|---|---|---|---|
-| Vidrio | brasa | 987 | 96,8 | **58 %** (era 82) | 3/5 |
-| Hueso | veneno | 1013 | 94,9 | **61 %** (era 88) | 3/5 |
-| Plata | frenesí | 1044 | 90,9 | **64 %** (era 85) | 3/5 |
-| Óxido | marca | 733 | 125,0 | **65 %** | 2/5 |
-| Hierro | escarcha | 721 | 138,5 | **70 %** (era 86) | 3/5 |
-| **Acero** | — | **729** | **137,1** | **71 %** | **3/5** |
-
-Los cinco elementales quedan en la banda 58-70 %, todos en o por debajo del
-neutro, y con el daño por bola entre 721 y 1044: **pegan mucho más y el run sale
-más caro, que es la forma que tenía que tener.**
-
-**Lo que NO está medido, dicho claro:** Piedra (77 %), Bronce (66 %) y Runas
-(59 %) traen los números de la tanda anterior. A Piedra solo le cambió la física
-—que el modelo no puede ver, porque dentro no hay física— y a Bronce nada; a
-**Runas se le añadió `aplica_escarcha_orbita`, así que su 59 % está desactualizado
-hacia abajo**: ahora será más seguro. Vuelve a medirse con
-`CASCABELES=casc_runas`.
-
-### Lo que NO está y es lo siguiente
-
-**Multibola.** Es lo que de verdad significa "frenético" y `DISEÑO.md` §8 ya lo
-tiene como eje de build ("Caos"), pero `Mesa` tiene UNA bola (`var bola :=
-Bola.new()`): pasar a N toca el solver, el drenaje, la búsqueda de bola y la
-cámara —a cuál sigue—. Es la tanda siguiente y ahora el motor de estados ya está
-puesto debajo.
-
-## TANDA 2 DE `PROPÓSITO.md`: LA CAPA DE PREPARACIÓN, HECHA Y MEDIDA
-
-**Nueve cascabeles y cuatro juegos de palas, todo abierto desde el primer día**
-(`DISEÑO.md` §5). Batería **381/381**, y medido con `medir_daniel.gd`, que es el
-único que reproduce a Daniel.
-
-Un cascabel **no es código**: es una bolsa de modificadores con nombre, igual
-que una reliquia, y entra por `BolsaReliquias.base` usando los 31 ganchos que
-`Combate` ya leía. **Ni un `if` nuevo.** Las palas sí tocan la física, y por eso
-`_montar_combate()` rehace la mesa entera al empezar el run: `Mesa.new()` copia
-los parámetros dentro de los colisionadores, así que cambiar de palas sobre una
-mesa hecha no hace nada.
-
-### La medida, y ha cambiado el diseño a mitad
-
-La primera versión destapó algo incómodo: **pegar más hacía el juego más fácil.**
-Vidrio pegaba un 46 % más que Acero y acababa el run con MÁS vida (80 % contra
-71 %), aunque drenar le costara dos veces y media. La causa lleva escrita en
-`CLAUDE.md` desde el rebalance: el coste de un combate es `tiempo/reloj × ataque
-+ bolas × drenaje`, así que más daño acorta el combate y un combate corto come
-menos relojes. **El drenaje se paga una vez por bola; el reloj se paga
-continuamente.**
-
-Así que la regla de `PROPÓSITO.md` §4 se ha ampliado y los tres cascabeles de
-daño se han rediseñado: **lo que suba el daño se paga en RELOJ, nunca en
-drenaje.**
-
-| cascabel | daño/bola | s/combate | vida al acabar | acaba |
-|---|---|---|---|---|
-| Vidrio | 961 | 91,7 | **58 %** (era 80) | **2/5** |
-| Óxido | 912 | 106,5 | **59 %** (era 86) | 3/5 |
-| Runas | 906 | 108,9 | 59 % | 3/5 |
-| Bronce | 825 | 119,1 | **66 %** (era 75) | 3/5 |
-| Hueso | 829 | 125,7 | 73 % | 3/5 |
-| **Acero** | **729** | **137,1** | **71 %** | **3/5** |
-| Piedra | 795 | 129,5 | 77 % | 3/5 |
-| Plata | 805 | 129,6 | 77 % | 3/5 |
-| Hierro | 663 | 158,1 | 78 % | 3/5 |
-
-**Acero sale clavado al barrido neutro** (729 · 137 · 71 % · 3/5): la prueba de
-que la capa nueva no ha movido nada por su cuenta. Y ahora la tabla tiene la
-forma que debía: los que pegan más quedan POR DEBAJO del neutro y los seguros
-por encima. Vidrio acaba 2 de 5 runs contra los 3 de Acero, que es lo que
-significa "todos, con miedo".
-
-### Y por fin está medido el pilar
-
-`DISEÑO.md` §1 dice que la mesa es un menú de tiros y que un cascabel cambia a
-qué tiro vas. **Eso no lo comprobaba nadie.** Ahora hay un cruce de tres
-jugadores distintos —racimero, puntero y corredor— contra cada cascabel
-(`SOLO=tiros`), y se lee **dividiendo por Acero dentro de cada columna**: en
-crudo los tres perfiles hacen 265, 1551 y 1999 de daño por bola, así que gana
-siempre la misma columna y la tabla no diría nada.
-
-| cascabel | racimero | puntero | corredor | dice empujar a |
-|---|---|---|---|---|
-| Bronce | **×1,19** | ×1,10 | ×1,02 | el racimo ✓ |
-| Piedra | ×0,93 | **×1,12** | ×1,04 | targets y cañón ✓ |
-| Óxido | ×1,20 | ×1,17 | **×1,50** | órbita, retorno y cañón ✓ |
-
-Piedra es el único que **pierde** con el jugador de racimo (×0,93), que es
-exactamente su tradeoff. Y de aquí salió el tercer arreglo: Óxido llevaba
-`suma_golpes_por_recorrido` y ganaba MÁS con el racimero (×1,36) que con el
-corredor (×1,31), o sea lo contrario de lo que promete. **Una clave de combo no
-da identidad de tiro: el multiplicador cobra en todo lo que golpees después.**
-Cambiada por `factor_dano_recorrido` a secas, y ahora sí (×1,50 al corredor).
-
-### Lo que sigue flojo, dicho sin adornos
-
-Piedra y Plata acaban al 77 %, por encima de Acero, o sea que siguen siendo algo
-gratis. Los dos son suaves (+9 % de daño) y su identidad está validada arriba,
-así que no los he tocado: **subirles el reloj sin haber medido que hace falta
-sería ajustar a ojo**, y así se fue al traste la tabla de enemigos dos veces.
-
-**Cómo iterar esto sin perder la tarde:** el barrido entero son trece minutos.
-`SOLO=cascabeles|barrido|calibrar|tiros` lanza una sección, y
-`CASCABELES=casc_vidrio,casc_oxido` filtra a los que estés tocando (Acero entra
-siempre, que es la vara).
-
-## TANDA 1 DE `PROPÓSITO.md`, HECHA
-
-**Guardado + clics + menú de Inicio + `RECUPERADO/`.** Es la espina dorsal del
-propósito: hasta ahora, acabar un run no dejaba absolutamente nada, así que no
-existía ninguna frase que empezara por "la próxima vez". **Escrito Y EJECUTADO**:
-todo lo de abajo está mirado en el juego de verdad con display virtual, no
-deducido. Batería en **358/358**.
-
-| Pieza nueva | Qué hace |
+| Gancho | Cuándo |
 |---|---|
-| `sim/guardado.gd` | `user://cascabel.guardado.json`, escritura atómica y lectura a prueba de balas |
-| `data/recuperable.json` + `data/catalogo_recuperable.gd` | las 22 piezas de `RECUPERADO`: 9 cáscaras, 9 criaturas, 4 registros |
-| `render/regiones_clic.gd` | qué hay bajo el ratón, con histéresis de apretar/soltar |
-| `render/nodo_sistema.gd` | capa 30: menú de Inicio, `RECUPERADO`, `mi_maquina`, papelera y registro |
+| `azar_bola_extra_recorrido` | al completar cualquier recorrido |
+| `azar_bola_extra_banco` | al cerrar un banco de targets |
+| `suma_bolas_al_servir` | de salida, cada vez que te sirven bola |
 
-**Lo que se gana y cómo.** Al cerrar un run —**se gane o se pierda**— se paga
-`1 + nodos_superados/5` piezas, en el orden del JSON. Que un run perdido en el
-primer combate también pague es la decisión de toda la tanda: con cero, perder
-sigue sin costar nada y el agujero queda igual. Las cáscaras vienen todas de
-fábrica (son capa de Preparación, no desbloqueo) y lo que se recupera son
-**criaturas, que son skin pura, y registros, que son texto**: así entra la
-meta-progresión sin reabrir `DISEÑO.md` §13.
+Y la clave que lo convierte en un eje y no en tres reliquias sueltas: `Combate`
+publica **`bolas`** en el contexto, así que `cuando: multibola` y `cuando:
+bola_sola` ya se pueden escribir en el JSON. Soltar bolas es la mitad de la
+build; que las bolas de más CAMBIEN algo es la otra.
 
-**Tres averías cazadas mirando el juego, y ninguna daba error:**
+Cinco reliquias nuevas (Bifurcación, Proceso hijo, Bomba de procesos, Condición
+de carrera, Hilo único). **La bola extra sale por el carril lanzador y sale
+disparada a tope**, no aparece en mitad del campo: un lanzamiento a tope engancha
+la órbita siempre, así que entra en juego por arriba, dando la vuelta, igual que
+la bola con la que empiezas. Cero geometría nueva.
 
-- El menú de Inicio llevaba **barra de título**, que mide 16 px y se comía la
-  primera entrada entera. Parecía que la opción de arriba salía resaltada.
-- La ventana del registro se titulaba **`log_arranque.log`**, que es la clave del
-  JSON, y la papelera escribía **`goblin_carroniero`** sin la ñ. Es la avería del
-  "COMUN" de la Fase 4, otra vez. Las dos tienen prueba ahora.
-- El botón Inicio seguía siendo **pulsable debajo del mapa**, que lo tapa
-  entero: un clic que abría un menú donde no había nada dibujado.
+### La decisión que se ha tomado y hay que saber que se tomó
 
-**Y una pregunta abierta que sale de arreglar la tercera:** el escritorio solo se
-puede tocar DURANTE EL COMBATE, porque el mapa y TILT se dibujan maximizados y
-tapan la barra de tareas. Ver "Abierto".
+**El eje de Caos pasa a tener 14 reliquias y los otros cuatro siguen con 9.** La
+batería exigía que fueran los mismos y se ha aflojado a "al menos nueve"
+(decisión de Daniel). Lo que se paga, dicho para poder deshacerlo sabiendo qué se
+deshace: **la ruleta sortea por RAREZA, no por eje**, así que Caos pasa del 20 %
+al 28 % de lo que se ofrece. Si al jugar sale demasiado, la salida no es volver a
+cerrar la prueba: es sortear por eje, o subir los otros cuatro.
 
-## Lo de la sesión anterior (Fátima)
+### Y SE HA MIRADO JUGANDO, con display virtual, y ha destapado algo
 
-**La cámara tenía dos averías y las dos están arregladas y medidas.** Las cazó
-Fátima jugando; la batería estaba en verde encima de las dos porque solo
-comprobaba `objetivo()`, que es pura, y nadie miraba `y_actual`, que es lo que
-se ve. El detalle está en `CLAUDE.md`, "Trampas".
+**Lo que se hizo:** arrancar el juego de verdad en la caja (Xvfb + un autoload de
+usar y tirar que no va al repo), empezar un run, entrar al primer combate, meter
+cuatro bolas y dejarlo 16 s dando a las palas, midiendo fotograma a fotograma
+cuántas bolas vivas quedaban FUERA del rectángulo que se está viendo.
 
-| | antes | ahora |
-|---|---|---|
-| Cámara en reposo | y=985 con el ancla en 1030 | **y=1030** |
-| Mesa que no se veía nunca | los últimos **45 px** (el drenaje) | **0** |
-| Bola de verdad, fotogramas sin flipper en plano | **57 %** | **0 %** |
-| A 1900 px/s, borde por encima de la punta | **456 px** | **0** |
+**El resultado, y no salía en ninguna prueba:**
 
-Qué se tocó: la zona muerta pasa a ser histéresis (decide si arranca, no dónde
-para), el adelanto pasa de 110 px fijos a `0,18 s × velocidad`, y la garantía
-dura pasa de "que la bola esté en pantalla" a "que se vea DÓNDE CAE".
-`tests/medir_camara.gd` es nuevo y mide `y_actual`, no la intención. Tres
-pruebas nuevas en la batería.
+| Qué | Medido |
+|---|---|
+| Fotogramas con dos o más bolas y ALGUNA fuera de plano | **61-67 %** |
+| De esas, por arriba / por abajo | **79 / 2** |
+| Lo más lejos que llegó a estar una bola por encima del borde | **485 px** |
 
-**Y está escrito `PROPÓSITO.md`**, que es la capa que faltaba: por qué alguien
-vuelve a abrir el juego. Reordena "Siguiente" — decisión de Fátima, no de la
-medida: el barrido sigue diciendo que la Fase 6 es lo que arregla la banda de
-dificultad. Hallazgo que cambia el coste de media propuesta: **`assets/bolas/`
-son 9 cáscaras y `assets/criaturas_64/` son 9 criaturas, o sea 81 cascabeles ya
-dibujados** y sin que ningún código los cargue.
+O sea: **la mesa mide 1300 de alto y por la ventana caben 540**, así que con la
+cámara siguiendo a UNA bola las demás se salen por definición, y casi siempre por
+arriba —la que está dando la vuelta a la órbita—. Con una bola esto no podía
+pasar, y por eso no existía el problema.
 
-## Fase actual
+**Arreglado, y sin tocar la cámara:** `_dibujar_bolas_fuera()` pone una punta de
+flecha dorada pegada al borde por el que se ha ido la bola, en su x y del tamaño
+de la bola, y más pálida cuanto más lejos esté. **No es zoom**: alejar la cámara
+rompe el escalado entero y la mesa hierve (`CLAUDE.md`). Mirado en las capturas:
+se leen.
 
-**Rebalance hecho, y el modelo por fin reproduce a Daniel.** Lo que faltaba no
-era otro número: era que **el medidor jugaba sin reliquias**. `medir_balance.gd`
-juega el run entero, pero su jugador de mentira no completa misiones, así que
-llega al jefe del acto 3 con la bolsa vacía. Daniel llega con once reliquias
-encima. Por eso el modelo decía que se pierden 500 de 1080 en un run y Daniel
-perdió 36 de 1800: **no medía un balance flojo, medía a otro jugador.**
+**Y de paso cayó una trampa vieja con cara nueva:** la primera versión ponía la
+flecha a 10 px del canto de la pantalla y NO SE VEÍA, porque la cáscara va en la
+capa 5 y la mesa en la 0, así que quedaba detrás de la barra de título. Es
+exactamente lo que escondía la bola en lo alto de la órbita. Ahora el margen sale
+de `cam.alto_franja_hud`, que es el mismo número que usa la cámara.
 
-`tests/medir_daniel.gd` (nuevo) arregla eso: el combate comparte la bolsa del
-run, recibe la escalera de misiones real, tira la ruleta al completarlas, y usa
-la vida de verdad en vez de vida infinita —así las reliquias condicionales se
-encienden cuando les toca—. **Acaba el run con el 99 % de vida contra el 98 %
-real de Daniel.** Es la primera vez que el modelo y la partida dicen lo mismo.
+### Y está medido lo que se podía medir, que era la mitad importante
 
-### Lo que dice el barrido, y es más gordo que la tabla
+**El motor de multibola es EXACTAMENTE NEUTRO con una bola.** Corriendo
+`medir_daniel.gd` en la caja, con el motor nuevo puesto y las cinco reliquias
+nuevas sacadas del JSON, salen los mismos seis números dígito a dígito que antes
+de tocar nada: **462 seco · 729 d/bola · 137 s · 7,6 reliquias · 71 % de vida ·
+3 de 5 runs**. O sea que pasar de una bola a N no ha movido el balance ni un
+punto, que es justo lo que había que demostrar antes de creerse nada más.
 
-Primero se barrió vida × ataque, que era lo que mandaba la tanda 1. **De las 20
-casillas, ninguna deja el run entre el 25 y el 60 % de vida.** El patrón es
-siempre el mismo: o el enemigo no te toca (93-100 % al acabar), o te mata. No
-hay banda intermedia.
+**Y las cinco reliquias nuevas SÍ mueven el balance, y mucho:** con ellas dentro,
+el mismo perfil acaba el run con el **97 % de vida** en vez del 71 %, con 835 de
+daño por bola y combates de 128 s. Medido, no supuesto.
 
-La causa está medida y **ya estaba escrita como aviso en Abierto**: un enemigo
-que solo tiene vida y UN ataque por reloj no puede apretar de forma continua
-durante dos minutos, solo puede pegar picos. Subir el ataque hace los picos
-letales; bajarlo los vuelve invisibles. **Lo que falta no es un número de
-`data/enemigos.json`: son los comportamientos de la Fase 6** (`DISEÑO.md` §11).
+**No es `condicion_de_carrera`**, que era el sospechoso obvio: quitándola sola el
+número se queda en 97 %. **Son las bolas extra**, que vuelan solas y pegan gratis.
 
-Lo segundo que salió, al añadir la curación como tercer eje: **las reliquias de
-cura devuelven más de lo que cualquier tabla puede quitar.** `rutina_de_
-reparacion` daba el 8 % al matar (96 % de barra en un run) y `desfragmentacion`
-un 2 % acumulativo por victoria (156 %). Eso rompe el invariante de `DISEÑO.md`
-§9 —la vida no se cura entre combates— que es lo que hace que elegir rama
-importe. Bajadas a un tercio, con su texto reescrito.
+**Pero ese 97 % no vale como veredicto, solo como aviso**, y hay que saber por
+qué: `medir_daniel.gd` **no sabe JUGAR con varias bolas** —sus perfiles no tienen
+física dentro—, así que la bola extra le da todo el daño y no le cuesta ninguna
+de las dos cosas que cuesta jugando: repartir la atención y perderlas. De paso se
+ha arreglado ahí un fallo de verdad: el drenaje de mentira apagaba solo
+`mesa.bola` y dejaba las extra vivas para siempre.
 
-### Lo que se ha escrito, que es lo mejor alcanzable sin Fase 6
+**Conclusión, y manda en el orden del plan:** calibrar el eje de Caos exige antes
+que el medidor sepa jugar con N bolas. Va en "Siguiente" 1b, con el rebalance.
 
-| Qué | Antes | Ahora |
-|---|---|---|
-| Vida de enemigo | 1250-3220 | **3750-9660** (×3) |
-| Ataque | 9-16 | **6-11** (×0,7) |
-| Curación de reliquias | — | **a un tercio** |
-| Combate medio | 52 s | **137 s** (el objetivo era 120-300) |
-| Vida al acabar el run | 87 % | **71 %** |
-| Runs acabados de 5 | 5/5 | **3/5** |
+### Lo que NO está y hay que saberlo antes de jugar
 
-Confirmado lanzando el medidor contra los JSON ya escritos, no calculado.
+- **El eje de Caos no está calibrado**, por lo de arriba: las cinco reliquias
+  están puestas a ojo y el medidor no puede juzgarlas. **El rebalance con
+  multibola va DESPUÉS de la Fase 6**, como el otro.
+- **No hay arte de multibola.** Las bolas extra se dibujan todas iguales a
+  propósito —una bola extra no es de segunda, pega lo mismo y se pierde igual—
+  pero no hay ni contador en pantalla ni sonido propio: la bola extra suena con
+  el arpegio del combo, que es un préstamo, igual que las reliquias.
+- **Las cinco reliquias nuevas no tienen icono**, y suben a 32 las que no lo
+  tienen.
 
-### Lo que cambió de sitio la sesión anterior
+## LA CÁMARA: DOS INTENTOS FALLIDOS Y EL BUENO (REGLA 5)
 
-| Qué | Antes | Ahora |
-|---|---|---|
-| Vida, enemigo, crítico, daño de bola | franja de 70 px sobre la mesa | paneles `enemigo.exe`, `jugador.sys`, `ayuda.hlp` en la banda derecha |
-| El reloj del enemigo | barra en esa misma franja | **barra de progreso dentro de la barra de título de la mesa** |
-| El enemigo | dentro del campo, en y=758 | su panel, con partículas propias |
-| El mapa | pantalla suelta con fondo plano | ventana de explorador: menú, ruta, detalles y barra de estado |
-| `alto_franja_hud` | 58 px escritos a mano | 24, y sale de `NodoCascara.chrome_superior()` |
-| Fondo del escritorio | uno fijo por acto | variante al azar por acto, tirada al volver al mapa |
+Daniel, jugando: *"se siente super mal a la hora de ponerse abajo, se
+teletransporta"* — y después del primer arreglo, *"sigue siendo brusca al bajar
+**en cierto punto**"*. Las dos veces tenía razón y las dos por un motivo
+distinto. **Lo caro fue entender que se estaba midiendo el número equivocado.**
 
-**La decisión de tacto la tomó Daniel: el reloj se queda en la mesa.** Dentro
-de la barra de título, que ya gastaba 16 px pegados al campo diciendo
-"cascabel.exe". Cuesta cero píxeles de campo, sigue en la línea de visión —que
-era la razón de tenerlo en el HUD— y encima es la broma: una ventana con una
-barra de progreso que no querrías que se llenara.
+### Intento 1: tope de velocidad. Arregló el salto y no la sensación
 
-### La avería que se ha encontrado de paso
+Las dos garantías duras de `avanzar` —el techo de la barra de título y el suelo
+que promete ver dónde cae la bola— se aplicaban DESPUÉS del suavizado, como un
+`minf` y un `maxf`. Medido: **113 px en un fotograma, 13.616 px/s**. Se limitó la
+velocidad y el salto bajó a 15 px… y seguía sintiéndose mal, porque un tope de
+velocidad es **velocidad constante con arranque y parada instantáneos**, que es
+lo más mecánico que puede hacer una cámara.
 
-La cáscara va en la capa −10 y `NodoSuelo` pinta un rectángulo negro OPACO
-sobre los 400 px de la mesa de arriba abajo. O sea que **la barra de título de
-la ventana de la mesa se dibujaba entera y no se veía nunca**, y la barra de
-tareas quedaba partida por la mitad —se salvó de milagro: Inicio, la pestaña y
-el reloj caen los tres fuera de esa columna—. El docstring prometía una capa 5
-desde la primera pasada y la capa no existía. Ahora sí: `NodoCascaraFrente`.
-La regla está en `CLAUDE.md`, "Trampas".
+### Lo que de verdad se nota es la ACELERACIÓN, no el salto
 
-Y una segunda, más pequeña: la prueba que impide tamaños de fuente sueltos
-tenía un agujero en el patrón y dejaba pasar un `11` en el nombre de la
-reliquia dentro de la tele. Arreglado el patrón y el 11.
+Ese fue el cambio de instrumento, y con él se vio todo. `medir_camara.gd` §4 mide
+ahora el pico de aceleración con seis bolas de verdad, y ahí estaban las dos
+causas:
+
+**(a) El "en cierto punto" era literal.** `suelo_visible` tenía escrito
+`if bola_y > alto_mesa - margen_ancla: return alto_mesa`, o sea que al cruzar la
+bola la línea de seguridad (y=1000) el suelo garantizado saltaba de ~1150 a 1300
+**de golpe, siempre en el mismo sitio de la mesa**. Quitado: la REGLA 2 la sigue
+poniendo `objetivo()`, así que no se afloja nada.
+
+**(b) El objetivo dependía de `vy`, y `vy` NO es continua.** El suelo vale
+`bola_y + vy × t_ant + margen`, y `vy` salta entero en cada salida de rampa, cada
+bumper, cada palazo. **Un objetivo que salta no se puede suavizar sin perder la
+garantía**: o la cámara llega a tiempo dando un corte, o va suave y se pierde el
+flipper. Probadas las dos, medidas las dos, y las dos se notan.
+
+### El arreglo: que el objetivo dependa solo de la POSICIÓN
+
+`tiempo_anticipacion` pasa de 0,18 a **0**, y lo que se deja de pagar en
+predicción se paga en margen: `margen_debajo_bola` de 150 a **300**. La posición
+sí es continua, así que el objetivo ya no da ningún golpe.
+
+|  t_ant | margen | Peor salto | Pico de aceleración | Sin flipper |
+|---|---|---|---|---|
+| 0,18 | 150 | 91,6 px | 1.244.744 px/s² | 0 % | ← como estaba |
+| 0,09 | 150 | 36,3 px | 447.208 px/s² | 3 % |
+| 0,00 | 150 | 8,4 px | 117.951 px/s² | **8 %** ← se pierde |
+| 0,00 | 250 | 7,1 px | 76.637 px/s² | 0 % |
+| **0,00** | **300** | **~6 px** | **~68.000 px/s²** | **0 %** ← elegido |
+| 0,00 | 350 | 5,4 px | 60.132 px/s² | 0 % |
+
+**15 veces menos salto y 18 veces menos aceleración, sin perder ni un fotograma
+de flipper** — comprobado hasta con la caída recta a 1900 px/s, más rápido de lo
+que la mesa puede producir. Los 300 px salen de una cuenta: el muelle va por
+detrás como mucho `vy × tiempo_suavizado`, o sea 1500 × 0,16 = 240, y 300 deja
+holgura.
+
+### Y el suavizado pasa a ser un muelle
+
+`lerp` arranca a tope y frena (tirón al empezar); un tope de velocidad no arranca
+ni frena (mecánico). Un **muelle críticamente amortiguado** arranca de cero,
+acelera, frena y nunca se pasa de largo. El dial es `tiempo_suavizado` = **0,16
+s**, y ahora se piensa en segundos en vez de en un factor que además dependía de
+los FPS.
+
+### Las tres redes, y por qué están las tres
+
+1. **Las garantías van en el OBJETIVO** (`objetivo_completo()`, pura y
+   comprobable): el muelle sale hacia allí con tiempo y llega suave.
+2. **Y otra vez al final, como red**: dentro de la zona muerta la cámara no se
+   mueve, así que el objetivo no se aplica — sin esta red la bola se subía detrás
+   de la barra de título (lo cazó la batería: 8 fotogramas, hasta 22 px de 24).
+3. **Y el tope de velocidad, dormido casi siempre**: el peor fotograma jugando
+   mueve ~6 px y el tope está en 21. Existe para lo que el medidor no ve — cuando
+   **la BOLA se teletransporta** (se sirve otra, empieza otro combate) el objetivo
+   se va al otro extremo de la mesa. Medido en el juego corriendo: **659 px en un
+   fotograma**. Con el tope, un barrido de un cuarto de segundo.
+
+**Dos pruebas nuevas** lo cierran: el tope de velocidad y **el pico de
+aceleración**, con el techo una orden de magnitud por encima de lo que sale hoy —
+es una alarma de que ha vuelto un objetivo discontinuo, no un ajuste de tacto.
+Batería **438**, mismos 21 fallos de assets.
+
+**Si aún se siente mal, el dial es `tiempo_suavizado`** (más alto = más cine, más
+bajo = más pegada), y el que decide cuánta mesa se ve por debajo de la bola es
+`margen_debajo_bola`. Los dos están medidos arriba.
+
+## EL RUN DE DANIEL DEL 15 DE AGOSTO, Y LO QUE DICE
+
+Ganado entero, acto 3, 15 nodos. **Es la primera partida de verdad con el
+rebalance dentro**, y sin ninguna reliquia de multibola.
+
+| | Antes del rebalance | Ahora | Modelo (`d-flojo`) |
+|---|---|---|---|
+| Vida al acabar | 98 % | **90 %** (976/1080) | 71 % |
+| Daño por bola | 797 | **1450** | 729 |
+| Combate medio | 45 s | **80 s** | 137 s |
+| Bolas jugadas | 43 | **72** | — |
+
+**El rebalance ha hecho algo, y se puede decir cuánto:** los combates duran casi
+el doble y hacen falta 29 bolas más para ganar el run. Pero **el objetivo era
+acabar entre el 25 y el 60 % de vida y sigue acabando al 90 %**, así que el
+resultado es exactamente el que anunciaba el barrido: sin comportamientos de
+enemigo no hay tabla de números que llegue a esa banda. Es la razón por la que la
+Fase 6 existe, ahora medida con un jugador de verdad y no solo con el modelo.
+
+**Y el modelo SIGUE sin ser Daniel, en otra dirección que antes.** Daniel pega el
+doble por bola (1450 contra 729) y sus combates duran la mitad (80 s contra 137).
+O sea: mata tan rápido que el reloj del enemigo le pega la mitad de veces, y por
+eso acaba con más vida que el modelo aunque el modelo esté calibrado. **Lo que le
+falta al perfil no es daño, es ritmo**: `medir_daniel.gd` reparte los tiros en el
+tiempo como si todos costaran lo mismo. Va con la tanda 1b.
+
+## LAS TRES TANDAS ANTERIORES, EN CORTO
+
+Detalle borrado por la regla de tamaño de este fichero. Lo que sobrevive es lo
+que sigue mandando en decisiones de hoy.
+
+**Los cascabeles son elementos, no porcentajes (tanda 2b).** Fátima: *"cambiar de
+cascabel es MUY inútil, esto tiene que ser un roguelike progresivo frenético"*, y
+tenía razón por arquitectura: montados como bolsa de modificadores salieron
+medidos, equilibrados y **completamente invisibles**, porque una bolsa de
+modificadores solo sabe producir porcentajes y **para que PASEN COSAS hacen falta
+eventos**. De ahí `sim/estados.gd`: veneno, escarcha, brasa, marca y frenesí, que
+duran en el tiempo y acumulan. **Es la misma lección que ha traído la multibola**,
+y ya van tres veces: lo que no se ve pasar, no existe.
+
+**La capa de Preparación (tanda 2), hecha y medida.** Nueve cascabeles y cuatro
+juegos de palas, todo abierto desde el primer día (`DISEÑO.md` §5). Un cascabel
+no es código: es una bolsa con nombre que entra por `BolsaReliquias.base` usando
+los ganchos que `Combate` ya leía. Las palas sí tocan la física, y por eso
+`_montar_combate()` rehace la mesa entera al empezar el run: cambiar de palas
+sobre una mesa ya hecha no hace nada.
+
+**Guardado, clics, menú de Inicio y `RECUPERADO/` (tanda 1).** `sim/guardado.gd`
+(escritura atómica en `user://`), 22 piezas recuperables, `render/regiones_clic.gd`
+y `render/nodo_sistema.gd`. Al cerrar un run —**se gane o se pierda**— se paga
+`1 + nodos_superados/5` piezas: que un run perdido también pague es la decisión
+entera de la tanda. Lo que se recupera son criaturas (skin) y registros (texto),
+así entra la meta-progresión sin reabrir `DISEÑO.md` §13.
+
+**El rebalance, y por qué el modelo mentía.** `medir_balance.gd` juega el run con
+un jugador que no completa misiones, así que llega al jefe con la bolsa vacía;
+Daniel llega con once reliquias. **No medía un balance flojo, medía a otro
+jugador.** `tests/medir_daniel.gd` lo arregla y acaba el run al 99 % de vida
+contra el 98 % real. El barrido de vida × ataque dice lo que ya avisaba
+"Abierto": **de 20 casillas, ninguna deja el run entre el 25 y el 60 % de vida**,
+porque un enemigo con solo vida y un ataque por reloj pega picos, no presión.
+**Lo que falta no es un número: son los comportamientos de la Fase 6.** Lo mejor
+alcanzable sin ella ya está escrito: vida ×3, ataque ×0,7, curación de reliquias
+a un tercio, combate medio de 52 s a **137 s**, y 3 de 5 runs acabados.
+
+**Y la cámara, que tenía dos averías que cazó Fátima jugando** con la batería en
+verde encima de las dos: quedaba parada a 45 px del ancla para siempre (los
+últimos 45 px de mesa, los del drenaje, no se veían nunca) y el 57 % de los
+fotogramas bajos no tenían el flipper en plano. Las dos a 0 %. El detalle está en
+`CLAUDE.md`, "Trampas", y `tests/medir_camara.gd` mide `y_actual`, no la
+intención.
+
 
 ## Hecho
 
+- **MULTIBOLA.** `Mesa` pasa de una bola a N con choque entre bolas, estado por
+  bola y drenaje que solo cuenta cuando cae la última; la cámara sigue a la más
+  baja. **414/435 en la caja de la sesión** (los 21 que faltan son PNG que allí
+  no están). Ver arriba.
+- **La multibola mirada jugando, no deducida.** Con display virtual: 61-67 % de
+  los fotogramas con dos o más bolas tenían alguna fuera de plano, casi siempre
+  por arriba. Arreglado con flechas en el borde, sin tocar la cámara.
+- **El eje de Caos existe.** Tres ganchos de bola extra, el prefijo `azar_*`, la
+  clave `bolas` en el contexto y cinco reliquias nuevas. Es el primer eje de
+  `DISEÑO.md` §8 que pasa de estar escrito a estar jugado.
 - **El cuadro de diálogo del ataque, que era el peor bug que quedaba.** Su
   `relleno` no era un tono plano sino una baldosa con borde, así que al
   repetirse pintaba una **rejilla de ladrillos** por todo el cartel — y ese
@@ -489,6 +467,10 @@ Los números que se tocan para ajustar el tacto. Uno cada vez.
 
 | Dial | Valor | Para qué |
 |---|---|---|
+| `tiempo_suavizado` (cámara) | 0,16 s | **EL dial de tacto de la cámara.** Alto = cine, bajo = pegada |
+| `margen_debajo_bola` | 300 px | Cuánta mesa se ve bajo la bola. Suelo 250: por debajo se pierde el flipper |
+| `tiempo_anticipacion` | 0 | Subirlo devuelve la predicción por velocidad **y con ella el tirón** |
+| `velocidad_maxima` (cámara) | 2600 px/s | Red para los teletransportes de bola. Dormida en juego normal |
 | `ancho_outlane` | 21 | Dificultad. Suelo 18, techo ~26 |
 | `flipper_longitud` | 64 | Dificultad. Hueco central 47 px |
 | `flipper_velocidad_giro` | 30 | Lo lejos que llega tu tiro. Suelo 26: por debajo la cuna no alcanza |
@@ -536,7 +518,40 @@ ejecutado:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**Lo de esta sesión, por orden de lo que más puede haber salido mal:**
+**Lo de esta sesión, por orden de lo que más puede haber salido mal. Las M son
+de la multibola y ninguna se puede cerrar leyendo código:**
+
+M0. **PARA PROBAR LA MULTIBOLA SIN DEPENDER DE LA SUERTE: F1 y luego F2.**
+    F1 enciende la depuración y F2 suelta una bola extra, hasta cuatro. Es banco
+    de pruebas y no un atajo del juego: por el camino normal la multibola sale de
+    las reliquias de Caos, que son 5 de 50, o sea una de cada diez tiradas.
+
+M1. **LA CÁMARA CON DOS BOLAS, que es la decisión que puede caerse entera.**
+    Con F1+F2, o con `bomba_de_procesos` si la ruleta te la da, juega
+    una multibola de verdad. Sigue a la más baja, así que se queda casi siempre
+    abajo. **(b) ya está medido y arreglado**: el 61-67 % del tiempo había una
+    bola fuera de plano, casi siempre por arriba, y ahora hay flechas doradas en
+    el borde. Lo que queda es **(a): ¿se puede JUGAR?** ¿Basta con la flecha para
+    saber que va a caer algo, o la bola de arriba sigue apareciendo de la nada?
+    Y **(c)**: ¿estorban las flechas cuando hay tres? Son un `draw_colored_polygon`
+    y se quitan en un minuto.
+
+M2. **PERDER UNA BOLA NO CUESTA NADA, ¿se nota demasiado bueno?** Con multibola
+    puedes drenar dos veces seguidas sin que pase nada. Es lo que hace que la
+    multibola sea un eje de build y no un adorno, pero también es la red de
+    seguridad más grande del juego. Si con una bola extra el combate deja de dar
+    miedo, lo que se toca es que la bola extra cueste algo al entrar (reloj), no
+    que perderla duela.
+
+M3. **CUATRO BOLAS, ¿son demasiadas?** `bolas_maximas` está en 4 porque es lo
+    que cabe en el plano, no porque esté medido. Con las palas llenas, ¿estás
+    jugando o estás mirando?
+
+M4. **La bola extra sale disparada por el carril lanzador.** ¿Se ve salir, o
+    aparece sin más? Si no se ve, el sitio del aviso es el carril, no el centro.
+
+M5. **Caos sale más que los otros ejes** (28 % contra 20 %) porque tiene 14
+    reliquias. ¿Se nota jugando que la ruleta ofrece Caos de más?
 
 S1. **EL SISTEMA OPERATIVO, que es lo nuevo.** Pulsa Inicio durante un combate.
     **(a)** ¿Se entiende que `RECUPERADO` es lo que te falta por conseguir, sin
@@ -742,14 +757,10 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    arriba. Y de paso ha quedado medido el pilar de `DISEÑO.md` §1, que no lo
    comprobaba nadie.
 
-0e. **Siguiente tarea: MULTIBOLA** (Opus, razonamiento **alto**). Es lo que
-   significa "frenético" y es el eje "Caos" de `DISEÑO.md` §8, que lleva escrito
-   desde el principio y sin implementar. `Mesa` tiene UNA bola: pasar a N toca el
-   solver, el drenaje, el ball search y la cámara (a cuál sigue, y qué pasa
-   cuando se separan). **Lo caro no es lanzar tres bolas, es decidir qué mira la
-   cámara**, y eso hay que decidirlo con Fátima y Daniel antes de escribir nada.
-   Con multibola, `aplica_<estado>_<tiro>` ya permite builds del tipo "cada bola
-   extra envenena".
+0e. ~~**MULTIBOLA**~~ **HECHA Y EJECUTADA.** 414/435 en la caja (los 21 que
+   faltan son assets que allí no están). Con ella, el eje de Caos deja de ser
+   nueve porcentajes. Ver arriba. Lo que queda de esta tanda son las preguntas
+   M1-M5, y M1 puede tirar la decisión de cámara entera.
 
 0f. **Y después: `PROPÓSITO.md` §8, la dopamina de mesa** (el campo de
    pines con **Opus + alto**, porque es geometría nueva y cada rincón es un
@@ -769,7 +780,12 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    tiene vida se nota que es un saco
 1a. ~~**PONER LA BATERÍA EN VERDE**~~ **HECHA. 321/321.** Ver el detalle en
    "Abierto". Falta el commit.
-1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes:
+1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes,
+   **y ahora tiene que contar la multibola**: `medir_daniel.gd` juega con
+   perfiles sin física dentro, así que no sabe soltar bolas ni jugarlas y lo que
+   diga de una build de Caos no vale. Antes del rebalance hace falta que el
+   medidor sepa jugar con N bolas, o las cinco reliquias nuevas se calibran a
+   ojo. Lo de siempre:
    con comportamientos dentro, `tests/medir_daniel.gd` vuelve a barrer y la
    banda del 25-60 % pasa a ser alcanzable. Hasta entonces, tocar la tabla es
    mover el mismo número por cuarta vez
@@ -828,6 +844,11 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 | Duración de bola, mesa pequeña | ~10 s |
 | Objetivo de drenaje | cada 2-3 bolas |
 | Daño por bola: malo / normal / bueno | 42 / 312 / 840 |
+| **Run real de Daniel (15-ago, con rebalance)** | **90 % de vida · 1450 d/bola · 80 s · 72 bolas** |
+| Run real de Daniel (antes del rebalance) | 98 % de vida · 797 d/bola · 45 s · 43 bolas |
+| Motor de multibola, una bola: antes → después | 71 % / 3-5 runs → **idéntico** |
+| Con las 5 reliquias de Caos dentro (modelo, no veredicto) | 97 % de vida, 835 d/bola, 128 s |
+| Tope de bolas a la vez | 4 (`bolas_maximas`, elegido a ojo) |
 | Brecha entre jugar mal y jugar bien | 20× (8,4× sin multiplicador) |
 | Vida de enemigos | 225-660, salida del barrido |
 | Runs acabados: malo / normal / bueno | 0/5 · 2/5 · 5/5 |
@@ -873,6 +894,24 @@ de geometría fina y se hace jugando, no midiendo.
 
 ## Abierto
 
+- **NO HAY BOLA-BOLA DENTRO DE LAS RAMPAS NI EN EL PLATILLO, y es a propósito.**
+  Una bola enganchada a una curva está en otro plano —las rampas son elevadas—,
+  así que las demás la atraviesan. Dos bolas SÍ pueden ir por la misma rampa a la
+  vez: el recorrido lo lleva cada bola, no la rampa. En una mesa real se
+  solaparían; aquí la de la curva se dibuja como sombra, así que ni se ve. Si
+  alguna vez molesta, la salida es una cola por rampa, y es trabajo de verdad.
+- **La bola no tiene giro, y ahora se nota más.** Sin spin, dos bolas que chocan
+  no se transmiten efecto: el choque es puro impulso normal. La rodadura es la
+  aproximación barata y aguanta, pero si en algún momento se quiere una física
+  que destaque, el siguiente paso es momento angular, y es un cambio que toca el
+  solver entero.
+- **`medir_daniel.gd` no sabe jugar con varias bolas**, así que la multibola no
+  está medida y las cinco reliquias de Caos están puestas a ojo. Es lo primero
+  que hay que arreglar antes del rebalance de la Fase 6 (ver "Siguiente" 1b).
+- **Las cinco reliquias nuevas no tienen icono**, y con ellas suben a 32 de 50
+  las que no lo tienen. Los prompts están en `assets/prompts_reliquias.md`.
+- **La bola extra no tiene sonido propio**: suena con el arpegio del combo, que
+  es un préstamo. Igual que las reliquias.
 - **`fuente.py` ya no reproduce los marcos del repo, y la tabla de herramientas
   de `CLAUDE.md` invita a lanzarlo.** Medido: al regenerar, las nueve piezas de
   `ventana`, `titulo` y `barra` salen con todos los píxeles distintos y

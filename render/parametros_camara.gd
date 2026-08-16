@@ -32,28 +32,52 @@ var adelanto: float = 110.0
 ## flippers de vista por irse detrás de una bola que sube.
 var adelanto_subiendo: float = 0.0
 
-## EL ADELANTO SE MIDE EN TIEMPO, NO EN PÍXELES, y esta es la mitad del arreglo
-## de "con la bola rápida no llegas a ver el flipper".
+## EL ADELANTO YA NO SE MIDE EN TIEMPO, Y ESTA ES LA HISTORIA COMPLETA PORQUE
+## LAS DOS MITADES SON VERDAD.
 ##
-## Con un adelanto fijo de 110 px la cámara miraba siempre lo mismo por debajo
-## de la bola, cayera a 300 o a 1900 px/s. A 1900 esos 110 px son 58 ms de
-## juego: la cámara enseñaba el sitio donde la bola ya estaba, no aquel al que
-## iba. Medido: el borde inferior de la pantalla llegaba a quedarse 456 px por
-## encima de la punta del flipper, o sea que la bola llegaba a una pala que no
-## estaba en plano.
+## Estuvo en 0,18 s, y no por capricho: con un adelanto fijo de 110 px la cámara
+## miraba siempre lo mismo por debajo de la bola, cayera a 300 o a 1900 px/s. A
+## 1900 esos 110 px son 58 ms de juego, o sea que la cámara enseñaba el sitio
+## donde la bola YA estaba. Medido entonces: el borde inferior llegaba a quedarse
+## 456 px por encima de la punta del flipper. Multiplicar por la velocidad
+## arreglaba eso.
 ##
-## Multiplicando por la velocidad, el adelanto ES el sitio donde va a estar la
-## bola dentro de este tiempo, que es lo que hace falta ver. 0,18 s está elegido
-## contra el techo de la pantalla, no a ojo: con la ventana de 540 px, un valor
-## mayor mete a la bola rápida detrás de la barra de título en la bajada.
-var tiempo_anticipacion: float = 0.18
+## **Y era la causa del tirón.** El suelo garantizado vale
+## `bola_y + vy × tiempo_anticipacion + margen_debajo_bola`, así que depende de
+## `vy` — y `vy` NO es continua: salta entera cada vez que la bola sale de una
+## rampa, pega en un bumper o toca una pala. Un objetivo que salta no se puede
+## suavizar sin perder la garantía: o la cámara llega a tiempo dando un corte, o
+## va suave y se pierde el flipper. Se probaron las dos y las dos se notan.
+##
+## **La salida es que el objetivo dependa solo de la POSICIÓN, que sí es
+## continua**, y pagar en margen lo que se deja de pagar en predicción. Medido
+## con seis bolas de verdad (`medir_camara.gd` §4):
+##
+##     t_ant  margen   peor salto      aceleración   sin flipper
+##      0,18     150      91,6 px    1.244.744 px/s²      0 %   ← como estaba
+##      0,09     150      36,3 px      447.208 px/s²      3 %
+##      0,00     150       8,4 px      117.951 px/s²      8 %   ← se pierde
+##      0,00     250       7,1 px       76.637 px/s²      0 %
+##      0,00     300       —            —                 0 %   ← elegido
+##      0,00     350       5,4 px       60.132 px/s²      0 %
+##
+## O sea: **17 veces menos salto y 20 veces menos aceleración, sin perder ni un
+## fotograma de flipper**. Lo que cuesta es que se ve más mesa por debajo de la
+## bola y menos por encima, que en una mesa vertical es el lado bueno.
+##
+## Se deja el parámetro en vez de borrarlo porque es el dial con el que se
+## reabre esta decisión: subirlo devuelve la predicción y con ella el tirón.
+var tiempo_anticipacion: float = 0.0
 
-## GARANTÍA DURA, y es la otra mitad del arreglo. La vieja prometía que la BOLA
-## estuviera en pantalla, y eso se cumplía dejándola pegada al canto de abajo
-## con nada debajo: se veía la bola y no se veía adónde caía. Esta promete lo
-## contrario y es lo que de verdad se juega: **el borde inferior de la pantalla
-## tiene que llegar por debajo de donde la bola va a estar**, con este margen.
-var margen_debajo_bola: float = 150.0
+## GARANTÍA DURA: el borde inferior de la pantalla tiene que llegar por debajo de
+## la bola con este margen. Ahora es lo ÚNICO que la sostiene —antes se repartía
+## con la predicción de velocidad— y por eso ha subido de 150 a 300.
+##
+## El número sale de una cuenta, no del ojo: el muelle va por detrás del objetivo
+## como mucho `vy × tiempo_suavizado`, y con la bola al tope (1500 px/s) y 0,16 s
+## eso son 240 px. Con 300 queda holgura, y está comprobado contra la caída recta
+## a 1900 px/s, que es más rápido de lo que la mesa puede producir.
+var margen_debajo_bola: float = 300.0
 
 ## Lo que hay dibujado encima de la mesa por arriba, y por debajo de lo cual la
 ## bola no puede subir sin esconderse.
@@ -85,6 +109,40 @@ var margen_ancla: float = 300.0
 ## del drenaje, no se veían nunca. Ahora es una histéresis: por debajo de la
 ## zona no arranca, y una vez arrancada llega hasta el final.
 var zona_muerta: float = 45.0
-var suavizado: float = 5.0
-## Sin bola en juego (resolviendo, victoria) la cámara vuelve abajo, despacio.
-var suavizado_reposo: float = 2.0
+
+## REGLA 5 — LA CÁMARA NO SE TELETRANSPORTA, y ahora tampoco arranca ni frena de
+## golpe. **Cuánto tarda en llegar a donde quiere estar, en segundos.**
+##
+## SUSTITUYE AL `lerp` Y AL TOPE DE VELOCIDAD, y las tres formas se han probado
+## jugando, en este orden, cada una arreglando el fallo de la anterior:
+##
+##   1. `lerp` con factor por fotograma. El tirón no estaba aquí: estaba en que
+##      las garantías duras de `avanzar` se aplicaban DESPUÉS y sin suavizar.
+##      Medido: 113 px en un fotograma, 13.616 px/s.
+##   2. Tope de velocidad (`move_toward`). Quitó el salto —113 px pasaron a 15—
+##      pero es velocidad constante con arranque y parada instantáneos, o sea lo
+##      más mecánico de los tres. Daniel lo siguió notando: *"sigue siendo brusca
+##      a la hora de bajar en cierto punto"*.
+##   3. Muelle críticamente amortiguado, que es esto. Arranca de cero, acelera y
+##      frena, y nunca se pasa de largo. **Lo que se nota no es el tamaño del
+##      salto, es la aceleración**, y por eso los dos primeros intentos fallaron
+##      midiendo bien el número equivocado.
+##
+## Y el "en cierto punto" era literal: `suelo_visible` tenía un escalón en la
+## línea de seguridad (y=1000) que movía el suelo garantizado 150 px de golpe
+## SIEMPRE EN EL MISMO SITIO de la mesa. Está quitado.
+##
+## **Es EL dial de tacto de la cámara.** Más alto = más perezosa y más cine; más
+## bajo = más pegada a la bola y más nerviosa. El suelo lo pone la garantía del
+## flipper: pasado cierto punto la cámara ya no llega a tiempo con la bola rápida
+## y se pierde la punta de la pala. La tabla del barrido está en `ESTADO.md`.
+var tiempo_suavizado: float = 0.16
+## Sin bola en juego (resolviendo, victoria) la cámara vuelve abajo, despacio: no
+## hay nada que perseguir, así que puede tomarse su tiempo.
+var tiempo_suavizado_reposo: float = 0.45
+
+## Red de seguridad del muelle, en px/s. **Ya no es el dial de tacto** —ese es
+## `tiempo_suavizado`—: limita la DISTANCIA que el muelle se plantea de una vez,
+## no la velocidad, porque recortar la velocidad devolvía la esquina dura que se
+## quería quitar. Solo actúa en saltos de objetivo enormes.
+var velocidad_maxima: float = 2600.0

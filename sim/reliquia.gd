@@ -15,6 +15,7 @@ extends RefCounted
 ##   suma_*    se suman entre todas las reliquias que lo lleven
 ##   factor_*  se multiplican entre sí, partiendo de 1,0
 ##   bandera_* basta que una lo lleve
+##   azar_*    probabilidades: se SUMAN y luego se tira un dado contra el total
 ##
 ## Y cualquier clave que acabe en `_por_victoria` es la misma clave aplicada una
 ## vez por cada combate ganado en el run: ahí vive el eje de ESCALADO sin
