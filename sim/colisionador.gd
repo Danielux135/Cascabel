@@ -5,9 +5,7 @@ extends RefCounted
 ## Todo el mundo de la mesa se monta con esto (paredes, arco teselado, bumpers,
 ## slingshots y los postes de goma).
 
-## PIN va el último a propósito: los ordinales de los demás no se tocan, que
-## `guardado.gd` y las pruebas los dan por buenos.
-enum Tipo { PARED, BUMPER, SLINGSHOT, POSTE, PUERTA, FLIPPER, TARGET, PIN }
+enum Tipo { PARED, BUMPER, SLINGSHOT, POSTE, PUERTA, FLIPPER, TARGET }
 
 var a: Vector2
 var b: Vector2

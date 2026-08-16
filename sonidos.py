@@ -57,16 +57,6 @@ SONIDOS = {
         onda="cuadrada", f0=900, f1=620, dur=0.07, caida=45,
         ruido=0.10, filtro=6000, crush=6, vol=0.42,
     ),
-    # El pin de la boveda. Es el sonido que mas veces suena de todo el juego
-    # —una entrada al racimo son diez o doce seguidos— asi que es el mas corto
-    # y el mas flojo de la mesa: 35 ms y caida 90. Agudo y sin cuerpo, para que
-    # se distinga del bumper sin competir con el; un pin es una chincheta de
-    # metal, no un solenoide. Cualquier cola aqui convierte el traqueteo en un
-    # zumbido, que es justo lo que hay que evitar.
-    "pin": dict(
-        onda="triangulo", f0=1500, f1=1150, dur=0.035, caida=90,
-        ruido=0.06, filtro=9000, crush=6, vol=0.30,
-    ),
     # El flipper no es un tono: es un solenoide. Ruido filtrado y un golpe seco.
     "flipper": dict(vol=0.38, mezcla=[
         dict(onda="ruido", dur=0.045, caida=95, filtro=2600, crush=6, vol=0.8),

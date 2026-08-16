@@ -209,7 +209,6 @@ var _tex_girador: Array[Texture2D] = []
 var _giro: Array[float] = []
 var _giro_velocidad: Array[float] = []
 var _flash_bumper: Array[float] = []
-var _flash_pin: Array[float] = []
 var _numeros: Array[Dictionary] = []
 ## Cuántas veces se ha atrapado la bola en esta partida. Solo para dejar de dar
 ## la pista una vez que se ve que ya la sabes.
@@ -315,7 +314,6 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	mesa.slingshot_golpeado.connect(_al_golpear_slingshot)
 	mesa.poste_golpeado.connect(_al_golpear_poste)
 	mesa.bumper_golpeado.connect(_al_golpear_bumper)
-	mesa.pin_golpeado.connect(_al_golpear_pin)
 	# La caza no estrena sonido: entra con el de recorrido gordo y sale con el
 	# del banco. Un sonido nuevo por cada cosa nueva acaba en un banco que nadie
 	# distingue, y estos dos ya significan "algo grande" y "algo se ha cerrado".
@@ -352,7 +350,6 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	_giro.resize(mesa.giradores.size())
 	_giro_velocidad.resize(mesa.giradores.size())
 	_flash_bumper.resize(mesa.bumpers.size())
-	_flash_pin.resize(mesa.pines.size())
 
 # ------------------------------------------------------------------- el run
 
@@ -532,12 +529,21 @@ func _physics_process(delta: float) -> void:
 	if _en_ruleta:
 		camara.avanzar(delta, 0.0, 0.0, false)
 		return
-	mesa.flipper_izq.pulsado = Input.is_physical_key_pressed(KEY_A) \
+	# LAS CUATRO PALAS CON LAS MISMAS DOS TECLAS, y es lo que hace una máquina de
+	# verdad con un flipper superior: el botón izquierdo mueve todas las
+	# izquierdas. No se aprende un control nuevo, se aprende una mesa nueva — y
+	# como la planta alta y la de abajo nunca se juegan a la vez (el umbral no
+	# traga con multibola), no hay ambigüedad posible.
+	var izq := Input.is_physical_key_pressed(KEY_A) \
 		or Input.is_physical_key_pressed(KEY_LEFT) \
 		or Input.is_physical_key_pressed(KEY_SHIFT)
-	mesa.flipper_der.pulsado = Input.is_physical_key_pressed(KEY_D) \
+	var der := Input.is_physical_key_pressed(KEY_D) \
 		or Input.is_physical_key_pressed(KEY_RIGHT) \
 		or Input.is_physical_key_pressed(KEY_CTRL)
+	mesa.flipper_izq.pulsado = izq
+	mesa.flipper_alto_izq.pulsado = izq
+	mesa.flipper_der.pulsado = der
+	mesa.flipper_alto_der.pulsado = der
 
 	if mesa.flipper_izq.pulsado != _flipper_izq_antes 			or mesa.flipper_der.pulsado != _flipper_der_antes:
 		if mesa.flipper_izq.pulsado or mesa.flipper_der.pulsado:
@@ -605,9 +611,6 @@ func _process(delta: float) -> void:
 	for i in _flash_bumper.size():
 		_flash_bumper[i] = maxf(
 			_flash_bumper[i] - delta / anim.bumper_destello_duracion, 0.0)
-	for i in _flash_pin.size():
-		_flash_pin[i] = maxf(
-			_flash_pin[i] - delta / anim.bumper_destello_duracion, 0.0)
 	for i in _giro.size():
 		_giro[i] += _giro_velocidad[i] * delta
 		_giro_velocidad[i] = maxf(_giro_velocidad[i] - anim.girador_frenado * delta, 0.0)
@@ -728,17 +731,6 @@ func _al_perder_bola(_restantes: int, punto: Vector2) -> void:
 func _al_entrar_bola_extra(punto: Vector2, _total: int) -> void:
 	_sonido.reproducir("combo")
 	impactos.polvo(punto, Vector2.UP, C_ORO_CLARO, 1.2)
-
-## El pin: destello, chispa y sonido, y NADA DE SACUDIDA. Un traqueteo son diez
-## toques en un segundo y sacudir la pantalla diez veces seguidas marea; la
-## sacudida se reserva para lo que pega de verdad.
-func _al_golpear_pin(punto: Vector2, fuerza: float) -> void:
-	_sonido.reproducir("pin")
-	var i := mesa.pin_mas_cercano(punto)
-	if i >= 0 and i < _flash_pin.size():
-		_flash_pin[i] = 1.0
-		var fuera := (punto - (mesa.pines[i] as Vector2)).normalized()
-		impactos.chispas(punto, fuera, C_METAL_LUZ, clampf(fuerza / 600.0, 0.2, 0.6))
 
 func _bumper_mas_cercano(punto: Vector2) -> int:
 	var mejor := -1
@@ -1151,15 +1143,14 @@ func _dibujar_objetos() -> void:
 				centro.y - mesa.p.target_ancho * 0.5,
 				mesa.p.target_canto, mesa.p.target_ancho), C_CABINA)
 	_dibujar_giradores()
-	_dibujar_pines()
 	_dibujar_bumpers()
 	# Los postes van ANTES que los flippers: solapan con la cápsula del eje (es
 	# lo que sella el hueco del atasco) y dibujar la pala encima deja el perno
 	# del pivote a la vista.
 	for centro in mesa.postes:
 		_dibujar_sprite_centrado(_tex_poste, centro, mesa.p.poste_radio * 2.0, 60.0)
-	_dibujar_flipper(mesa.flipper_izq)
-	_dibujar_flipper(mesa.flipper_der)
+	for f in mesa.flippers:
+		_dibujar_flipper(f)
 
 ## El target va por código, no con sprite, por la misma razón que el flipper:
 ## `target_canto` es un dial que todavía se está ajustando y el arte tiene que
@@ -1199,28 +1190,6 @@ func _dibujar_bumpers() -> void:
 		# sprite. Se queda.
 		var tinte := Color.WHITE.lerp(C_ORO_CLARO, flash * 0.8)
 		draw_texture_rect(_tex_bumper, Rect2(esquina, Vector2(lado, lado)), false, tinte)
-
-## Los pines van por código y no con sprite, y por la misma razón que el target:
-## el campo se GENERA desde `pin_paso` y `pin_radio`, así que el arte tendría que
-## medir exactamente lo que mide el colisionador y volver a cortarse cada vez que
-## se toca un número. Con 10 px de diámetro, además, un sprite no daría más de lo
-## que dan tres rectángulos.
-##
-## Tres capas y todas en píxeles enteros: sombra, cuerpo y una luz arriba a la
-## izquierda, que es de donde viene la luz en el resto de la mesa. Al golpearlo
-## se enciende entero, sin crecer: crecer un pin de 10 px un píxel es un salto
-## del 20 % y a diez toques por segundo eso es la mesa hirviendo.
-func _dibujar_pines() -> void:
-	var lado := roundf(mesa.p.pin_radio * 2.0)
-	for i in mesa.pines.size():
-		var flash: float = _flash_pin[i] if i < _flash_pin.size() else 0.0
-		var centro: Vector2 = (mesa.pines[i] as Vector2)
-		var esquina := (centro - Vector2(lado, lado) * 0.5).round()
-		draw_rect(Rect2(esquina + Vector2(0.0, 1.0), Vector2(lado, lado)), C_CABINA)
-		draw_rect(Rect2(esquina, Vector2(lado, lado)),
-			C_METAL.lerp(C_ORO_CLARO, flash))
-		draw_rect(Rect2(esquina + Vector2.ONE, Vector2(2.0, 2.0)),
-			C_METAL_LUZ.lerp(C_ORO_CLARO, flash))
 
 ## Ocho escorzos pregenerados: se elige uno, no se rota nada en vivo.
 func _dibujar_giradores() -> void:
@@ -1308,7 +1277,7 @@ func _dibujar_depuracion() -> void:
 			draw_circle(c.a, c.radio, C_ARCANO, false, 1.0)
 		else:
 			draw_line(c.a, c.b, C_ARCANO, 1.0)
-	for f in [mesa.flipper_izq, mesa.flipper_der]:
+	for f in mesa.flippers:
 		draw_line(f.eje, f.punta(), C_ARCANO, 1.0)
 		draw_circle(f.eje, f.radio, C_ARCANO, false, 1.0)
 		draw_circle(f.punta(), f.radio, C_ARCANO, false, 1.0)

@@ -19,18 +19,19 @@ var _fin := 0
 func _initialize() -> void:
 	print("")
 	var m := Mesa.new()
-	print("ZONA ALTA  ·  %d pines en la arena · umbral en (%.0f,%.0f) · caza de %.0f s"
-		% [_pines_arriba(m), m.p.umbral_boca.x, m.p.umbral_boca.y, m.p.caza_tiempo])
+	print("PLANTA ALTA  ·  %d palas · %d bumpers · %d bancos · umbral en (%.0f,%.0f)"
+		% [_palas_altas(m), m.bumpers.size(), m.bancos.size(),
+		m.p.umbral_boca.x, m.p.umbral_boca.y])
 	print("")
 	_a_se_entra()
 	_b_que_pasa_arriba()
 	_c_se_caza_al_volver()
 	quit()
 
-func _pines_arriba(m: Mesa) -> int:
+func _palas_altas(m: Mesa) -> int:
 	var n := 0
-	for v in m.pines:
-		if v.y < 660.0:
+	for f in m.flippers:
+		if f.eje.y < 660.0:
 			n += 1
 	return n
 
@@ -71,27 +72,34 @@ func _a_se_entra() -> void:
 
 # --------------------------------------------------- B. ¿qué pasa ahí arriba?
 
-## La bola se mete en el umbral a mano y se deja correr la caza entera. Lo que
-## se mira: cuánto traquetea, si se queda muerta en un rincón, y si el
-## temporizador la devuelve como dice.
+## La bola se mete por el umbral y se juega la caza entera CON PALAS, que es lo
+## que la diferencia de la versión de pines: allí solo existía el temporizador y
+## daba igual lo que hicieras. Aquí lo que se mide es si la planta alta se
+## comporta como una mesa —golpes, y una bola que se pierde si no la juegas— o
+## como un pasillo.
+##
+## El jugador de mentira es el mismo de siempre: aporrea las dos palas cuando la
+## bola baja. No juega bien; sirve para saber si la mesa RESPONDE.
 func _b_que_pasa_arriba() -> void:
-	print("B · ARRIBA — 60 cazas enteras, entrando por el umbral")
+	print("B · ARRIBA — 60 cazas enteras, con un jugador que aporrea las palas")
 	var rng := RandomNumberGenerator.new()
-	var pines := 0
-	var quietas := 0
-	var no_vuelven := 0
+	var golpes := 0
+	var duracion := 0.0
+	var por_drenaje := 0
+	var por_tiempo := 0
 	var mejor := 0
-	var peor_pines := 999
+	var quietas := 0
 	for s in SEMILLAS:
 		rng.seed = s
 		for _i in 10:
 			var m := Mesa.new()
-			m.p.busqueda_tiempo = 1e9   # sin red: que se vea si se queda muerta
-			m = Mesa.new(m.p)
-			_pines = 0
-			_fin = 0
-			m.pin_golpeado.connect(func(_p: Vector2, _f: float) -> void: _pines += 1)
-			m.caza_terminada.connect(func(_p: Vector2) -> void: _fin += 1)
+			var n := [0]
+			var fin := [0]
+			m.bumper_golpeado.connect(func(_p: Vector2, _f: float) -> void: n[0] += 1)
+			m.target_abatido.connect(func(_p: Vector2, _b: int) -> void: n[0] += 1)
+			m.girador_girado.connect(func(_p: Vector2, _i: int, _f: float) -> void: n[0] += 1)
+			m.slingshot_golpeado.connect(func(_p: Vector2, _f: float) -> void: n[0] += 1)
+			m.caza_terminada.connect(func(_p: Vector2) -> void: fin[0] += 1)
 			var b := m.bola
 			b.en_carril = false
 			b.viva = true
@@ -99,25 +107,42 @@ func _b_que_pasa_arriba() -> void:
 			b.vel = Vector2(rng.randf_range(-40.0, 40.0),
 				-rng.randf_range(m.p.umbral_velocidad_minima + 60.0, 700.0))
 			var t := 0.0
+			var t0 := -1.0
+			var pulso := 0.0
 			var quieta := 0.0
-			while t < m.p.caza_tiempo + 6.0 and b.viva:
+			while t < m.p.caza_tiempo + 8.0 and b.viva:
+				pulso -= DT
+				if b.libre() and b.pos.y > m.p.arena_y_pala - 70.0 and b.vel.y > 0.0 \
+						and pulso <= 0.0:
+					pulso = 0.14
+				var izq: bool = pulso > 0.0 and b.pos.x < 200.0
+				var der: bool = pulso > 0.0 and b.pos.x >= 200.0
+				m.flipper_alto_izq.pulsado = izq
+				m.flipper_alto_der.pulsado = der
 				m.avanzar(DT)
 				t += DT
+				if m.en_caza and t0 < 0.0:
+					t0 = t
 				if m.en_caza and b.libre() and b.velocidad() < 40.0:
 					quieta += DT
-				if _fin > 0 and b.libre() and b.pos.y > 1000.0:
+				if fin[0] > 0:
+					duracion += t - t0
 					break
-			pines += _pines
-			mejor = maxi(mejor, _pines)
-			peor_pines = mini(peor_pines, _pines)
+			golpes += n[0]
+			mejor = maxi(mejor, n[0])
 			if quieta > 1.5:
 				quietas += 1
-			if _fin == 0:
-				no_vuelven += 1
-	print("   pines por caza: %.1f de media (la mejor %d, la peor %d)"
-		% [float(pines) / 60.0, mejor, peor_pines])
+			if fin[0] > 0:
+				if m.caza_por_drenaje:
+					por_drenaje += 1
+				else:
+					por_tiempo += 1
+	print("   golpes por caza: %.1f de media (%d el mejor)" % [float(golpes) / 60.0, mejor])
+	print("   dura %.1f s de media (el tope son %.0f)"
+		% [duracion / 60.0, Mesa.new().p.caza_tiempo])
+	print("   acaba por DRENAR arriba %d veces y por AGOTAR el tiempo %d"
+		% [por_drenaje, por_tiempo])
 	print("   cazas con la bola muerta más de 1,5 s: %d de 60" % quietas)
-	print("   cazas que no terminan: %d de 60" % no_vuelven)
 	print("")
 
 # ------------------------------------------------- C. ¿se caza al volver?

@@ -40,7 +40,6 @@ func _initialize() -> void:
 	_prueba_sonido()
 	_prueba_impactos()
 	_prueba_racimo()
-	_prueba_campo_pines()
 	_prueba_zona_alta()
 	_prueba_sin_rebote_encerrado()
 	_prueba_slingshot_tiene_espalda()
@@ -311,8 +310,12 @@ func _prueba_ball_search() -> void:
 
 func _prueba_targets() -> void:
 	var m := _nueva_mesa()
-	_comprobar("hay dos bancos de tres targets",
-		m.bancos.size() == 2 and m.targets.size() == 6,
+	# CUATRO BANCOS: dos por planta. Desde que hay planta alta, todo lo que se
+	# cuente sobre `m.bancos`, `m.bumpers`, `m.giradores` o `m.rampas` cuenta LAS
+	# DOS MESAS. Contarlo sin decirlo es de donde salen las pruebas que miden
+	# otra cosa sin enterarse.
+	_comprobar("hay dos bancos de tres targets por planta",
+		m.bancos.size() == 4 and m.targets.size() == 12,
 		"%d bancos, %d targets" % [m.bancos.size(), m.targets.size()])
 
 	# El target es una PLANCHA, no un bolo: la cápsula mide `target_ancho` de
@@ -751,12 +754,22 @@ func _prueba_adornos() -> void:
 ## Girado 60° da 3,9 subiendo. La tabla entera está en `bumper_giro`.
 func _prueba_racimo() -> void:
 	var m := _nueva_mesa()
-	_comprobar("el racimo son tres bumpers", m.bumpers.size() == 3)
+	# SOLO EL DE ABAJO. Hay dos racimos desde que hay planta alta, y medirlos
+	# juntos daba "huecos entre 24 y 521": el 521 era la distancia de un racimo
+	# al otro. La prueba salía en rojo con la mesa perfecta.
+	var racimo: Array[Vector2] = []
+	for v in m.bumpers:
+		if (v as Vector2).distance_to(m.p.bumper_centro) < 100.0:
+			racimo.append(v)
+	_comprobar("el racimo son tres bumpers", racimo.size() == 3,
+		"%d de %d bumpers cerca del centro del racimo" % [racimo.size(), m.bumpers.size()])
+	_comprobar("y hay dos racimos, uno por planta", m.bumpers.size() == 6,
+		"%d bumpers" % m.bumpers.size())
 
 	var huecos: Array[float] = []
-	for i in m.bumpers.size():
-		for j in range(i + 1, m.bumpers.size()):
-			huecos.append((m.bumpers[i] as Vector2).distance_to(m.bumpers[j])
+	for i in racimo.size():
+		for j in range(i + 1, racimo.size()):
+			huecos.append((racimo[i] as Vector2).distance_to(racimo[j])
 				- m.p.bumper_radio * 2.0)
 	_comprobar("es un triangulo con el hueco que dice el parametro",
 		absf(huecos.min() - m.p.bumper_hueco) < 1.0
@@ -808,121 +821,11 @@ func _prueba_racimo() -> void:
 	# huecos seguirían bien, el triángulo seguiría siendo un triángulo, y la
 	# bola volvería a rebotar una vez y marcharse.
 	var arriba := 0
-	for c in m.bumpers:
+	for c in racimo:
 		if (c as Vector2).y < m.p.bumper_centro.y:
 			arriba += 1
 	_comprobar("y hay DOS bumpers en la cara por la que sube la bola",
 		arriba == 1, "%d de 3 por encima del centro del racimo" % arriba)
-
-## EL CAMPO DE PINES. Pachinko bajo el arco: la bola sale del racimo, traquetea
-## y vuelve a caer al racimo. Lo que hay que asegurar no es que haya pines, es
-## que NO SE PUEDA ACUÑAR LA BOLA en ellos y que no tapen ningún tiro: el campo
-## se GENERA desde `pin_paso` y `pin_alto_fila`, así que tocar un número rehace
-## la rejilla entera y las dos cosas se rompen sin dar error.
-func _prueba_campo_pines() -> void:
-	var m := _nueva_mesa()
-	_comprobar("hay campo de pines", m.pines.size() >= 6,
-		"%d pines" % m.pines.size())
-
-	# EL INVARIANTE. Todo hueco de paso tiene que dejar pasar la bola; si no,
-	# la bóveda es una trampa de acuñar con forma de adorno.
-	var paso := m.paso_minimo_pines()
-	_comprobar("por todos los huecos del campo cabe la bola",
-		paso > m.p.radio_bola * 2.0,
-		"el más estrecho mide %.1f px y la bola %.0f" % [paso, m.p.radio_bola * 2.0])
-
-	# Simétrico o ninguno: un campo torcido se lee como un fallo.
-	var espejo := true
-	for v in m.pines:
-		var hay := false
-		for w in m.pines:
-			if absf(w.x - (Mesa.ANCHO - v.x)) < 0.5 and absf(w.y - v.y) < 0.5:
-				hay = true
-				break
-		if not hay:
-			espejo = false
-			break
-	_comprobar("el campo es simétrico", espejo)
-
-	# Ningún pin puede tapar una boca de recorrido ni el platillo: taparla
-	# quitaría un tiro de la mesa sin que nada diera error.
-	var pisa := ""
-	for v in m.pines:
-		for pl in m.platillos:
-			if v.distance_to(pl.centro) < pl.radio + m.p.pin_radio + 1.0:
-				pisa = "platillo"
-		for r in m.rampas:
-			# Solo las bocas que TRAGAN. El final de un recorrido de un solo
-			# sentido es una salida: `sentido_entrada` ni lo mira, y un pin al
-			# lado no tapa nada.
-			var bocas: Array[Vector2] = [r.puntos[0]]
-			if r.bidireccional:
-				bocas.append(r.puntos[r.puntos.size() - 1])
-			for boca in bocas:
-				if v.distance_to(boca) < r.entrada_radio + m.p.pin_radio + 1.0:
-					pisa = r.nombre
-	_comprobar("ningún pin tapa una boca ni el platillo", pisa == "",
-		"tapado: %s" % pisa)
-
-	# Y LA BÓVEDA SE VACÍA SOLA. Con el ball search apagado a propósito: con él
-	# puesto, una bola acuñada saldría a los 2 s y la prueba diría que todo va
-	# bien tapando justo lo que se quiere ver.
-	var rng := RandomNumberGenerator.new()
-	rng.seed = SEMILLA
-	var peor := 0.0
-	for _i in 40:
-		var m2 := _nueva_mesa()
-		m2.p.busqueda_tiempo = 1e9
-		m2.nueva_bola()
-		m2.bola.en_carril = false
-		m2.bola.pos = Vector2(rng.randf_range(70.0, 330.0), rng.randf_range(690.0, 750.0))
-		m2.bola.vel = Vector2(rng.randf_range(-400.0, 400.0), rng.randf_range(-500.0, 200.0))
-		var t := 0.0
-		while t < 15.0 and m2.bola.viva and m2.bola.pos.y < 800.0:
-			m2.avanzar(DT)
-			t += DT
-		peor = maxf(peor, t)
-	_comprobar("una bola suelta en la bóveda siempre acaba saliendo",
-		peor < 15.0, "la peor tardó %.1f s" % peor)
-
-	# El aviso sale UNA vez por golpe, no una por subpaso. Es la trampa que ya
-	# costó tiempo con los bumpers: 480 golpes por segundo con la bola apoyada.
-	var m3 := _nueva_mesa()
-	m3.p.busqueda_tiempo = 1e9
-	m3.nueva_bola()
-	m3.bola.en_carril = false
-	var avisos := [0]
-	m3.pin_golpeado.connect(func(_p: Vector2, _f: float) -> void: avisos[0] += 1)
-	var pin: Vector2 = m3.pines[0]
-	m3.bola.pos = pin - Vector2(0.0, m3.p.pin_radio + m3.p.radio_bola - 0.4)
-	m3.bola.vel = Vector2.ZERO
-	for _i in int(1.0 / DT):
-		m3.avanzar(DT)
-	_comprobar("una bola apoyada en un pin no avisa por subpaso",
-		avisos[0] <= 2, "%d avisos en 1 s" % avisos[0])
-
-	# Y lo que cobra: relleno, y sin tocar el combo mientras `pin_suma_combo`
-	# esté apagado. Un traqueteo de doce toques poniéndote el combo a tope
-	# regalaría el multiplicador, que es casi toda la brecha por habilidad.
-	# Sin críticos: con 12 toques y un 6 % por golpe salta uno de cada dos
-	# intentos y la prueba se pondría roja sola. Los críticos tienen la suya.
-	var pc := ParametrosCombate.new()
-	pc.prob_critico = 0.0
-	var c := Combate.new(pc)
-	c.iniciar(Enemigo.new({"nombre": "Prueba", "vida": 500, "ataque": 10}))
-	_en_juego(c)
-	# La vida se lee AQUÍ, no se da por 500: sacar el combate de la fase de
-	# lanzamiento ya cuesta un golpe, y esta prueba mide lo que paga el pin.
-	var vida_antes := c.enemigo.vida
-	var golpes_antes := c.golpes
-	for _i in 12:
-		c.mesa.pin_golpeado.emit(Vector2(200, 720), 300.0)
-	_comprobar("el pin paga poco y paga siempre",
-		c.enemigo.vida == vida_antes - c.p.dano_pin * 12,
-		"ha quitado %d, esperado %d" % [vida_antes - c.enemigo.vida, c.p.dano_pin * 12])
-	_comprobar("y no regala combo",
-		c.golpes == golpes_antes or c.p.pin_suma_combo,
-		"%d golpes de más" % (c.golpes - golpes_antes))
 
 ## LA ZONA ALTA. `DISEÑO.md` §5 y §7: un tiro difícil abre el modo de caza, subes,
 ## juegas arriba un tiempo limitado con el reloj del enemigo corriendo, y bajas.
@@ -934,8 +837,17 @@ func _prueba_campo_pines() -> void:
 func _prueba_zona_alta() -> void:
 	var m := _nueva_mesa()
 	_comprobar("la arena tiene sus dos recorridos", m.umbral >= 0 and m.regreso >= 0)
-	_comprobar("y pines dentro, que si no es una habitación vacía",
-		_pines_arriba(m) >= 10, "%d pines arriba" % _pines_arriba(m))
+	# LO QUE HACE QUE LA PLANTA ALTA SE JUEGUE SON PALAS. La primera versión era
+	# un campo de pines y Daniel la tumbó jugándola: una rejilla se come la
+	# energía de la bola y no devuelve nada, así que no hay tiro, hay embudo.
+	_comprobar("la planta alta tiene sus dos palas",
+		mesa_palas_altas(m) == 2, "%d palas arriba" % mesa_palas_altas(m))
+	_comprobar("y las cuatro palas están en la lista que recorre la física",
+		m.flippers.size() == 4, "%d palas" % m.flippers.size())
+	_comprobar("tiene bumpers, targets y su propia órbita",
+		m.bumpers.size() == 6 and m.bancos.size() == 4 and m.rampas.size() == 6,
+		"%d bumpers, %d bancos, %d rampas"
+			% [m.bumpers.size(), m.bancos.size(), m.rampas.size()])
 
 	# EL REGRESO NO TIENE BOCA. Si la tuviera sería un agujero en el suelo del
 	# piso de arriba y la caza duraría lo que tarda la bola en encontrarlo, no lo
@@ -944,9 +856,9 @@ func _prueba_zona_alta() -> void:
 		(m.rampas[m.regreso] as Rampa).sentido_entrada(
 			(m.rampas[m.regreso] as Rampa).puntos[0], Vector2(0, 900)) == 0)
 
-	# LA ARENA ESTÁ CERRADA. Una bola suelta ahí dentro no puede acabar en la
-	# mesa de abajo por gravedad: entre el fondo del embudo y el arco no hay
-	# comunicación, y salir es el regreso o nada.
+	# LAS DOS PLANTAS NO SE COMUNICAN POR GRAVEDAD. Una bola suelta arriba no
+	# puede aparecer abajo: o se queda arriba o se va por el regreso, que es una
+	# curva. Si se colara, llegaría a las palas de abajo a 1500 px/s.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = SEMILLA
 	var escapes := 0
@@ -963,6 +875,8 @@ func _prueba_zona_alta() -> void:
 			t += DT
 			if m2.bola.libre() and m2.bola.pos.y > 700.0:
 				escapes += 1
+				break
+			if m2.bola.rampa == m2.regreso:
 				break
 		if not m2.bola.viva:
 			muertas += 1
@@ -992,9 +906,16 @@ func _prueba_zona_alta() -> void:
 		if cerrada[0] > 0 and t_cierra < 0.0:
 			t_cierra = t3
 	_comprobar("el umbral abre la caza", abierta[0] == 1, "%d veces" % abierta[0])
-	_comprobar("y la caza dura lo que dice el parámetro",
-		t_cierra > 0.0 and absf((t_cierra - t_abre) - m3.p.caza_tiempo) < 0.5,
-		"duró %.1f s y pide %.1f" % [t_cierra - t_abre, m3.p.caza_tiempo])
+	# LA CAZA SE ACABA DE DOS MANERAS, y esa es la diferencia entre una mesa y un
+	# paseo: drenando ahí arriba —o sea jugando mal, que es lo que hace un
+	# jugador que no toca las palas— o agotando el tiempo. Con la versión de
+	# pines solo existía la segunda y por eso daba igual lo que hicieras.
+	_comprobar("y se acaba, sin tocar las palas y por drenaje",
+		t_cierra > 0.0 and m3.caza_por_drenaje,
+		"cerró a los %.1f s, por drenaje: %s" % [t_cierra - t_abre, m3.caza_por_drenaje])
+	_comprobar("y nunca dura más que el tope",
+		t_cierra > 0.0 and (t_cierra - t_abre) <= m3.p.caza_tiempo + 0.5,
+		"duró %.1f s y el tope es %.1f" % [t_cierra - t_abre, m3.p.caza_tiempo])
 
 	# Y LA QUE PUEDE TIRAR EL MODO ENTERO: al bajar, ¿se caza la bola?
 	var m4 := _nueva_mesa()
@@ -1040,10 +961,10 @@ func _prueba_zona_alta() -> void:
 		m5.avanzar(DT)
 	_comprobar("con dos bolas en juego el umbral no traga", abierta5[0] == 0)
 
-func _pines_arriba(m: Mesa) -> int:
+func mesa_palas_altas(m: Mesa) -> int:
 	var n := 0
-	for v in m.pines:
-		if v.y < 660.0:
+	for f in m.flippers:
+		if f.eje.y < 660.0:
 			n += 1
 	return n
 
@@ -1296,17 +1217,27 @@ func _prueba_no_se_queda_pegada() -> void:
 ## propia sería pedirle identidad a la puerta de salida.
 func _prueba_identidad_recorridos() -> void:
 	var m := _nueva_mesa()
-	var premios := {}
+	# POR PLANTA, y las dos órbitas son el MISMO tiro en dos mesas distintas: la
+	# de arriba paga multiplicador igual que la de abajo, y eso es lo correcto —
+	# lo que cambia entre plantas es la mesa, no lo que significa una órbita.
 	var nombres: Array[String] = []
-	for i in m.rampas.size():
-		if i == m.regreso:
-			continue
-		premios[(m.rampas[i] as Rampa).premio] = true
-		nombres.append((m.rampas[i] as Rampa).nombre)
-	_comprobar("cada recorrido que se apunta paga una cosa distinta",
-		premios.size() == nombres.size(),
-		"%d premios distintos en %s" % [premios.size(), str(nombres)])
-	_comprobar("y son los cuatro que hay: órbita, retorno, cañón y umbral",
+	for planta in [{"q": "abajo", "min": 660.0, "max": 1300.0},
+			{"q": "arriba", "min": 0.0, "max": 660.0}]:
+		var premios := {}
+		var cuantos := 0
+		for i in m.rampas.size():
+			if i == m.regreso or i == m.umbral:
+				continue
+			var r := m.rampas[i] as Rampa
+			if r.puntos[0].y < float(planta["min"]) or r.puntos[0].y > float(planta["max"]):
+				continue
+			premios[r.premio] = true
+			cuantos += 1
+			nombres.append(r.nombre)
+		_comprobar("los recorridos de %s pagan cosas distintas" % planta["q"],
+			premios.size() == cuantos,
+			"%d premios en %d recorridos" % [premios.size(), cuantos])
+	_comprobar("y están los cuatro de abajo más la órbita de arriba",
 		nombres.size() == 4, str(nombres))
 
 	# La órbita sube el multiplicador de tramo, sin encadenar golpes.
@@ -1801,7 +1732,12 @@ func _prueba_slingshot_tiene_espalda() -> void:
 	var m := _nueva_mesa()
 	var sling: Colisionador = null
 	for c in m.colisionadores:
-		if c.tipo == Colisionador.Tipo.SLINGSHOT and c.centro().x < 200.0:
+		# EL DE ABAJO. Desde que hay planta alta hay cuatro slingshots, y sin la
+		# y se cogía el de arriba: su cara mira hacia arriba, no al centro, así
+		# que la prueba medía otra goma y salía en rojo sin que nada estuviera
+		# roto.
+		if c.tipo == Colisionador.Tipo.SLINGSHOT and c.centro().x < 200.0 \
+				and c.centro().y > 1000.0:
 			sling = c
 	_comprobar("el slingshot sabe cual es su cara buena",
 		sling != null and sling.cara != Vector2.ZERO)
@@ -1944,8 +1880,8 @@ func _prueba_rampas() -> void:
 	# Tres abajo (órbita, retorno, cañón) y dos de la zona alta (umbral y
 	# regreso), que son las dos mitades de la misma idea: a la arena no se sube
 	# ni se baja por gravedad.
-	_comprobar("hay cinco recorridos y un platillo",
-		m.rampas.size() == 5 and m.platillos.size() == 1,
+	_comprobar("hay seis recorridos y un platillo",
+		m.rampas.size() == 6 and m.platillos.size() == 1,
 		"%d rampas, %d platillos" % [m.rampas.size(), m.platillos.size()])
 	var r: Rampa = m.rampas[0]
 	_comprobar("la orbita llega a la zona alta",
@@ -3016,8 +2952,8 @@ func _prueba_regiones_clic() -> void:
 
 func _prueba_giradores() -> void:
 	var m := _nueva_mesa()
-	_comprobar("hay un girador en cada carril de retorno",
-		m.giradores.size() == 2, "%d giradores" % m.giradores.size())
+	_comprobar("hay un girador en cada carril de retorno de cada planta",
+		m.giradores.size() == 4, "%d giradores" % m.giradores.size())
 
 	# Hay que soltarla BAJANDO POR EL CARRIL: el carril de retorno izquierdo va
 	# en diagonal, y a plomo desde arriba la bola cae fuera, sobre el slingshot.

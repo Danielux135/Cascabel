@@ -16,10 +16,6 @@ const VOCES := 14
 const AJUSTES := {
 	"bumper":        {"db": -3.0, "tono": 0.10},
 	"target":        {"db": -4.0, "tono": 0.08},
-	# El pin suena diez o doce veces seguidas en una entrada buena, o sea que es
-	# el que más desafine necesita de todos: sin él, un traqueteo es un zumbido
-	# a una nota. Y va bajo de volumen a propósito, que son muchos.
-	"pin":           {"db": -11.0, "tono": 0.16},
 	"banco":         {"db": -1.0, "tono": 0.00},
 	"atrapar":       {"db": -7.0, "tono": 0.00},
 	"flipper":       {"db": -9.0, "tono": 0.06},

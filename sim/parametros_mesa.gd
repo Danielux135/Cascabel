@@ -135,128 +135,62 @@ var bumper_centro := Vector2(200.0, 805.0)
 ## como estaba, no llegaba ninguna ruta de la mesa.
 var bumper_giro: float = 60.0
 
-# --- Campo de pines (*) ---
-# Pachinko: la bola sale disparada del racimo, traquetea por la bóveda que hay
-# bajo el arco y vuelve a caer al racimo. No venían del prototipo.
-#
-# LOS PINES NO EMPUJAN, Y ESO ES EL DISEÑO ENTERO. Un bumper es un actuador y
-# fabrica energía si te descuidas —ya pasó, ver `bumper_rebote`—; un pin solo
-# recibe. Cada toque le quita algo a la bola, así que la bóveda se vacía sola y
-# no puede convertirse en un bucle que se sostiene sin las palas, que es lo que
-# `PLAN.md` §3B prohíbe.
-#
-# Y VAN DONDE NO ESTORBAN: la bóveda está por encima del racimo, fuera de los
-# carriles por los que la bola BAJA. Meter pines en las bandas haría el descenso
-# aleatorio, y con el outlane ahí abajo eso es perder la bola sin jugarla.
-var pin_radio: float = 5.0
-## Metal, y sin actuador: el rebote es de pared larga. Con más, la bola se queda
-## viviendo arriba; con menos, cruza la bóveda sin traquetear.
-var pin_rebote: float = 0.55
-## Umbral del aviso, no de la física. Es lo que separa "esto ha sido un golpe"
-## de "la bola está rozando el pin": sin él, una bola apoyada emitiría un aviso
-## por subpaso, que es la trampa que ya cazamos con los bumpers (480 golpes por
-## segundo). Una bola apoyada llega al contacto con lo que le da la gravedad en
-## un subpaso —1750/480 = 3,6 px/s—, o sea que 70 la deja fuera de sobra.
-var pin_velocidad_minima: float = 70.0
-## Rejilla al tresbolillo: `pin_paso` de separación entre centros de la misma
-## fila y `pin_alto_fila` entre filas, con las impares desplazadas medio paso.
-##
-## LOS DOS NÚMEROS SON UN INVARIANTE DISFRAZADO. El hueco por el que pasa la
-## bola es `paso − 2·radio` en horizontal y `hipotenusa(paso/2, alto) − 2·radio`
-## en diagonal, y la bola mide 18. Con 36 y 29 salen 26 y 24,1: pasa por los dos
-## con holgura. El suelo es paso > 28; y con ese paso, alto > 21,4. Por debajo
-## la bóveda deja de ser un campo de pines y pasa a ser una trampa de acuñar.
-## Lo comprueba la batería, no la buena voluntad.
-var pin_paso: float = 36.0
-var pin_alto_fila: float = 29.0
-## Dónde empieza la primera fila. 707 la deja bajo el arco (que en el centro
-## abre hasta y=660) y por encima de los bumpers de arriba (y=787 menos 19 de
-## radio = 768).
-var pin_y: float = 707.0
-## Tres filas pedidas, dos colocadas: la tercera cae encima del racimo y el
-## filtro de holgura la tira entera. Se deja en 3 a propósito, para que apretar
-## `pin_alto_fila` la recupere sin tocar nada más.
-var pin_filas: int = 3
-
-## EL CEDAZO, Y ESTÁ AQUÍ PORQUE LO PIDIÓ LA MEDIDA. La bóveda sola no la toca
-## nadie: el tiro desde la cuna —el único tiro repetible de la mesa— sube a
-## y=894 de media, y el mejor de 42 se queda en y=751, quince píxeles por debajo
-## de la fila de abajo de la bóveda. Cero pines tocados en 42 tiros.
-##
-## Esta fila iba en y=875, que es la banda que cruza TODO lo que baja de la zona
-## alta. Y SE QUEDA APAGADA, porque medirla contestó a una pregunta que no
-## habíamos hecho: esa banda no es hueco libre, **es el pasillo de tiro**.
-##
-## Encendida, los tiros desde la cuna tocaban pin (10 de 21 por la izquierda, 9
-## de 21 por la derecha) pero dejaban de subir: el mejor pasaba de y=751 a
-## y=884. Y los dos pines de los extremos caen justo debajo de las bocas del
-## retorno y del cañón, que están en y=790: o sea que el precio de que la bola
-## traquetee era tapar dos de los seis tiros de `DISEÑO.md` §4.
-##
-## Se deja el parámetro, no el apaño: a 1 vuelve, y lo que haría falta antes es
-## que `_cabe_pin` sepa de PASILLOS DE TIRO y no solo de bocas. Está apuntado en
-## ESTADO.md.
-var pin_cedazo_y: float = 875.0
-var pin_cedazo_filas: int = 0
-## Hueco mínimo que un pin tiene que dejar contra TODO lo que ya está puesto
-## —arco, paredes, bumpers, platillo y bocas de recorrido— para que se coloque.
-## Por debajo del diámetro de la bola sería un sitio donde acuñarse; 24 deja
-## 3 px de aire por lado sobre los 18 que mide.
-var pin_holgura: float = 24.0
-
-# --- LA ZONA ALTA: LA ARENA DE CAZA ---
+# --- LA PLANTA ALTA: LA ARENA DE CAZA ---
 #
 # `DISEÑO.md` §7 lista un tiro llamado **umbral alto** que "abre el modo de
-# caza", y §5 dice que los monstruos de la zona alta sueltan material de
-# desbloqueo, que el modo dura un tiempo limitado, que el reloj del enemigo sigue
-# corriendo mientras estás arriba, y que eso es lo que **"le da sentido a la zona
-# alta, que hasta ahora era un pasillo"**.
+# caza", y §5 dice que eso es lo que **"le da sentido a la zona alta, que hasta
+# ahora era un pasillo"**. Pasillo era literal: por encima del arco (y=660) no
+# había un solo colisionador.
 #
-# Pasillo era literal: por encima del arco (y=660) no había un solo colisionador.
-# 530 px de mesa que solo cruzaban splines.
+# Y ES UNA MESA, NO UN CAMPO DE PINES. La primera versión era una rejilla al
+# tresbolillo y Daniel la tumbó jugándola: *"el pachinko es literalmente que
+# caiga la bola, y que luego no pase de la primera línea"*. Es exacto y se ve en
+# la física: una rejilla es un comedor de energía pasivo —la primera fila se
+# lleva la velocidad y el resto es caída—, así que no hay tiro, hay embudo.
+# **Lo que hace que una zona de pinball se juegue son palas.**
 #
-# POR QUÉ ES UNA ARENA CERRADA Y NO CAMPO ABIERTO, y esto es aritmética, no
-# gusto: una bola que cae libre desde la altura de las rampas llega a las palas a
-# 1500 px/s, o sea 67 ms de ventana. El cañón ya se tuvo que ablandar a la mitad
-# porque 900 px/s —111 ms— era "un tiro imposible, o sea perder la bola con pasos
-# extra". Quitar el arco y ya está sería regalar esa caída en cada visita. La
-# arena tiene su propio suelo y devuelve la bola por un carril, que es como se
-# baja de una planta alta en una máquina de verdad.
-#
-# Y LA BOLA NO PUEDE SUBIR SOLA: el tope de 1500 px/s con gravedad 1750 da 643 px
-# de subida, y desde las palas eso se queda en y=557. A la arena solo se entra
-# enganchado al umbral.
+# POR QUÉ ES UN PISO Y NO CAMPO ABIERTO, que es aritmética y no gusto: la bola
+# sube 643 px por sus medios, o sea que desde las palas de abajo no pasa de
+# y=557 aunque no hubiera techo; y una caída libre desde aquí llega abajo a
+# 1500 px/s, 67 ms de ventana, cuando el cañón ya se tuvo que ablandar a la
+# mitad porque 900 px/s —111 ms— era "un tiro imposible, o sea perder la bola
+# con pasos extra".
 
-## El techo de la arena: elipse de radio `arena_techo_rx` × `arena_techo_ry` con
-## el centro en el hombro. Igual que el arco de abajo, para que las dos mitades
-## de la mesa se lean como la misma mesa.
+## El techo de la arena: elipse igual que el arco de abajo, para que las dos
+## plantas se lean como la misma mesa.
 var arena_techo_ry: float = 70.0
-## Donde el techo se encuentra con las paredes laterales, o sea el punto más alto
-## al que llega una pared recta.
+## Donde el techo se encuentra con las bandas.
 var arena_hombro_y: float = 220.0
-## Donde las paredes dejan de ser verticales y empieza el embudo.
-var arena_suelo_y: float = 600.0
-## El fondo del embudo. Entre este y el arco de la mesa de abajo (y=660) quedan
-## 12 px de nada: la arena es un piso aparte, no se comunica por gravedad.
+## LA ALTURA DE LAS PALAS DE ARRIBA. Todo el resto de la planta cuelga de aquí:
+## slingshots, postes, carriles de retorno y giradores se colocan en relación a
+## este número, exactamente igual que abajo, así que moverlo mueve la zona de
+## palas entera sin descuadrar nada.
+var arena_y_pala: float = 560.0
+## Dónde va el racimo de la planta alta.
+var arena_bumper_centro := Vector2(200.0, 300.0)
+## Y dónde empiezan los dos bancos de targets.
+var arena_y_targets: float = 380.0
+## Velocidad mínima para engancharse a la órbita corta. Más baja que la de abajo
+## (500) porque aquí arriba las distancias son la mitad: con 500 no engancharía
+## nunca.
+var arena_orbita_velocidad_minima: float = 320.0
+## El fondo del embudo, que es la boca del desagüe de la planta alta. Entre este
+## y el arco de la mesa de abajo (y=660) quedan 12 px de nada: **las dos plantas
+## no se comunican por gravedad.**
 var arena_fondo_y: float = 648.0
-## Ancho del rellano del fondo, donde la bola se posa cuando se acaba el tiempo.
-var arena_rellano: float = 12.0
-
-## EL EMBUDO ES UN TRAMPOLÍN, y es lo que hace que la caza sea caza y no una
-## visita de medio segundo. Las dos paredes inclinadas del fondo son gomas que
-## devuelven la bola al campo: sin ellas la bola cae, se posa, y ya está.
-##
-## Va por debajo del slingshot de abajo (700) a propósito: aquí no hay palas que
-## corrijan nada, así que una goma fuerte deja la bola rebotando de techo a suelo
-## sin tocar un solo pin.
-var arena_empuje: float = 520.0
-var arena_rebote: float = 0.55
-var arena_velocidad_minima: float = 70.0
+## Por debajo de esta línea la bola de la planta alta se ha drenado y la caza se
+## acaba. Es una LÍNEA y no una boca: una boca se puede esquivar cayendo por su
+## lado, y entonces la bola se queda en el hueco entre las dos plantas, que es un
+## sitio del que no se sale.
+var arena_drenaje_y: float = 630.0
 
 ## Cuánto dura el modo. `DISEÑO.md` §5: "el modo dura un tiempo limitado y el
 ## reloj del enemigo sigue corriendo mientras estás arriba. Sin eso, cazar sería
-## gratis." Doce segundos son casi una bola entera de las de abajo.
-var caza_tiempo: float = 12.0
+## gratis." **Pero el tiempo es el TECHO, no el final**: la caza se acaba de
+## verdad cuando drenas ahí arriba, y por eso aguantar la bola también vale en la
+## planta alta. Con la versión de pines solo existía el tiempo, y por eso daba
+## igual lo que hicieras.
+var caza_tiempo: float = 20.0
 
 ## LA BOCA DEL UMBRAL, Y ESTÁ DONDE LA PUSO LA MEDIDA, NO DONDE QUEDABA BONITO.
 ##
@@ -286,36 +220,36 @@ var caza_tiempo: float = 12.0
 ## porque la de abajo se traga la bola primero.
 ##
 ## Así que el umbral es literalmente **el tiro que hay más allá de los bumpers**:
-## no se apunta, se gana con una entrada buena al racimo. Medido, 2-3 de cada 100
-## entradas. Es raro a propósito, pero **este es el número que hay que mirar
-## después de jugar**: si la arena no se ve nunca, los diales son esta posición,
-## `umbral_entrada_radio` y `umbral_velocidad_minima`, por ese orden.
+## no se apunta, se gana con una entrada buena al racimo. **Este es el número que
+## hay que mirar después de jugar**: si la planta alta no se ve nunca, los diales
+## son esta posición, `umbral_entrada_radio` y `umbral_velocidad_minima`, por ese
+## orden.
 var umbral_boca := Vector2(340.0, 730.0)
 ## Y hay que llegar CON FUERZA, no de rebote agotado. Una bola que apenas alcanza
 ## la boca llega a 0 px/s: sin umbral de velocidad, el tiro difícil se ganaría
 ## por accidente.
 var umbral_velocidad_minima: float = 150.0
-## Con cuánta velocidad se suelta la bola dentro de la arena. Baja: entras a
-## jugar arriba, no a estrellarte contra el techo.
+## Con cuánta velocidad se suelta la bola arriba. Baja: subes a jugar, no a
+## estrellarte contra el techo.
 var umbral_factor_salida: float = 0.45
 ## La boca del umbral es MÁS ANCHA que las demás (18). Con 18 se abría la caza
 ## en 1 de cada 240 entradas al racimo: eso no es difícil, es que no existe.
 var umbral_entrada_radio: float = 30.0
 
-## EL REGRESO. No tiene boca: no se entra en él, la arena te mete cuando se acaba
-## el tiempo. Por eso la bola se lanza a una velocidad fija en vez de con la que
-## traía — si no, una caza que acaba con la bola parada tardaría siglos en bajar.
+## EL REGRESO. No tiene boca: no se entra en él, te mete la planta alta cuando
+## drenas arriba o cuando se acaba el tiempo. Por eso la bola se lanza a una
+## velocidad fija en vez de con la que traía — si no, una caza que acaba con la
+## bola parada tardaría siglos en bajar.
 var regreso_velocidad: float = 700.0
 ## Y sale despacio. Vuelves de estar arriba y la bola te llega posada a la pala:
 ## el precio de la caza es el reloj del enemigo, no perder la bola al bajar.
-## A 700 × 0,35 son 245 px/s, o sea 408 ms de ventana contra los 250 que tarda un
-## humano en reaccionar.
-var regreso_factor_salida: float = 0.35
+## Medido, y ajustado dos veces contra el cronómetro: con la salida a 0,35 y la
+## boca 20 px más abajo, la bola llegaba a la pala en 197 ms — por DEBAJO de los
+## 250 que tarda un humano en reaccionar, o sea el mismo fallo que tenía el cañón
+## antes de ablandarlo. Con 0,30 y la salida más arriba sale a 210 px/s y llega
+## en 300 ms largos.
+var regreso_factor_salida: float = 0.30
 
-## El campo de pines de la arena. Mismo generador y mismo recorte que la bóveda:
-## `pin_paso`, `pin_alto_fila` y `pin_holgura` mandan también aquí.
-var pin_arena_y: float = 310.0
-var pin_arena_filas: int = 5
 
 ## (*) Outlanes: los dos carriles que van directos al drenaje, por fuera de los
 ## carriles de retorno. Son la válvula de dificultad de la mesa: sin ellos solo

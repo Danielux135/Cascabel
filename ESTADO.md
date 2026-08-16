@@ -13,123 +13,106 @@ pasa de una pantalla, sobra algo.
 
 Lo mínimo que hay que saber si esta conversación empieza de cero.
 
-**Dónde estamos.** La mesa tiene **dos pisos**. Encima del arco, donde antes solo
-cruzaban splines, hay ahora una **arena de caza**: paredes, techo, embudo de
-gomas y 43 pines. Se sube por el **umbral**, un recorrido con la boca pegada a la
-banda derecha, y se baja por el **regreso**, que devuelve la bola posada a la
-pala. Batería **437/458 en la caja de la sesión**; los 21 que faltan son todos
-"no existe tal PNG", porque en la caja no está `assets/`. En el equipo de Daniel
-tienen que salir los 458 — **y para eso hay que generar `pin.wav`**
-(`python3 sonidos.py`), que es sonido nuevo de la tanda anterior.
+**Dónde estamos.** La mesa tiene **dos plantas, y las dos son mesas de pinball
+de verdad**. Encima del arco hay una planta alta con **sus propias dos palas**,
+su racimo, dos bancos de targets, dos slingshots, dos giradores y su órbita. Se
+sube por el **umbral** y se baja por el **regreso**, y los dos van por las
+franjas de 20 px de fuera de las bandas, que estaban muertas. Batería **446/467
+en la caja**; los 21 que faltan son "no existe tal PNG", porque en la caja no
+está `assets/`.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**En una sesión remota se puede lanzar Godot, y CON VENTANA.** La receta está en
-`CLAUDE.md`, "Godot". **Lo visual se mira, no se deduce**, y la arena NO SE HA
-MIRADO todavía: eso es lo primero de la próxima sesión.
+**Y NADIE HA VISTO ESTO DIBUJADO.** La receta para lanzar Godot con ventana en
+sesión remota está en `CLAUDE.md`, "Godot". Es lo primero de la próxima sesión.
 
-**Lo que manda ahora**: jugar la caza y decidir si se entra demasiado poco. Ver
-"Siguiente" 0h.
+## FUERA LOS PINES: LA PLANTA ALTA ES UNA MESA (tanda 0g)
 
-## LA ZONA ALTA YA SE JUEGA (tanda 0g)
+Dos correcciones de Daniel, las dos jugando o mirando, y las dos cambiaron la
+tanda entera.
 
-Lo corrigió Daniel a mitad de la tanda anterior, y tenía razón: **el mapa tiene
-que ser jugable por la zona de las rampas, no hasta el techo que teníamos.**
-Estaba escrito desde el principio y lo habíamos pasado por alto — `DISEÑO.md` §7
-lista un tiro llamado **umbral alto** que "abre el modo de caza", y §5 dice que
-los monstruos de la zona alta sueltan material de desbloqueo, que el modo dura un
-tiempo limitado, que el reloj del enemigo sigue corriendo mientras estás arriba, y
-que eso es lo que **"le da sentido a la zona alta, que hasta ahora era un
-pasillo"**.
+**La primera:** *"el mapa tiene que ser jugable por la zona de las rampas, no el
+límite de techo que tenemos"*. Estaba escrito desde el principio y lo habíamos
+pasado por alto — `DISEÑO.md` §7 lista un tiro llamado **umbral alto** que "abre
+el modo de caza" y §5 remata con *"y le da sentido a la zona alta, que hasta
+ahora era un pasillo"*. Pasillo era literal: por encima del arco no había un solo
+colisionador.
 
-Pasillo era literal: por encima del arco no había un solo colisionador. 530 px de
-mesa que solo cruzaban curvas.
-
-### Por qué es un PISO y no la misma mesa estirada
-
-No es gusto, es aritmética, y son los dos números que mandan en todo lo demás:
-
-- **La bola no sube.** Con gravedad 1750 y tope de 1500 px/s sube 643 px, así que
-  desde las palas no pasa de y=557 aunque no hubiera techo.
-- **Y bajar cayendo no se caza.** Una caída libre desde la altura de las rampas
-  llega a las palas a **1500 px/s, o sea 67 ms de ventana**. El cañón ya se tuvo
-  que ablandar a la mitad porque 900 px/s —111 ms— era "un tiro imposible, o sea
-  perder la bola con pasos extra".
-
-Por eso la arena tiene su propio techo, sus paredes y su propio suelo, y se entra
-y se sale por recorrido. Entre el fondo del embudo (y=648) y el arco de abajo
-(y=660) quedan 12 px de nada: **los dos pisos no se comunican por gravedad.**
+**La segunda, sobre el campo de pines que monté a la primera:** *"el pachinko es
+literalmente que caiga la bola, y que luego no pase de la primera línea"*. Es el
+diagnóstico exacto y se ve en la física: una rejilla es un **comedor de energía
+pasivo** —la primera fila se lleva la velocidad y el resto es caída—, así que no
+hay tiro, hay embudo. **Los pines están fuera del juego entero**, arena y bóveda.
+Lo que hace que una zona de pinball se juegue son palas.
 
 ### Lo que hay montado
 
-- **La arena**: techo de elipse igual que el arco de abajo, paredes de y=220 a
-  y=600, y un **embudo que es un trampolín** —las dos paredes inclinadas del
-  fondo son gomas—. Sin eso la bola cae, se posa, y la caza dura medio segundo:
-  aquí arriba no hay palas que la levanten
-- **43 pines** con el mismo generador y el mismo recorte que la bóveda. Aquí sí
-  pagan: es el único sitio de la mesa con hueco de sobra y sin pasillos de tiro
-  que tapar, porque arriba no se apunta a nada, se traquetea
-- **El umbral**, con la boca en (340,730) y `Premio.CAZA`. **No paga daño**: lo
-  que da es el modo, y el modo cuesta reloj. Si además pagara como el cañón sería
-  el tiro obligatorio
-- **El regreso**, que NO TIENE BOCA: no se entra en él, te mete la arena cuando
-  se acaba el tiempo. Una boca ahí sería un agujero en el suelo del piso de
-  arriba y la caza duraría lo que tarda la bola en encontrarlo
-- **Doce segundos de caza** con el reloj del enemigo corriendo, cuenta atrás en
-  el cartel del centro, y sonido prestado al entrar y al salir
+La planta alta es una mesa pequeña de verdad, y su zona de palas está **calcada
+de la de abajo a propósito**: esa zona costó tres sesiones de averías —la bola
+acuñada en el inlane, el slingshot que pateaba por la espalda, el outlane que
+tragaba demasiado— y copiarla es heredar los arreglos.
 
-### Y la boca está donde la puso la medida, no donde quedaba bonita
+- **Dos palas**, con las MISMAS teclas que las de abajo. Es lo que hace una
+  máquina real con un flipper superior: no se aprende un control nuevo, se
+  aprende una mesa nueva. Y no hay ambigüedad, porque el umbral no traga con
+  multibola y las dos plantas no se juegan a la vez
+- Slingshots, postes, carriles de retorno, dos giradores y outlanes
+- **Un racimo propio** (`_racimo` es ahora una función: los dos racimos heredan
+  la corrección de la cara de entrada)
+- **Dos bancos de targets, metidos hacia dentro** y no pegados a las bandas:
+  por fuera va la órbita, y una boca de recorrido a 20 px de un target se traga
+  la bola que acaba de rebotar en él
+- **Su propia órbita corta**, bidireccional, por fuera de los bancos. Es lo que
+  hace que arriba se APUNTE en vez de aguantar: sin un tiro largo, una mesa
+  pequeña es un pasillo con palas
+- **Un embudo que lleva al desagüe**, y drenar arriba no cuesta vida: cuesta la
+  caza
 
-Empezó en el centro, bajo el vértice del arco. **Cero entradas en 240**, y el
-motivo es que el bumper de arriba del racimo está en (200,769) y tapa el pasillo
-central entero. Repartido por bandas, de 240 entradas al racimo:
+### Las dos franjas muertas, que las cazó Daniel mirando el dibujo
 
-| banda x | y<700 | y<730 | y<760 | y<790 |
-|---|---|---|---|---|
-| 20..90 | 0 | 0 | 0 | 1 |
-| 90..150 | 0 | 0 | 3 | 4 |
-| **150..250** (el centro) | 1 | 1 | 1 | 1 |
-| 250..310 | 0 | 0 | 3 | 3 |
-| **310..380** (la banda derecha) | 0 | **8** | **9** | **10** |
+Entre la pared de cada banda y el borde de la mesa quedaban **20 px sin usar**,
+de arriba abajo de las dos plantas. Son 20 px para una bola de 18: **un carril
+exacto**. Ahí van ahora los dos recorridos que unen las plantas — el umbral sube
+pegado a la derecha y el regreso baja pegado a la izquierda, como los habitrails
+de alambre de una máquina de verdad. Y de paso se arregla otra cosa: cruzando por
+dentro, esas curvas se dibujaban encima del racimo y de los targets.
 
-Y tampoco se puede poner en la línea de tiro de una pala, aunque sea lo que pide
-`DISEÑO.md` §7: medido, el mejor tiro desde la cuna izquierda muere en (104,751)
-y el de la derecha en (296,751), y **las dos líneas ya acaban en una boca** —el
-retorno en (95,790) y el cañón en (305,790)—. Una boca por encima de esas no se
-alcanza nunca, porque la de abajo se traga la bola primero.
+### La caza ya no es un temporizador
 
-Así que el umbral es **el tiro que hay más allá de los bumpers**: no se apunta,
-se gana con una entrada buena al racimo.
+**Se acaba de dos maneras: drenando arriba o agotando el tiempo.** Con la versión
+de pines solo existía la segunda, y por eso daba igual lo que hicieras. Ahora
+aguantar la bola en la planta alta es la misma habilidad que abajo, y el tiempo
+(20 s) es el TECHO, no el final.
 
 ### Medido
 
 | Qué | Valor |
 |---|---|
-| Se abre la caza | **2 de cada 100 entradas al racimo** |
-| Pines por caza | 24,4 de media (36 la mejor, 5 la peor) |
-| Cazas con la bola muerta más de 1,5 s | 3 de 60 |
-| Cazas que no terminan | 0 de 60 |
+| Se abre la caza | **3 de cada 100 entradas al racimo** |
+| Golpes por caza (jugador que solo aporrea) | 8,3 de media, 24 el mejor |
+| Dura | 5,2 s con ese jugador; el tope son 20 |
+| Y acaba | **52 de 60 veces por DRENAR arriba**, ninguna por tiempo |
 | Al volver, llega a una pala | **60 de 60** |
-| Y llega a | **251 px/s · 662 ms** (un humano reacciona en 250) |
+| Y llega a | **211 px/s · 292 ms** (un humano reacciona en 250) |
 
-### Lo que NO está y hay que saberlo antes de jugar
+Ojo con el 292: con la salida a 0,35 y la boca 20 px más abajo salían **197 ms**,
+por debajo del umbral humano, que es exactamente el fallo que tenía el cañón
+antes de ablandarlo. Está ajustado contra el cronómetro, no a ojo.
+
+### Lo que NO está
 
 - **NO HAY BICHOS ARRIBA.** `DISEÑO.md` §5 dice que la zona alta es donde cazas
-  material de desbloqueo; lo que hay montado es el sitio y el modo, no la caza.
-  Hoy arriba se traquetea entre pines y punto. El desbloqueo es la tanda 9 de
-  `PROPÓSITO.md` §11 y sigue donde estaba
-- **No se ha mirado.** El código está escrito y la batería en verde, pero nadie
-  ha visto la arena dibujada. La cámara debería subir sola —`limite_arriba()` ya
-  vale 270 y la arena entra entera en los 540 px de alto visible— pero eso es un
-  cálculo, no una captura
-- **El umbral no traga con multibola**, a propósito: la cámara sigue a la bola
-  más baja, así que la caza pasaría entera fuera de plano
-- **El 2 % puede ser muy poco.** Es el número que hay que mirar después de jugar,
-  y los diales son `umbral_boca`, `umbral_entrada_radio` y
-  `umbral_velocidad_minima`, por ese orden
+  material de desbloqueo. Está el sitio y el modo, no la caza
+- **No se ha mirado dibujado.** La cámara debería subir sola —su límite superior
+  ya da de sí y la planta alta entra entera en los 540 px visibles— pero eso es
+  una cuenta, no una captura
+- **`assets/sonido/pin.wav` se queda huérfano**: era el sonido del campo de
+  pines. Se puede borrar; el bridge del escritorio no puede
+- **El 3 % puede ser muy poco.** Los diales, por orden: `umbral_boca`,
+  `umbral_entrada_radio`, `umbral_velocidad_minima`
 
 ## EL RACIMO ESTABA DE ESPALDAS (tanda 0f)
 

@@ -123,13 +123,26 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   alcanza, así que la bola entra SUBIENDO y la cara de entrada es la de abajo
   (`bumper_giro`, ago-2026). Estuvo del revés desde el principio con un
   comentario que decía "esto está medido": lo estaba, contra una bola que caía.
-- **Los pines NO empujan, y la bóveda se recorta sola.** El campo de pines se
-  genera desde `pin_paso` y `pin_alto_fila`, y `_cabe_pin` tira todo pin que no
-  deje aire contra lo que ya hay. Dos invariantes, y los dos los vigila la
-  batería: por todos los huecos tiene que caber la bola, y ningún pin puede tapar
-  una boca de recorrido ni el platillo. Un pin que empujara sería un bumper
-  pequeño y la bola se quedaría a vivir arriba.
-- **LA MESA TIENE DOS PISOS, y no se comunican por gravedad.** Encima del arco
+- **LA MESA TIENE DOS PLANTAS Y LAS DOS SON MESAS, con sus palas.** La planta
+  alta tiene dos palas —con las MISMAS teclas que las de abajo, como un flipper
+  superior de verdad—, racimo, bancos de targets, slingshots, giradores y órbita
+  propia. La primera versión era un campo de pines y Daniel la tumbó jugándola:
+  *"el pachinko es literalmente que caiga la bola, y que luego no pase de la
+  primera línea"*. **Una rejilla de pines es un comedor de energía pasivo**: la
+  primera fila se lleva la velocidad y el resto es caída, así que no hay tiro,
+  hay embudo. Lo que hace que una zona de pinball se juegue son palas.
+  Y su zona de palas está CALCADA de la de abajo a propósito: esa zona costó tres
+  sesiones de averías y copiarla es heredar los arreglos.
+- **Las dos franjas de 20 px de fuera de las bandas son CARRIL, no margen.** Una
+  bola mide 18. Ahí van el umbral (sube por la derecha) y el regreso (baja por la
+  izquierda), como los habitrails de una máquina real. Un recorrido que cruza el
+  campo por dentro se dibuja encima del racimo y de los targets y no se entiende.
+- **Todo lo que se cuente sobre `bumpers`, `bancos`, `giradores` o `rampas`
+  cuenta LAS DOS PLANTAS.** Media batería contaba "3 bumpers" y "2 bancos" y se
+  puso en rojo con la mesa perfecta: los huecos del racimo salían "entre 24 y
+  521", y el 521 era la distancia de un racimo al otro. Cualquier prueba de
+  geometría tiene que decir de qué planta habla.
+- **Y LAS DOS PLANTAS no se comunican por gravedad.** Encima del arco
   está la arena de caza (`DISEÑO.md` §5 y §7): su propio techo, sus paredes y su
   propio suelo, con 12 px de nada entre el fondo de su embudo y el arco de abajo.
   Se sube por el **umbral** y se baja por el **regreso**, y las dos son curvas.

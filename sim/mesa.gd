@@ -11,7 +11,6 @@ signal slingshot_golpeado(punto: Vector2, fuerza: float)
 signal poste_golpeado(punto: Vector2, fuerza: float)
 signal flipper_golpeado(punto: Vector2, fuerza: float)
 signal target_abatido(punto: Vector2, banco: int)
-signal pin_golpeado(punto: Vector2, fuerza: float)
 ## La caza: se abre al salir del umbral, se cierra sola cuando se acaba el
 ## tiempo. `Combate` las escucha para el aviso y para no parar el reloj.
 signal caza_empezada(punto: Vector2)
@@ -46,8 +45,18 @@ var p: ParametrosMesa
 var rng := RandomNumberGenerator.new()
 
 var colisionadores: Array[Colisionador] = []
+## LAS CUATRO PALAS. `flipper_izq` y `flipper_der` siguen siendo LAS DE ABAJO y
+## siguen llamándose igual a propósito: media batería y toda la vista las nombran
+## así, y renombrarlas no habría arreglado nada. Lo que se añade es la lista, que
+## es lo que recorre la física.
 var flipper_izq: Flipper
 var flipper_der: Flipper
+## Las de la planta alta. Van con las MISMAS TECLAS que las de abajo, que es lo
+## que hace una máquina real con un flipper superior: no se aprende un control
+## nuevo, se aprende una mesa nueva.
+var flipper_alto_izq: Flipper
+var flipper_alto_der: Flipper
+var flippers: Array[Flipper] = []
 
 ## LAS BOLAS QUE HAY EN LA MESA. Nunca está vacía: cuando no hay bola en juego
 ## queda una sola, con `viva = false`, que es exactamente el estado que había
@@ -80,9 +89,6 @@ var _drenadas: Array[Bola] = []
 var arco := PackedVector2Array()
 ## Solo para dibujar: centros y radios de bumpers y postes.
 var bumpers: Array[Vector2] = []
-## Los pines de la bóveda, en el orden en el que se colocaron. Solo para dibujar
-## y para que las pruebas puedan medir el campo.
-var pines: Array[Vector2] = []
 var postes: Array[Vector2] = []
 ## Targets abatibles, agrupados en bancos. `activo` dice si están en pie.
 var targets: Array[Colisionador] = []
@@ -98,6 +104,10 @@ var regreso: int = -1
 ## El modo de caza está abierto, y cuánto le queda.
 var en_caza := false
 var caza_restante: float = 0.0
+## Si la última caza acabó porque drenaste arriba (true) o porque se agotó el
+## tiempo (false). Lo lee el cartel: no es lo mismo "se acabó" que "la has
+## perdido", y contar las dos igual sería quitarle el mérito a aguantar.
+var caza_por_drenaje := false
 var platillos: Array[Platillo] = []
 
 var carga_lanzador: float = 0.0
@@ -260,15 +270,8 @@ func _construir() -> void:
 	_platillo(_v(70, 170), Vector2(0.75, 1.0))
 
 	# --- LA ZONA ALTA: la arena de caza ---
-	# Va antes que los pines porque los pines se recortan contra ella.
 	_arena()
 	_umbral_y_regreso()
-
-	# --- El campo de pines, y va EL ÚLTIMO a propósito ---
-	# Se coloca contra lo que ya hay: cada pin mide su hueco contra todos los
-	# colisionadores, platillos y bocas puestos antes, y si no llega no se pone.
-	# Construirlo antes obligaría a repetir aquí la geometría de media mesa.
-	_campo_pines()
 
 	flipper_izq = Flipper.new(
 		p.flipper_eje_izq, p.flipper_longitud, p.flipper_radio, p.flipper_rebote,
@@ -282,13 +285,26 @@ func _construir() -> void:
 		p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
 
+	# LAS DE LA PLANTA ALTA. Mismo largo, mismo ángulo y misma velocidad que las
+	# de abajo: la planta alta se aprende como mesa, no como control.
+	flipper_alto_izq = Flipper.new(
+		Vector2(p.flipper_eje_izq.x, p.arena_y_pala), p.flipper_longitud,
+		p.flipper_radio, p.flipper_rebote,
+		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
+	flipper_alto_der = Flipper.new(
+		Vector2(p.flipper_eje_der.x, p.arena_y_pala),
+		p.flipper_longitud_der if p.flipper_longitud_der > 0.0 else p.flipper_longitud,
+		p.flipper_radio, p.flipper_rebote,
+		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
+	flippers = [flipper_izq, flipper_der, flipper_alto_izq, flipper_alto_der]
+
 	# El rozamiento se reparte aquí, al final y en un solo sitio: cada superficie
 	# lo hereda de su tipo y así no hay que pasarlo por los treinta sitios en los
 	# que se crea un colisionador.
 	for c in colisionadores:
 		c.friccion = p.friccion_de(c.tipo)
-	flipper_izq.friccion = p.friccion_flipper
-	flipper_der.friccion = p.friccion_flipper
+	for f in flippers:
+		f.friccion = p.friccion_flipper
 
 func _construir_arco() -> void:
 	# Elipse centro (200,130), rx 180, ry 70. De (380,130) a (20,130) por arriba.
@@ -338,11 +354,7 @@ func _bumper(centro: Vector2) -> Colisionador:
 ## entra SUBIENDO y la cara de entrada es la de abajo. `bumper_giro` lo cuenta
 ## entero, con la tabla.
 func _racimo_bumpers() -> void:
-	var lado := p.bumper_hueco + p.bumper_radio * 2.0
-	var radio_racimo := lado / sqrt(3.0)          # del centro a cada vértice
-	for i in 3:
-		var ang := PI * 0.5 + deg_to_rad(p.bumper_giro) + float(i) * TAU / 3.0
-		_bumper(p.bumper_centro + Vector2(cos(ang), sin(ang)) * radio_racimo)
+	_racimo(p.bumper_centro)
 
 ## Cada target es una PLANCHA, no un bolo: una cápsula tumbada a lo largo de la
 ## línea del banco (o sea, paralela a la pared), de `target_ancho` de cara y
@@ -415,73 +427,126 @@ func _girador(centro: Vector2) -> void:
 
 # --------------------------------------------------------- la zona alta
 
-## LA ARENA DE CAZA. `DISEÑO.md` §5 y §7: un tiro difícil abre el umbral, subes,
+## LA PLANTA ALTA. `DISEÑO.md` §5 y §7: un tiro difícil abre el umbral, subes,
 ## juegas arriba un tiempo limitado con el reloj del enemigo corriendo, y bajas.
 ##
-## Es un PISO APARTE, no la misma mesa estirada, y la razón es aritmética: una
-## bola que cae libre desde aquí llega a las palas a 1500 px/s, o sea 67 ms de
-## ventana, y el cañón ya se tuvo que ablandar porque 900 px/s era incazable. La
-## arena tiene su propio techo, sus paredes y su propio suelo, y se sale de ella
-## por un carril, no cayendo.
+## Y ES UNA MESA, NO UN CAMPO DE PINES. La primera versión era una rejilla al
+## tresbolillo, y Daniel la tumbó jugándola con una frase que es el diagnóstico
+## entero: *"el pachinko es literalmente que caiga la bola, y que luego no pase
+## de la primera línea"*. Tenía razón y se ve en la física: una rejilla es un
+## comedor de energía pasivo —la primera fila se lleva la velocidad y el resto es
+## caída—, así que no hay tiro, hay embudo. **Lo que hace que una zona de pinball
+## se juegue son palas**, y aquí arriba hay dos.
 ##
-## Entre el fondo del embudo (y=648) y el arco de la mesa de abajo (y=660) quedan
-## 12 px de nada. No se comunican: la única forma de bajar es el regreso.
+## Es un PISO APARTE, no la misma mesa estirada, y eso sigue siendo aritmética:
+## la bola sube 643 px por sus medios (desde las palas de abajo, hasta y=557) y
+## una caída libre desde aquí llega abajo a 1500 px/s, o sea 67 ms, cuando el
+## cañón ya se tuvo que ablandar porque 900 px/s era incazable.
 func _arena() -> void:
-	var rx := ANCHO * 0.5 - 20.0
 	var cx := ANCHO * 0.5
-	# El techo, teselado igual que el arco de abajo para que las dos mitades de
-	# la mesa se lean como la misma mesa.
+	var rx := cx - 20.0
+	var yp := p.arena_y_pala
+
+	# El techo, teselado igual que el arco de abajo para que las dos plantas se
+	# lean como la misma mesa.
 	for i in SEGMENTOS_ARCO:
 		var t0 := PI * float(i) / float(SEGMENTOS_ARCO)
 		var t1 := PI * float(i + 1) / float(SEGMENTOS_ARCO)
 		_pared(
 			Vector2(cx + rx * cos(t0), p.arena_hombro_y - p.arena_techo_ry * sin(t0)),
 			Vector2(cx + rx * cos(t1), p.arena_hombro_y - p.arena_techo_ry * sin(t1)))
-	# Las paredes rectas.
-	_pared(Vector2(20.0, p.arena_hombro_y), Vector2(20.0, p.arena_suelo_y))
-	_pared(Vector2(ANCHO - 20.0, p.arena_hombro_y), Vector2(ANCHO - 20.0, p.arena_suelo_y))
-	# EL EMBUDO ES UN TRAMPOLÍN. Si fuera pared, la bola caería, se posaría y la
-	# caza duraría medio segundo: aquí arriba no hay palas que la levanten.
-	var media := p.arena_rellano * 0.5
-	_trampolin(Vector2(20.0, p.arena_suelo_y), Vector2(cx - media, p.arena_fondo_y))
-	_trampolin(Vector2(ANCHO - 20.0, p.arena_suelo_y), Vector2(cx + media, p.arena_fondo_y))
-	# Y el rellano del fondo, que es donde la bola se posa cuando se le acaba el
-	# tiempo. Pared normal: si también empujara, no se posaría nunca.
-	_pared(Vector2(cx - media, p.arena_fondo_y), Vector2(cx + media, p.arena_fondo_y))
 
-## Goma de la arena. Mira SIEMPRE hacia arriba, y esa es la diferencia con
-## `_slingshot`: aquel orienta la cara hacia el centro horizontal de la mesa,
-## que es lo que quiere una banda vertical y lo contrario de lo que quiere un
-## suelo. Con la cara hacia el centro, el embudo escupiría la bola de lado
-## contra la pared en vez de devolverla al campo.
-func _trampolin(a: Vector2, b: Vector2) -> Colisionador:
-	var c := Colisionador.new(a, b, 0.0, Colisionador.Tipo.SLINGSHOT,
-		p.arena_rebote, p.arena_empuje, p.arena_velocidad_minima)
-	var d := (b - a).normalized()
-	var perp := Vector2(-d.y, d.x)
-	if perp.y > 0.0:
-		perp = -perp
-	c.cara = perp
-	colisionadores.append(c)
-	return c
+	# Las bandas, y bajan POR DEBAJO de las palas: ese tramo es la pared de fuera
+	# del outlane, igual que abajo. Cortarlas a la altura de las palas dejaría a
+	# la bola salirse de lado por el hueco.
+	_pared(Vector2(20.0, p.arena_hombro_y), Vector2(20.0, yp + 30.0))
+	_pared(Vector2(ANCHO - 20.0, p.arena_hombro_y), Vector2(ANCHO - 20.0, yp + 30.0))
 
-## EL UMBRAL Y EL REGRESO, y son las dos mitades de la misma idea: a la arena no
-## se llega ni se sale por gravedad, porque la bola no sube 540 px por sus medios
-## (el tope da 643 px desde las palas, o sea y=557) y bajarlos cayendo llega a
-## 1500 px/s, que no se caza.
+	# --- La zona de palas, calcada de la de abajo y por buenas razones ---
+	# La de abajo costó tres sesiones de averías —la bola acuñada en el inlane,
+	# el slingshot que pateaba por la espalda, el outlane que tragaba demasiado—
+	# y todas están resueltas en esas seis líneas. Copiarlas es heredar los
+	# arreglos; inventarse otra zona de palas es volver a comprarlos.
+	_pared(Vector2(20.0 + p.ancho_outlane, yp - 86.0), Vector2(99.0, yp - 16.0))
+	_slingshot(Vector2(64.0, yp - 112.0), Vector2(117.0, yp - 42.0))
+	_poste(Vector2(102.0, yp - 4.0))
+	_pared(Vector2(ANCHO - 20.0 - p.ancho_outlane, yp - 88.0), Vector2(301.0, yp - 16.0))
+	_slingshot(Vector2(318.0, yp - 108.0), Vector2(278.0, yp - 44.0))
+	_poste(Vector2(298.0, yp - 4.0))
+
+	# --- Un racimo propio, arriba del todo ---
+	# Dos bumpers en la cara de entrada, que aquí también es la de abajo: a la
+	# planta alta se sube igual que a la de abajo, tirando desde una pala.
+	_racimo(p.arena_bumper_centro)
+
+	# --- Dos bancos de targets, y NO pegados a las bandas ---
+	# Abajo van pegados porque por fuera queda un carril de 23 px. Aquí por fuera
+	# va la ÓRBITA, y una boca de recorrido a 20 px de un target se traga la bola
+	# que acaba de rebotar en él. Metidos hacia dentro, el carril de la órbita
+	# queda limpio y los bancos se leen como lo que son: un tiro del centro.
+	_banco_targets(Vector2(100.0, p.arena_y_targets),
+		Vector2(100.0, p.arena_y_targets + 80.0), 3)
+	_banco_targets(Vector2(ANCHO - 100.0, p.arena_y_targets),
+		Vector2(ANCHO - 100.0, p.arena_y_targets + 80.0), 3)
+
+	# --- Un girador en cada carril de retorno ---
+	_girador(Vector2(87.0, yp - 55.0))
+	_girador(Vector2(ANCHO - 100.0, yp - 55.0))
+
+	# --- Y la órbita corta: el tiro largo de la planta ---
+	# Va por fuera de los bancos, pegada a las bandas, y da la vuelta por encima
+	# del racimo. Es lo que hace que aquí arriba se APUNTE en vez de aguantar:
+	# sin un tiro largo, una mesa pequeña es un pasillo con palas. Bidireccional,
+	# como la de abajo: entras por un lado y sales por el otro.
+	var o := Rampa.new(PackedVector2Array([
+		Vector2(42.0, yp - 120.0),
+		Vector2(34.0, 400.0), Vector2(36.0, 320.0), Vector2(60.0, 262.0),
+		Vector2(120.0, 226.0), Vector2(200.0, 216.0), Vector2(280.0, 226.0),
+		Vector2(340.0, 262.0), Vector2(364.0, 320.0), Vector2(366.0, 400.0),
+		Vector2(358.0, yp - 120.0),
+	]))
+	o.entrada_radio = p.rampa_entrada_radio
+	o.velocidad_minima = p.arena_orbita_velocidad_minima
+	o.nombre = "orbita_alta"
+	o.premio = Rampa.Premio.MULTIPLICADOR
+	rampas.append(o)
+
+	# --- El suelo: un embudo que lleva al desagüe ---
+	# No es una pared que pare la bola, es por donde se va. Drenar en la planta
+	# alta no cuesta vida: cuesta la caza, que es exactamente el castigo que
+	# tiene que tener.
+	_pared(Vector2(20.0, yp + 30.0), Vector2(cx - 40.0, p.arena_fondo_y))
+	_pared(Vector2(ANCHO - 20.0, yp + 30.0), Vector2(cx + 40.0, p.arena_fondo_y))
+
+## El mismo triángulo del racimo de abajo, en el sitio que se le diga. Se saca a
+## función porque ahora hay dos, y porque `bumper_giro` —que es la corrección de
+## la cara de entrada— tiene que valer para los dos igual.
+func _racimo(centro: Vector2) -> void:
+	var lado := p.bumper_hueco + p.bumper_radio * 2.0
+	var radio_racimo := lado / sqrt(3.0)
+	for i in 3:
+		var ang := PI * 0.5 + deg_to_rad(p.bumper_giro) + float(i) * TAU / 3.0
+		_bumper(centro + Vector2(cos(ang), sin(ang)) * radio_racimo)
+
+## EL UMBRAL Y EL REGRESO, y son las dos mitades de la misma idea: a la planta
+## alta no se llega ni se sale por gravedad.
 func _umbral_y_regreso() -> void:
 	# EL UMBRAL. Boca pegada a la banda derecha, que es el único sitio por el que
 	# la bola sube de verdad: el bumper de abajo a la derecha del racimo la
 	# escupe hacia allí. El porqué entero, con la tabla por bandas, está en
-	# `umbral_boca`. Sube pegado a la banda y cruza el techo de la arena para
-	# soltar la bola arriba a la izquierda, apuntando hacia dentro: así la visita
-	# empieza cayendo por los pines y no pegada a una pared.
+	# `umbral_boca`.
+	#
+	# Y SUBE POR FUERA DE LA BANDA, por la franja de 20 px que quedaba muerta
+	# entre la pared y el borde de la mesa. Son 20 px para una bola de 18: es un
+	# carril exacto, y es lo que hace una máquina de verdad — el habitrail va por
+	# el borde, no cruzando el campo. Cruzando por dentro, la curva se dibujaba
+	# encima del racimo y de los targets y no se entendía nada.
 	umbral = rampas.size()
 	var r := Rampa.new(PackedVector2Array([
 		p.umbral_boca,
-		Vector2(348, 660), Vector2(344, 580), Vector2(330, 500),
-		Vector2(300, 420), Vector2(255, 350), Vector2(200, 300),
-		Vector2(145, 280), Vector2(110, 300),
+		Vector2(376, 706), Vector2(390, 660), Vector2(391, 560),
+		Vector2(391, 440), Vector2(390, 330), Vector2(378, 258),
+		Vector2(344, 218), Vector2(295, 228),
 	]))
 	r.entrada_radio = p.umbral_entrada_radio
 	r.velocidad_minima = p.umbral_velocidad_minima
@@ -492,18 +557,15 @@ func _umbral_y_regreso() -> void:
 	rampas.append(r)
 
 	# EL REGRESO, y NO TIENE BOCA a propósito: `velocidad_minima` imposible, así
-	# que `sentido_entrada` no lo coge nunca. No se entra en él, te mete la arena
-	# cuando se acaba el tiempo (`_terminar_caza`). Una boca aquí sería un agujero
-	# en el suelo del piso de arriba, y entonces la caza duraría lo que tarda la
-	# bola en encontrarlo.
+	# que `sentido_entrada` no lo coge nunca. No se entra en él, te mete la
+	# planta alta cuando drenas ahí arriba o cuando se acaba el tiempo. Baja por
+	# la franja izquierda y devuelve la bola posada en el inlane.
 	regreso = rampas.size()
 	var g := Rampa.new(PackedVector2Array([
-		# Arranca 24 px por encima del rellano: una boca a 8 px dejaría el punto
-		# de partida DENTRO del colisionador del suelo —la bola mide 9 de radio—
-		# y la bola aparecería empotrada. Hay una prueba que lo vigila.
 		Vector2(ANCHO * 0.5, p.arena_fondo_y - 24.0),
-		Vector2(170, 700), Vector2(130, 780), Vector2(95, 860),
-		Vector2(72, 940), Vector2(66, 1010), Vector2(70, 1060),
+		Vector2(120, 640), Vector2(40, 672), Vector2(11, 730),
+		Vector2(9, 840), Vector2(9, 940), Vector2(12, 990),
+		Vector2(30, 1024), Vector2(58, 1034),
 	]))
 	g.entrada_radio = p.rampa_entrada_radio
 	g.velocidad_minima = INF
@@ -522,15 +584,17 @@ func _empezar_caza(punto: Vector2) -> void:
 	caza_restante = p.caza_tiempo
 	caza_empezada.emit(punto)
 
-## Se acaba el tiempo: todo lo que esté en la arena se va por el regreso. Se
-## empuja en vez de esperar a que la bola encuentre la salida, y por dos razones:
-## el modo tiene que durar LO QUE DICE, y una bola dando botes en un embudo con
-## gomas puede tardar en pasar por un agujero lo que le dé la gana.
-func _terminar_caza() -> void:
+## LA CAZA SE ACABA DE DOS MANERAS, y esa es la diferencia entre una mesa y un
+## paseo: **drenando ahí arriba** —o sea, jugando mal— o **agotando el tiempo**.
+## Con la versión de pines solo existía la segunda, y por eso daba igual lo que
+## hicieras: la rejilla te devolvía abajo pasaras lo que pasaras. Ahora aguantar
+## la bola en la planta alta es la habilidad que se premia, igual que abajo.
+func _terminar_caza(por_drenaje: bool = false) -> void:
 	if not en_caza:
 		return
 	en_caza = false
 	caza_restante = 0.0
+	caza_por_drenaje = por_drenaje
 	var punto := Vector2(ANCHO * 0.5, p.arena_fondo_y)
 	for b in bolas:
 		if b.viva and b.libre() and en_la_arena(b):
@@ -544,8 +608,8 @@ func _meter_en_regreso(b: Bola) -> void:
 	var r := rampas[regreso]
 	b.rampa = regreso
 	b.rampa_sentido = 1
-	# Velocidad FIJA, no la que traía: una caza que acaba con la bola posada en
-	# el rellano tardaría siglos en bajar los 400 px del carril.
+	# Velocidad FIJA, no la que traía: una caza que acaba con la bola posada
+	# tardaría siglos en bajar los 400 px del carril.
 	b.rampa_velocidad = p.regreso_velocidad
 	b.rampa_distancia = 0.0
 	b.pos = r.punto_en(0.0)
@@ -554,144 +618,34 @@ func _meter_en_regreso(b: Bola) -> void:
 
 ## Una bola está arriba si está por encima del arco de la mesa de abajo. Es la
 ## frontera de verdad: entre el fondo del embudo y el arco no hay nada, así que
-## cualquier bola libre por encima de ahí solo puede estar en la arena.
+## cualquier bola libre por encima de ahí solo puede estar en la planta alta.
 func en_la_arena(b: Bola) -> bool:
 	return b.pos.y < p.arena_fondo_y + 6.0
 
 func _avanzar_caza(h: float) -> void:
 	if not en_caza:
 		return
+	# EL DRENAJE DE ARRIBA VA ANTES QUE EL RELOJ. Es una línea, no una boca:
+	# una boca se puede esquivar cayendo por su lado y entonces la bola se queda
+	# en el hueco entre las dos plantas, que es un sitio del que no se sale.
+	for b in bolas:
+		if b.viva and b.libre() and b.pos.y > p.arena_drenaje_y \
+				and b.pos.y < p.arena_fondo_y + 40.0:
+			_terminar_caza(true)
+			return
 	caza_restante -= h
 	if caza_restante <= 0.0:
-		_terminar_caza()
+		_terminar_caza(false)
 
-# ------------------------------------------------------------ campo de pines
-
-## LA BÓVEDA. Rejilla al tresbolillo bajo el arco y por encima del racimo: la
-## bola sale disparada de un bumper, traquetea entre los pines y vuelve a caer
-## al racimo, que la vuelve a subir. Es lo de Peglin y lo del pachinko, y es el
-## sitio más barato de la mesa donde pasan muchas cosas seguidas.
-##
-## POR QUÉ NO SE VA DE LAS MANOS, que era el miedo: los pines no empujan. Un
-## bumper con `bumper_rebote` por encima de 1 fabricaba energía y la bola se
-## quedaba a vivir arriba (está en el comentario de ese parámetro); aquí cada
-## toque QUITA, así que la bóveda se vacía sola por gravedad.
-##
-## La rejilla se genera, no se escribe a mano, y se recorta con `_cabe_pin`: un
-## pin que no deje `pin_holgura` px de aire contra lo que ya hay no se coloca.
-## Por eso la fila de en medio se abre justo encima del racimo —ahí no cabe— y
-## queda el embudo que devuelve la bola a los bumpers.
-##
-## SIMÉTRICO O NINGUNO. Si un lado no cabe, su espejo tampoco se pone. Un campo
-## de pines torcido no se lee como una decisión, se lee como un fallo, y la
-## asimetría de esta mesa la ponen el platillo y las bocas, que ya están.
-## Y SON DOS GRUPOS, NO UNO, Y ESO LO DECIDIÓ LA MEDIDA. La bóveda sola era
-## decoración: el tiro desde la cuna —el único repetible que tiene la mesa—
-## sube a y=894 de media y a y=751 el mejor de todos, o sea que no llega a la
-## fila de abajo de la bóveda ni en su mejor día. Medido con las dos palas y 21
-## posiciones de cuna: 0 de 42 tiros tocaban un pin.
-##
-## El cedazo va donde la bola SÍ pasa: la banda de y=875, que la cruza todo lo
-## que baja de la zona alta. La bóveda se queda igualmente porque cuesta cero y
-## sí se toca desde el racimo y desde las salidas de recorrido, pero quien paga
-## las cuentas es el cedazo.
-func _campo_pines() -> void:
-	for f in p.pin_filas:
-		_fila_de_pines(p.pin_y + float(f) * p.pin_alto_fila, f % 2 == 1)
-	for f in p.pin_cedazo_filas:
-		_fila_de_pines(p.pin_cedazo_y + float(f) * p.pin_alto_fila, f % 2 == 1)
-	# Y LA ARENA, con el mismo generador y el mismo recorte. Aquí sí paga: es el
-	# único sitio de la mesa con hueco de sobra y sin pasillos de tiro que tapar,
-	# porque arriba no se apunta a nada, se traquetea.
-	for f in p.pin_arena_filas:
-		_fila_de_pines(p.pin_arena_y + float(f) * p.pin_alto_fila, f % 2 == 1)
-
-func _fila_de_pines(y: float, desplazada: bool) -> void:
-	var desfase: float = p.pin_paso * 0.5 if desplazada else 0.0
-	var k := 0
-	while true:
-		var dx := desfase + float(k) * p.pin_paso
-		var izq := ANCHO * 0.5 - dx
-		var der := ANCHO * 0.5 + dx
-		if izq <= 0.0 or der >= ANCHO:
-			break
-		if _cabe_pin(Vector2(izq, y)) and _cabe_pin(Vector2(der, y)):
-			_pin(Vector2(izq, y))
-			if dx > 0.0:
-				_pin(Vector2(der, y))
-		k += 1
-
-func _pin(centro: Vector2) -> Colisionador:
-	var c := Colisionador.new(centro, centro, p.pin_radio, Colisionador.Tipo.PIN,
-		p.pin_rebote, 0.0, p.pin_velocidad_minima)
-	colisionadores.append(c)
-	pines.append(centro)
-	return c
-
-func _cabe_pin(centro: Vector2) -> bool:
-	return hueco_libre(centro, p.pin_radio) >= p.pin_holgura
-
-## Cuánto aire queda entre un círculo de radio `radio` puesto en `centro` y lo
-## más cercano que ya haya en la mesa. Negativo si se solapan.
-##
-## Cuenta los colisionadores, los platillos y las BOCAS de los recorridos. Las
-## bocas no son colisionadores —una rampa es una curva— pero capturan la bola,
-## así que tapar una con un pin sería quitar un tiro de la mesa sin que nada
-## diera error.
+## Cuánto aire queda entre un círculo puesto en `centro` y lo más cercano que ya
+## haya en la mesa. Negativo si se solapan. Lo usan las pruebas de la planta alta
+## para comprobar que no hay rincones donde acuñar la bola.
 func hueco_libre(centro: Vector2, radio: float) -> float:
 	var menor := INF
 	for c in colisionadores:
 		menor = minf(menor,
 			centro.distance_to(c.punto_mas_cercano(centro)) - c.radio - radio)
-	for pl in platillos:
-		menor = minf(menor, centro.distance_to(pl.centro) - pl.radio - radio)
-	for r in rampas:
-		if r.puntos.is_empty():
-			continue
-		# SOLO LAS BOCAS QUE TRAGAN. El final de un recorrido de un solo sentido
-		# es una SALIDA, no una boca: `sentido_entrada` ni lo mira. Guardarlo
-		# también costaba catorce pines de la arena por proteger un sitio por el
-		# que no se entra.
-		menor = minf(menor,
-			centro.distance_to(r.puntos[0]) - r.entrada_radio - radio)
-		if r.bidireccional:
-			menor = minf(menor,
-				centro.distance_to(r.puntos[r.puntos.size() - 1]) - r.entrada_radio - radio)
 	return menor
-
-## EL INVARIANTE DE LA BÓVEDA, en un número: el hueco de paso más estrecho que
-## deja el campo, contra otro pin y contra cualquier otra cosa sólida de la
-## mesa. Si baja de los 18 que mide la bola, la bóveda deja de ser un campo de
-## pines y pasa a ser un sitio donde acuñarse. Lo vigila la batería, porque el
-## campo se GENERA y tocar `pin_paso` o `pin_alto_fila` lo rehace entero.
-##
-## No entran ni platillos ni bocas: por ahí la bola no pasa, se la tragan. Que
-## un pin no las tape ya lo decide `_cabe_pin` al colocarlo.
-func paso_minimo_pines() -> float:
-	var menor := INF
-	for i in pines.size():
-		var pin: Vector2 = pines[i]
-		for j in range(i + 1, pines.size()):
-			menor = minf(menor,
-				pin.distance_to(pines[j]) - p.pin_radio * 2.0)
-		for c in colisionadores:
-			if c.tipo == Colisionador.Tipo.PIN:
-				continue
-			menor = minf(menor,
-				pin.distance_to(c.punto_mas_cercano(pin)) - c.radio - p.pin_radio)
-	return menor
-
-## El pin más cercano a un punto de contacto, para que la vista sepa cuál
-## encender. -1 si no hay ninguno cerca.
-func pin_mas_cercano(punto: Vector2) -> int:
-	var mejor := -1
-	var mejor_d := INF
-	for i in pines.size():
-		var d: float = (pines[i] as Vector2).distance_squared_to(punto)
-		if d < mejor_d:
-			mejor_d = d
-			mejor = i
-	return mejor
 
 ## Los giradores no colisionan: la bola los atraviesa. Se disparan al ENTRAR,
 ## una vez por pasada, así que mientras la bola siga dentro no vuelven a avisar.
@@ -883,8 +837,8 @@ func avanzar(dt: float) -> void:
 		_subpaso(h)
 
 func _subpaso(h: float) -> void:
-	flipper_izq.avanzar(h)
-	flipper_der.avanzar(h)
+	for f in flippers:
+		f.avanzar(h)
 	_avanzar_bancos(h)
 	# EL ATRAPE ES DE LA MESA, NO DE UNA BOLA: se reinicia una vez por subpaso y
 	# lo enciende cualquier bola que esté posada en una cuna. Antes se reiniciaba
@@ -1100,8 +1054,8 @@ func _colisionar(b: Bola, h: float) -> void:
 	_contactos.clear()
 	for c in colisionadores:
 		c.consultar(b.pos, b.vel, p.radio_bola, _contactos)
-	flipper_izq.consultar(b.pos, b.vel, p.radio_bola, _contactos)
-	flipper_der.consultar(b.pos, b.vel, p.radio_bola, _contactos)
+	for f in flippers:
+		f.consultar(b.pos, b.vel, p.radio_bola, _contactos)
 	if _contactos.is_empty():
 		return
 
@@ -1213,14 +1167,6 @@ func _avisar(c: Contacto, fuerza: float, empuje: float) -> void:
 		Colisionador.Tipo.BUMPER:
 			if empuje > 0.0:
 				bumper_golpeado.emit(c.punto, fuerza)
-		Colisionador.Tipo.PIN:
-			# El pin no empuja, así que el filtro no puede ser el empuje como en
-			# el bumper: es la velocidad de llegada. Y hace la misma faena, que
-			# es lo que importa: una bola apoyada en un pin llega al contacto
-			# con lo que le da la gravedad en un subpaso —1750/480 = 3,6 px/s—,
-			# muy por debajo del umbral, así que no repite el aviso.
-			if fuerza >= c.velocidad_minima:
-				pin_golpeado.emit(c.punto, fuerza)
 		Colisionador.Tipo.SLINGSHOT:
 			if empuje > 0.0:
 				slingshot_golpeado.emit(c.punto, fuerza)

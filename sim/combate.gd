@@ -165,7 +165,6 @@ func _init(parametros: ParametrosCombate = null, la_mesa: Mesa = null) -> void:
 	mesa.target_abatido.connect(_al_abatir_target)
 	mesa.banco_completado.connect(_al_completar_banco)
 	mesa.girador_girado.connect(_al_girar_girador)
-	mesa.pin_golpeado.connect(_al_golpear_pin)
 	mesa.caza_empezada.connect(_al_empezar_caza)
 	mesa.caza_terminada.connect(_al_terminar_caza)
 	mesa.rampa_salida.connect(_al_salir_de_rampa)
@@ -510,9 +509,6 @@ func _al_girar_girador(punto: Vector2, _indice: int, _fuerza: float) -> void:
 	_golpear(p.dano_girador, punto, true, _escala_relleno(),
 		bolsa.factor("factor_dano_relleno"))
 
-## El pin es relleno, como el bumper y el girador: paga poco y no escala con el
-## combo salvo que una reliquia lo encienda. Lo que decide si además SUMA combo
-## es `pin_suma_combo`, y por qué está ahí y no aquí lo cuenta ese parámetro.
 ## LA CAZA NO PARA EL RELOJ, y por eso estos dos ganchos no tocan `_temporizador`
 ## ni la fase. `DISEÑO.md` §5: "el modo dura un tiempo limitado y el reloj del
 ## enemigo sigue corriendo mientras estás arriba. Sin eso, cazar sería gratis."
@@ -526,11 +522,6 @@ func _al_empezar_caza(_punto: Vector2) -> void:
 
 func _al_terminar_caza(_punto: Vector2) -> void:
 	mision_cambiada.emit(mision())
-
-func _al_golpear_pin(punto: Vector2, _fuerza: float) -> void:
-	_apuntar("pin")
-	_golpear(p.dano_pin, punto, p.pin_suma_combo, _escala_relleno(),
-		bolsa.factor("factor_dano_relleno"))
 
 ## Lo que cobra CUALQUIER recorrido completado: rampas y platillo. Va aparte del
 ## daño porque no todas las reliquias de recorrido pagan en daño —una cura, otra
