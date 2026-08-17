@@ -311,6 +311,257 @@ con la que se hizo.** Si la prueba escoge ella misma la dirección del impacto,
 la prueba está eligiendo el resultado.
 
 
+### En un prompt con imagen de referencia, GANA EL TEXTO (ago-2026)
+
+Dos hojas quemadas por lo mismo, con una semana de diferencia:
+
+1. El prompt de las criaturas adjuntaba `cr_brasa.png` como *"exact reference"* y
+   a la vez ordenaba *"no bell, no circular outline of any kind"*. La referencia
+   ERA una campana.
+2. El prompt de `cr_calavera` decía *"a small skull with a flame burning behind
+   its eye sockets"*, y `cr_calavera.png` **no tiene fuego por ningún lado** —
+   medidos sus colores son todos piedra y hueso, cero rojos. Esa frase es del
+   enemigo `calavera_llameante`. Salió una calavera ardiendo, sin manos, con la
+   silueta del cráneo cortada por las llamas.
+
+Las nueve descripciones estaban escritas **desde los identificadores**, no
+mirando los nueve PNG. Comprobadas una a una: tres describían a otro bicho
+(`cr_calavera` sin fuego, `cr_diablillo` que es un gato gris sin cuernos,
+`cr_espectro` que es un blob violeta de tres ojos y no un encapuchado) y tres
+más se quedaban a medias.
+
+> **La regla: la descripción dice QUÉ SE MUEVE, no QUÉ ES.** Qué es lo dice la
+> imagen. Cada adjetivo de aspecto en el texto es una oportunidad de
+> contradecirla, y cuando se contradicen gana el texto.
+
+**Y un rasgo que no nombras, el generador lo borra.** Ocho de las nueve
+criaturas tienen manos agarradas al borde del arco: son parte de la pose de
+asomarse, así que al mandar tirar el arco se quedan agarradas a nada y
+desaparecen. Hay que decir a qué se agarran.
+
+### NO SE PUEDE ITERAR UNA GENERACIÓN (ago-2026)
+
+Cuatro hojas de `cr_calavera` en una mañana, y la cuarta salió **peor** que la
+tercera. Medido:
+
+| | v3 | v4 |
+|---|---|---|
+| Línea de suelo | **61 en los ocho** | 60-61: el bicho flota |
+| Alto | **43-43, variación cero** | 45-46 |
+| Tonos de cuerpo | 7 | **8** |
+| Reflejo que parpadea | 85 % | **86 %** |
+
+O sea: **no arregló ninguna de las dos cosas que se le pidieron y rompió dos que
+ya estaban perfectas.** No es mala suerte, es cómo funciona: cada hoja nueva es
+**una tirada nueva**, no una edición de la anterior. El generador no refina,
+vuelve a dibujar de cero. Por eso ajustar el prompt y regenerar no sube una
+cuesta: te mueve a otro punto al azar de la misma distribución.
+
+**Lo que sí funciona:** meter TODAS las correcciones conocidas en UN prompt,
+generar **varias hojas de golpe con ese mismo prompt**, y elegir la mejor. Un
+tirón de cuatro tiradas iguales bate a cuatro tiradas distintas encadenadas.
+
+**Y guardar siempre la mejor hasta la fecha.** La v3 estuvo a punto de perderse
+porque la v4 parecía "la siguiente".
+
+### Post-procesar sí arregla lo mecánico (y no, lo mal dibujado)
+
+*Matiza la regla que quedó escrita demasiado ancha tras la v2.*
+
+- **NO se arregla con un script lo MAL DIBUJADO**: un personaje equivocado, diez
+  dedos que no caben en la celda, una pose que no es. Ahí se regenera.
+- **SÍ se arregla lo MECÁNICO**: tonos de más, un contorno que se redibuja, una
+  silueta que tiembla. Son fallos de repetición, y una máquina repite mejor que
+  un generador.
+
+`anim.py --pulir 3` hace las tres cosas: silueta por mayoría de los fotogramas,
+contorno duro al color más oscuro de la paleta, y cuerpo reducido a los N tonos
+más usados. La v3 de `cr_calavera` pasó de 7 tonos / 85 % de reflejo parpadeando
+/ 27 manchas sueltas a **3 tonos / 34 % / cero manchas**, y de no pasar la
+batería a pasarla entera. **Sin generar otra hoja.**
+
+No se le pasa a un bicho cuya gracia sea el degradado o el parpadeo, como la
+llama de `cr_brasa`.
+
+### Mira los sprites sobre GRIS, no sobre el fondo del juego
+
+Perdí un rato dando por perdida una versión pulida porque "había perdido el
+contorno". Lo tenía —luminancia 19,5, más oscuro que el original— pero el fondo
+de la previsualización era casi negro y un contorno negro sobre negro no existe.
+**El mosaico de revisión va sobre un gris medio** (`7A6B52` sirve), que es donde
+se ve a la vez la silueta y las luces.
+
+### El suelo de legibilidad a 64 px, y no se negocia (ago-2026)
+
+La segunda hoja de `cr_calavera` tenía el personaje bien —sin fuego, con manos,
+silueta cerrada— y **no valía**. Lo cazó Fátima: *«píxeles fuera de zona, dedos
+bug, mucho cambio de píxeles en la luz»*. Los tres, medidos:
+
+| Síntoma | Medido | Causa |
+|---|---|---|
+| La luz parpadea | **87 % del reflejo**: 172 px se encienden alguna vez, 23 en los ocho | **8 tonos de hueso** donde la guía pide 3 |
+| Píxeles sueltos por el borde | 116 px parpadeando en **22 manchas** | el contorno se redibuja cada fotograma |
+| Dedos ilegibles | la banda es **UN bloque** con 2 separaciones | ~10 dedos en 49 px = **4,9 px por dedo** |
+
+**El tercero no es un fallo de dibujo, es un límite del tamaño**, y por eso
+importa más que los otros dos: no se arregla insistiendo, se arregla pidiendo
+menos cosas más grandes.
+
+Los tres números que van en cualquier prompt de celda 64:
+
+- **Nada por debajo de 3 px de ancho se lee.** Un dedo de 2 px con hueco de 1 es
+  una banda gris.
+- **Máximo 3 tonos por superficie.** Ya está en el bloque A de `GUIA_ESTILO.md`;
+  cada tono de más es una frontera más que puede temblar entre fotogramas.
+- **Un reflejo especular es una FORMA FIJA**, no una zona que se redibuja.
+
+**Y probado y descartado como parche:** congelar el cráneo con
+`anim.py --congelar-arriba 38`. Funciona —el cambio por fotograma baja de 333 a
+207 px— pero entonces lo único que se mueve son los dedos, o sea que le da todo
+el protagonismo a lo peor dibujado. **Post-procesar no salva una hoja mala**, y
+conviene recordarlo antes de escribir más código de salvamento.
+
+### Un generador NO sabe repetir un dibujo ocho veces (ago-2026)
+
+Y por eso hay una parte que no se arregla con prompts. La segunda hoja de
+`cr_calavera` pedía *"everything else must be pixel-identical in all eight
+cells"* y aun así **el 20-42 % de los píxeles cambia entre fotogramas, con la
+silueta bailando entre 377 y 1.841 px**. A 64 px eso no se lee como animación,
+se lee como que el sprite hierve.
+
+**Descartado antes de culpar al arte:** que fuera el recorte. Se cortó a paso
+uniforme entero en vez de por centroide y sale igual, 49 % contra 51 %. El
+temblor viene de la hoja.
+
+Se arregla en la herramienta, no pidiendo otra hoja. `anim.py --estabilizar`
+(por defecto):
+
+- Calcula el fotograma **MODA** — el color más repetido de cada píxel a lo largo
+  del bucle. Ese es el dibujo que el generador intentaba repetir.
+- Cada fotograma conserva solo los píxeles que se apartan mucho de la moda; el
+  resto vuelve a ella. El movimiento de verdad se aparta mucho y sobrevive; el
+  ruido de redibujado se aparta poco y desaparece.
+- **Moda y no media**, porque son entradas de una paleta de 33 y promediar
+  inventaría colores que no están.
+- **Y nunca borra tinta**: solo devuelve a la moda un píxel opaco en los dos
+  sitios. Sin esa condición se comía las chispas sueltas de `cr_brasa`, que solo
+  salen en uno o dos fotogramas y son arte. Un píxel que aparece o desaparece es
+  movimiento por definición.
+
+Medido: la calavera pasa de 578 a 333 px de cambio por fotograma y el 87 % de la
+tinta vuelve a la moda; la llama conserva su movimiento (68 %).
+
+### El mapa de movimiento: contar píxeles no basta, hay que ver DÓNDE
+
+La hoja mala de `cr_calavera` cambiaba entre 867 y 1.293 px por fotograma —
+números buenísimos, iguales que los de la hoja buena de `cr_brasa`. Y estaba
+mal: se movía el cráneo entero en vez de solo las cuencas.
+
+`anim.py` saca `_movimiento.png`: pinta encima del primer fotograma qué píxeles
+cambian a lo largo del bucle. En `cr_brasa` se enciende el borde de la llama y el
+centro se queda oscuro; en la calavera se enciende **todo, mandíbula incluida**.
+
+**Se mira contra lo que pedía el prompt.** Si se ilumina algo que debía estar
+quieto, la hoja se vuelve a generar. Es de la misma familia que el mosaico antes
+de integrar: la comprobación que el ojo no hace solo.
+
+### Una tira de animación no se corta en rejilla fija (ago-2026)
+
+`procesar.py --tira N` parte la hoja entera en N columnas iguales, y eso da por
+hecho que el generador centró cada fotograma en su columna. **No lo hace.**
+Medido sobre la hoja de `cr_brasa`: las bases de las llamas caen a 15,6 / 9,1 /
+7,2 / 6,8 / 4,1 / 0,1 / −4,0 / −9,3 px del centro de su celda — **24,9 px de
+recorrido, 7,5 px a tamaño 64**. Un baile visible.
+
+Ojo, que `--tira` sigue siendo mejor que el recorte por silueta, que saca cada
+fotograma con la caja de su propio dibujo. El problema es que arregla la mitad.
+
+Lo correcto está en **`anim.py`**: ventana vertical común anclada al suelo,
+horizontal por el **centroide de la base** de cada fotograma (el 25 % inferior de
+la tinta), y **una sola escala** sacada del fotograma más alto. Centrar por la
+caja entera tampoco vale: se llevaría por delante el movimiento de las puntas,
+que es justo lo que se ha pedido dibujar.
+
+**Y una tira se comprueba contando cuánto cambia cada fotograma respecto al
+siguiente.** Ocho copias con un píxel movido no dan error y no se ven hasta que
+están en el juego. En `cr_brasa`: de 440 a 1.159 px de 4.096.
+
+### El halo del fondo se vuelve VIOLETA ARCANO al cuantizar (ago-2026)
+
+La hoja de `cr_brasa` salió con 61 px de arcano en una criatura de fuego, y
+`CONTEXTO.md` reserva ese violeta para lo mágico y lo pide con cuentagotas.
+
+No lo dibujó la IA: **el fondo magenta no acaba de golpe**. Deja un borde a 315°
+de tono con el fondo a 299,8°, y `procesar.py` corta a 14°, así que el halo
+sobrevive como dibujo y al cuantizar cae en el violeta.
+
+**Ensanchar el margen de tono NO lo arregla:** de 14° a 28° el arcano baja de
+5.585 px a 833 y se come 5.943 px de llama. El halo degrada hasta el rojo y no
+hay corte limpio.
+
+Lo que lo arregla: **sacar los dos violetas de la paleta al cuantizar** una hoja
+que no lleva magia. El halo cae al rojo más cercano, que es lo que debe ser el
+borde de una llama. `anim.py` lo hace por defecto; `--con-arcano` lo devuelve
+para `cr_espectro` y `cr_sombra`.
+
+*Y una hipótesis que se probó y era falsa, anotada para que no se vuelva a
+intentar: sangrar el color del objeto sobre el fondo antes de reducir, por si
+`Image.BOX` metía magenta en el borde al promediar RGB y alfa por separado.
+Cambia **0 px** — el umbral de alfa a 128 tira esos píxeles antes de que
+lleguen.*
+
+### Lo que se dibuje ENCIMA de la bola no se ve: mide 18 px (ago-2026)
+
+Lo destapó Fátima preguntando si en la ranura de los cascabeles cabía un peek. No
+cabe —la ranura es de **48 × 6 px** sobre celda de 64— pero el motivo de fondo es
+peor y vale para cualquier cosa que se plantee dibujar sobre la bola:
+
+| Dato | Dónde | Valor |
+|---|---|---|
+| Radio de la bola | `sim/parametros_mesa.gd:12` | `radio_bola = 9.0` → **18 px** |
+| Sprite y escala | `render/vista_mesa.gd:1340` | `bola.png` de 24, escala 0,9 |
+| La ranura, a tamaño de mesa | factor 0,28 | **13,5 × 1,7 px** |
+
+**A 18 px de una bola solo se lee el color y el patrón.** Se probó perforando la
+ranura y componiendo ojos de colores debajo: a 8× queda bien y a tamaño real no
+existe. Por eso `DISEÑO.md` §4 dejó de pedir dos capas en la mesa.
+
+**La regla: antes de diseñar algo que se dibuja sobre la bola, escálalo a 18 px y
+míralo.** No a 4×, ni a 8×: a 18. Es la misma disciplina que el mosaico antes de
+integrar, aplicada al tamaño en vez de al contenido.
+
+### Una palabra del inventario no describe el asset (ago-2026)
+
+`INVENTARIO_HOJAS.md` apuntó la hoja de las nueve criaturas como **"criaturas
+peek 3×3"**. Alguien leyó "peek" como *"dibujada sola, asomándose"* y lo escribió
+en `prompts_animacion.md` §4: *"se generaron así, y por eso sirven como
+referencia exacta"*. **Peek quiere decir asomándose POR ALGO, y ese algo está
+pintado**: las nueve llevan un arco de piedra con su interior oscuro, y varias
+tienen zarpas agarradas al borde.
+
+Medido: **337 px (13,6 %) son idénticos en los nueve sprites y dibujan el anillo
+exterior**, y borrarlos **no cambia la caja de tinta** (59×48 antes y después),
+porque cada hoja sombreó su arco distinto. O sea que **no se quita con máscara y
+`limpiar.py` no lo arregla: hay que regenerar**.
+
+Lo que se llevaba por delante, y ninguna de las tres daba error:
+
+- El prompt de §4 adjuntaba una de esas PNG como *"exact reference"* y a la vez
+  ordenaba *"no bell, no circular outline of any kind around it"*. **La
+  referencia contradecía a la orden**, y eso se paga con la hoja piloto.
+- La combinatoria de 81 de `PROPÓSITO.md` §3: el arco es piedra gris, así que
+  sobre `casc_hueso`, `casc_vidrio` o `casc_runas` sale un arco gris pegado a una
+  campana que no lo es.
+- *"La cáscara rueda, la criatura no"* (`DISEÑO.md` §4): al girar la cáscara, el
+  arco pintado en la criatura se queda quieto y la costura se parte.
+
+**La regla: antes de usar un asset como referencia de una tanda nueva, MÍRALO —
+las nueve juntas y ampliadas—, no leas lo que el inventario dice que es.** Es la
+misma familia que "un identificador no es un rótulo" y que "medir por la cara que
+no es": la etiqueta era correcta y la lectura no. Y el mosaico de las nueve a 5×
+lo canta en dos segundos, mientras que un PNG suelto en un visor no enseña que
+todas comparten arco.
+
 - **Rejilla de píxeles.** Nada se mueve, escala ni rota en fracciones de
   píxel: la cámara, la respiración y las rotaciones van en pasos enteros o
   la imagen hierve.

@@ -255,6 +255,63 @@ música tiene que dar prisa.
 `getting slightly ahead of the beat` es lo que la hace incómoda sin subir el
 volumen. Es prisa, no acción.
 
+### 6b. La CAPTURA — tres puntadas y dos estados · *añadido con `CAZA.md`*
+
+`caza.ogg` cubre **una** de las cuatro fases de `CAZA.md` §2: el acoso. Las otras
+tres piden sonido y **ninguna es una pieza nueva** — dos son stems de `caza` y
+tres son puntadas de tres segundos. Coste real: **una generación de puntadas**.
+
+**Los dos estados salen de los stems de `caza.ogg`**, igual que los actos II y
+III salen de `combate` (§2). Se genera `caza` una vez y se separa:
+
+| Fase | Qué suena | De dónde sale |
+|---|---|---|
+| **Rastro** — aún no la ves | `caza` **sin el ostinato**: solo el tic y el fondo | stem |
+| **Acoso** — la estás acorralando | `caza` entera | ya está |
+| **Regreso** — bajas con ella dentro | `caza` **sin el tic**, y el bajo de `recuperado` debajo | stem + stem |
+
+Ese último es el que hace el trabajo: **al capturar, el reloj deja de oírse.** La
+prisa se acaba y lo que queda es lo que llevas. Si además drenas, lo pierdes.
+
+#### `captura_cierre.wav` — se rinde, se abre la ventana · 2 s · NO es bucle
+
+> a sudden hush, the ticking stops dead, one low detuned FM bell struck once and
+> left ringing, air pressure dropping, 2 seconds, unresolved, nothing triumphant
+
+**Lo importante es que PARA**, no que suene. Después de 20 s de tic nervioso, el
+silencio es el aviso de que hay ventana. Es la misma idea que el silencio detrás
+de `tilt`.
+
+#### `captura_hecha.wav` — la criatura entra en el cascabel · 3 s · NO es bucle
+
+> the first three notes of a detuned music box phrase, warm and fragile, then a
+> soft heavy latch closing over them, 3 seconds, do not finish the phrase
+
+**Y aquí está la única idea de este apartado que vale la pena defender:** esas
+tres notas son **el principio de `recuperado.ogg`**, la pieza de la carpeta. O
+sea que la primera vez que oyes esa melodía es al capturar, se corta, y **solo
+suena entera cuando abres `RECUPERADO/` y ves el fichero**. La recompensa se
+promete con el oído en la mesa y se paga en la cáscara, sin una línea de texto.
+
+Se genera **después** de `recuperado.ogg`, y se recorta de ella: no es una
+generación nueva, son sus tres primeros segundos con el cierre encima.
+
+#### `captura_perdida.wav` — drenas bajando y se escapa · 2 s · NO es bucle
+
+> the same music box phrase cut off by a hard digital dropout mid-note, one
+> descending detuned tone, then room tone, 2 seconds, no resolution, no impact
+> hit
+
+**Sin golpe.** La tentación es un porrazo, y un porrazo dice "has fallado un
+tiro". Lo que ha pasado es peor y más callado: se ha ido. La frase cortada a
+mitad de nota es la misma broma que `recuperado`, usada en contra.
+
+#### La regla que las tres comparten
+
+**Ninguna se pisa con `caza.ogg`, porque la música se agacha mientras suenan.**
+Tres puntadas encima de un ostinato a 120 BPM no se oyen. Es el mismo ducking
+que §3 pide para el multibola, y hay que acordarse de escribirlo al conectarlas.
+
 ### 7. `tienda.ogg` — tienda y descanso · 70 BPM
 
 El único momento cálido del juego. Y aun así, mal.
@@ -309,8 +366,12 @@ son bonitas y una última que no encaja: el juego entero, antes del menú.
 1. **`combate`**, hasta que el timbre esté bien. Guardarla como Persona.
 2. **Separarla en stems** y montar de ahí los actos II y III y MODO SEGURO.
 3. **`recuperado`**, que es la que decide si el propósito emociona o solo informa.
+   **Y de ella salen recortadas las dos puntadas de captura de §6b**, así que va
+   antes que `caza`.
 4. **`arranque` y `tilt`**, que son cortas y no necesitan bucle.
 5. Las cinco restantes, todas desde la Persona.
+5b. **`caza`, y separarla en stems** — de ahí salen el rastro y el regreso (§6b)
+   sin generar nada más.
 6. **Recortar, exportar a OGG, y en Godot activar `Loop` con su `Loop Offset`.**
 
 **Piloto de una antes de generar diez**, igual que con las hojas de animación.

@@ -381,6 +381,25 @@ plataformas, túneles"**.
 
 Va DESPUÉS de las capas, porque plataformas y túneles son capas.
 
+**El diseño está escrito entero en `CAZA.md` (ago-2026), y con él el sistema de
+captura, que no existía.** Lo que cierra esa nota y no se vuelve a abrir:
+
+- **Dos palas y las mismas dos teclas, pero cortas.** Lo decidió Fátima: la
+  planta alta sin palas se descartó porque gobernarla pedía botones nuevos y
+  esto es un pinball de dos teclas. La pala corta perdona menos, y como arriba
+  drenar cuesta la caza y no vida, **el hueco entre palas de arriba es el reloj
+  de la caza**.
+- **Sin slingshots, sin outlanes, sin carriles de retorno.** Es la diferencia
+  que más se nota por menos trabajo: sin slingshot no hay salvada gratis, que
+  es "de random a skill" literal.
+- **La planta de abajo se congela y se atenúa** mientras juegas arriba, y la
+  cáscara abre una ventana de recuperación de disco encima.
+- **La órbita de arriba va por la franja izquierda**, que está libre entera de
+  y=150 a 670.
+- **Se juega la geometría con un objetivo de mentira ANTES de meter la
+  captura.** Si la planta alta no se siente distinta sin bichos, los bichos no
+  la salvan.
+
 Y arrastra lo que sigue sin usarse: **los márgenes de los lados**. Medido con la
 mesa de hoy, las dos franjas de 20 px de fuera de las bandas solo están ocupadas
 por tramos —el umbral sube por la derecha de y=730 a 258, el regreso baja por la

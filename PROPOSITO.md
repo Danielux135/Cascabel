@@ -103,11 +103,24 @@ código lo cargue**:
 | `assets/mesa_tunel/` | tapas y bocas de túnel | las rampas, que hoy no tienen boca dibujada |
 | `assets/mesa/` | 9 de 13 PNG sin usar | bumpers y targets alternativos |
 
-**Nueve cáscaras por nueve criaturas son 81 cascabeles distintos**, y el arte
-está hecho. `DISEÑO.md` §4 ya dice que se dibujan en dos capas —la cáscara rueda,
-la criatura no—, así que la combinatoria es gratis: el mismo código dibuja las 81.
+**Nueve cáscaras por nueve criaturas son 81 cascabeles distintos**, y eso
+resuelve de golpe la pregunta de qué se colecciona.
 
-Eso resuelve de golpe la pregunta de qué se colecciona.
+**Pero el arte NO está hecho, y las 81 son de interfaz.** *Corregido ago-2026,
+después de mirar los PNG en vez de fiarse del inventario:*
+
+1. **Las nueve `criaturas_64/` no están dibujadas solas**: llevan un arco de
+   piedra pintado, con interior oscuro y zarpas al borde. El inventario las
+   apuntó como "criaturas peek 3×3" y se leyó "peek" como "sola". **Hay que
+   regenerarlas sin arco**, y está escrito en `assets/prompts_animacion.md` §4.
+2. **Y la combinatoria no es de mesa, es de interfaz.** La bola mide 18 px
+   jugando y la ranura de las cáscaras baja a 1,7 px de alto: en la mesa se ve la
+   cáscara y nada más. Las 81 se componen a 64 px en Preparación, en
+   `RECUPERADO/` y en los tooltips, donde hay sitio de sobra. El detalle está en
+   `DISEÑO.md` §4.
+
+**Las cáscaras sí están hechas y no se tocan** (decisión de Fátima, 17-ago): a
+18 px identifican de sobra por color y patrón.
 
 ---
 

@@ -93,6 +93,35 @@ genera, van aquí en su propia fila cuando lleguen.
 (`_fondos_acto`, línea ~89-92). Hace falta un array de variantes por acto y
 un sorteo al entrar en el escritorio. Detalle en `ESTADO.md`.
 
+## Tanda del 17 de agosto — `cr_brasa` ANIMADA, la primera hoja de criatura sola
+
+**La hoja piloto de `prompts_animacion.md` §4, y es la primera que sale sin arco
+de piedra.** Generada por Fátima con ChatGPT, 1774×887 px, tira horizontal de 8
+sobre magenta `#F706F8`.
+
+| Contenido | Destino | Estado |
+|---|---|---|
+| `cr_brasa` idle, 8 fotogramas en una fila | `assets/criaturas_anim/cr_brasa/idle_1..8.png` | **USADA**, celda 64 |
+
+**Guardar la hoja original en `Desktop\Sprites` como `2026-08-17_cr_brasa_idle_8.png`.**
+
+Lo que dio la hoja, medido:
+
+| Qué | Valor | Juicio |
+|---|---|---|
+| Línea de suelo | y=551 en **los ocho** | perfecta: el prompt lo pedía y salió |
+| Alto de la llama | 151 a 200 px | anima de verdad, no ocho copias |
+| Cambio entre fotogramas | 440 a 1.159 px de 4.096 | ídem; el 8→1 es el menor, así que el bucle cierra |
+| Deriva horizontal de la base | ±3 px vs paso uniforme | despreciable |
+| Fondo comido por dentro | 0 px de dibujo | los 11 "agujeros" son magenta legítimo entre lenguas |
+| Colores finales | 10 de paleta | |
+| Violeta arcano | 61 px → **0** tras sacarlo de la paleta | ver `CLAUDE.md`, "Trampas" |
+
+**Y destapó dos averías del proceso**, las dos en `CLAUDE.md`: `--tira` de
+`procesar.py` no vale para animación (los fotogramas no están centrados en su
+columna, 7,5 px de baile a tamaño 64), y el halo del fondo se vuelve violeta
+arcano al cuantizar. Sale `anim.py`.
+
 ## Tanda del 13 de agosto (2) — criatura de fuego candidata a coleccionable, generada con Claude Design
 
 No es una hoja de `Desktop\Sprites`: se generó con Claude Design (herramienta

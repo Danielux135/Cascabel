@@ -188,23 +188,139 @@ capricho: es exactamente el formato de la exploración de `cascabel_brasa`, que 
 está probado de punta a punta con este generador. Cambiar de formato en el piloto
 es cambiar dos cosas a la vez.
 
-**Un solo estado: `idle`.** Y esto es lo que ahorra la tanda entera. La criatura
-va dentro de una bola que se pasa la partida rebotando, así que:
+**Un solo estado: `idle`.** Y esto es lo que ahorra la tanda entera. Esta hoja es
+la de la criatura **en la interfaz** —el retrato de Preparación, el icono de
+`RECUPERADO/`, el tooltip—, o sea una cosa que está quieta en un panel:
 
 | Lo que hace la criatura | Quién lo hace | ¿Se dibuja? |
 |---|---|---|
 | Respirar / moverse | **la hoja** | **sí, los 8 fotogramas** |
-| Aplastarse al chocar | el código (squash de píxel entero) | **no** |
-| Mirar hacia donde va | el código (desplazamiento de un par de píxeles) | **no** |
-| Girar | **nadie: la criatura NO gira**, es la cáscara la que rueda | **no** |
+| Aplastarse, mirar hacia donde va | el código, si algún día hace falta | **no** |
+| Girar | **nadie: la criatura no gira** | **no** |
 
 Es la misma regla del punto 3 de arriba: no se pide arte de lo que ya hace el
 motor, porque dibujarlo además lo duplica y el bicho hierve.
 
-**Sin cáscara alrededor y sin contorno de bola.** La criatura se dibuja sola,
-como si se asomara. Las que ya están en `assets/criaturas_64/` se generaron así
-—la hoja del 13 de agosto está documentada como *"criaturas peek 3×3"*— y por eso
-sirven como referencia exacta.
+*Aquí ponía "la criatura va dentro de una bola que se pasa la partida
+rebotando". **Ya no**: a 18 px no se ve nada dentro de la bola, ver el ⚠⚠ de
+abajo. La hoja es la misma; lo que cambia es dónde se usa.*
+
+### ⚠ LAS NUEVE CRIATURAS DE HOY **NO** ESTÁN DIBUJADAS SOLAS
+
+*Medido y mirado el 17-ago-2026, antes de gastar la primera hoja. Aquí ponía lo
+contrario y era falso.*
+
+Lo que ponía: *"Sin cáscara alrededor y sin contorno de bola. La criatura se
+dibuja sola, como si se asomara. Las que ya están en `assets/criaturas_64/` se
+generaron así —la hoja está documentada como «criaturas peek 3×3»— y por eso
+sirven como referencia exacta."*
+
+**"Peek" no quiere decir "dibujada sola": quiere decir asomándose POR ALGO, y ese
+algo está dibujado.** Las nueve llevan un **arco de piedra** encima y a los
+lados, con su interior oscuro, y varias tienen manos o zarpas agarradas al borde.
+Se ve en dos segundos montando el mosaico de las nueve a 5× y no se ve mirando un
+PNG suelto, que es como se había mirado.
+
+Medido sobre los nueve PNG:
+
+| Qué | Valor |
+|---|---|
+| Caja de tinta de cada sprite | **59-60 × 47-48** sobre celda de 64 |
+| Píxeles idénticos en los NUEVE | **337, el 13,6 %** — y dibujan el anillo exterior |
+| Caja al borrar esos 337 px | **la misma**: 59×48 |
+
+Ese último número es el que decide: **el arco no se puede quitar con una
+máscara**, porque cada hoja lo sombreó distinto. No es reparable con
+`limpiar.py`; hay que volver a generar.
+
+**Y tumba tres cosas escritas en el repo:**
+
+1. **El prompt de abajo se contradice consigo mismo.** Adjunta `cr_brasa.png`
+   como *"exact reference — same character, same silhouette"* y a la vez ordena
+   *"no ball, no bell, no sphere, no capsule and no circular outline of any kind
+   around it"*. La referencia ES una campana. Un generador con esas dos órdenes
+   devuelve cualquier cosa, y se gasta la hoja piloto averiguándolo.
+2. **La combinatoria de 81 no es gratis** (`PROPÓSITO.md` §3, `DISEÑO.md` §4). El
+   arco es piedra gris, así que sobre `casc_hueso` (crema), `casc_vidrio` (verde)
+   o `casc_runas` sale un arco gris pegado a una campana que no lo es. Se ve
+   compuesto: encaja con las cáscaras de piedra y canta con las otras.
+3. **"La cáscara rueda, la criatura no" es imposible con este arte.** Al girar la
+   cáscara, el arco que la criatura lleva pintado se queda quieto y la costura se
+   parte al primer fotograma.
+
+**La decisión, y es de Fátima:**
+
+- **A — regenerar las nueve SOLAS.** Es lo recomendado, y es gratis *ahora*:
+  las nueve hay que rehacerlas de todos modos para animarlas, así que el arreglo
+  no cuesta ninguna hoja de más. Recupera la combinatoria y la rotación.
+- **B — dar el "peek" por bueno.** Son nueve cascabeles completos y ya está: se
+  cae el 81 y se cae la cáscara que rueda. Compuestas sobre las cáscaras de
+  piedra se ven bien; es una salida honesta si A no sale a la primera.
+
+**Se decide antes de generar, no después.** Lo de abajo está escrito para A.
+
+### Cómo se le pasa la referencia si se va por A
+
+No basta con adjuntar el PNG: hay que decirle qué parte tirar. La línea que lo
+arregla, y va **antes** de las CRITICAL:
+
+> The attached reference image shows this creature sitting inside a round stone
+> bell, framed by a stone arch with a dark interior behind it. Use it ONLY for
+> the creature itself — its shape, its colours, its face and its expression.
+> **Discard the stone arch, the dark interior and the rim completely.** In the
+> sheet, the creature must appear alone against the magenta, with nothing behind
+> it and nothing around it.
+
+Y el tamaño. **Aquí ponía que la criatura debía caber en 40×32 px "porque va
+dentro de la cáscara", y eso ya no vale** (17-ago, ver el ⚠⚠ de abajo): la
+criatura NO se dibuja nunca dentro de la cáscara. Se dibuja sola, a 64, en la
+interfaz y en la caza. Así que ocupa la celda entera como cualquier otro sprite:
+
+> The creature fills its cell the way the reference creature fills the opening in
+> the reference image — same apparent size — but with nothing around it. Leave a
+> 2 pixel margin of empty magenta on every side and nothing more.
+
+### ⚠⚠ Y lo que zanja el asunto: en la mesa la bola mide 18 px
+
+*Medido el 17-ago con el código delante, después de que Fátima preguntara si en
+la ranura de los cascabeles cabía un peek.*
+
+No cabe, y el motivo es más gordo que la ranura:
+
+| Dato | Dónde sale | Valor |
+|---|---|---|
+| Radio de la bola | `sim/parametros_mesa.gd:12` | `radio_bola = 9.0` → **18 px** |
+| Sprite y escala | `render/vista_mesa.gd:1340` | `bola.png` de 24, a escala 0,9 |
+| Ranura de las cáscaras | medido sobre las nueve | **48 × 6 px** sobre celda de 64 |
+| Esa ranura en la mesa | factor 0,28 | **13,5 × 1,7 px** |
+
+> **A 18 px de una bola solo se lee el color y el patrón.** Cualquier sistema de
+> dos capas —criatura dentro, ojos por la ranura, lo que sea— devuelve menos de
+> dos píxeles. Se probó perforando la ranura y componiendo ojos debajo: a 8× queda
+> bien y **a tamaño de mesa no existe**.
+
+**Decisión de Fátima, 17-ago:**
+
+- **Las nueve cáscaras se quedan como están.** Ruedan, y a 18 px identifican de
+  sobra por color y patrón (bronce, hueso, óxido, verde y oro se distinguen).
+  No se regeneran.
+- **La criatura no se dibuja nunca sobre la bola.** Vive a 64 px en la interfaz
+  —Preparación, `RECUPERADO/`, tooltips, el momento de capturar— y suelta por la
+  planta alta durante la caza.
+- **Las 81 combinaciones pasan a ser cosa de interfaz**: cáscara y criatura se
+  eligen por separado y se componen en un panel a 64 px, donde hay sitio de
+  sobra y no hay que meter nada por ninguna ranura.
+
+Y de paso queda un argumento a favor de la caza que no teníamos: **es el único
+momento del juego en que ves lo que estás coleccionando a un tamaño en el que se
+lee.**
+
+*Nota para quien retome esto: hoy no hay nada comprometido. `vista_mesa.gd:236`
+carga `assets/mesa/bola.png` y ya está — ni `bolas_64/` ni `criaturas_64/` las
+toca ninguna línea de código.*
+
+**Y el mosaico de las nueve a 5× se monta ANTES de integrar**, que es lo que
+cazó esto. Un PNG suelto en un visor no enseña que las nueve comparten arco.
 
 **El piloto es `cr_brasa`**, y por dos razones: es la que Fátima ya exploró, así
 que hay con qué comparar; y es fuego, que es el caso más difícil —una llama que
@@ -228,11 +344,20 @@ palabras sale otra criatura, y el escritorio enseñaría una y la mesa otra.
 > point sits on the SAME ROW OF PIXELS. If one frame sits two pixels lower than
 > the next, the creature jitters.
 >
+> The attached reference image shows this creature sitting inside a round stone
+> bell, framed by a stone arch with a dark interior behind it. Use it ONLY for
+> the creature itself — its shape, its colours, its face and its expression.
+> Discard the stone arch, the dark interior and the rim completely.
+>
 > CRITICAL: draw the creature ALONE. No ball, no bell, no sphere, no glass, no
-> capsule and no circular outline of any kind around it, and no ground, no
-> pedestal and no shadow under it. In the game this creature is drawn inside a
+> capsule, no arch and no circular outline of any kind around it, and no ground,
+> no pedestal and no shadow under it. In the game this creature is drawn inside a
 > separate shell sprite that is layered on top, so anything round you add here
 > will be duplicated.
+>
+> CRITICAL: keep the creature at the same apparent size it has inside the opening
+> of the reference image — do not enlarge it to fill the space left by the arch
+> you removed. Leave a 2 pixel margin of empty magenta on every side.
 >
 > CRITICAL: the creature does NOT rotate, does not tilt and does not change
 > scale between frames, and it never leaves its cell. It stays upright and
@@ -249,38 +374,233 @@ palabras sale otra criatura, y el escritorio enseñaría una y la mesa otra.
 >
 > The creature is: [descripción de la tabla].
 
-### Las nueve descripciones
+### ⚠⚠⚠ LA REGLA QUE SALIÓ DE LA HOJA FALLIDA DE `cr_calavera` (17-ago)
 
-Cada una tiene que decir **qué parte se mueve**, que es lo único que distingue
-una animación de ocho fotogramas idénticos.
+Fátima generó `cr_calavera` con la descripción de más abajo y salió **otro
+bicho**: sin manos, con una hoguera encima, con la silueta del cráneo cortada
+por las llamas y con los dientes moviéndose.
 
-| Criatura | Descripción para el último párrafo |
-|---|---|
-| `cr_brasa` | *"a small live flame with two bright eyes in it. The flame is the whole creature. Over the loop it leans, gutters and flares as if in a draught — the eyes stay level while the fire moves around them"* |
-| `cr_calavera` | *"a small skull with a flame burning behind its eye sockets. The skull barely moves; the eye flames flicker and change size"* |
-| `cr_diablillo` | *"a tiny horned imp with a wide grin. It shifts its weight side to side and its ears and tail-tip twitch on different frames"* |
-| `cr_espectro` | *"a small hooded spectre with no legs, its lower half trailing off into nothing. It drifts and the trailing edge ripples — the hood and face stay still"* |
-| `cr_gusano` | *"a fat pale dungeon grub. It compresses and extends along its length, like a caterpillar breathing, with the segments moving in sequence rather than all at once"* |
-| `cr_musgo` | *"a lump of living moss with two small eyes. Tufts and fronds sway on it at slightly different rates; the body itself hardly moves"* |
-| `cr_rata` | *"a small dungeon rat. Its nose and whiskers twitch, its ears flick, and it blinks once during the loop — the body stays still"* |
-| `cr_sapo` | *"a squat warty toad. It inflates and deflates its throat sac; the throat does almost all the movement and the body follows a little behind"* |
-| `cr_sombra` | *"a small blot of living shadow with two pale eyes. Its outline creeps and shifts, so its silhouette is never twice the same, but it keeps the same overall mass"* |
+**No es culpa del generador.** La descripción que había escrita era:
 
-### Después de generar
+> *"a small skull with a flame burning behind its eye sockets"*
 
-    python3 procesar.py hoja.png --tam 64 --tira 8 --filas 1 \
-        --salida assets/criaturas_anim/cr_brasa/ \
-        --nombres "idle_1,idle_2,idle_3,idle_4,idle_5,idle_6,idle_7,idle_8"
+Y el sprite real de `assets/criaturas_64/cr_calavera.png` **no tiene fuego por
+ningún lado**: medidos sus colores, son todos piedra y hueso —`3A3832`,
+`55524A`, `7A7669`, `D9BF95`, `A88968`— y **cero rojos**. Es una calavera pálida
+de cuencas vacías y negras con dos manos huesudas agarradas al borde.
 
-`--tira 8 --filas 1` no es opcional: **por defecto `procesar.py` recorta por
-silueta**, y en una animación eso saca cada fotograma con la caja de su propio
-dibujo, así que la criatura salta de sitio y de tamaño a cada fotograma. Es la
-misma avería que descuadró los marcos de nueve trozos, y aquí canta más porque se
-mueve.
+Esa frase es del **enemigo `calavera_llameante`** de §1, no de la criatura.
+Alguien escribió las nueve descripciones desde los identificadores en vez de
+mirar los nueve PNG. Comprobadas una a una, **tres describen a otro bicho y tres
+más se quedan a medias**.
+
+> **LA REGLA: la descripción dice QUÉ SE MUEVE, no QUÉ ES.** Qué es lo dice la
+> imagen de referencia. Cada adjetivo de aspecto que metas en el texto es una
+> oportunidad de contradecirla — **y cuando texto e imagen se contradicen, gana
+> el texto**. Ya ha pasado dos veces: "no bell" con una campana adjunta, y
+> "flame burning" con una calavera sin fuego.
+
+Lo único que el texto debe repetir del aspecto son **los rasgos que no se pueden
+perder**, y por un motivo concreto: si no los nombras, el generador los quita.
+
+### Las manos, que es un problema de los nueve
+
+**Ocho de las nueve criaturas tienen manos o zarpas agarradas al borde del
+arco.** Solo `cr_brasa` no las tiene, porque es fuego.
+
+Y ahí está el motivo real de que la calavera saliera sin manos: **las manos son
+parte de la pose de asomarse**. Al mandar tirar el arco, las manos se quedan
+agarradas a nada y el generador simplemente las borra.
+
+No hay que renunciar a ellas — hay que decir a qué se agarran:
+
+> The creature's hands (or paws, or claws) must be kept exactly as in the
+> reference: resting on the BOTTOM EDGE of the cell, fingers curled over it, as
+> if it were leaning on a ledge. Do not remove them and do not redraw them
+> hanging in the air.
+
+Y encaja con el juego: en la caza la criatura está encaramada a la plataforma
+central, que tiene borde. Agarrarse a un borde es la pose correcta.
+
+### ⚠⚠⚠⚠ EL SUELO DE LEGIBILIDAD A 64 PX, Y LOS TRES NÚMEROS QUE LO FIJAN
+
+*La segunda hoja de `cr_calavera` arregló el personaje —sin fuego, con manos,
+silueta cerrada— y aun así **no vale**. Lo cazó Fátima mirándola: «píxeles fuera
+de zona, dedos bug, mucho cambio de píxeles en la luz». Los tres, medidos:*
+
+| Lo que vio | Medido | Por qué pasa |
+|---|---|---|
+| «mucho cambio en la luz» | **el 87 % del reflejo parpadea**: 172 px se encienden alguna vez y solo 23 en los ocho | la hoja usa **8 tonos de hueso** donde la guía pide 3. Con ocho tonos las fronteras se mueven un píxel por fotograma |
+| «píxeles fuera de zona» | 116 px de tinta parpadean **en 22 manchas sueltas** por el borde | el contorno se redibuja entero cada fotograma |
+| «dedos bug» | la banda de dedos es **UN bloque fundido** con 2 separaciones, donde debería haber dos manos | **aritmética**: ~10 dedos repartidos en 49 px son 4,9 px por dedo con su hueco |
+
+**El tercero es el importante porque no es un fallo de dibujo, es un límite del
+tamaño.** Y de ahí salen tres números que hay que meter en todo prompt de 64:
+
+> - **Nada por debajo de 3 px de ancho se lee.** Un dedo de 2 px con un hueco de
+>   1 px es una banda gris.
+> - **Máximo 3 tonos por superficie**, que ya lo dice el bloque A y aquí se
+>   incumplió. Cada tono de más es una frontera más que puede temblar.
+> - **Un reflejo especular es una FORMA FIJA**, no una zona que se redibuja.
+
+Traducido a líneas de prompt:
+
+> The creature must read at 64 pixels. Use exactly THREE tones for the bone
+> plus one dark outline, and nothing else — no extra shading tones, no gradients
+> between them.
+>
+> The highlight is a FIXED shape in a FIXED position, pixel-identical in all
+> eight frames. Do not redraw it, do not move it and do not resize it.
+>
+> The creature has TWO clearly separate hands, one on each side, with an empty
+> gap between them. Each hand has only THREE thick fingers, each finger at least
+> 3 pixels wide with a 1 pixel gap. Do not draw more fingers: at this size they
+> merge into one solid bar.
+
+**Y la regla vale para CUALQUIER detalle repetido, no solo para los dedos.** La
+tercera hoja de `cr_calavera` arregló las manos —tres dedos gruesos, dos manos
+separadas, medido y correcto— **y trasladó el fallo a los dientes**: 10 a 13
+dientes con anchuras de `[4, 2, 1, 7, 3, 3, 6, 2, 3, 3, 1]`. La regla estaba
+escrita nombrando los dedos, y lo que no se nombra no se aplica.
+
+> Any repeated detail — teeth, fingers, ribs, spikes, whiskers, scales — must be
+> at least 3 pixels wide with a 1 pixel gap. Count them: prefer FEWER and
+> CHUNKIER. Five teeth read; twelve teeth are a grey smear.
+
+**La cuenta que hay que hacer antes de pedir el prompt:** ancho disponible en
+píxeles ÷ 4 = número máximo de repeticiones. Una boca de 30 px admite **siete
+dientes como mucho**, y quedan mejor cinco.
+
+*Y probado y descartado como arreglo: congelar el cráneo desde la herramienta
+(`anim.py --congelar-arriba 38`). Deja el cráneo como una roca y baja el cambio
+por fotograma de 333 a 207 px — pero entonces **lo único que se mueve son los
+dedos**, o sea que le da todo el protagonismo a lo peor dibujado. Una hoja mala
+no se salva post-procesando.*
+
+### Las tres CRITICAL que faltaban
+
+Cada una viene de un fallo de la hoja de `cr_calavera`:
+
+> CRITICAL: the creature's silhouette must be CLOSED and COMPLETE in every
+> frame. Nothing may cover, cut or overlap its outline — no flames, no smoke,
+> no effect crossing in front of it. If part of the body is hidden the sprite
+> reads as unfinished.
+>
+> CRITICAL: ONLY the parts named below may change between frames. Everything
+> else — head, body, teeth, hands, outline — must be pixel-identical in all
+> eight cells. Do not redraw the whole creature each frame.
+>
+> CRITICAL: do not add anything that is not in the reference image. No fire, no
+> smoke, no sparks, no aura, no props and no background elements unless the
+> reference already has them.
+
+La segunda es la que arregla los dientes que bailan, y es **comprobable**:
+`anim.py` saca un mapa de movimiento que enseña exactamente qué píxeles cambian
+a lo largo del bucle. Si se ilumina la mandíbula, la hoja está mal.
+
+### Las nueve descripciones, REESCRITAS MIRANDO LOS PNG
+
+Cada una en dos partes: **lo que no se puede perder** (para que el generador no
+lo borre) y **lo único que se mueve**.
+
+| Criatura | Lo que es de verdad, y no se puede perder | Lo único que se mueve |
+|---|---|---|
+| `cr_brasa` | *a small live flame with two bright round eyes inside it; the flame IS the creature and it has no body and no hands* | *it leans, gutters and flares as if in a draught — the eyes stay level while the fire moves around them* ✅ *(la única que ya estaba bien: es la hoja que salió buena)* |
+| `cr_calavera` | *a pale bone skull with EMPTY BLACK eye sockets and no fire anywhere, a row of square teeth, and TWO BONY HANDS with separated fingers resting on the bottom edge* | *only the jaw and the tiny highlights: it opens its jaw slightly and closes it again. The cranium, the sockets, the teeth and the hands do not move* |
+| `cr_diablillo` | *a grey cat-like gargoyle creature with LARGE POINTED EARS, huge round yellow eyes, a short muzzle, and two grey clawed paws on the bottom edge. It has NO horns and NO grin* | *only the ears and the eyes: the ears flick on different frames and it blinks once during the loop* |
+| `cr_espectro` | *a bright VIOLET blob-like creature with THREE white round eyes of different sizes and thin violet tendrils coming off it. It is NOT hooded and has no cloak* | *only the tendrils and the eyes: the tendrils curl and uncurl, and the three eyes blink out of sync* |
+| `cr_gusano` | *a fat pale segmented grub with a ROUND MOUTH FULL OF SMALL TEETH and two small pale hands on the bottom edge* | *only the body segments: it compresses and extends along its length, the segments moving in sequence rather than all at once. The mouth and the hands stay put* |
+| `cr_musgo` | *a grey STONE FACE covered in green moss and yellow lichen, with heavy half-closed golden eyes and two stone hands on the bottom edge* | *only the moss and the lichen: tufts sway at slightly different rates. The stone face itself does not move at all* |
+| `cr_rata` | *a dark grey dungeon rat with LARGE BROWN EARS, RED eyes, pale whiskers and two brown paws on the bottom edge* | *only the nose, the whiskers and the ears: they twitch and flick, and it blinks once. The head and the paws stay still* |
+| `cr_sapo` | *a grumpy green toad with heavy drooping eyelids over yellow eyes and two green hands on the bottom edge* | *only the throat and the eyelids: the throat swells and settles, and the lids droop lower and lift again* |
+| `cr_sombra` | *a very dark blot of living shadow with two small pale eyes and ONE THIN VIOLET CRACK across it* | *only the outline and the crack: the silhouette creeps and shifts so it is never twice the same, keeping the same overall mass, and the violet crack flickers* |
+
+**`cr_sombra` es la única que se corta con `--con-arcano`**, porque su grieta
+violeta es arte, no halo. `cr_espectro` es violeta entero, así que también.
+Las otras siete van con el arcano fuera.
+
+### Después de generar — y NO es `procesar.py`
+
+    python3 anim.py hoja.png --n 8 --tam 64 --salida assets/criaturas_anim/cr_brasa/
+
+*Aquí ponía `procesar.py --tam 64 --tira 8 --filas 1`. **Se ejecutó el 17-ago
+sobre la hoja de verdad y no vale**, por dos motivos que solo salen midiendo.*
+
+**1. El recorte por silueta sí había que evitarlo, y `--tira` lo evita.** Eso
+estaba bien visto: por defecto `procesar.py` saca cada fotograma con la caja de
+su propio dibujo y la criatura salta de sitio y de tamaño. Es la misma avería
+que descuadró los marcos de nueve trozos.
+
+**2. Pero `--tira` parte la hoja ENTERA en N columnas iguales, y da por hecho
+que el generador centró cada fotograma en su columna.** No lo hace. Medido sobre
+la hoja de `cr_brasa`: las bases de las llamas caen a **15,6 / 9,1 / 7,2 / 6,8 /
+4,1 / 0,1 / −4,0 / −9,3 px** del centro de su celda. Son **24,9 px de recorrido
+= 7,5 px a tamaño 64**, o sea un baile bien visible.
+
+`anim.py` hace las tres cosas que una tira necesita y que `--tira` no da:
+
+| | Qué hace | Por qué |
+|---|---|---|
+| **Vertical** | ventana común anclada a la línea de suelo | la animación no puede flotar |
+| **Horizontal** | centra cada fotograma en el **centroide de su base** (el 25 % inferior de la tinta) | mata la deriva del generador y **conserva** el movimiento de las puntas, que es el que se ha pedido |
+| **Escala** | una sola, del fotograma más alto | si no, el más bajo se estira para llenar la celda |
+
+Y de paso avisa por consola de lo que no se ve mirando: cuánto cambia cada
+fotograma respecto al siguiente. En `cr_brasa` cambian de 440 a 1.159 px de
+4.096 — hay animación de verdad, no ocho copias.
+
+`procesar.py` se queda para todo lo demás: iconos sueltos, hojas 3×3, la mesa.
+
+### El arcano que se cuela y no da ningún error
+
+La hoja de `cr_brasa` salió con **61 px de violeta arcano** en una criatura de
+fuego, y `CONTEXTO.md` dice que el arcano es EL color mágico y va con
+cuentagotas. No es que la IA lo dibujara: **es el halo del fondo**.
+
+El fondo magenta no acaba de golpe. Deja un borde a **315° de tono** cuando el
+fondo está a 299,8°, y `procesar.py` corta el fondo a 14° — así que ese halo
+sobrevive como si fuera dibujo, y al cuantizar un magenta lavado cae en el
+violeta.
+
+**Ensanchar el margen de tono no lo arregla**, y está medido: de 14° a 28° el
+arcano baja de 5.585 px a 833 y de paso se lleva por delante 5.943 px de llama.
+El halo degrada hasta el rojo, no hay corte limpio.
+
+Lo que sí lo arregla: **`anim.py` saca los dos violetas de la paleta por
+defecto**, así que ese halo cae al rojo más cercano — que es exactamente lo que
+debe ser el borde de una llama. Medido: 61 px → **0**.
+
+Se apaga con `--con-arcano` para `cr_espectro` y `cr_sombra`, que sí pueden
+llevarlo a propósito. **Para las otras siete, no se toca.**
 
 Y **guardar la hoja** en `Desktop\Sprites` con su fila en `INVENTARIO_HOJAS.md`.
 De las tandas sin hoja guardada —`criaturas_64`, `bolas`, la cáscara— no hay
 original, así que esos sprites solo se pueden reparar, no rehacer.
+
+### La batería de revisión: `revisar.py`
+
+*Escrita después de dar por buena una hoja mala contando píxeles.*
+
+    python3 revisar.py assets/criaturas_anim/cr_calavera/
+
+Siete pruebas, y las siete salen de un fallo que ya ha pasado:
+
+| # | Qué mide | Salta cuando |
+|---|---|---|
+| 1 | **Tonos** | más de 4 tonos de cuerpo: cada uno de más es una frontera que tiembla |
+| 2 | **La luz** | más del 40 % del reflejo parpadea |
+| 3 | **Silueta** | más de 8 manchas de tinta apareciendo y desapareciendo por el borde |
+| 4 | **Tamaño** | el bicho cambia de ancho o alto, o la línea de suelo baila |
+| 5 | **Dónde se mueve** | reparte el movimiento por bandas, para contrastarlo con lo que pedía el prompt |
+| 6 | **Detalle fino** | hay trazos de menos de 3 px |
+| 7 | **Cierre del bucle** | el salto del último al primero es el mayor: se ve el tirón |
+
+**Ojo con la 2 y la 4 en bichos que cambian de forma a propósito.** En
+`cr_brasa` la llama crece 15 px y el reflejo se mueve con ella: ahí saltan y no
+es un fallo. La batería no sustituye al criterio, ordena dónde mirar.
+
+**Y no sustituye a mirar la hoja a 10× fotograma a fotograma**, que es lo que
+cazó las tres hojas malas. Lo dice ella misma al acabar.
 
 ### Cómo mirarlo antes de meterlo en el juego
 
@@ -289,6 +609,74 @@ El mosaico de prueba que ya está en `CLAUDE.md`, pero para animación: montar l
 real se ve si el movimiento existe; a 4× se ve si el contorno está en rejilla.
 Los dos fallos que ha tenido esta clase de hoja —fotogramas casi idénticos y
 silueta redondeada— se ven ahí y no se ven dentro de Godot hasta mucho después.
+
+---
+
+## 5. La criatura como PRESA — la hoja de la caza
+
+*Escrita el 17-ago-2026 con `CAZA.md`. **Esta hoja no existía**, y con ella se
+cae la frase "la captura no cuesta ni un fotograma nuevo": sí cuesta, una hoja
+por criatura, y conviene saberlo antes de prometer nada.*
+
+**Las nueve criaturas tienen DOS papeles y necesitan DOS hojas.** Es lo que no
+estaba visto:
+
+| Papel | Dónde | Qué necesita | Estado |
+|---|---|---|---|
+| **Pasajera** — dentro de tu cascabel | la bola, todo el run | `idle` y nada más: el squash y el giro los hace el código | **§4, escrita y lista** |
+| **Presa** — suelta en la planta alta | la caza (`CAZA.md`) | reacciona: se asusta, huye, se rinde | **esto** |
+
+La de §4 se genera **ya**. Esta va **detrás de la puerta B de `CAZA.md` §5**: si
+la planta alta no se siente distinta jugándola sin bichos, esta hoja no se genera
+nunca y no se ha perdido nada.
+
+### Los cuatro estados, y por qué son los mismos cuatro de un enemigo
+
+Los de `CAZA.md` §2 caen casi encima de los de §1, así que **la plantilla del
+enemigo vale tal cual**, cambiando la celda de 96 a 64:
+
+| Fila | En un enemigo | En la caza | Qué pasa en la mesa |
+|---|---|---|---|
+| 1 | `idle` | **acecho** | está suelta y no la has tocado |
+| 2 | `golpe` | **susto** | le has dado: sube el MIEDO |
+| 3 | `ataque` | **huida** | se revuelve y se va a un túnel |
+| 4 | `muerte` | **rendida** | miedo lleno: la ventana de captura |
+
+La única fila que **no** se puede copiar es la 3. En un enemigo el ataque va
+*hacia* el jugador; una presa se va *al revés*. Se cambia el párrafo:
+
+> Row 3 — FLEEING, a 4-frame turn-and-bolt: flinching away · turning its back ·
+> mid-scramble, low to the ground · almost out of frame but still fully inside
+> its cell. It moves AWAY from the viewer, never toward it.
+
+Y la 4 tampoco es una muerte: **la criatura no se muere, se rinde.** Es un juego
+de coleccionar, y una presa que agoniza al capturarla dice lo contrario de lo que
+quiere `PROPÓSITO.md`:
+
+> Row 4 — GIVING UP, a 4-frame surrender: legs folding · sinking down · curled
+> up small and still · the same, eyes closed. It is exhausted and it submits —
+> it is NOT dying, NOT bleeding and NOT falling apart. Do not fade it out.
+
+Las otras dos filas se copian de §1 sin tocar nada.
+
+### Formato
+
+**4×4, celda 64, la misma que §4.** No 96: la presa se ve sobre una planta alta
+de 400 px de ancho y el enemigo se ve en su panel de la banda derecha.
+
+    python3 procesar.py hoja.png --tam 64 --tira 4 --filas 4 \
+        --salida assets/criaturas_caza/cr_brasa/ \
+        --nombres "acecho_1,acecho_2,acecho_3,acecho_4,susto_1,susto_2,susto_3,susto_4,huida_1,huida_2,huida_3,huida_4,rendida_1,rendida_2,rendida_3,rendida_4"
+
+**Y aquí SÍ se dibuja sola de verdad**, sin arco y sin cáscara: en la caza la
+criatura está suelta por la mesa, no dentro de nada. O sea que la corrección del
+apartado ⚠ de §4 vale igual, y con más motivo.
+
+### La que no hace falta dibujar
+
+**El rastro (`CAZA.md` §2, fase 1) no lleva arte de criatura.** Es una sombra que
+cruza por debajo del tablero y partículas. Se dibuja con lo que ya hay, y es la
+fase más barata de las cuatro — conviene que siga siéndolo.
 
 ---
 
@@ -331,8 +719,10 @@ Las de animación no van todas seguidas: se reparten según lo que desbloquean.
 
 | # | Hoja | Cuándo | Por qué ahí |
 |---|---|---|---|
-| 1 | **`cr_brasa` animada** (§4) | ya | Es el piloto y el caso más difícil. Y sin criaturas no hay coleccionable, que es el gancho de `PROPÓSITO.md` §2 |
+| 1 | **`cr_brasa` animada** (§4) | ya | Es el piloto y el caso más difícil. Y sin criaturas no hay coleccionable, que es el gancho de `PROPÓSITO.md` §2. **Leer antes el ⚠ de §4: la referencia lleva un arco de piedra que hay que mandar tirar explícitamente** |
 | 2 | **Las otras 8 criaturas** (§4) | tras validar la 1 | Trámite si la 1 sale bien. Si no, se cambia el prompt antes de gastar ocho hojas |
+| 2b | **`cr_brasa` como presa** (§5) | **solo tras la puerta B de `CAZA.md` §5** | Si la planta alta no se siente distinta sin bichos, esta hoja no se genera y no se pierde nada |
+| 2c | **Las otras 8 presas** (§5) | tras validar la 2b | |
 | 3 | **Bandeja de sistema** (`prompts_cascara.md` §11-12) | tanda de cáscara | Lo único de la cáscara sin generar, y la barra de tareas lo dibuja con `draw_rect` a mano hasta entonces |
 | 4 | **27 iconos de reliquia** (`prompts_reliquias.md`) | cuando toque | 27 de 45 reliquias siguen sin icono y se ven en tres sitios |
 | 5 | **`rata` animada** (§1) | con la Fase 6 | Un enemigo animado sin comportamiento sigue siendo un saco, solo que un saco que respira |

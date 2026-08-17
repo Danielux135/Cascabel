@@ -81,14 +81,35 @@ cáscara es la máquina intentando gestionar un proceso que no puede matar.
 **La bola es una criatura, no un objeto.** Eso da a quién mejorar, de quién
 tirar en las reliquias y a qué ponerle skins. La criatura no habla nunca.
 
-**Se dibuja en dos capas: la cáscara rueda, la criatura no.** Como una bola
-de hámster. La cáscara gira con ocho o doce rotaciones pregeneradas por
-código y ajustadas a rejilla, elegidas según la distancia recorrida; la
-criatura se queda derecha, se aplasta al chocar y mira hacia donde va.
+**En la mesa se ve la CÁSCARA, y solo la cáscara.** Gira con ocho o doce
+rotaciones pregeneradas por código y ajustadas a rejilla, elegidas según la
+distancia recorrida. Un ciclo de rodadura con fotogramas NO sirve: la bola cambia
+de dirección constantemente y un ciclo solo vale para un sentido. Y las cáscaras
+se dibujan sin arriba ni abajo —sin pies, sin asa— porque van a rotar.
 
-Un ciclo de rodadura con fotogramas NO sirve: la bola cambia de dirección
-constantemente y un ciclo solo vale para un sentido. Y las cáscaras se
-dibujan sin arriba ni abajo —sin pies, sin asa— porque van a rotar.
+**La criatura NO se dibuja sobre la bola.** *Corregido ago-2026, y es aritmética,
+no gusto.* Aquí ponía "dos capas, como una bola de hámster: la cáscara rueda, la
+criatura no". Pero la bola mide **18 px** en la mesa (`radio_bola = 9.0`), y la
+ranura de las nueve cáscaras baja de 48×6 a **13,5 × 1,7 px** a ese tamaño. Un
+sistema de dos capas ahí no devuelve ni dos píxeles. Se probó perforando la
+ranura y componiendo ojos debajo: a 8× queda bien y **a tamaño de mesa no
+existe**.
+
+El reparto que sí funciona:
+
+| Dónde | Qué se ve | Tamaño |
+|---|---|---|
+| **La mesa** | la cáscara rodando; identifica por color y patrón | 18 px |
+| **La interfaz** — Preparación, `RECUPERADO/`, tooltips, la captura | cáscara y criatura compuestas en un panel | 64 px |
+| **La caza**, en la planta alta | la criatura suelta, sin cáscara | 64 px |
+
+Las **81 combinaciones** de `PROPÓSITO.md` §3 siguen en pie y pasan a ser **de
+interfaz**: se elige cáscara y criatura por separado y se componen donde hay
+sitio, no metiendo nada por una ranura de seis píxeles.
+
+Y de ahí sale un argumento a favor de la caza que no estaba escrito: **es el
+único momento del juego en que ves lo que coleccionas a un tamaño en el que se
+lee.**
 
 **La mazmorra corre dentro de un sistema operativo viejo.** No se explica ni
 se justifica; es el marco visual. Cada elemento del sistema hace trabajo de
@@ -154,6 +175,13 @@ El modo dura un tiempo limitado y **el reloj del enemigo sigue corriendo
 mientras estás arriba**. Sin eso, cazar sería gratis.
 
 Las skins salen de aquí y no afectan a nada: son la recompensa de coleccionar.
+
+**Qué se caza, y está entero en `CAZA.md` (ago-2026):** las nueve criaturas de
+`assets/criaturas_64/`. Cada una que traes viva deja de estar corrupta en
+`RECUPERADO/` y se puede meter en tu cascabel en Preparación — nueve cáscaras
+por nueve criaturas son 81 cascabeles con el arte ya hecho. La captura no resta
+vida, sube MIEDO; capturar acaba la caza; y **hay que bajar la criatura viva
+por el regreso o se pierde**.
 
 ---
 

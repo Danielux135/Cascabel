@@ -33,6 +33,393 @@ una réplica de la de abajo y Daniel la tumbó mirándola: *"el mapa de arriba n
 puede ser una réplica, ha de sentirse diferente"*. El sistema de capas ya está;
 **lo que toca ahora es rehacerla encima**. Ver "Siguiente" 0i.
 
+**El diseño de esa planta ya no hay que inventarlo: está en `CAZA.md`** (tanda
+0i-diseño, 17-ago). Ahí está también el sistema de CAPTURA, que no existía
+escrito en ningún sitio. La siguiente tanda es construir la geometría, no
+decidirla.
+
+## LA PLANTA ALTA Y LA CAPTURA, DECIDIDAS (tanda 0i-diseño · sin tocar código)
+
+Tanda de diseño, no de código: la planta alta ha salido mal dos veces por
+construir antes de decidir. **No se ha tocado ni un `.gd` y la batería sigue
+donde estaba.** Sale `CAZA.md`, más punteros en `PLAN.md` §1d y `DISEÑO.md` §5.
+
+**Lo que se ha resuelto, y era lo que bloqueaba: qué se captura.** `PROPÓSITO.md`
+§2 (reconstruir el sistema, `RECUPERADO/`) y `DISEÑO.md` §5 (arriba se caza
+material de desbloqueo) pedían lo mismo y nadie los había juntado. Se cazan **las
+nueve criaturas de `assets/criaturas_64/`**, que llevan desde el 13 de agosto
+procesadas y sin que las cargue nadie. Cada una que traes viva es un `.dat` que
+deja de estar corrupto, y luego va dentro de tu cascabel en Preparación: **81
+cascabeles con el arte ya hecho**.
+
+**Y la pregunta de arte de Fátima —¿hacen falta muchos sprites por ángulo, como
+en Pokémon Pinball?— tiene respuesta y es NO.** Pokémon Pinball no es caro por
+los ángulos (cada bicho tiene una vista fija y no rota nunca), es caro por 151
+criaturas. Aquí son nueve, y el eje correcto no es el ángulo sino el **estado**.
+
+**Ojo, que aquí ponía "cero fotogramas nuevos" y era falso** — corregido el
+17-ago al repasar los prompts de verdad. Esa hoja 4×4 de celda 96 es la del
+ENEMIGO (`prompts_animacion.md` §1). La de las criaturas es §4: **8 fotogramas
+en una fila, celda 64, solo `idle`**. La criatura tiene **dos papeles y necesita
+dos hojas** — pasajera dentro del cascabel (§4, lista para generar hoy) y presa
+suelta en la caza (§5, escrita ahora: acecho, susto, huida, rendida). Son 9
+hojas más, y **van detrás de la puerta B**: si la planta alta no se siente
+distinta sin bichos, no se generan nunca.
+
+## `cr_brasa` ANIMADA, CORTADA Y MIRANDO (17-ago) — y sale `anim.py`
+
+**La hoja piloto está hecha y es buena.** Fátima la generó con el prompt de §4
+corregido y salió sin arco de piedra, que era lo que había que comprobar. Los 8
+fotogramas están en `assets/criaturas_anim/cr_brasa/idle_1..8.png`.
+
+| Qué | Valor |
+|---|---|
+| Línea de suelo | **y=551 en los ocho** — el prompt lo pedía y salió clavado |
+| Alto de la llama | 151 a 200 px en origen; 45 a 60 dentro de la celda de 64 |
+| Cambio entre fotogramas consecutivos | **440 a 1.159 px de 4.096**, y el 8→1 es el menor: el bucle cierra |
+| Dibujo comido por el recorte | **0 px** (los 11 "agujeros" son magenta legítimo entre lenguas) |
+| Colores finales | 10 de paleta, **0 de arcano** |
+
+### Y cortarla destapó dos averías del proceso
+
+**1. `procesar.py --tira N` no vale para una tira de animación.** Parte la hoja
+en N columnas iguales dando por hecho que el generador centró cada fotograma en
+la suya, y no lo hace: las bases caen a 15,6 / 9,1 / 7,2 / 6,8 / 4,1 / 0,1 /
+−4,0 / −9,3 px del centro de su celda, o sea **24,9 px de recorrido = 7,5 px a
+tamaño 64**. Un baile visible. El comando que estaba escrito en
+`prompts_animacion.md` era ese.
+
+Sale **`anim.py`**: ventana vertical común anclada al suelo, horizontal por el
+**centroide de la base** de cada fotograma, y una sola escala. Centrar por la
+caja entera tampoco valdría — se llevaría el movimiento de las puntas, que es lo
+que se ha pedido dibujar. Y avisa por consola de cuánto cambia cada fotograma,
+que es la comprobación que el ojo no hace.
+
+**2. El halo del fondo se vuelve VIOLETA ARCANO al cuantizar.** 61 px de arcano
+en una criatura de fuego, y `CONTEXTO.md` reserva ese violeta para lo mágico.
+No lo dibujó la IA: el magenta deja un borde a 315° de tono con el fondo a
+299,8°, y `procesar.py` corta a 14°. Ensanchar el margen NO lo arregla —de 14° a
+28° el arcano baja de 5.585 a 833 px y se come 5.943 px de llama—. Lo que lo
+arregla es **sacar los dos violetas de la paleta**: `anim.py` lo hace por
+defecto, y `--con-arcano` los devuelve para `cr_espectro` y `cr_sombra`.
+Medido: 61 → **0**.
+
+*Probado y descartado, para que no se vuelva a intentar: sangrar el color sobre
+el fondo antes de reducir, por si `Image.BOX` metía magenta al promediar RGB y
+alfa por separado. Cambia 0 px.*
+
+**Las dos están en `CLAUDE.md`, "Trampas", y la hoja en `INVENTARIO_HOJAS.md`.**
+
+## LA SEGUNDA HOJA SALIÓ MAL, Y LA CULPA ERA DEL PROMPT (17-ago)
+
+`cr_calavera` salió **sin manos, con una hoguera encima, con la silueta del
+cráneo cortada por las llamas y con los dientes moviéndose**. Lo cazó Fátima
+mirándola al lado de la referencia.
+
+**No es culpa del generador.** La descripción que había escrita para `cr_calavera`
+era *"a small skull with a flame burning behind its eye sockets"*, y el sprite
+real **no tiene fuego por ningún lado**: medidos sus colores, todos piedra y
+hueso —`3A3832`, `55524A`, `7A7669`, `D9BF95`— y **cero rojos**. Esa frase es
+del enemigo `calavera_llameante` de §1.
+
+**Las nueve descripciones estaban escritas desde los identificadores, sin mirar
+los PNG.** Comprobadas una a una: **tres describen a otro bicho** —`cr_diablillo`
+es un gato/gárgola gris sin cuernos ni sonrisa, `cr_espectro` es un blob violeta
+de TRES ojos y no un encapuchado— y **tres más se quedan a medias**. Reescritas
+las nueve mirando los sprites, en `prompts_animacion.md` §4.
+
+**Y las manos son un problema de los nueve.** Ocho de nueve las tienen agarradas
+al borde del arco (solo `cr_brasa` no, que es fuego): **son parte de la pose de
+asomarse**, así que al mandar tirar el arco se quedan agarradas a nada y el
+generador las borra. Ahora se pide explícitamente que se apoyen en el borde
+inferior de la celda — y encaja, porque en la caza la criatura está encaramada a
+la plataforma, que tiene borde.
+
+**La regla que sale de aquí, y ya ha quemado dos hojas:**
+
+> En un prompt con imagen de referencia, **gana el texto**. La descripción dice
+> QUÉ SE MUEVE, no QUÉ ES. Y un rasgo que no nombras, el generador lo borra.
+
+### Y sale una comprobación nueva: el mapa de movimiento
+
+La hoja mala cambiaba entre 867 y 1.293 px por fotograma — **números tan buenos
+como los de la hoja que salió bien**. Contar no basta.
+
+`anim.py` saca ahora `_movimiento.png`: pinta encima del primer fotograma qué
+píxeles cambian a lo largo del bucle. En `cr_brasa` se enciende el borde de la
+llama y el centro se queda oscuro, que es justo lo que pedía el prompt. En la
+calavera se enciende **todo el cráneo, mandíbula incluida**. Se mira contra lo
+que decía el prompt, y si se ilumina algo que debía estar quieto, se regenera.
+
+En `CLAUDE.md`, "Trampas", las dos.
+
+## `cr_calavera` CERRADA — con la v3 y `--pulir`, no con la v4 (17-ago)
+
+**La cuarta hoja salió PEOR que la tercera**, y eso destapó lo que estaba
+pasando toda la mañana:
+
+| | v3 | v4 |
+|---|---|---|
+| Línea de suelo | **61 en los ocho** | 60-61: flota |
+| Alto | **43-43, variación cero** | 45-46 |
+| Tonos de cuerpo | 7 | **8** |
+| Reflejo que parpadea | 85 % | **86 %** |
+
+No arregló ninguna de las dos cosas pedidas y rompió dos que ya estaban
+perfectas. **No se puede iterar una generación:** cada hoja es una tirada nueva,
+no una edición de la anterior. Ajustar el prompt y regenerar no sube una cuesta,
+te mueve a otro punto al azar. Lo que funciona es meter todas las correcciones
+en UN prompt, sacar **varias hojas de golpe con ese mismo prompt** y elegir. Está
+en `CLAUDE.md`.
+
+### Y la v3 se cierra sin generar nada más
+
+La v3 tenía **el dibujo bien** —dos manos de tres dedos, tamaño clavado,
+mandíbula con ciclo coherente de 426 a 532 px— y fallaba solo en lo **mecánico**.
+Eso sí se arregla con código:
+
+    python3 anim.py hoja.png --n 8 --tam 64 --salida assets/criaturas_anim/cr_calavera/ --pulir 3
+
+| | v3 cruda | **v3 pulida** |
+|---|---|---|
+| Tonos de cuerpo | 7 | **3** |
+| Reflejo que parpadea | 85 % | **34 %** |
+| Manchas sueltas | 27 | **0** |
+| Trazo más estrecho | 1 px | **3 px** |
+| Batería | NO PASA | **PASA ENTERA** |
+
+`--pulir N` hace tres cosas: silueta por mayoría de los ocho fotogramas,
+contorno duro al color más oscuro de la paleta, y cuerpo reducido a los N tonos
+más usados. **No se le pasa a `cr_brasa`**, que vive del degradado.
+
+Con esto se matiza la regla que había quedado demasiado ancha: **post-procesar
+no arregla lo mal DIBUJADO —personaje equivocado, dedos que no caben— pero sí
+arregla lo MECÁNICO**, que son fallos de repetición y una máquina los hace mejor
+que un generador.
+
+*Y una tonta que costó un rato: di por perdida la versión pulida creyendo que
+había perdido el contorno. Lo tenía (luminancia 19,5, más oscuro que el
+original); el fondo de la previsualización era casi negro. **Los mosaicos de
+revisión van sobre gris medio.***
+
+### Lo que se vio en la tercera hoja, y cómo se llegó aquí
+
+Lo que **sí** arregló, y no es poco:
+
+| | v2 | **v3** |
+|---|---|---|
+| Manos | un bloque fundido, 2 separaciones | **dos manos, tres dedos gruesos, hueco claro** — medido `[4,4,1,4,5]` |
+| Ancho / alto | 59-60 / 41-42 | **60-60 / 43-43**, variación CERO |
+| Línea de suelo | 61 | **61 en los ocho** |
+| La mandíbula | abría en un fotograma | **ciclo coherente**: la zona oscura va de 426 a 532 px y vuelve |
+
+Y lo que **no**:
+
+- **Los dientes son los dedos de antes.** 10 a 13 dientes con anchuras
+  `[4, 2, 1, 7, 3, 3, 6, 2, 3, 3, 1]`. La regla de los 3 px la escribí nombrando
+  los dedos, y **lo que no se nombra no se aplica**. Generalizada ahora a
+  cualquier detalle repetido, con la cuenta: ancho ÷ 4 = repeticiones máximas.
+- **7 tonos de cuerpo** donde la guía pide 3, así que el **85 % del reflejo
+  sigue parpadeando**.
+- **27 manchas sueltas** parpadeando por el borde, peor que las 22 de la v2.
+
+### Y sale `revisar.py`, la batería que faltaba
+
+Siete pruebas sobre una tira ya cortada —tonos, luz, silueta, tamaño, dónde se
+mueve, detalle fino, cierre del bucle— cada una salida de un fallo que ya pasó.
+Existe porque di por buena una hoja mala contando píxeles.
+
+Con dos avisos escritos dentro: las pruebas 2 y 4 saltan en `cr_brasa` y **ahí
+no es un fallo** —la llama crece a propósito—, y **la batería no sustituye a
+mirar la hoja a 10×**, que es lo que cazó las tres malas.
+
+### ⚠ LA SEGUNDA HOJA DE `cr_calavera` TAMPOCO VALE — y yo dije que sí
+
+**Lo de abajo está mal y se deja escrito para no repetirlo.** Di por buena la
+hoja con un «es la mejor de las tres» y con un ⚠️ blando sobre el temblor.
+Fátima la miró y la tumbó en tres golpes: *«píxeles fuera de zona, dedos bug,
+mucho cambio de píxeles en la luz»*. Los tres son reales y los tres se miden:
+
+| Lo que vio | Medido |
+|---|---|
+| «mucho cambio en la luz» | **el 87 % del reflejo parpadea** — 172 px se encienden alguna vez y solo 23 en los ocho |
+| «píxeles fuera de zona» | 116 px de tinta parpadeando **en 22 manchas sueltas** por el borde |
+| «dedos bug» | la banda de dedos es **UN bloque fundido** con 2 separaciones |
+
+Y las causas, que no son las que yo había supuesto:
+
+- La luz parpadea porque la hoja usa **8 tonos de hueso** donde `GUIA_ESTILO.md`
+  pide 3. Cada tono de más es una frontera más que tiembla.
+- Los dedos no se leen por **aritmética, no por dibujo**: ~10 dedos repartidos en
+  49 px son 4,9 px por dedo con su hueco. Por debajo de 3 px no hay dedo, hay
+  banda gris.
+
+**Probado y descartado como parche:** `anim.py --congelar-arriba 38` deja el
+cráneo como una roca y baja el cambio de 333 a 207 px por fotograma, pero
+entonces lo único que se mueve son los dedos — le da todo el protagonismo a lo
+peor dibujado. **Post-procesar no salva una hoja mala.** La opción se queda en
+la herramienta porque sirve para otros casos, con esa advertencia escrita.
+
+De aquí sale el **suelo de legibilidad a 64 px**, en `CLAUDE.md` y en
+`prompts_animacion.md` §4: nada por debajo de 3 px de ancho, máximo 3 tonos por
+superficie, y el reflejo es una forma fija. **Tres dedos gruesos por mano y dos
+manos separadas**, no diez dedos.
+
+**La lección de proceso, que es la que más vale:** conté píxeles, miré el mapa de
+movimiento y di el visto bueno sin mirar la hoja a 10× fotograma a fotograma. Los
+números decían que la hoja era mejor que las anteriores y era verdad, pero
+«mejor» no es «vale». **El juicio de arte lo cierra el ojo de Fátima, no una
+tabla.**
+
+### Lo que decía antes, y por qué se quedó corto
+
+Fátima la volvió a generar con la descripción corregida y las tres CRITICAL
+nuevas. **Sale bien**, y es la mejor de las tres hojas:
+
+| Qué pedía el prompt | Qué salió |
+|---|---|
+| Sin fuego | ✅ ni un píxel |
+| Cuencas vacías y negras | ✅ |
+| Dos manos con dedos en el borde inferior | ✅ vuelven, y era el fallo gordo de la anterior |
+| Silueta cerrada, nada la tapa | ✅ |
+| Solo se mueve la mandíbula | ⚠️ abre en el fotograma 4, pero el cráneo entero se redibuja |
+| Línea de suelo común | ✅ y=459 en los ocho |
+| Tamaño estable | ✅ 170-173 px (3 de variación; la llama variaba 49) |
+
+En `assets/criaturas_anim/cr_calavera/`. 16 colores, 0 de arcano.
+
+### El temblor no se arregla con prompts: sale `--estabilizar`
+
+El único punto flojo —que el cráneo se redibuja entero— **no es del prompt**.
+Medido: 20-42 % de los píxeles cambian entre fotogramas y la silueta baila entre
+377 y 1.841 px, aunque el prompt pedía "pixel-identical". Un generador no sabe
+repetir un dibujo ocho veces, y no lo va a saber por insistir.
+
+Descartado que fuera el recorte: cortando a paso uniforme entero en vez de por
+centroide sale igual, 49 % contra 51 %.
+
+Se arregla en `anim.py`, con el **fotograma moda**: el color más repetido de cada
+píxel a lo largo del bucle es el dibujo que el generador intentaba repetir; cada
+fotograma conserva solo lo que se aparta mucho de él. El movimiento de verdad
+sobrevive, el ruido de redibujado desaparece. **Y nunca borra tinta** — sin esa
+condición se comía las chispas sueltas de `cr_brasa`, que son arte.
+
+Medido: la calavera pasa de 578 a 333 px de cambio por fotograma (87 % de la
+tinta vuelve a la moda); la llama conserva su movimiento (68 %).
+
+Está en `CLAUDE.md`, "Trampas". Se apaga con `--sin-estabilizar`.
+
+**Lo que queda:** las siete criaturas restantes, con sus descripciones nuevas de
+`prompts_animacion.md` §4. `cr_sombra` y `cr_espectro` con `--con-arcano`, las
+demás sin él. Y dos cosas menores de la calavera que se pueden dejar o pulir:
+un trazo gris en la sien derecha con una mota roja que no está en la referencia,
+y que a 64 px la fila de dedos y la de dientes se leen como una sola banda.
+
+## LOS PROMPTS, REPASADOS — Y LAS CRIATURAS LLEVAN CÁSCARA PINTADA (17-ago)
+
+**El repaso ha cazado una trampa que se habría comido la hoja piloto.** Está
+entera en `CLAUDE.md`, "Trampas".
+
+Las nueve `assets/criaturas_64/*.png` **no están dibujadas solas**: llevan un
+arco de piedra con interior oscuro, y varias con zarpas agarradas al borde. El
+inventario las apuntó como *"criaturas peek 3×3"* y alguien leyó "peek" como
+"dibujada sola"; quiere decir asomándose **por algo**, y ese algo está pintado.
+
+Medido: **337 px (13,6 %) idénticos en las nueve, y dibujan el anillo exterior**.
+Borrarlos **no cambia la caja** (59×48 antes y después), porque cada hoja sombreó
+su arco distinto: **no se quita con máscara y `limpiar.py` no lo arregla.**
+
+Tumba tres cosas escritas, y ninguna daba error:
+
+1. **El prompt de §4 se contradecía**: adjuntaba una de esas PNG como *"exact
+   reference"* y a la vez ordenaba *"no bell, no circular outline of any kind"*.
+2. **La combinatoria de 81** (`PROPÓSITO.md` §3): el arco es gris, así que sobre
+   `casc_hueso`, `casc_vidrio` o `casc_runas` canta.
+3. **"La cáscara rueda, la criatura no"** (`DISEÑO.md` §4): al girar, el arco
+   pintado se queda quieto y la costura se parte.
+
+### Y preguntando por la ranura, Fátima destapó lo de verdad importante
+
+*«Los cascabeles ya dibujados tienen una rejilla muy pequeña, ahí no va a caber
+ningún peek.»* No cabe —la ranura es de **48 × 6 px**— pero al ir a medirlo salió
+el motivo de fondo, y es aritmética:
+
+| Dato | Dónde | Valor |
+|---|---|---|
+| Radio de la bola | `sim/parametros_mesa.gd:12` | `radio_bola = 9.0` → **18 px** |
+| Sprite y escala | `render/vista_mesa.gd:1340` | `bola.png` de 24, escala 0,9 |
+| La ranura a tamaño de mesa | factor 0,28 | **13,5 × 1,7 px** |
+
+**A 18 px de una bola solo se lee el color y el patrón.** Probado perforando la
+ranura y componiendo ojos de colores debajo: a 8× queda bien y a tamaño real no
+existe. O sea que **el sistema de dos capas de `DISEÑO.md` §4 no puede devolver
+nada en la mesa**, se haga como se haga.
+
+**Y nada está comprometido:** `vista_mesa.gd:236` carga `assets/mesa/bola.png` y
+punto — ni `bolas_64/` ni `criaturas_64/` las toca ninguna línea de código.
+
+**Las tres decisiones de Fátima, 17-ago:**
+
+1. **Las nueve cáscaras se quedan como están.** No se regeneran: a 18 px
+   identifican de sobra por color y patrón.
+2. **La criatura no se dibuja nunca sobre la bola.** Vive a 64 px en la interfaz
+   (Preparación, `RECUPERADO/`, tooltips, la captura) y suelta por la planta alta
+   durante la caza.
+3. **Las 81 combinaciones pasan a ser de interfaz**, compuestas en un panel a 64
+   donde hay sitio, no metidas por una ranura de seis píxeles.
+
+Escrito en `DISEÑO.md` §4, `PROPÓSITO.md` §3, `CLAUDE.md` "Trampas" y el ⚠⚠ de
+`prompts_animacion.md` §4.
+
+**Y sale gratis un argumento a favor de la caza que no teníamos:** es el único
+momento del juego en que ves lo que coleccionas a un tamaño en el que se lee.
+
+**Lo que hay que generar, entonces:** las nueve criaturas **solas, sin arco**
+(`prompts_animacion.md` §4), que es lo que Fátima propuso como `brasa_peek` sin
+bola. Ya no para meterlas dentro de nada — para la interfaz y para la caza.
+
+**Lo demás del repaso:** los comandos de `procesar.py` de los prompts están bien
+(`--tam`, `--tira`, `--filas`, `--nombres` existen y hacen lo que dicen), y
+`GUIA_ESTILO.md` no necesita tocarse. Se añade `prompts_animacion.md` §5 (la
+presa) y `prompts_musica.md` §6b (la captura: dos estados por stems de `caza` y
+tres puntadas, una de ellas recortada de `recuperado`).
+
+**Y una decisión de Fátima sobre cómo se prueba:** *«si es de prueba vale, pero
+no quiero cosas aleatorias para probar»*. El objetivo de la puerta B pasa a ser
+determinista — `cr_brasa` plantada en la plataforma, tres impactos siempre, caza
+abierta con tecla de depuración. Está en `CAZA.md` §5.
+
+**La captura no resta vida, sube MIEDO**, y el túnel es la pieza que la hace
+juego: mientras la criatura está debajo del tablero la pierdes de vista y el
+miedo drena, así que no se juega a acertar, se juega a taparle las bocas.
+Capturar **acaba la caza** (esa es la decisión), y luego **hay que bajarla viva
+por el regreso** — que ya está medido llegando a una pala 60 de 60, a 211 px/s
+y 292 ms, y que hoy no significa nada.
+
+**Las dos decisiones de tacto de la tanda, y las tomó Fátima:**
+
+1. **Palas cortas, no "sin palas".** Descartó la planta alta sin palas: *«no
+   tenemos habilidades para controlar el resto de la mesa, y añadirlas con más
+   botones abre mucho la complejidad de lo que es un pinball de dos teclas»*. Y
+   dio la razón de la pala corta: *«pasa de ser random a skill»*. Como arriba
+   drenar cuesta la caza y no vida, el hueco entre palas de arriba **es** el
+   reloj de la caza; los 20 s son el techo.
+2. **La planta de abajo se congela y se atenúa** mientras juegas arriba.
+
+Y de ahí sale la que más se nota por menos trabajo: **fuera los slingshots**.
+Un slingshot mantiene viva una bola que ya habías perdido, y patea al azar.
+Sin él, la bola que se va por el lado está muerta. Es borrar dos nodos.
+
+**La medida que cierra la geometría, y sustituye a "el hueco será de X px":** un
+jugador que aporrea drena arriba en 3-4 s y uno bueno llega al techo de 20. Hoy
+son 5,2 s de media y 52 de 60 acaban drenando, ninguna por tiempo: **la brecha
+no existe**.
+
+**Riesgo escrito antes de tropezar:** el 3 % de apertura de la caza ya estaba
+anotado como dial, pero ahora importa más — una caza de cuatro fases hay que
+aprenderla, y no se aprende lo que ves dos veces por run. Se decide la
+frecuencia ANTES de construir las fases.
+
 ## CAPAS DE ALTURA: EL SISTEMA, Y NI UN NÚMERO MOVIDO (tanda 0h)
 
 La mesa deja de ser plana, y lo importante de la tanda es lo que NO ha pasado.
@@ -1092,14 +1479,26 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    arriba. Lo que queda de esta tanda son los sonidos de caída y la barra de
    carga, y las dos van detrás de 0i.
 
-0i. **LA PLANTA ALTA, REHECHA** (Opus, alto + Daniel y Fátima). `PLAN.md` §1d, y
-   **es lo siguiente**. El sistema de capas ya está debajo, que era lo único que
-   no se podía hacer al revés. "Diferente diseño, bumpers, zonas, plataformas,
-   túneles", y de paso ocupar los 1.470 px de carril muerto de los márgenes. La
-   de hoy se tira: no se retoca una réplica hasta que deje de serlo.
+0i-d. ~~**DISEÑAR LA PLANTA ALTA Y LA CAPTURA**~~ **HECHA.** Sale `CAZA.md`. Sin
+   tocar código. Ver arriba.
+
+0i. **LA PLANTA ALTA, REHECHA — LA GEOMETRÍA** (Opus, alto + Daniel y Fátima).
+   `PLAN.md` §1d y **`CAZA.md` §3 y §5, que ya la tienen decidida entera**: es
+   construirla, no diseñarla. Y **es lo siguiente**. El sistema de capas ya está
+   debajo, que era lo único que no se podía hacer al revés.
+   Lo que entra: palas cortas con las mismas dos teclas, **fuera los
+   slingshots**, fuera outlanes y carriles de retorno, plataforma central con
+   borde, dos túneles que cruzan por debajo, tres búmperes sueltos pegados a las
+   bocas, órbita por la franja izquierda libre (y=150 a 670), y la planta de
+   abajo congelada y atenuada. La de hoy se tira entera.
    Lo que ya se puede usar sin construir nada: plataformas con borde, túneles
    que cruzan por debajo, rampas que hay que pegar fuerte para coronar y carriles
    que te sueltan al tablero si no llegas.
+   **Y se cierra con un objetivo de mentira, sin bichos** (`CAZA.md` §5, puerta
+   B): si la planta alta no se siente distinta sin captura, la captura no la
+   salva. El criterio no se lee, se juega.
+   La medida que la cierra: aporrear drena arriba en 3-4 s, jugar bien llega a
+   los 20. Hoy 5,2 s y 52 de 60 drenando.
 
 0h2. **QUE CAERSE SUENE** (Sonnet, medio). `bola_cayo` y `rampa_fallada` no
    tienen sonido, y un evento que no se oye se diagnostica como que no existe
@@ -1112,9 +1511,14 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    rehacer entera. Lo que sí vale la pena mirar ya es **la cámara cruzando las
    dos plantas**, que es lo único que no depende de la geometría.
 
-0k. **BICHOS EN LA ARENA** (Opus, alto). `DISEÑO.md` §5: ahí arriba se caza
-   material de desbloqueo, y sin eso el modo es bonito y no sirve para nada —
-   subir cuesta reloj y no da nada a cambio. Después de 0i.
+0k. **BICHOS EN LA ARENA: LA CAPTURA** (Opus, alto). `CAZA.md` §2 y §5, puertas
+   C y D — ya está diseñada entera: rastro, acoso por MIEDO, cierre que acaba la
+   caza, y el regreso donde se puede perder lo capturado. `DISEÑO.md` §5: ahí
+   arriba se caza material de desbloqueo, y sin eso el modo es bonito y no sirve
+   para nada — subir cuesta reloj y no da nada a cambio. Después de 0i, y
+   **después de decidir cada cuánto se abre la caza** (`CAZA.md` §7, riesgo 1).
+   Depende de la tanda 7 (reproductor de hojas de fotogramas) para los cuatro
+   estados de cada criatura.
    Sube al primer puesto porque lo ha destapado la tanda anterior y porque
    invalida a medias todo lo que se decida encima: el tiro desde la cuna sube a
    y=893 de media y toca 0,1 bumpers, y ninguna salida de recorrido pasa de
