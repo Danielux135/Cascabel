@@ -36,6 +36,14 @@ const C_DRENAJE     := Paleta.DRENAJE
 const C_VERDE       := Paleta.VERDE
 const C_FUEGO       := Paleta.FUEGO
 const C_PIEDRA      := Paleta.PIEDRA
+## Las dos caras de una plataforma. La de arriba lleva luz y el canto no: es lo
+## único que hace que una losa se lea como ALTA en dos dimensiones.
+const C_PIEDRA_LUZ    := Paleta.PIEDRA_4
+const C_PIEDRA_CANTO  := Paleta.PIEDRA_1
+## Lo alto que se dibuja una plataforma. No es física —la física es plana y de
+## capas— es cuánto canto se ve. Está aquí y no en `ParametrosMesa` porque no
+## cambia ningún número: se ajusta mirando.
+const GROSOR_PLATAFORMA := 12.0
 
 ## El multiplicador va grande, en el hueco entre los slingshots y los flippers,
 ## que es donde tienes puesto el ojo mientras juegas. Se dibuja pegado al suelo,
@@ -661,6 +669,16 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 			# puede juzgar si la multibola se juega bien.
 			if _depuracion and combate != null and not combate.terminado():
 				mesa.soltar_bola_extra()
+		KEY_F3:
+			# MONTA EL ANDAMIO DE CAPAS EN LA PLANTA ALTA, y solo con la
+			# depuración encendida (F1 primero). Existe porque el sistema de
+			# capas entró APAGADO —ninguna geometría lo usa hasta `PLAN.md` §1d—
+			# y un sistema que no se puede tocar no se puede juzgar: sin esto,
+			# la única forma de saber si una plataforma se lee es creerse una
+			# tabla. No es geometría de la mesa y no está al empezar: se pide.
+			if _depuracion:
+				mesa.montar_andamio_de_capas()
+				queue_redraw()
 		KEY_ESCAPE:
 			# ESC cierra lo que haya abierto ANTES de salir del juego. Antes
 			# salía siempre, y con un menú de Inicio delante eso es cerrar la
@@ -963,6 +981,9 @@ func _draw() -> void:
 	# El enemigo NO se dibuja aquí ni está en la mesa: vive en `panel_enemigo`,
 	# en la banda derecha, con material propio para el destello y la disolución.
 	_dibujar_inlanes()
+	# Las plataformas van DEBAJO de las rampas y encima del suelo: son terreno,
+	# no adorno. Una rampa que cruce por encima de una tiene que verse cruzando.
+	_dibujar_plataformas()
 	_dibujar_rampas()
 	_dibujar_platillos()
 	_dibujar_paredes()
@@ -1078,8 +1099,87 @@ const ETIQUETA_RAMPA := {
 	Rampa.Premio.DANO: "OTRA PALA",
 }
 
+## UNA PLATAFORMA SE TIENE QUE VER, O ES UNA TRAMPA. Lo único que hace en la
+## física es cambiar de capa a quien se sale de ella, así que si el jugador no
+## sabe dónde acaba, caerse no es información: es que el juego le quita la bola
+## sin decir por qué.
+##
+## Se dibuja como suelo elevado —relleno claro— con el BORDE marcado, que es lo
+## que hay que leer de un vistazo: no importa dónde está el centro, importa
+## dónde se acaba.
+func _dibujar_plataformas() -> void:
+	for pl in mesa.plataformas:
+		var puntos := pl.poligono
+		if puntos.size() < 3:
+			var r := pl.region
+			puntos = PackedVector2Array([
+				r.position, r.position + Vector2(r.size.x, 0),
+				r.end, r.position + Vector2(0, r.size.y)])
+		# LO QUE HACE QUE UNA LOSA SE LEA COMO ALTA ES EL CANTO, NO LA SOMBRA.
+		# La primera versión era el polígono translúcido con una sombra oscura
+		# detrás, y encima de un tablero casi negro eso no dice nada: parecía un
+		# panel de la cáscara puesto encima del campo. Lo que se lee en dos
+		# dimensiones es un bloque: una cara de arriba clara y OPACA, un canto
+		# recto y oscuro debajo, y una sombra dura más allá. Son tres piezas y
+		# hacen falta las tres.
+		var canto := GROSOR_PLATAFORMA
+		var sombra := PackedVector2Array()
+		var lateral := PackedVector2Array()
+		for punto in puntos:
+			sombra.append(punto + Vector2(canto + 5.0, canto + 5.0))
+			lateral.append(punto + Vector2(0, canto))
+		draw_colored_polygon(sombra, C_CABINA)
+		# El canto es la cara de abajo desplazada MÁS la de arriba: entre las dos
+		# queda la banda vertical que es el grosor de la losa.
+		draw_colored_polygon(lateral, C_PIEDRA_CANTO)
+		draw_colored_polygon(puntos, C_PIEDRA)
+		var cerrado := puntos
+		cerrado.append(puntos[0])
+		# El filo de arriba con luz: es el que separa la cara del canto.
+		draw_polyline(cerrado, C_PIEDRA_LUZ, 2.0)
+
+## Las tiras de tablero que cruzan por encima de un túnel. Son lo que dice que
+## la curva va por DEBAJO: sin ellas es una rampa pintada de otro color.
+func _tapar_a_trozos(puntos: PackedVector2Array) -> void:
+	var recorrido := 0.0
+	for i in puntos.size() - 1:
+		var a := puntos[i]
+		var b := puntos[i + 1]
+		var tramo := a.distance_to(b)
+		if tramo <= 0.001:
+			continue
+		# Un trozo tapado de 14 px cada 26: la bola mide 18, así que se ve pasar
+		# por los huecos sin que llegue a desaparecer del todo.
+		var d := 0.0
+		while d < tramo:
+			var global := recorrido + d
+			if int(global / 26.0) % 2 == 0:
+				var t0 := d / tramo
+				var t1 := minf(d + 14.0, tramo) / tramo
+				draw_line(a.lerp(b, t0), a.lerp(b, t1), C_MESA, 19.0)
+			d += 14.0
+		recorrido += tramo
+
 func _dibujar_rampas() -> void:
 	for r in mesa.rampas:
+		# UN TÚNEL VA POR DEBAJO DEL TABLERO y se dibuja como tal: sin la tira
+		# clara que hace que una rampa parezca elevada, y con la boca apagada.
+		# Es lo único que lo separa de una rampa, porque en la física son la
+		# misma curva.
+		# UN TÚNEL ES UN AGUJERO, Y UN AGUJERO SE LEE POR LOS BORDES. Pintado de
+		# negro sobre un tablero casi negro no se veía nada. Lo que lo cuenta es
+		# que EL TABLERO PASA POR ENCIMA: se dibuja el canal oscuro y luego se
+		# tapa a trozos con el color del tablero, así que se ve a rachas, como
+		# una alcantarilla. Y las dos bocas van marcadas, que es por donde de
+		# verdad interactúas con él.
+		if r.subterranea:
+			draw_polyline(r.puntos, C_CABINA, 17.0)
+			draw_polyline(r.puntos, Color(C_PIEDRA_CANTO, 0.9), 11.0)
+			_tapar_a_trozos(r.puntos)
+			for extremo in [r.puntos[0], r.puntos[r.puntos.size() - 1]]:
+				draw_circle(extremo, r.entrada_radio, C_CABINA)
+				draw_circle(extremo, r.entrada_radio, C_PIEDRA_LUZ, false, 2.0)
+			continue
 		draw_polyline(r.puntos, Color(C_CABINA, 0.85), 15.0)
 		draw_polyline(r.puntos, Color(C_MESA_BAJA, 0.9), 11.0)
 		draw_polyline(r.puntos, Color(C_PARED, 0.55), 1.0)
@@ -1244,7 +1344,21 @@ func _dibujar_bola() -> void:
 		if not b.viva:
 			continue
 		if b.rampa >= 0:
+			# POR UN TÚNEL LA BOLA NO SE VE. Va por debajo del tablero, así que
+			# lo único que queda es un bulto oscuro moviéndose por la curva: es
+			# lo que hace que un túnel se lea como túnel y no como una rampa
+			# pintada de otro color.
+			if (mesa.rampas[b.rampa] as Rampa).subterranea:
+				draw_circle(b.pos, mesa.p.radio_bola * 0.7, Color(C_CABINA, 0.9))
+				continue
 			# Va por encima de la mesa: una sombra debajo lo cuenta sin texto.
+			draw_circle(b.pos + Vector2(3, 6), mesa.p.radio_bola * 0.8,
+				Color(C_CABINA, 0.5))
+		elif b.capa > Mesa.CAPA_TABLERO:
+			# Subida a una plataforma. La MISMA sombra que en una rampa, y a
+			# propósito: para el jugador las dos cosas son "esta bola va por
+			# arriba", y darles dos lenguajes distintos sería pedirle que
+			# aprenda dos.
 			draw_circle(b.pos + Vector2(3, 6), mesa.p.radio_bola * 0.8,
 				Color(C_CABINA, 0.5))
 		draw_set_transform(b.pos, 0.0, Vector2(escala, escala))

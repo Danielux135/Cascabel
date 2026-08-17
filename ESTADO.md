@@ -17,22 +17,101 @@ Lo mínimo que hay que saber si esta conversación empieza de cero.
 de verdad**. Encima del arco hay una planta alta con **sus propias dos palas**,
 su racimo, dos bancos de targets, dos slingshots, dos giradores y su órbita. Se
 sube por el **umbral** y se baja por el **regreso**, y los dos van por las
-franjas de 20 px de fuera de las bandas, que estaban muertas. Batería **446/467
-en la caja**; los 21 que faltan son "no existe tal PNG", porque en la caja no
-está `assets/`.
+franjas de 20 px de fuera de las bandas, que estaban muertas. Y desde el 16 de
+agosto la mesa **tiene capas de altura**, aunque todavía no las use ninguna
+geometría: `Bola.capa`, máscara por colisionador, plataformas con borde, túneles
+y rampas con cuesta, todo apagado por defecto. Batería **497/497** con `assets/`
+en la caja (sin `assets/`, 20 fallos que son todos "no existe tal PNG").
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**Y LA PLANTA ALTA DE HOY ESTÁ RECHAZADA, aunque la batería esté en verde.** Es
+**Y LA PLANTA ALTA DE HOY SIGUE RECHAZADA, aunque la batería esté en verde.** Es
 una réplica de la de abajo y Daniel la tumbó mirándola: *"el mapa de arriba no
-puede ser una réplica, ha de sentirse diferente"*. Lo que toca ahora es el
-sistema de capas de altura y luego rehacerla. Ver "Siguiente" 0h y 0i.
+puede ser una réplica, ha de sentirse diferente"*. El sistema de capas ya está;
+**lo que toca ahora es rehacerla encima**. Ver "Siguiente" 0i.
 
-**Y NADIE HA VISTO ESTO DIBUJADO.** La receta para lanzar Godot con ventana en
-sesión remota está en `CLAUDE.md`, "Godot". Es lo primero de la próxima sesión.
+## CAPAS DE ALTURA: EL SISTEMA, Y NI UN NÚMERO MOVIDO (tanda 0h)
+
+La mesa deja de ser plana, y lo importante de la tanda es lo que NO ha pasado.
+
+**Lo que hay.** Una bola tiene un nivel (`Bola.capa`) y un colisionador solo
+existe en los suyos (`Colisionador.capas`, y también `Flipper.capas`). Con eso
+salen casi solas las cuatro piezas que Daniel pidió: **plataforma** (una región
+con borde, `sim/plataforma.gd`; salirte del borde es caer), **túnel** (el mismo
+spline con `subterranea`, que se dibuja oscuro y se traga la bola), **cruces**
+(una boca elevada no engancha a una bola del tablero) y **rampas que no
+llegan**.
+
+**La velocidad de escape no es una escalera de tres casos, es energía:**
+
+    v(recorrido)² = v_entrada² − (velocidad_escape · 0,6)² · recorrido / largo
+
+y las tres bandas de `PROPÓSITO.md` §6 —no llegas / coronas justo / limpia— caen
+de ahí sin fronteras escritas a mano. Medido, con escape a 1000: al 56 % vuelve,
+al 64 % corona a 205 px/s, al 120 % sale a 1024. Y **la velocidad se calcula
+desde la distancia, no se acumula**: sin eso, subir y volver a bajar devuelve un
+número parecido en vez del mismo, y la rampa deja de ser determinista.
+
+Fallar tiene dos formas y es **por rampa**: un tubo (`abierta` false) te devuelve
+por donde entraste; un carril te **suelta al tablero**. Las dos avisan por
+`rampa_fallada`, y la segunda además por `bola_cayo`, que es el MISMO evento que
+salirse de una plataforma.
+
+### Lo que de verdad había que medir
+
+Todo esto entra **apagado**: máscaras en `TODAS`, cuesta a 0, `plataformas`
+vacía, las dos bocas de cada rampa en el tablero. Y está comprobado, no supuesto
+— `tests/medir_capas.gd` guarda la referencia medida ANTES de escribir una línea
+y la reproduce después:
+
+| Qué | Antes | Después |
+|---|---|---|
+| Duración de bola (60 bolas) | 8,142 s | **8,142 s** |
+| Reparto de drenaje | 60 por el centro | **igual** |
+| Golpes por entrada al racimo (240) | 3,09 | **3,09** |
+| Huella (duraciones + posiciones) | 16621,1901 | **16621,1901** |
+| `medir_caza.gd` entero | — | **idéntico línea a línea** |
+
+Batería: **497/497** con assets. Son 15 pruebas nuevas (`_prueba_capas`), y la
+primera de todas comprueba que nadie haya restringido una capa por su cuenta:
+una máscara puesta sin querer no da error, deja a la bola atravesando una pared.
+
+### PARA VERLO: F1 Y LUEGO F3
+
+**El sistema entró apagado, así que la mesa se ve EXACTAMENTE igual que ayer**, y
+eso confundió a Fátima con razón: parecía que no se había aplicado nada. Un
+sistema que no se puede tocar no se puede juzgar, así que hay una tecla:
+
+> **F1** enciende la depuración y **F3** monta el andamio de capas en la
+> **planta alta**. Se sube por el umbral y ahí está: un carril con cuesta que
+> lleva a una plataforma, la plataforma con su borde, y un túnel que cruza por
+> debajo del tablero.
+
+Va en la planta alta a propósito, que es la que ya está rechazada y se tira
+entera en 0i: **la planta baja no se toca**, y por eso la huella de la mesa
+sigue clavada. No se monta al empezar y no se llega a ella jugando: es banco de
+pruebas, igual que F2 con la multibola.
+
+### Y SE HA MIRADO DIBUJADO
+
+Con display virtual, en una mesa de prueba de usar y tirar que no va al repo:
+plataforma con sombra, túnel oscuro por debajo del tablero y carril con cuesta.
+La captura está en la conversación. `VistaMesa` dibuja ya plataformas (relleno
+de piedra, borde marcado y sombra proyectada) y túneles.
+
+### Lo que NO está
+
+- **No hay barra de CARGA** (`PROPÓSITO.md` §6). Duplicar daño cuatro segundos
+  se pasa por `medir_daniel.gd` antes de tocar la mesa, y ese medidor todavía no
+  sabe jugar con N bolas
+- **No suena nada al caerse.** `bola_cayo` y `rampa_fallada` no tienen wav:
+  meter una clave nueva sin generar el sonido en `sonidos.py` pone la batería en
+  rojo. Es media tanda de Sonnet
+- **Ninguna geometría usa el sistema.** Es a propósito y es el orden que decidió
+  Daniel; la mesa de verdad se rediseña en 0i
 
 ## FUERA LOS PINES: LA PLANTA ALTA ES UNA MESA (tanda 0g)
 
@@ -723,8 +802,39 @@ ejecutado:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**Lo de esta sesión, por orden de lo que más puede haber salido mal. Las M son
-de la multibola y ninguna se puede cerrar leyendo código:**
+**LO DE ESTA SESIÓN (capas de altura) — y ojo, que casi todo es "que no pase
+nada":**
+
+C1. **QUE LA MESA SIGA SIENDO LA MISMA.** El sistema entró apagado y los números
+    salen idénticos, pero eso lo dice un medidor, no una mano. Juega tres o
+    cuatro bolas y di si notas algo distinto —la bola más lenta, un rebote raro,
+    una rampa que se traga distinto—. Si notas cualquier cosa, es un fallo mío y
+    va antes que todo lo demás.
+
+C2. **EL 60 % DE LA VELOCIDAD DE ESCAPE: ¿es la frontera buena?** Es tacto puro
+    y está expuesto en `Rampa.UMBRAL_CORONA`. Todavía no lo lleva ninguna rampa
+    de la mesa, así que esta se contesta de verdad en 0i; lo que sí se puede
+    decidir ya es la INTENCIÓN: ¿qué prefieres, que fallar una rampa sea
+    frecuente (frontera alta, más tensión, más frustración) o raro (frontera
+    baja, la rampa engancha casi siempre y el fallo es un susto)?
+
+C3. **CAERSE, ¿DEVUELVE O SUELTA?** Un tubo te devuelve la bola por donde
+    entró, cayéndote a la pala; un carril te la suelta al tablero desde donde se
+    paró. Es una propiedad por rampa, así que se puede mezclar. Mirando la
+    captura de la conversación: ¿qué esperas de cada recorrido de la mesa de
+    hoy?
+
+C4. **LA PLATAFORMA Y EL TÚNEL, ¿SE LEEN?** Con F1+F3 en la planta alta. La
+    primera versión la tumbó Fátima mirándola: la losa era un polígono
+    translúcido con una sombra oscura detrás y encima de un tablero casi negro
+    eso parecía un panel de la cáscara, no un bloque; y el túnel era negro sobre
+    negro. Ahora la losa lleva **canto** —cara de arriba clara y opaca, banda
+    oscura debajo— y el túnel lo tapa el tablero a trozos, con las dos bocas
+    marcadas. ¿Se entiende ya que una está ALTA y que el otro va POR DEBAJO? Si
+    no, sobra código: hace falta arte.
+
+**Lo de la sesión anterior, por orden de lo que más puede haber salido mal. Las
+M son de la multibola y ninguna se puede cerrar leyendo código:**
 
 M0. **PARA PROBAR LA MULTIBOLA SIN DEPENDER DE LA SUERTE: F1 y luego F2.**
     F1 enciende la depuración y F2 suelta una bola extra, hasta cuatro. Es banco
@@ -977,28 +1087,25 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    era que **la zona de las rampas tenía que ser jugable**. Hay arena de caza.
    437/458. Ver arriba.
 
-0h. **CAPAS DE ALTURA: EL SISTEMA** (Opus, razonamiento alto). `PLAN.md` §1c, y
-   va la primera por decisión de Daniel. Lo que hay que montar, sin tocar
-   geometría:
-   - **nivel de altura en la bola** (`Bola.capa`)
-   - **colisionadores por capa**, con máscara: por defecto "todas las capas", que
-     es lo que deja intacta la mesa de hoy y toda la física medida
-   - **caída de una capa a otra**: salirte del borde de una plataforma es un
-     evento, y es el mismo que caerse de una rampa
-   - **`velocidad_escape` en las rampas** (`PROPÓSITO.md` §6): entras por debajo
-     del 60 %, la bola corona a medias y se para. Cerrada, te devuelve por donde
-     entraste; abierta, **te tira al tablero**
-   - **túneles**: el mismo spline por debajo del tablero
-   Y lo que hay que medir antes de darlo por bueno: que la mesa de hoy con
-   máscaras a "todas" produce EXACTAMENTE los mismos números que ahora
-   (duración de bola, reparto de drenaje, golpes por entrada al racimo), o el
-   balance entero deja de valer sin avisar.
+0h. ~~**CAPAS DE ALTURA: EL SISTEMA**~~ **HECHO Y MEDIDO.** 497/497 con assets,
+   15 pruebas nuevas, y la mesa de hoy da los mismos números al decimal. Ver
+   arriba. Lo que queda de esta tanda son los sonidos de caída y la barra de
+   carga, y las dos van detrás de 0i.
 
-0i. **LA PLANTA ALTA, REHECHA** (Opus, alto + Daniel). `PLAN.md` §1d. Va después
-   de 0h porque plataformas y túneles SON capas. "Diferente diseño, bumpers,
-   zonas, plataformas, túneles", y de paso ocupar los 1.470 px de carril muerto
-   de los márgenes. La de hoy se tira: no se retoca una réplica hasta que deje de
-   serlo.
+0i. **LA PLANTA ALTA, REHECHA** (Opus, alto + Daniel y Fátima). `PLAN.md` §1d, y
+   **es lo siguiente**. El sistema de capas ya está debajo, que era lo único que
+   no se podía hacer al revés. "Diferente diseño, bumpers, zonas, plataformas,
+   túneles", y de paso ocupar los 1.470 px de carril muerto de los márgenes. La
+   de hoy se tira: no se retoca una réplica hasta que deje de serlo.
+   Lo que ya se puede usar sin construir nada: plataformas con borde, túneles
+   que cruzan por debajo, rampas que hay que pegar fuerte para coronar y carriles
+   que te sueltan al tablero si no llegas.
+
+0h2. **QUE CAERSE SUENE** (Sonnet, medio). `bola_cayo` y `rampa_fallada` no
+   tienen sonido, y un evento que no se oye se diagnostica como que no existe
+   —es la avería del platillo—. Hay que generarlos en `sonidos.py`, reimportar y
+   engancharlos en `vista_mesa.gd`. Va después de 0i para que se ajusten oyendo
+   la mesa de verdad y no una de prueba.
 
 0j. **JUGAR LA CAZA Y MIRARLA** (Daniel). Baja de puesto: no tiene sentido
    afinar el 3 % de entrada ni los 20 s de la caza sobre una planta que se va a

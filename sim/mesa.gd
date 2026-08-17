@@ -27,6 +27,14 @@ signal bola_extra(punto: Vector2, total: int)
 signal busqueda_bola(punto: Vector2)
 signal rampa_entrada(punto: Vector2, indice: int)
 signal rampa_salida(punto: Vector2, indice: int)
+## La bola se ha quedado a mitad de una rampa con cuesta (`PROPÓSITO.md` §6). No
+## es un castigo, es información: pasa siempre por aquí, tanto si el tubo la
+## devuelve como si el carril la suelta.
+signal rampa_fallada(punto: Vector2, indice: int, ratio: float)
+## HA CAÍDO DE UNA CAPA A OTRA. Es el mismo evento para las dos formas de caerse
+## —salirte del borde de una plataforma y desprenderte de una rampa abierta—
+## porque en la mano se sienten igual.
+signal bola_cayo(punto: Vector2, desde: int, hasta: int)
 signal platillo_capturado(punto: Vector2, indice: int)
 signal platillo_expulsado(punto: Vector2, indice: int)
 ## La bola acaba de quedarse atrapada en la cuna de una pala, o de salir de
@@ -40,6 +48,12 @@ const ALTO := 1300.0
 ## para que los números sigan siendo los del prototipo y se puedan comparar.
 const DESPLAZAMIENTO := 600.0
 const SEGMENTOS_ARCO := 48
+
+## Las capas de altura, repetidas aquí para poder escribir `Mesa.CAPA_ALTA` sin
+## acordarse de que viven en `Colisionador`. Son las mismas constantes.
+const CAPA_TUNEL := Colisionador.CAPA_TUNEL
+const CAPA_TABLERO := Colisionador.CAPA_TABLERO
+const CAPA_ALTA := Colisionador.CAPA_ALTA
 
 var p: ParametrosMesa
 var rng := RandomNumberGenerator.new()
@@ -109,6 +123,9 @@ var caza_restante: float = 0.0
 ## perdido", y contar las dos igual sería quitarle el mérito a aguantar.
 var caza_por_drenaje := false
 var platillos: Array[Platillo] = []
+## Regiones elevadas. HOY ESTÁ VACÍA a propósito: el sistema entra sin tocar
+## geometría, y la planta alta se rediseña encima después (`PLAN.md` §1d).
+var plataformas: Array[Plataforma] = []
 
 var carga_lanzador: float = 0.0
 var cargando := false
@@ -518,6 +535,55 @@ func _arena() -> void:
 	_pared(Vector2(20.0, yp + 30.0), Vector2(cx - 40.0, p.arena_fondo_y))
 	_pared(Vector2(ANCHO - 20.0, yp + 30.0), Vector2(cx + 40.0, p.arena_fondo_y))
 
+## EL ANDAMIO DE CAPAS. No es geometría de la mesa y no se monta al empezar: lo
+## pide F1+F3 desde la vista, y lo que monta va en la PLANTA ALTA, que es la que
+## está rechazada y se tira entera en `PLAN.md` §1d.
+##
+## Por qué existe. El sistema de capas entró apagado —esa era la mitad del
+## trabajo, porque encenderlo sin comprobarlo mueve el balance medido sin
+## avisar—, y eso deja el juego exactamente igual que el día anterior. Un
+## sistema que no se puede tocar no se puede juzgar: sin esto, la única forma
+## de saber si una plataforma se lee como alta es creerse una tabla, y aquí las
+## tablas verdes ya han tapado dos averías que se cazaron jugando.
+##
+## Monta las cuatro cosas de golpe y encadenadas, que es como se juzgan:
+## un carril con cuesta que SUBE a una plataforma —si no le pegas fuerte, te
+## suelta a mitad—, la plataforma con su borde —te sales y te caes—, y un túnel
+## que cruza por debajo del tablero.
+##
+## Se puede llamar dos veces sin que se apile: si ya está, no hace nada.
+func montar_andamio_de_capas() -> void:
+	if not plataformas.is_empty():
+		return
+
+	# La losa, en el hueco que queda entre los dos bancos de targets y por
+	# debajo del racimo.
+	plataformas.append(Plataforma.new(Rect2(140.0, 396.0, 120.0, 84.0), CAPA_ALTA))
+
+	# El carril que sube a ella desde la pala izquierda. ABIERTO a propósito:
+	# es lo que hace que fallar sea caerse y no que te devuelvan.
+	var subida := Rampa.new(PackedVector2Array([
+		Vector2(78.0, 528.0), Vector2(110.0, 470.0), Vector2(168.0, 430.0)]))
+	subida.entrada_radio = p.rampa_entrada_radio
+	subida.velocidad_minima = 260.0
+	subida.bidireccional = false
+	subida.velocidad_escape = 700.0
+	subida.abierta = true
+	subida.capa_salida = CAPA_ALTA
+	subida.nombre = "andamio_subida"
+	rampas.append(subida)
+
+	# Y el túnel, del lado derecho al centro. Las dos bocas en el tablero: baja,
+	# cruza por debajo y vuelve a salir.
+	var tunel := Rampa.new(PackedVector2Array([
+		Vector2(330.0, 500.0), Vector2(300.0, 410.0), Vector2(268.0, 352.0)]))
+	tunel.entrada_radio = p.rampa_entrada_radio
+	tunel.velocidad_minima = 260.0
+	tunel.bidireccional = false
+	tunel.subterranea = true
+	tunel.nombre = "andamio_tunel"
+	rampas.append(tunel)
+
 ## El mismo triángulo del racimo de abajo, en el sitio que se le diga. Se saca a
 ## función porque ahora hay dos, y porque `bumper_giro` —que es la corrección de
 ## la cara de entrada— tiene que valer para los dos igual.
@@ -705,6 +771,7 @@ func _poste(centro: Vector2) -> Colisionador:
 ## con un hueco de girador por cada girador de la mesa.
 func _preparar_bola(b: Bola) -> void:
 	b.vel = Vector2.ZERO
+	b.capa = CAPA_TABLERO
 	b.rampa = -1
 	b.platillo = -1
 	b.platillo_espera = 0.0
@@ -877,6 +944,7 @@ func _avanzar_bola(b: Bola, h: float) -> void:
 
 	_colisionar(b, h)
 	_avanzar_giradores(b)
+	_comprobar_plataformas(b)
 	_comprobar_rampas(b)
 	_comprobar_platillos(b)
 	_actualizar_estado(b)
@@ -958,20 +1026,97 @@ func _recoger_drenadas() -> void:
 ## a mitad de rampa.
 func _avanzar_rampa(b: Bola, h: float) -> void:
 	var r := rampas[b.rampa]
-	b.rampa_distancia += b.rampa_velocidad * float(b.rampa_sentido) * h
+	# La velocidad se CALCULA desde la distancia, no se acumula. Con la rampa
+	# llana (`velocidad_escape` a 0) devuelve la de entrada tal cual y esto es
+	# palabra por palabra lo de antes; con cuesta, no hay deriva de integración,
+	# así que subir y volver a bajar devuelve exactamente la velocidad de
+	# entrada en vez de un número parecido.
+	var v := r.velocidad_en(b.rampa_velocidad,
+		r.recorrido(b.rampa_distancia, b.rampa_subida))
+	# ¿Se ha quedado sin cuesta? Solo cuenta subiendo: bajando la velocidad crece.
+	if r.velocidad_escape > 0.0 and b.rampa_sentido == b.rampa_subida \
+			and v <= Rampa.VELOCIDAD_ESTANCADA:
+		_estancar(b, r)
+		return
+	b.rampa_distancia += v * float(b.rampa_sentido) * h
 	if b.rampa_distancia > 0.0 and b.rampa_distancia < r.largo:
 		b.pos = r.punto_en(b.rampa_distancia)
 		return
 	# Salida: vuelve a la física con la velocidad tangente.
 	var d := clampf(b.rampa_distancia, 0.0, r.largo)
 	var indice := b.rampa
+	var v_salida := r.velocidad_en(b.rampa_velocidad,
+		r.recorrido(d, b.rampa_subida))
 	b.pos = r.punto_en(d)
 	b.vel = r.tangente_en(d) * float(b.rampa_sentido) \
-		* b.rampa_velocidad * r.factor_salida
+		* v_salida * r.factor_salida
+	# La capa a la que sale es la de la boca por la que sale, que con las dos
+	# bocas en el tablero —toda rampa de hoy— no cambia nada.
+	b.capa = r.capa_salida if b.rampa_sentido > 0 else r.capa_entrada
 	b.rampa = -1
 	rampa_salida.emit(b.pos, indice)
 	if indice == umbral:
 		_empezar_caza(b.pos)
+
+## La bola se ha quedado sin cuesta a mitad de rampa. Las dos salidas son las de
+## `PROPÓSITO.md` §6 y es una propiedad POR RAMPA, no una decisión global:
+##
+##   - **tubo** (`abierta` false): la curva la baja sola. Vuelve por donde
+##     entró, y por el modelo de energía llega abajo con la velocidad exacta con
+##     la que entró — cayéndote a la pala, que es lo que se busca.
+##   - **carril** (`abierta` true): se DESPRENDE. Cae al tablero desde donde se
+##     quedó, y de ahí en adelante es una bola normal en caída libre.
+func _estancar(b: Bola, r: Rampa) -> void:
+	var indice := b.rampa
+	var ratio := b.rampa_velocidad / maxf(r.velocidad_escape, 1.0)
+	rampa_fallada.emit(b.pos, indice, ratio)
+	if not r.abierta:
+		b.rampa_sentido = -b.rampa_subida
+		return
+	b.pos = r.punto_en(b.rampa_distancia)
+	# Sin velocidad: se ha parado de verdad. Lo que la baja es la gravedad, y
+	# ESO es lo que se siente como caerse en vez de como volver.
+	b.vel = Vector2.ZERO
+	b.rampa = -1
+	# `desde` es la capa a la que IBA, no en la que estaba: mientras recorre la
+	# curva la bola está en el aire, y lo que cuenta la caída es de qué altura
+	# se ha desprendido. Con las dos bocas en el tablero sale 0→0, que se lee
+	# raro y es verdad: se ha soltado y ha caído al tablero.
+	_caer(b, r.capa_entrada, r.capa_salida)
+
+## Bajar una capa. El único sitio que lo hace, y por eso el único que avisa.
+##
+## AVISA SIEMPRE, aunque la capa de salida sea la misma. Caerse de una rampa
+## abierta que empieza y acaba en el tablero no cambia ningún número y sí es un
+## evento: es el que tiene que sonar, sacudir la cámara y contar para la barra
+## de carga. Un aviso que se calla cuando "no ha cambiado nada" es la avería del
+## platillo otra vez —un sistema que el jugador no ve no existe.
+func _caer(b: Bola, hasta: int, desde: int = -99) -> void:
+	var de := desde if desde != -99 else b.capa
+	b.capa = hasta
+	bola_cayo.emit(b.pos, de, hasta)
+
+## ¿Se ha salido del borde de la plataforma en la que estaba?
+##
+## SI NO HAY NINGUNA PLATAFORMA EN SU CAPA, NO PASA NADA. Es lo que impide que
+## una bola subida a la capa alta de una mesa sin plataformas —la de hoy— se
+## caiga sola en el primer subpaso.
+func _comprobar_plataformas(b: Bola) -> void:
+	if plataformas.is_empty() or not b.libre():
+		return
+	var hay := false
+	var dentro := false
+	var debajo := CAPA_TABLERO
+	for pl in plataformas:
+		if pl.capa != b.capa:
+			continue
+		hay = true
+		debajo = pl.capa_debajo
+		if pl.contiene(b.pos):
+			dentro = true
+			break
+	if hay and not dentro:
+		_caer(b, debajo)
 
 ## Dos bolas SÍ pueden ir por la misma rampa a la vez, y a propósito: el recorrido
 ## lo lleva cada bola en sus propios `rampa_*`, no la rampa, así que no hay estado
@@ -996,8 +1141,17 @@ func _comprobar_rampas(b: Bola) -> void:
 		var sentido := rampas[i].sentido_entrada(b.pos, b.vel)
 		if sentido == 0:
 			continue
+		# LA BOCA TIENE ALTURA. Es lo que hace que dos recorridos se crucen sin
+		# tocarse: una rampa elevada no le engancha la bola a la que va por el
+		# tablero, aunque su boca caiga justo encima. Con todo en el tablero
+		# —hoy— esta comprobación siempre pasa.
+		var capa_boca := rampas[i].capa_entrada if sentido > 0 \
+			else rampas[i].capa_salida
+		if capa_boca != b.capa:
+			continue
 		b.rampa = i
 		b.rampa_sentido = sentido
+		b.rampa_subida = sentido
 		b.rampa_velocidad = b.velocidad()
 		b.rampa_distancia = 0.0 if sentido > 0 else rampas[i].largo
 		b.pos = rampas[i].punto_en(b.rampa_distancia)
@@ -1052,9 +1206,17 @@ func _colisionar(b: Bola, h: float) -> void:
 	# `flipper_atrapando` NO se reinicia aquí: es de la mesa y lo reinicia
 	# `_subpaso` una vez para todas las bolas.
 	_contactos.clear()
+	# EL FILTRO DE CAPA VA AQUÍ Y NO DENTRO DE `consultar`: así la firma de
+	# `consultar` no cambia, y flippers y colisionadores la comparten. Con todo
+	# en `TODAS` —o sea, la mesa de hoy— esto es un `and` por colisionador y no
+	# quita ni añade un solo contacto.
 	for c in colisionadores:
+		if not c.en_capa(b.capa):
+			continue
 		c.consultar(b.pos, b.vel, p.radio_bola, _contactos)
 	for f in flippers:
+		if not f.en_capa(b.capa):
+			continue
 		f.consultar(b.pos, b.vel, p.radio_bola, _contactos)
 	if _contactos.is_empty():
 		return

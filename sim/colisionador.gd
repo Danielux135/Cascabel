@@ -7,6 +7,46 @@ extends RefCounted
 
 enum Tipo { PARED, BUMPER, SLINGSHOT, POSTE, PUERTA, FLIPPER, TARGET }
 
+# ------------------------------------------------------------- capas de altura
+#
+# La mesa deja de ser plana. Una bola tiene un NIVEL y un colisionador solo
+# existe en los suyos, que es lo que hace que una plataforma tenga borde, que un
+# túnel pase por debajo del tablero y que dos recorridos se crucen sin tocarse.
+#
+# Los números son alturas, no índices: el túnel va por debajo del tablero y por
+# eso vale −1. La máscara los mete en bits con `bit()`, que suma
+# `DESPLAZAMIENTO` para que el túnel no pida un bit negativo.
+#
+# POR DEFECTO TODO COLISIONADOR ESTÁ EN TODAS LAS CAPAS. No es pereza: es lo
+# único que deja la mesa de hoy —y toda su física medida— exactamente como
+# estaba. Una capa se restringe cuando alguien la restringe a mano.
+
+const CAPA_TUNEL := -1
+const CAPA_TABLERO := 0
+const CAPA_ALTA := 1
+## Cuántas capas hay sitio para nombrar. Sobra de largo; está escrito para que
+## una capa nueva no obligue a mirar si cabe.
+const CAPAS_MAXIMAS := 8
+const DESPLAZAMIENTO_CAPA := 1
+## Todos los bits de las capas nombrables. Es el valor por defecto.
+const TODAS := (1 << (CAPAS_MAXIMAS + DESPLAZAMIENTO_CAPA)) - 1
+
+static func bit(capa: int) -> int:
+	return 1 << (capa + DESPLAZAMIENTO_CAPA)
+
+## Máscara a partir de una lista de capas: `mascara([CAPA_ALTA])`.
+static func mascara(capas_lista: Array) -> int:
+	var m := 0
+	for c in capas_lista:
+		m |= bit(int(c))
+	return m
+
+## En qué capas existe esto. `TODAS` = la mesa plana de siempre.
+var capas: int = TODAS
+
+func en_capa(capa: int) -> bool:
+	return (capas & bit(capa)) != 0
+
 var a: Vector2
 var b: Vector2
 var radio: float

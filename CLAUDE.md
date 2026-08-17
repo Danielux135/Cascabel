@@ -46,6 +46,7 @@ Medidas (no son pruebas: no fallan, imprimen tablas):
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_reliquias.gd
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_capas.gd
 
 ### En una sesión remota se puede lanzar el juego CON VENTANA
 
@@ -67,6 +68,25 @@ hay tarjeta) y avisa; da igual.
 
 Esto es lo que cazó el halo de magenta y el reloj cortado, y ninguno de los
 dos salía en la batería. **Lo visual se mira, no se deduce.**
+
+**Y para llevar el repo a la caja, un tar, no cincuenta ficheros.** El bridge
+sube 50 ficheros por llamada y el repo tiene 600, así que lo que se hace es
+comprimirlo EN la carpeta del escritorio, subir el `.tgz` y descomprimirlo en la
+caja. Dos paquetes, porque el código pesa 300 KB y los assets 1,4 MB:
+
+    tar czf caja_fuente.tgz --exclude='*.uid' project.godot icon.svg icon.svg.import \
+        sim render tests data *.md
+    tar czf caja_assets.tgz assets
+
+Los `.uid` sobran: Godot los regenera con `--import`, que hay que lanzar en la
+caja de todos modos y **también después de crear una clase nueva**, o `Parse
+Error: Could not find type "..."`. Ojo con el sitio de los dos `.tgz`: nada se
+descomprime dentro del repo (ver Trampas), y como el bridge no puede borrar, al
+acabar se mueven a `_to_delete/`.
+
+**Sin `assets/` la batería da 20 fallos que no son fallos** —todos "no existe tal
+PNG"—, así que si lo que se toca es física, con el paquete de código basta; si se
+toca cualquier cosa que dibuje, hay que subir los dos y entonces sale 497/497.
 
 ## Herramientas del repo
 
@@ -140,6 +160,26 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   DESPUÉS del sistema de capas de altura (§1c) porque plataformas y túneles son
   capas. **No la des por buena porque esté medida y en verde: está medida y
   rechazada.**
+- **LA MESA TIENE CAPAS DE ALTURA, Y ENTRARON APAGADAS.** `Bola.capa` dice a qué
+  altura va cada bola y `Colisionador.capas` en qué alturas existe cada cosa; una
+  plataforma es una región con borde y salirse de él es caerse; un túnel es el
+  mismo spline con `subterranea`; y una rampa puede tener cuesta
+  (`velocidad_escape`). **Todo eso viene por defecto en "todas las capas" y con
+  la cuesta a 0, que es lo único que deja la mesa medida exactamente como
+  estaba** — y está comprobado al decimal en `tests/medir_capas.gd`. Cuando algo
+  se restrinja a una capa, se restringe a mano y se vuelve a medir. Una máscara
+  puesta sin querer no da ningún error: deja a la bola atravesando una pared.
+- **Una rampa con cuesta es ENERGÍA, no tres casos.** `v² = v0² − (escape·0,6)²·
+  recorrido/largo`, y las tres bandas de `PROPÓSITO.md` §6 salen de ahí sin
+  fronteras escritas a mano. Y la velocidad se CALCULA desde la distancia, nunca
+  se acumula: integrándola, subir y volver a bajar devuelve un número parecido en
+  vez del mismo, y una rampa que no es determinista deja de ser una curva y pasa
+  a ser física simulada, que es justo lo que el invariante prohíbe.
+- **Caerse de una plataforma y caerse de una rampa son EL MISMO evento**
+  (`Mesa.bola_cayo`). En la mano se sienten igual, y separarlos obligaría a la
+  vista, al sonido y al combate a enterarse dos veces de lo mismo. Avisa aunque
+  la capa no cambie: una rampa abierta que empieza y acaba en el tablero no mueve
+  ningún número y sigue siendo un evento que tiene que sonar.
 - **El ALTO de la mesa no es invariante; el ANCHO sí.** Los 400 px de ancho
   sostienen el hueco entre palas y toda la física medida. Los 1300 de alto se
   suben si las capas lo piden — lo dijo Daniel: *"si ha de aumentarse la altura

@@ -25,6 +25,14 @@ var angulo: float
 var omega: float = 0.0
 var pulsado := false
 
+## En qué capas de altura existe esta pala. Por defecto en todas, que es la mesa
+## plana de siempre. Cuando la planta alta se rediseñe con plataformas, sus dos
+## palas se restringen a la suya y dejan de estorbar a una bola del tablero.
+var capas: int = Colisionador.TODAS
+
+func en_capa(capa: int) -> bool:
+	return (capas & Colisionador.bit(capa)) != 0
+
 func _init(
 		p_eje: Vector2,
 		p_longitud: float,

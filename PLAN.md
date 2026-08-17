@@ -301,10 +301,11 @@ Windows y web, página de itch.io.
 
 ---
 
-## Fase 1c — Capas de altura
+## Fase 1c — Capas de altura · EL SISTEMA, HECHO Y MEDIDO
 
 *Escrita en agosto de 2026, después de que la primera planta alta saliera mal
-dos veces. No está empezada.*
+dos veces. **El sistema está construido (tanda 0h, 16-ago-2026); la geometría
+que lo use es la 1d.***
 
 La mesa tiene dos plantas y las dos son mesa jugable. Lo que falta —y lo que
 Daniel pidió con estas palabras— son **capas de altura, como plataformas, y
@@ -333,6 +334,38 @@ que no se puede hacer al revés.
 
 **Criterio de salida:** una rampa fallada te tira al tablero y sabes por qué; y
 dos recorridos se cruzan sin tocarse.
+
+### Lo que quedó construido
+
+| Pieza | Dónde vive | Apagado por defecto |
+|---|---|---|
+| Nivel de altura de la bola | `Bola.capa` | toda bola nace en `CAPA_TABLERO` |
+| Máscara por capa | `Colisionador.capas` y `Flipper.capas` | `TODAS`, o sea la mesa plana |
+| Plataforma con borde | `sim/plataforma.gd`, `Mesa.plataformas` | la lista está VACÍA |
+| Caída de una capa a otra | señal `Mesa.bola_cayo` | no salta si nadie sube |
+| Velocidad de escape | `Rampa.velocidad_escape` | a 0 = la rampa determinista de siempre |
+| Tubo o carril | `Rampa.abierta` | `false` |
+| Túnel | `Rampa.subterranea` | `false` |
+| Cruces | `Rampa.capa_entrada` / `capa_salida` | las dos en el tablero |
+
+**Todo entra apagado, y eso es la mitad del trabajo.** La medida que lo cierra
+está en `tests/medir_capas.gd`: la mesa de hoy da los mismos números al decimal
+—8,142 s de duración de bola, 120 golpes, 3,09 golpes de bumper por entrada al
+racimo, misma huella— antes y después de escribir el sistema entero.
+
+La velocidad de escape no es una escalera de tres casos, es energía:
+
+    v(recorrido)² = v_entrada² − (velocidad_escape · 0,6)² · recorrido / largo
+
+y las tres bandas del diseño salen solas de ahí. La velocidad se calcula desde
+la distancia en vez de acumularse, así que subir y volver a bajar devuelve la
+velocidad de entrada exacta y el recorrido sigue siendo determinista.
+
+**Lo que NO lleva:** la barra de CARGA de `PROPÓSITO.md` §6 (duplicar daño
+cuatro segundos hay que pasarlo por `medir_daniel.gd` antes, y ese medidor
+todavía no sabe jugar con N bolas), y ningún sonido para `bola_cayo` ni para
+`rampa_fallada` — hace falta generarlos en `sonidos.py`, y meter una clave
+nueva sin su wav pone la batería en rojo.
 
 ---
 

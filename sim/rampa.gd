@@ -35,6 +35,74 @@ var bidireccional := true
 ## era en la práctica perder la bola.
 var factor_salida: float = 1.0
 
+# ------------------------------------------------------------- capas de altura
+
+## Qué capa hay en cada boca. Con las dos en el tablero —lo de siempre— una
+## rampa se comporta EXACTAMENTE como antes: sube y baja sin cambiar de altura.
+## Una rampa a una plataforma pone `capa_salida = CAPA_ALTA`; un túnel se mete
+## por debajo y vuelve, así que sus dos bocas siguen en el tablero.
+var capa_entrada: int = Colisionador.CAPA_TABLERO
+var capa_salida: int = Colisionador.CAPA_TABLERO
+
+## Va por DEBAJO del tablero. No cambia la física —una rampa nunca colisiona con
+## nada— pero sí el dibujo: se pinta oscura y la bola no se ve mientras la
+## recorre. Es lo único que separa un túnel de una rampa.
+var subterranea := false
+
+# ------------------------------------------------- la rampa que no siempre sube
+
+## `PROPÓSITO.md` §6. A 0 esto está APAGADO y la rampa es la determinista de
+## siempre: entras y sales. Por encima de 0, la curva tiene cuesta.
+##
+## El modelo es energía, no una escalera de casos: subir la rampa entera cuesta
+## la energía cinética de `velocidad_escape * UMBRAL_CORONA`, así que
+##
+##     v(recorrido)² = v_entrada² − (velocidad_escape·0,6)² · recorrido/largo
+##
+## y de ahí salen solas las tres bandas del diseño, sin fronteras escritas a
+## mano y sin integrar nada (la velocidad se calcula desde la distancia, no se
+## acumula, así que no hay deriva y el recorrido sigue siendo determinista):
+##
+## | Entras a           | Qué pasa                                   |
+## |--------------------|--------------------------------------------|
+## | < 60 % de escape   | se para a mitad de cuesta                  |
+## | 60-100 %           | corona y sale despacio                     |
+## | > 100 %            | sale limpia y cada vez más rápido          |
+var velocidad_escape: float = 0.0
+## Dónde está la frontera de "no llego", en fracción de `velocidad_escape`. Es
+## el 60 % del diseño y está aquí y no escrito dentro de la cuenta porque es
+## tacto: se juzga jugando.
+const UMBRAL_CORONA := 0.6
+## Por debajo de esto se considera parada. No es cero para que una bola que se
+## queda a un pelo no tarde un segundo entero en decidirse.
+const VELOCIDAD_ESTANCADA := 8.0
+
+## Un CARRIL (abierta) o un TUBO (cerrada), y es lo que decide qué pasa al no
+## llegar: el tubo te devuelve por donde entraste, el carril te suelta al
+## tablero. Es una propiedad por rampa, no una decisión global.
+var abierta := false
+
+## Cuánto ha subido la bola desde la boca por la que entró.
+func recorrido(distancia: float, subida: int) -> float:
+	return distancia if subida > 0 else largo - distancia
+
+## La velocidad que le queda a la bola tras haber subido `recorrido`. Con
+## `velocidad_escape` a 0 devuelve la de entrada tal cual, que es lo que deja
+## intacta toda la mesa de hoy.
+func velocidad_en(v_entrada: float, recorrido_hecho: float) -> float:
+	if velocidad_escape <= 0.0 or largo <= 0.0:
+		return v_entrada
+	var coste := velocidad_escape * UMBRAL_CORONA
+	var v2 := v_entrada * v_entrada \
+		- coste * coste * clampf(recorrido_hecho / largo, 0.0, 1.0)
+	return sqrt(maxf(v2, 0.0))
+
+## ¿Llega arriba entrando a esta velocidad? Es la cuenta de arriba con el
+## recorrido entero, y sirve para dibujar la banda antes de que pase.
+func corona(v_entrada: float) -> bool:
+	return velocidad_escape <= 0.0 \
+		or v_entrada > velocidad_escape * UMBRAL_CORONA
+
 var _acumulado := PackedFloat32Array()
 
 func _init(control: PackedVector2Array, resolucion: int = 14) -> void:

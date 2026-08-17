@@ -10,6 +10,15 @@ extends RefCounted
 var pos := Vector2.ZERO
 var vel := Vector2.ZERO
 var viva := false
+
+## EN QUÉ CAPA DE ALTURA está esta bola. `CAPA_TABLERO` (0) es la mesa de
+## siempre; por encima van las plataformas y por debajo los túneles. Solo
+## colisiona con lo que exista en su capa (`Colisionador.en_capa`).
+##
+## Es de la bola y no de la mesa por lo de siempre: con dos bolas, una subida a
+## una plataforma y otra rodando por el tablero, una altura de la mesa sería la
+## altura de la última que se movió.
+var capa: int = Colisionador.CAPA_TABLERO
 ## Mientras esté en el carril lanzador, el lanzador funciona y el ball search no.
 var en_carril := true
 
@@ -19,6 +28,10 @@ var rampa: int = -1
 var rampa_sentido: int = 1
 var rampa_distancia: float = 0.0
 var rampa_velocidad: float = 0.0
+## Por dónde ENTRÓ, que no es lo mismo que por dónde va. Con velocidad de escape
+## una rampa fallada se recorre hacia atrás, así que `rampa_sentido` cambia a
+## mitad de curva y ya no sirve para saber cuánto se ha subido.
+var rampa_subida: int = 1
 
 ## Capturada en un platillo: quieta hasta que se agote `platillo_espera`.
 var platillo: int = -1

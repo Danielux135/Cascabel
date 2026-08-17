@@ -37,6 +37,7 @@ func _initialize() -> void:
 	_prueba_recuperable()
 	_prueba_regiones_clic()
 	_prueba_rampas()
+	_prueba_capas()
 	_prueba_sonido()
 	_prueba_impactos()
 	_prueba_racimo()
@@ -1875,6 +1876,211 @@ func _prueba_sonido() -> void:
 ## de vista, y sabes dónde va a salir. Aquí se comprueba que sale SIEMPRE por
 ## el mismo sitio, que tarda lo que tiene que tardar, y que no hay forma de que
 ## se quede a medias.
+# ------------------------------------------------------- capas de altura (§1c)
+
+## EL SISTEMA DE CAPAS ENTRA SIN TOCAR LA MESA, y esa es la mitad importante de
+## estas pruebas. Con todo en `TODAS` y toda bola en el tablero, la geometría de
+## hoy tiene que seguir dando lo mismo; lo que se mide aparte es que las piezas
+## nuevas —máscara, plataforma, túnel y velocidad de escape— hagan lo que dicen.
+func _prueba_capas() -> void:
+	var m := _nueva_mesa()
+
+	# 1. Lo primero: que nadie haya restringido nada por su cuenta. Si un día
+	# alguien pone una máscara en `_construir` sin querer, el balance entero se
+	# mueve y no da ningún error: la bola atraviesa una pared y ya está.
+	var restringidos := 0
+	for c in m.colisionadores:
+		if c.capas != Colisionador.TODAS:
+			restringidos += 1
+	for f in m.flippers:
+		if f.capas != Colisionador.TODAS:
+			restringidos += 1
+	_comprobar("la mesa de hoy sigue entera en TODAS las capas",
+		restringidos == 0, "%d colisionadores restringidos" % restringidos)
+	_comprobar("una bola nueva sale en el tablero",
+		m.bola.capa == Mesa.CAPA_TABLERO, "capa %d" % m.bola.capa)
+	var con_cuesta := 0
+	var con_capa := 0
+	for r in m.rampas:
+		if r.velocidad_escape > 0.0:
+			con_cuesta += 1
+		if r.capa_entrada != Mesa.CAPA_TABLERO or r.capa_salida != Mesa.CAPA_TABLERO:
+			con_capa += 1
+	_comprobar("y ningun recorrido de hoy tiene cuesta ni cambia de altura",
+		con_cuesta == 0 and con_capa == 0,
+		"%d con cuesta, %d con capa" % [con_cuesta, con_capa])
+
+	# 2. La máscara: la misma pared, dos capas, dos resultados.
+	for capa in [Mesa.CAPA_TABLERO, Mesa.CAPA_ALTA]:
+		var m2 := _mesa_pelada()
+		var pared := Colisionador.new(Vector2(120, 400), Vector2(280, 400), 6.0,
+			Colisionador.Tipo.PARED, m2.p.rebote_pared)
+		pared.capas = Colisionador.mascara([Mesa.CAPA_ALTA])
+		m2.colisionadores.append(pared)
+		var b := m2.bola
+		b.viva = true
+		b.en_carril = false
+		b.capa = capa
+		b.pos = Vector2(200, 300)
+		b.vel = Vector2(0, 400)
+		for _i in int(1.0 / DT):
+			m2.avanzar(DT)
+			if b.pos.y >= 470.0:
+				break
+		var paso := b.pos.y >= 470.0
+		if capa == Mesa.CAPA_TABLERO:
+			_comprobar("una pared de la capa alta no existe en el tablero",
+				paso, "se paro en y=%.0f" % b.pos.y)
+		else:
+			_comprobar("y en la capa alta si existe",
+				not paso, "la atraveso hasta y=%.0f" % b.pos.y)
+
+	# 3. Plataforma: salirse del borde es caerse, y solo una vez.
+	var m3 := _mesa_pelada()
+	m3.plataformas.append(Plataforma.new(Rect2(100, 300, 200, 200), Mesa.CAPA_ALTA))
+	var caidas := [0]
+	var salto := [Vector2.ZERO]
+	m3.bola_cayo.connect(func(_pt: Vector2, d: int, h: int) -> void:
+		caidas[0] += 1
+		salto[0] = Vector2(d, h))
+	var b3 := m3.bola
+	b3.viva = true
+	b3.en_carril = false
+	b3.capa = Mesa.CAPA_ALTA
+	b3.pos = Vector2(200, 400)
+	b3.vel = Vector2(600, 0)
+	for _i in int(1.0 / DT):
+		m3.avanzar(DT)
+	_comprobar("salirse del borde de una plataforma es caer una capa",
+		caidas[0] == 1 and b3.capa == Mesa.CAPA_TABLERO,
+		"%d avisos, salto %s, acabo en la capa %d"
+			% [caidas[0], str(salto[0]), b3.capa])
+
+	# 4. Y sin plataformas en su capa NO se cae: es lo que impide que la mesa de
+	# hoy —que no tiene ninguna— empiece a tirar bolas al primer subpaso.
+	var m4 := _mesa_pelada()
+	var falsas := [0]
+	m4.bola_cayo.connect(func(_pt: Vector2, _d: int, _h: int) -> void: falsas[0] += 1)
+	var b4 := m4.bola
+	b4.viva = true
+	b4.en_carril = false
+	b4.capa = Mesa.CAPA_ALTA
+	b4.pos = Vector2(200, 400)
+	b4.vel = Vector2(300, -100)
+	for _i in int(1.0 / DT):
+		m4.avanzar(DT)
+	_comprobar("sin plataformas en su capa, una bola alta no se cae sola",
+		falsas[0] == 0, "%d caidas" % falsas[0])
+
+	# 5. Cruces: una boca elevada no le engancha la bola a la que va por debajo.
+	var m5 := _mesa_pelada()
+	var puente := Rampa.new(PackedVector2Array([
+		Vector2(80, 500), Vector2(200, 500), Vector2(320, 500)]))
+	puente.velocidad_minima = 100.0
+	puente.bidireccional = false
+	puente.capa_entrada = Mesa.CAPA_ALTA
+	puente.capa_salida = Mesa.CAPA_ALTA
+	m5.rampas.append(puente)
+	var enganches := [0]
+	m5.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void: enganches[0] += 1)
+	var b5 := m5.bola
+	b5.viva = true
+	b5.en_carril = false
+	b5.capa = Mesa.CAPA_TABLERO
+	b5.pos = Vector2(80, 500)
+	b5.vel = Vector2(600, 0)
+	for _i in int(1.0 / DT):
+		m5.avanzar(DT)
+		if enganches[0] > 0:
+			break
+	_comprobar("una boca de la capa alta no engancha a una bola del tablero",
+		enganches[0] == 0, "%d enganches" % enganches[0])
+
+	# 6, 7. Velocidad de escape: las dos bandas y las dos formas de fallar.
+	for abierta in [false, true]:
+		for v0 in [400.0, 900.0]:
+			var m6 := _mesa_pelada()
+			var r6 := Rampa.new(PackedVector2Array([
+				Vector2(120, 900), Vector2(160, 600), Vector2(280, 400)]))
+			r6.velocidad_minima = 150.0
+			r6.bidireccional = false
+			r6.velocidad_escape = 1000.0
+			r6.abierta = abierta
+			r6.capa_salida = Mesa.CAPA_ALTA
+			m6.rampas.append(r6)
+			var cayo := [false]
+			var fallo := [false]
+			m6.bola_cayo.connect(func(_pt: Vector2, _d: int, _h: int) -> void:
+				cayo[0] = true)
+			m6.rampa_fallada.connect(func(_pt: Vector2, _i: int, _rt: float) -> void:
+				fallo[0] = true)
+			var b6 := m6.bola
+			b6.viva = true
+			b6.en_carril = false
+			b6.pos = Vector2(120, 900)
+			b6.vel = (Vector2(160, 600) - Vector2(120, 900)).normalized() * v0
+			for _i in int(6.0 / DT):
+				m6.avanzar(DT)
+				if b6.rampa < 0 and (fallo[0] or b6.capa == Mesa.CAPA_ALTA):
+					break
+			var ratio: float = v0 / r6.velocidad_escape
+			if ratio < Rampa.UMBRAL_CORONA:
+				_comprobar("al %.0f %% de la velocidad de escape no corona (%s)"
+					% [ratio * 100.0, "carril" if abierta else "tubo"],
+					fallo[0] and b6.capa == Mesa.CAPA_TABLERO,
+					"fallo=%s capa=%d" % [str(fallo[0]), b6.capa])
+				_comprobar("y entonces %s"
+					% ["el tubo la devuelve", "el carril la suelta"][int(abierta)],
+					cayo[0] == abierta,
+					"cayo=%s, abierta=%s" % [str(cayo[0]), str(abierta)])
+			else:
+				_comprobar("al %.0f %% corona y llega a la capa de arriba (%s)"
+					% [ratio * 100.0, "carril" if abierta else "tubo"],
+					not fallo[0] and b6.capa == Mesa.CAPA_ALTA,
+					"fallo=%s capa=%d" % [str(fallo[0]), b6.capa])
+
+	# 8. Y la rampa llana sigue siendo la determinista de siempre: la velocidad
+	# de escape a 0 no puede cambiar ni el tiempo de viaje.
+	var m8 := _mesa_pelada()
+	var r8 := Rampa.new(PackedVector2Array([
+		Vector2(120, 900), Vector2(160, 600), Vector2(280, 400)]))
+	r8.velocidad_minima = 150.0
+	r8.bidireccional = false
+	m8.rampas.append(r8)
+	var b8 := m8.bola
+	b8.viva = true
+	b8.en_carril = false
+	b8.pos = Vector2(120, 900)
+	b8.vel = (Vector2(160, 600) - Vector2(120, 900)).normalized() * 700.0
+	var pasos8 := 0
+	var salio8 := [false]
+	m8.rampa_salida.connect(func(_pt: Vector2, _i: int) -> void: salio8[0] = true)
+	for _i in int(6.0 / DT):
+		m8.avanzar(DT)
+		pasos8 += 1
+		if salio8[0]:
+			break
+	_comprobar("sin cuesta, el viaje sigue durando largo/velocidad",
+		salio8[0] and absf(float(pasos8) * DT - r8.largo / 700.0) < 0.1,
+		"tardo %.3f s, la curva mide %.0f px a 700 px/s"
+			% [float(pasos8) * DT, r8.largo])
+
+## La mesa de verdad, vaciada. Hace falta porque el campo entero está ocupado:
+## una pieza de prueba puesta "en un hueco" acaba midiendo el rebote contra el
+## techo de la arena de caza.
+func _mesa_pelada() -> Mesa:
+	var m := _nueva_mesa()
+	m.colisionadores.clear()
+	m.flippers.clear()
+	m.rampas.clear()
+	m.platillos.clear()
+	m.targets.clear()
+	m.bancos.clear()
+	m.giradores.clear()
+	m.umbral = -1
+	m.regreso = -1
+	return m
+
 func _prueba_rampas() -> void:
 	var m := _nueva_mesa()
 	# Tres abajo (órbita, retorno, cañón) y dos de la zona alta (umbral y
