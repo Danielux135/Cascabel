@@ -101,7 +101,16 @@ sobre magenta `#F706F8`.
 
 | Contenido | Destino | Estado |
 |---|---|---|
-| `cr_brasa` idle, 8 fotogramas en una fila | `assets/criaturas_anim/cr_brasa/idle_1..8.png` | **USADA**, celda 64 |
+| `cr_brasa` idle, 8 fotogramas en una fila | `assets/criaturas_anim/cr_brasa/idle_1..8.png` | **CARGADA DE VERDAD desde la tanda 7**, celda 64 |
+
+> ⚠ **"USADA" decía esta casilla, y era mentira.** La hoja estaba cortada,
+> estabilizada y pulida, y **no la cargaba ni una línea de `.gd`**: "usada"
+> quería decir "integrada en la carpeta", no "el juego la dibuja". Lo mismo
+> pasaba con `cr_calavera`. Desde la tanda 7 las dos entran por
+> `HojaAnimada.CATALOGO` y hay dos pruebas que impiden que vuelva a pasar. **En
+> esta tabla, "USADA" tiene que querer decir que alguien la LEE**, y si no se ha
+> comprobado, se escribe "recortada" y no "usada" — es la misma familia que "una
+> palabra del inventario no describe el asset", en `CLAUDE.md`.
 
 **Guardar la hoja original en `Desktop\Sprites` como `2026-08-17_cr_brasa_idle_8.png`.**
 

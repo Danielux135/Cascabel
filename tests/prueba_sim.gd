@@ -53,6 +53,7 @@ func _initialize() -> void:
 	_prueba_misiones()
 	_prueba_criticos()
 	_prueba_multibola()
+	_prueba_hojas_animadas()
 	_prueba_fuente()
 	await _prueba_cascara()
 	_prueba_paleta()
@@ -1961,6 +1962,87 @@ func _prueba_sonido() -> void:
 	_comprobar("cada tramo del multiplicador suena mas agudo que el anterior",
 		asciende and tonos.size() >= 3, str(tonos))
 
+	# EL CANDADO QUE FALTABA: un wav generado y no enganchado no da error, deja
+	# un evento mudo. `bola_cayo` y `rampa_fallada` llevaban así desde la tanda
+	# 0h. Al revés que la comprobación de arriba —que mira que exista el wav de
+	# lo que el juego pide—, esta mira que el juego pida todo lo que hay wav.
+	var sueltos: Array[String] = []
+	var dir := DirAccess.open("res://assets/sonido")
+	if dir != null:
+		for f in dir.get_files():
+			# Godot exporta los .wav como .import; en la caja se ven los dos.
+			if not f.ends_with(".wav"):
+				continue
+			if not NodoSonido.AJUSTES.has(f.get_basename()):
+				sueltos.append(f.get_basename())
+	_comprobar("no hay ningun wav generado que el juego no use", sueltos.is_empty(),
+		"%s: o se enganchan o se borran de sonidos.py" % str(sueltos))
+
+	# Y TODA SEÑAL DE `Mesa` TIENE QUE ATENDERLA ALGUIEN. Esta es la prueba que
+	# habría cazado la tanda entera: `bola_cayo` y `rampa_fallada` existían,
+	# estaban emitidas, y nadie las escuchaba — un evento mudo no da error, se
+	# diagnostica como que no pasa. Se lee del fichero, no se escribe la lista a
+	# mano, para que añadir una señal nueva ponga esto en rojo solo.
+	var declaradas := {}
+	var fm := FileAccess.open("res://sim/mesa.gd", FileAccess.READ)
+	if fm != null:
+		var re := RegEx.new()
+		re.compile("^signal ([a-z_]+)")
+		for linea in fm.get_as_text().split("\n"):
+			var m := re.search(linea)
+			if m != null:
+				declaradas[m.get_string(1)] = true
+		fm.close()
+	var texto_vista := ""
+	var fv := FileAccess.open("res://render/vista_mesa.gd", FileAccess.READ)
+	if fv != null:
+		texto_vista = fv.get_as_text()
+		fv.close()
+	_comprobar("se han podido leer las senales de la mesa y la vista",
+		declaradas.size() > 10 and texto_vista.length() > 1000,
+		"%d senales" % declaradas.size())
+	# Las dos excepciones van escritas con su motivo, que es lo que impide que
+	# esta prueba se relaje sola:
+	#
+	#  - `platillo_expulsado`: la expulsión suena por el lado del combate.
+	#  - `flipper_golpeado`: **NO está atendida, y es un hallazgo de esta misma
+	#    prueba, no una decisión.** Lo que suena hoy es el SOLENOIDE al pulsar la
+	#    tecla, le des a la bola o no, así que fallar un tiro suena exactamente
+	#    igual que clavarlo. Si eso vale o no es tacto —decisión de quien juega—,
+	#    y está anotado en `ESTADO.md`. El día que se decida, se quita de aquí.
+	const SENALES_SIN_ATENDER := ["platillo_expulsado", "flipper_golpeado"]
+	var sin_atender: Array[String] = []
+	for senal in declaradas:
+		if SENALES_SIN_ATENDER.has(senal):
+			continue
+		if not texto_vista.contains("mesa.%s.connect" % senal):
+			sin_atender.append(str(senal))
+	_comprobar("la vista atiende todas las senales de la mesa",
+		sin_atender.is_empty(),
+		"%s: una senal que nadie escucha es un evento mudo" % str(sin_atender))
+
+	# Caerse y fallar la rampa son los DOS ÚNICOS sonidos del juego cuya energía
+	# no llega en el primer instante, y ahí está toda su identidad: la mesa ya
+	# tenía tres sonidos que bajan de tono —drenaje, platillo y rampa_salida— y
+	# un cuarto barrido descendente no se distinguiría de ninguno. Una caída
+	# TERMINA EN UN GOLPE porque hay suelo; los otros se apagan. Si alguien
+	# regenera estos dos sin el retardo, esta prueba es la que lo caza.
+	var caida := load(NodoSonido.RUTA % "caida") as AudioStream
+	var fallada := load(NodoSonido.RUTA % "rampa_fallada") as AudioStream
+	var drenaje := load(NodoSonido.RUTA % "drenaje") as AudioStream
+	_comprobar("caerse dura mas que un golpe y menos que perder la bola",
+		caida.get_length() > bumper.get_length() * 2.0
+			and caida.get_length() < drenaje.get_length(),
+		"caida %.3f s · bumper %.3f s · drenaje %.3f s"
+			% [caida.get_length(), bumper.get_length(), drenaje.get_length()])
+	_comprobar("y la rampa fallada tambien tiene cuerpo",
+		fallada.get_length() > bumper.get_length() * 2.0,
+		"%.3f s" % fallada.get_length())
+	# Los dos son de la planta alta, así que van con desafine: la isla tira al
+	# tablero 1,7 veces por caza y sin variación eso se convierte en un tic.
+	_comprobar("caerse lleva variacion de tono, que pasa 1,7 veces por caza",
+		float((NodoSonido.AJUSTES["caida"] as Dictionary)["tono"]) > 0.0)
+
 ## El criterio de salida de la fase 1: la bola sube por una rampa, desaparece
 ## de vista, y sabes dónde va a salir. Aquí se comprueba que sale SIEMPRE por
 ## el mismo sitio, que tarda lo que tiene que tardar, y que no hay forma de que
@@ -3433,6 +3515,223 @@ func _prueba_respiracion(anim: ParametrosAnimacion) -> void:
 		"pies entre %.0f y %.0f" % [pies_flota.min(), pies_flota.max()])
 	nodo.free()
 	flotante.free()
+
+
+## EL REPRODUCTOR DE HOJAS DE FOTOGRAMAS (tanda 7).
+##
+## La avería que abre esta tanda: `assets/criaturas_anim/cr_brasa` y
+## `cr_calavera` llevaban cortadas, limpias y con sus ocho fotogramas **sin que
+## las cargara nadie**. Es la misma avería del wav generado y no enganchado, y
+## por eso lo primero que hay aquí es el mismo candado.
+func _prueba_hojas_animadas() -> void:
+	# EL CANDADO. Al revés que "carga lo que el catálogo pide", esta mira que el
+	# catálogo pida todo lo que hay en disco. Una hoja generada y no enganchada
+	# no da ningún error: deja un bicho quieto, y eso se diagnostica como que el
+	# arte no se nota.
+	var sueltas: Array[String] = []
+	var dir := DirAccess.open(HojaAnimada.CARPETA)
+	if dir != null:
+		for carpeta in dir.get_directories():
+			if not HojaAnimada.CATALOGO.has(carpeta):
+				sueltas.append(carpeta)
+	_comprobar("no hay ninguna hoja animada que el juego no cargue",
+		sueltas.is_empty(),
+		"%s: o se enganchan en HojaAnimada.CATALOGO o se borran" % str(sueltas))
+	_comprobar("y el catalogo no promete carpetas que no existen",
+		dir != null and HojaAnimada.CATALOGO.size() > 0
+			and _todas_las_carpetas_existen(dir),
+		"revisa HojaAnimada.CATALOGO contra " + HojaAnimada.CARPETA)
+
+	# Y NI UN PNG SUELTO DENTRO DE UNA CARPETA QUE SÍ ESTÁ. El catálogo declara
+	# las FILAS, no solo la carpeta: generar `golpe_1..4` y olvidar añadir
+	# "golpe" a la lista deja cuatro fotogramas muertos en disco.
+	var filas_sueltas: Array[String] = []
+	for el_id in HojaAnimada.CATALOGO:
+		var d2 := DirAccess.open(HojaAnimada.CARPETA + str(el_id))
+		if d2 == null:
+			continue
+		for f in d2.get_files():
+			if not f.ends_with(".png"):
+				continue
+			var estado := f.get_basename()
+			var guion := estado.rfind("_")
+			estado = estado.substr(0, guion) if guion > 0 else estado
+			if not (HojaAnimada.CATALOGO[el_id] as Array).has(estado):
+				filas_sueltas.append("%s/%s" % [str(el_id), f])
+	_comprobar("ni un fotograma en disco fuera de las filas declaradas",
+		filas_sueltas.is_empty(), str(filas_sueltas.slice(0, 4)))
+
+	# LAS CADENCIAS TIENEN QUE DIVIDIR A 60 SIN RESTO. Con una que no divide, el
+	# reproductor gasta unos fotogramas en 3 ticks y otros en 4, y a ocho
+	# fotogramas de bucle eso se ve como un cojeo. Es la rejilla de píxeles, en
+	# el tiempo.
+	var sucias: Array[String] = []
+	for estado in HojaAnimada.FPS:
+		var fps := float(HojaAnimada.FPS[estado])
+		if fps <= 0.0 or not is_equal_approx(fmod(60.0, fps), 0.0):
+			sucias.append("%s=%.2f" % [str(estado), fps])
+	_comprobar("toda cadencia de animacion divide a 60 sin resto",
+		sucias.is_empty(), str(sucias))
+
+	# Y CADA HOJA CARGA DE VERDAD, con todos sus fotogramas del mismo tamaño:
+	# una celda descuadrada no da error, mueve el bicho un píxel por fotograma.
+	var rotas: Array[String] = []
+	var descuadradas: Array[String] = []
+	for el_id in HojaAnimada.CATALOGO:
+		var h := HojaAnimada.de(str(el_id))
+		if h == null:
+			rotas.append(str(el_id))
+			continue
+		for estado in HojaAnimada.CATALOGO[el_id]:
+			if not h.tiene(str(estado)):
+				rotas.append("%s/%s" % [str(el_id), str(estado)])
+				continue
+			var tam := Vector2.ZERO
+			for i in h.cuantos(str(estado)):
+				var t := h.fotograma(str(estado), i)
+				var v := Vector2(t.get_width(), t.get_height())
+				if tam == Vector2.ZERO:
+					tam = v
+				elif v != tam:
+					descuadradas.append("%s/%s_%d" % [str(el_id), str(estado), i + 1])
+	_comprobar("todas las hojas del catalogo cargan sus filas",
+		rotas.is_empty(), str(rotas))
+	_comprobar("y todos los fotogramas de una fila miden lo mismo",
+		descuadradas.is_empty(), str(descuadradas.slice(0, 4)))
+
+	_prueba_reproductor()
+	_prueba_enemigo_con_hoja()
+	_prueba_retrato_preparacion()
+
+func _todas_las_carpetas_existen(dir: DirAccess) -> bool:
+	var hay := dir.get_directories()
+	for el_id in HojaAnimada.CATALOGO:
+		if not hay.has(str(el_id)):
+			return false
+	return true
+
+## EL RETRATO DE 64 DE LA PREPARACIÓN tiene que caber en el hueco que hay entre
+## las columnas y la franja de explicación, y caer en píxel entero. Un retrato
+## que pisa una columna no da error: deja una fila de la lista tapada por media
+## bola, y eso se descubre pulsando algo que no se ve.
+func _prueba_retrato_preparacion() -> void:
+	var sis := NodoSistema.new(null, null)
+	var v := Rect2(220, 60, NodoSistema.ANCHO_VENTANA, NodoSistema.ALTO_VENTANA)
+	var r := sis.caja_retrato(v)
+
+	_comprobar("el retrato de la preparacion cae en pixel entero",
+		r.position == r.position.round() and r.size == r.size.round(), str(r))
+	# 64 y no otro: los PNG miden 64, así que cualquier otro número es escala
+	# fraccionaria y el pixelart hierve.
+	_comprobar("y se dibuja a escala 1 sobre un PNG de 64",
+		r.size == Vector2(64, 64), str(r.size))
+
+	# Debajo de la columna más larga: nueve cáscaras a 20 px.
+	var ultima := sis.caja_opcion(v, 0, 8)
+	_comprobar("el retrato no pisa ninguna fila de las tres columnas",
+		r.position.y >= ultima.end.y, "retrato en %.0f, columna acaba en %.0f"
+			% [r.position.y, ultima.end.y])
+	# Y encima de la franja de explicación, que empieza en end.y − 58.
+	var franja_y: float = sis.caja_boton_vaciar(v).position.y - 32.0
+	_comprobar("y no pisa la franja de explicacion de abajo",
+		r.end.y <= franja_y, "retrato acaba en %.0f, la franja empieza en %.0f"
+			% [r.end.y, franja_y])
+	_comprobar("el retrato cabe entero dentro de la ventana",
+		v.encloses(r), "%s dentro de %s" % [str(r), str(v)])
+	sis.free()
+
+## El reproductor: bucle, un solo tiro, caída a `idle` y congelación.
+func _prueba_reproductor() -> void:
+	var h := HojaAnimada.de("cr_brasa")
+	var r := Reproductor.new()
+	r.poner(h)
+	var n := h.cuantos(HojaAnimada.QUIETO)
+	_comprobar("cr_brasa trae los ocho fotogramas de idle", n == 8, str(n))
+
+	# El bucle da la vuelta y pasa por todos: ocho copias con un fotograma
+	# clavado no darian error.
+	var vistos := {}
+	var paso := 1.0 / HojaAnimada.fps_de(HojaAnimada.QUIETO)
+	for _i in n * 2:
+		r.avanzar(paso)
+		vistos[r.fotograma] = true
+	_comprobar("el bucle de idle pasa por todos los fotogramas y vuelve",
+		vistos.size() == n and r.fotograma == 0, "%d de %d" % [vistos.size(), n])
+
+	# CONGELADO NO AVANZA. Es la razón de que el parámetro exista: sin esto los
+	# 70 ms de hitstop se comen justo el fotograma que el parón quiere enseñar.
+	var antes := r.fotograma
+	for _i in 20:
+		r.avanzar(paso, true)
+	_comprobar("congelado no pasa ni un fotograma", r.fotograma == antes,
+		"%d -> %d" % [antes, r.fotograma])
+
+	# UN ESTADO QUE LA HOJA NO TIENE SE CAE A `idle` Y SE PUEDE PREGUNTAR. Hoy
+	# ninguna criatura trae `golpe`, así que lo peligroso seria dibujar nada: un
+	# sprite en blanco no da ningun error.
+	r.pedir("golpe")
+	_comprobar("pedir una fila que no esta se cae a idle sin dejar el sprite vacio",
+		r.estado == HojaAnimada.QUIETO and r.textura() != null)
+	_comprobar("y se nota que se pidio otra cosa, en vez de tapar el hueco",
+		r.estado_pedido == "golpe", r.estado_pedido)
+
+	# Y EL ACUMULADOR SE RESTA, NO SE PONE A CERO. Con delta de 60 Hz da igual
+	# —la cadencia divide a 60 justo para eso—, así que hay que medirlo en una
+	# pantalla que NO sea de 60: a 144 Hz un fotograma de 10 fps cuesta 14,4
+	# ticks, y poniendo el acumulador a cero cada uno costaría 15. En diez
+	# segundos eso son 96 fotogramas en vez de 100, o sea la animación un 4 %
+	# más lenta en una pantalla rápida y sin ningún error.
+	var r2 := Reproductor.new()
+	r2.poner(h)
+	var cambios := 0
+	var previo := r2.fotograma
+	for _i in 1440:
+		r2.avanzar(1.0 / 144.0)
+		if r2.fotograma != previo:
+			cambios += 1
+			previo = r2.fotograma
+	_comprobar("el reproductor no pierde el sobrante en una pantalla que no sea de 60",
+		cambios == 100, "%d fotogramas en 10 s, se esperaban 100" % cambios)
+
+	# Un delta gordo pasa los fotogramas que toquen, no uno.
+	var r3 := Reproductor.new()
+	r3.poner(h)
+	r3.avanzar(paso * 3.0)
+	_comprobar("un delta gordo pasa los fotogramas que toca", r3.fotograma == 3,
+		str(r3.fotograma))
+
+## `NodoEnemigo` con hoja: dibuja el fotograma y NO se salta la rejilla.
+func _prueba_enemigo_con_hoja() -> void:
+	var anim := ParametrosAnimacion.new()
+	var nodo := NodoEnemigo.new(anim)
+	nodo.suelo = Vector2(200, 158)
+	nodo.configurar_hoja(HojaAnimada.de("cr_calavera"), false)
+	_comprobar("un bicho con hoja dibuja el fotograma, no el estatico",
+		nodo.tex_actual() != null and nodo.textura == null)
+
+	var no_enteros: Array[String] = []
+	var fotogramas := {}
+	for _i in 120:
+		nodo._process(DT)
+		var rc := nodo.rect_dibujo()
+		if rc.position != rc.position.round() or rc.size != rc.size.round():
+			no_enteros.append(str(rc))
+		fotogramas[nodo.reproductor.fotograma] = true
+	_comprobar("con hoja, el rect sigue cayendo en pixeles enteros",
+		no_enteros.is_empty(), str(no_enteros.slice(0, 3)))
+	_comprobar("y la hoja de verdad avanza dentro del nodo",
+		fotogramas.size() >= 4, "%d fotogramas distintos" % fotogramas.size())
+
+	# El hitstop congela los fotogramas y NO el resto de la capa visual: el
+	# destello tiene que seguir bajando durante el paron.
+	nodo.congelado = true
+	nodo.recibir_dano()
+	var f_antes: int = nodo.reproductor.fotograma
+	for _i in 10:
+		nodo._process(DT)
+	_comprobar("el hitstop congela los fotogramas del bicho",
+		nodo.reproductor.fotograma == f_antes)
+	nodo.free()
 
 ## La suite solo tocaba sim/, así que un error de sintaxis en la vista pasaba
 ## desapercibido y solo se veía al abrir el juego. Esto la carga y la arranca.

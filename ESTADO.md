@@ -26,8 +26,15 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **499/499** con `assets/` en la caja (sin `assets/`, 20 fallos que son
-todos "no existe tal PNG").
+Batería **528/528** con `assets/` en la caja (sin `assets/`, 20 fallos que son
+todos "no existe tal PNG"). **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y
+`rampa_fallada` llevaban desde la 0h sin que nadie las escuchara.
+
+**Y DESDE LA TANDA 7 EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` +
+`Reproductor`: `cr_brasa` y `cr_calavera` llevaban cortadas y limpias **sin que
+las cargara nadie**. Se ven animadas en el retrato de 64 de la pantalla de
+preparación, con la cáscara elegida detrás. La física no se ha movido — huella
+**16621,1901**, 8,142 s, 120 golpes, igual al decimal.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
@@ -56,6 +63,155 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## EL REPRODUCTOR DE FOTOGRAMAS (tanda 7 · 18-ago)
+
+**La avería que abre la tanda no era que faltara el subsistema: era que el arte
+ya estaba y no lo cargaba nadie.** `assets/criaturas_anim/cr_brasa` y
+`cr_calavera` llevaban desde el 17-ago con sus ocho fotogramas cortados,
+estabilizados y pulidos, y **cero referencias en todo el `.gd`**. Es la misma
+avería del wav generado y no enganchado, y por eso lo primero que se ha escrito
+después del reproductor es **el mismo candado**: `HojaAnimada.CATALOGO` dice qué
+pide el juego y dos pruebas comprueban que no queda ni una carpeta ni un PNG en
+disco fuera de la tabla.
+
+**528/528**, y la mesa da los mismos números al decimal: 8,142 s, 120 golpes,
+huella 16621,1901, racimo 3,08.
+
+### Lo que hay montado
+
+- **`render/hoja_animada.gd`** — PNG sueltos con el contrato `<estado>_<n>.png`,
+  que es exactamente lo que escupe `procesar.py` y lo que ya había en disco. Sin
+  atlas: a 64 px la diferencia de memoria es ruido y un empaquetado más no
+  compra nada.
+- **`render/reproductor.gd`** — estado, fotograma y acumulador. Los de un solo
+  tiro (`golpe`, `ataque`, `muerte`) vuelven a `idle`; `muerte` se queda clavada
+  en el último y deja que la disolución del shader haga el resto.
+- **`NodoEnemigo` cambia lo que decía el diseño: la textura sale del
+  reproductor y `rect_dibujo()` no se toca.** El squash y el stretch de píxel
+  entero siguen valiendo para los nueve enemigos, que no tienen hoja y siguen
+  siendo un sprite deformado por código; para un bicho con hoja se apagan
+  poniendo `respiracion_pixeles` a 0.
+- **El retrato de 64 de la preparación**, que es donde se ve. La cáscara elegida
+  detrás, la criatura elegida delante, en el hueco que había entre las columnas
+  y la franja de explicación.
+
+### Las tres cosas que no dan error y por eso llevan prueba
+
+1. **La cadencia divide a 60 sin resto.** Con una que no divide, unos fotogramas
+   cuestan 3 ticks y otros 4, y a ocho de bucle eso cojea.
+2. **El acumulador se resta, no se pone a cero** — y esto **solo se ve en una
+   pantalla que no sea de 60**: a 144 Hz un fotograma de 10 fps cuesta 14,4
+   ticks, poniendo a cero cuesta 15, o sea **96 fotogramas en diez segundos en
+   vez de 100**. La animación un 4 % más lenta en las pantallas rápidas.
+3. **Un estado que la hoja no tiene se cae a `idle` y se puede preguntar.** Hoy
+   ninguna criatura trae `golpe`, así que pedirlo tenía que hacer algo
+   razonable: lo peligroso era dibujar nada, porque un sprite en blanco no da
+   ningún error. `estado_pedido` guarda lo que se pidió.
+
+Y **el hitstop congela los fotogramas**, que no es lo mismo que congelar la capa
+visual: el destello y la sacudida siguen corriendo durante el parón a propósito,
+pero si el reproductor siguiera, los 70 ms se comerían justo el fotograma de
+golpe que el parón quiere enseñar.
+
+### Y MIRÁNDOLO salió el orden de las capas, que era una decisión de verdad
+
+Mosaico de las dos criaturas contra tres cáscaras, antes de escribir la línea:
+**la criatura va DELANTE.** Al revés la cáscara la tapa entera y lo que queda es
+una bola con una ranura negra — el bicho desaparece y no da ningún error. Con la
+criatura delante, las manos de `cr_calavera` se agarran al borde de la ranura y
+las dos capas se leen como un solo bicho asomándose, que es literalmente el
+criterio de salida escrito en `assets/prompts_animacion.md`.
+
+### Lo que NO está, y hay que saberlo
+
+- **Solo hay `idle`.** `golpe`, `ataque` y `muerte` están en el reproductor y en
+  la tabla de cadencias, y no hay ni una hoja que los traiga: son las tandas 2 y
+  5 de `assets/prompts_animacion.md`.
+- **Y solo dos criaturas de nueve.**
+- **`cr_brasa` y `cr_calavera` no son iniciales**, así que en una partida nueva
+  el retrato enseña a la Rata, que es estática. La animación no se ve hasta
+  recuperarlas. Eso es diseño (`PROPÓSITO.md` §2: recuperar es el juego), pero
+  significa que **el resultado de esta tanda es invisible en un guardado
+  limpio**, y eso es exactamente la avería del platillo. Pregunta A3, abajo.
+
+## QUE CAERSE SUENE (tanda 0h2 · 18-ago)
+
+`bola_cayo` y `rampa_fallada` llevaban desde la tanda 0h emitiéndose y **sin que
+nadie las escuchara**. Ahora suenan, se ven y hay una prueba que impide que
+vuelva a pasar. **506/506** y la mesa da los mismos números al decimal: 8,142 s,
+120 golpes, huella 16621,1901.
+
+**Lo primero que se hizo fue medir cuánto pasan de verdad**, porque un sonido
+que suena dos veces por bola y otro que suena una vez cada doce no se diseñan
+igual. Sonda de usar y tirar, 60 cazas:
+
+| | veces | por caza | abajo |
+|---|---|---|---|
+| `bola_cayo` | 102 | **1,70** — y cero pares por debajo de 200 ms | 0 |
+| `rampa_fallada` | 5 | **0,08** | 0 |
+
+O sea: **los dos son sonidos de la planta alta**, ninguno se solapa consigo
+mismo, y por eso los dos pueden permitirse cola en vez de ir secos como el
+bumper.
+
+### El problema no era inventar un sonido, era que ya había tres
+
+La mesa tenía **tres** sonidos que bajan de tono —`drenaje`, `platillo` y
+`rampa_salida`— más `rampa_fuerte` y `ataque` de graves sucios. Un cuarto
+barrido descendente no se distingue de ninguno, y de hecho el primer candidato
+salió al **0,98 de parecido** con `rampa_fuerte`.
+
+Lo que separa a una caída de los cinco: **los cinco se apagan y una caída
+termina en un golpe, porque hay suelo.** Medido sobre la envolvente en diez
+tramos, y es el resultado de la tanda:
+
+| sonido | dónde llega el pico |
+|---|---|
+| `caida` | **tramo 5 de 10** |
+| `rampa_fallada` | **tramo 4 de 10** |
+| `rampa_fuerte`, `muerte`, `ataque`, `drenaje`, `platillo`, `rampa_salida` | tramo 1 |
+
+**Son los dos únicos sonidos del juego cuya energía llega tarde**, y ahí está
+toda su identidad. Y el 0,98 contra `rampa_fuerte` era un espejismo del método:
+el espectro medio promedia el tiempo, que es justo lo único que los separa.
+Comparados en los primeros 100 ms —donde el oído decide— el más parecido a
+`caida` es `bumper` a 0,74, y `rampa_fuerte` no sale ni entre los tres primeros.
+
+Para conseguirlo hizo falta **una cosa nueva en `sonidos.py`: `retardo`**, que
+deja que una capa de una mezcla entre tarde. Sin poder separar el aire del
+impacto en el tiempo, lo único que se puede sintetizar es un golpe más.
+
+`rampa_fallada` va con el **mismo material que `rampa_entrada`** a propósito
+—0,97 de parecido en los primeros 100 ms— para que se oiga como el mismo gesto
+que no ha terminado: sube hasta 520 en vez de hasta 980, se queda sin sitio, y
+110 ms después baja con vibrato.
+
+### El `ratio` no toca el tono, y es una decisión medida
+
+`rampa_fallada` trae lo cerca que se quedó la bola. Es la tentación obvia
+—mapearlo al tono y que se oiga el "casi"— y **no vale hoy**: en 60 cazas sale
+siempre entre **0,470 y 0,569**, cinco veces y todas en la misma banda. Eso
+daría un ±5 % de tono que no se oye, con el agravante de hacer creer que la
+información está dada. **La subida es fallable en binario, no en grados**, y eso
+contradice a medias lo que pide `PROPÓSITO.md` §6. Cuando lo sea, el gancho está
+escrito y comentado en `_al_fallar_rampa`.
+
+### Y la prueba nueva destapó una tercera señal muda
+
+La prueba que cierra la tanda no comprueba estos dos sonidos: comprueba que
+**toda señal de `Mesa` la atienda alguien**, leyendo las señales del propio
+`sim/mesa.gd` para que añadir una nueva ponga la batería en rojo sola. Al
+lanzarla salió una que no estaba en el guion: **`flipper_golpeado`**.
+
+Lo que suena hoy al dar a la pala es **el solenoide al pulsar la tecla**, le des
+a la bola o no. O sea que **fallar un tiro suena exactamente igual que
+clavarlo**. Está en la lista de excepciones con su motivo escrito, no tapado, y
+es pregunta de tacto — abajo.
+
+Y hay un segundo candado: **ningún wav de `assets/sonido/` puede quedarse sin
+enganchar**. Generar el sonido y olvidar conectarlo era exactamente la avería de
+esta tanda, y no daba ningún error.
 
 ## LA PLANTA ALTA, REHECHA (tanda 0i · 18-ago)
 
@@ -1133,6 +1289,17 @@ intención.
 
 ## Hecho
 
+- **EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` + `Reproductor`, con el
+  candado de catálogo que impide que una hoja vuelva a quedarse sin cargar, y el
+  retrato de 64 de la preparación donde se ve. La física, igual al decimal.
+  **528/528.**
+- **CAERSE Y FALLAR UNA RAMPA SUENAN.** Dos sonidos nuevos construidos contra lo
+  que los podía tapar: son los únicos del juego cuya energía llega tarde —pico en
+  el tramo 4 y 5 de 10, contra el tramo 1 de los otros seis descendentes—, y ahí
+  está su identidad. Sale `retardo` en `sonidos.py`. **506/506.**
+- **Y dos candados de batería**: ningún wav puede quedarse sin enganchar, y toda
+  señal de `Mesa` tiene que atenderla alguien. El segundo destapó
+  `flipper_golpeado`, que sigue muda a día de hoy.
 - **MULTIBOLA.** `Mesa` pasa de una bola a N con choque entre bolas, estado por
   bola y drenaje que solo cuenta cuando cae la última; la cámara sigue a la más
   baja. **414/435 en la caja de la sesión** (los 21 que faltan son PNG que allí
@@ -1309,13 +1476,63 @@ era verdad: los textos cortados de la cáscara y las dos averías de la cámara 
 encontró Fátima jugando, con la batería en verde encima de las dos.
 
 
-**Primero importar y luego la batería. En ese orden, y nada de esto se ha
-ejecutado:**
+**Primero importar y luego la batería. En ese orden. Lo de la tanda 7 SÍ se ha
+ejecutado en una caja Linux (528/528), lo anterior no:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**LO DE ESTA SESIÓN (capas de altura) — y ojo, que casi todo es "que no pase
+**LO DE ESTA SESIÓN (tanda 7, el reproductor). Esto no se mide, se mira:**
+
+**A1.** Abre *Inicio → Nueva partida* con Brasa o Calavera recuperada y mira el
+retrato de 64. **¿Las dos capas se leen como UN bicho asomándose de la cáscara,
+o como una calcomanía pegada a una bola?** Es el criterio de salida escrito en
+`assets/prompts_animacion.md` y no lo puede cerrar una medida.
+
+**A2.** La cadencia de `idle` está a **10 fotogramas por segundo**. ¿Respira o
+tiembla? El mando es `HojaAnimada.FPS`, y **solo valen números que dividan a
+60**: 6, 10, 12, 15, 20.
+
+**A3.** El retrato está donde único cabía, en el hueco entre las columnas y la
+explicación, y con una partida nueva enseña a la **Rata, que es estática**. Dos
+preguntas en una: ¿se ve ahí, o pide más sitio? Y sobre todo — **¿molesta que la
+única animación del juego solo aparezca si has recuperado a Brasa?** Si molesta,
+la salida barata es que `cr_brasa` sea inicial; la cara es animar a la Rata.
+Decisión vuestra, que toca `PROPÓSITO.md` §2.
+
+**A4.** Mirando las dos criaturas juntas a 64: **¿merece la pena gastar las
+siete hojas que faltan con este prompt, o hay que cambiarlo antes?** Es la
+puerta que `prompts_animacion.md` pone entre la tanda 1 y la 2.
+
+**LO DE LA SESIÓN ANTERIOR (tanda 0h2, los dos sonidos). Esto no se mide, se oye:**
+
+**S1.** ¿Se distingue una CAÍDA de un drenaje? Son las dos cosas graves que
+pasan cuando la bola baja, y significan lo contrario: una es "sigues jugando" y
+la otra "has perdido el turno". Está construido para que se separen por la
+FORMA —la caída termina en un golpe y el drenaje se apaga—, y eso es una
+hipótesis hasta que alguien lo oiga.
+
+**S2.** La RAMPA FALLADA suena casi igual que entrar en una rampa, y es a
+propósito: el mismo gesto que no termina. ¿Se lee así, o suena a que el juego se
+ha equivocado?
+
+**S3.** Caerse de la isla pasa **1,7 veces por caza**. ¿Cansa? Si canta
+demasiado, el mando es el `db` de `caida` en `NodoSonido.AJUSTES`, no el sonido.
+
+**S4 — Y ESTA NO ES DE ESTA TANDA, la destapó la prueba nueva.**
+**`flipper_golpeado` no la escucha nadie**: lo que suena al dar a la pala es el
+solenoide al PULSAR LA TECLA, le des a la bola o no. O sea que **fallar un tiro
+suena igual que clavarlo**. ¿Hace falta que la bola golpeada suene distinto, o
+el solenoide ya basta? Es tacto puro, y es de quien juega. Si la respuesta es
+que sí, es una tanda pequeña: hay señal, hay punto de impacto y hay fuerza.
+
+**Lo que NO se ha mirado de esta tanda:** caerse pinta ahora una onda y una nube
+de polvo hacia arriba en el punto de caída, y **eso no se ha visto con ventana**,
+solo escrito. Son dos llamadas a las mismas primitivas que usa media mesa, pero
+la regla de este repo es que lo visual se mira. Si el polvo estorba en mitad de
+la caza, se quita de `_al_caer_bola` y no toca nada más.
+
+**LO DE LA SESIÓN ANTERIOR (capas de altura) — y ojo, que casi todo es "que no pase
 nada":**
 
 C1. **QUE LA MESA SIGA SIENDO LA MISMA.** El sistema entró apagado y los números
@@ -1629,12 +1846,9 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    Y falta por construir de `CAZA.md` §3.7: la **ventana de recuperación de
    disco** que la cáscara tenía que abrir encima durante la caza.
 
-0h2. **QUE CAERSE SUENE** (Sonnet, medio). `bola_cayo` y `rampa_fallada` no
-   tienen sonido, y un evento que no se oye se diagnostica como que no existe
-   —es la avería del platillo—. **Y ahora los dos pasan de verdad**: la isla tira
-   al tablero a quien se sale de su borde y la subida suelta a quien no le pega
-   fuerte, así que son los dos eventos nuevos de la mesa y no se oyen. Hay que
-   generarlos en `sonidos.py`, reimportar y engancharlos en `vista_mesa.gd`.
+0h2. ~~**QUE CAERSE SUENE**~~ **HECHA Y MEDIDA.** 506/506, dos sonidos nuevos,
+   `retardo` en `sonidos.py` y dos candados de batería. Ver arriba. Lo que queda
+   de esta tanda es **oírlos** (S1-S3, abajo) y decidir lo de `flipper_golpeado`.
 
 0j. **EL 3 % DE ENTRADA AL UMBRAL** (Daniel y Fátima). Con la planta alta ya
    rehecha, la pregunta vuelve a estar viva y es la primera de `CAZA.md` §7: una
@@ -1694,8 +1908,12 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 5. **Fase 5: juzgarla jugando** (Daniel). El código está escrito entero y sin
    ejecutar. Lo que queda no se lee, se juega: las preguntas N1-N8 de arriba. Si
    N2 o N4 salen mal, lo que vuelve a la mesa es reversible en un rato
-7. **Animación fotograma a fotograma de enemigos/criaturas/jefes** (Opus,
-   razonamiento alto). Pedida por Daniel y por Fátima. **Los prompts ya están
+7. **Animación fotograma a fotograma** — **EL SUBSISTEMA, HECHO Y MEDIDO**
+   (tanda 7, 18-ago): `HojaAnimada`, `Reproductor`, el candado de catálogo y el
+   retrato de 64 de la preparación. **528/528.** Ver arriba. Lo que queda de
+   este puesto es **arte, no código**: las otras siete criaturas (tanda 2 de la
+   tabla de abajo) y las filas `golpe`/`ataque`/`muerte`, que ninguna hoja trae.
+   El detalle viejo, que sigue valiendo para las hojas que faltan: Pedida por Daniel y por Fátima. **Los prompts ya están
    escritos, y ahora también la guía de estilo de la que dependían**: los tres
    ficheros de prompts empiezan por "Following the style guide above" y esa guía
    no estaba en el repo, así que ninguno generaba lo que decía. Está en

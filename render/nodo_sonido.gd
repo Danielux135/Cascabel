@@ -22,6 +22,8 @@ const AJUSTES := {
 	"rampa_entrada": {"db": -3.0, "tono": 0.02},
 	"rampa_salida":  {"db": -3.0, "tono": 0.02},
 	"rampa_fuerte":  {"db": -1.0, "tono": 0.03},
+	"rampa_fallada": {"db": -3.0, "tono": 0.04},
+	"caida":         {"db": -2.0, "tono": 0.05},
 	"platillo":      {"db": -2.0, "tono": 0.00},
 	"combo":         {"db":  1.0, "tono": 0.00},
 	"reloj":         {"db": -4.0, "tono": 0.00},

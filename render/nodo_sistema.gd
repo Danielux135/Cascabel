@@ -81,6 +81,11 @@ var abierto: String = ""
 var leyendo: String = ""
 
 var _lienzo: Node2D
+
+## EL RETRATO DE LA PREPARACIÓN. Un solo reproductor: solo hay una criatura
+## marcada a la vez y la ventana es única.
+var _repro := Reproductor.new()
+var _repro_id := ""
 var _fuente: Font
 var _iconos: Dictionary = {}
 var _sprites: Dictionary = {}
@@ -403,6 +408,20 @@ func caja_opcion(v: Rect2, col: int, i: int) -> Rect2:
 	return Rect2(d.position.x + 6.0 + float(col) * ancho, d.position.y + 24.0
 		+ float(i) * ALTO_OPCION, ancho - 6.0, ALTO_OPCION - 2.0)
 
+## EL RETRATO DE 64 DE LA PREPARACIÓN: la cáscara elegida con la criatura
+## elegida encima. Va debajo de las tres columnas y encima de la franja de
+## explicación, que es el único hueco de la ventana que no usa nadie.
+##
+## 64 Y NO 128. Los PNG miden 64, así que 64 es escala ×1 y ×2 sería 128, que no
+## cabe en los 94 px libres. Cualquier otro número sería escala fraccionaria y
+## el pixelart hierve — la misma regla del icono que tiene que dividir al PNG.
+func caja_retrato(v: Rect2) -> Rect2:
+	var d := _interior(v)
+	var ancho := (d.size.x - 16.0) / 3.0
+	return Rect2(
+		roundf(d.position.x + 6.0 + ancho + (ancho - 6.0 - 64.0) * 0.5),
+		roundf(d.position.y + 24.0 + 9.0 * ALTO_OPCION + 6.0), 64.0, 64.0)
+
 func caja_boton_vaciar(v: Rect2) -> Rect2:
 	var d := _interior(v)
 	return Rect2(d.end.x - 92.0, d.end.y - 26.0, 88.0, 20.0)
@@ -431,8 +450,21 @@ func _process(delta: float) -> void:
 	# la mesa congelada detrás de una pantalla que ya no la enseña.
 	if hay_algo() and not disponible():
 		cerrar()
+	_avanzar_retrato(delta)
 	if _lienzo != null:
 		_lienzo.queue_redraw()
+
+## La criatura marcada respira. Se resincroniza cuando cambia de criatura y no
+## en cada fotograma: `poner` reinicia el bucle, así que llamarlo siempre
+## dejaría la hoja clavada en el primer fotograma sin dar ningún error.
+func _avanzar_retrato(delta: float) -> void:
+	if abierto != "preparacion":
+		return
+	var el_id := _elegido_en(1)
+	if el_id != _repro_id:
+		_repro_id = el_id
+		_repro.poner(HojaAnimada.de(el_id))
+	_repro.avanzar(delta)
 
 func _dibujar() -> void:
 	if aviso_tiempo > 0.0:
@@ -749,6 +781,9 @@ func _dibujar_preparacion(d: Rect2, v: Rect2) -> void:
 
 	if senalado != "":
 		explicacion = senalado
+
+	_dibujar_retrato(caja_retrato(v))
+
 	# La franja de explicación, pegada abajo y por encima del botón.
 	var franja := Rect2(d.position.x + 6.0, d.end.y - 58.0, d.size.x - 12.0, 30.0)
 	_lienzo.draw_rect(franja, Color(C_VACIO, 0.8))
@@ -763,6 +798,34 @@ func _dibujar_preparacion(d: Rect2, v: Rect2) -> void:
 		"Empezar tira la partida en curso.", HORIZONTAL_ALIGNMENT_LEFT,
 		d.size.x - 110.0, 8, C_GOMA_LUZ)
 	_boton(caja_boton_vaciar(v), "Empezar", regiones.encima == "empezar")
+
+## LA CÁSCARA DETRÁS Y LA CRIATURA DELANTE, y ese orden no es indiferente: está
+## mirado en un mosaico de las dos criaturas contra tres cáscaras. Al revés la
+## cáscara tapa a la criatura entera y lo que queda es una bola con una ranura
+## negra — el bicho desaparece y no da ningún error. Con la criatura delante,
+## las manos de `cr_calavera` se agarran al borde de la ranura y las dos capas
+## se leen como UN bicho asomándose, que es exactamente lo que pedía
+## `assets/prompts_animacion.md` §4.
+##
+## Y NO GIRA. `DISEÑO.md` §4 dice que la cáscara rueda y la criatura no, pero eso
+## es en la mesa; aquí es un retrato de interfaz a 64 px, que es donde la
+## combinatoria de 81 se puede ver de verdad (en la mesa la bola mide 18).
+func _dibujar_retrato(caja: Rect2) -> void:
+	var casc := CatalogoRecuperable.por_id(_elegido_en(0))
+	if casc != null:
+		var tc := _sprite(casc.ruta_sprite())
+		if tc != null:
+			_lienzo.draw_texture_rect(tc, caja, false)
+	# El fotograma si la criatura tiene hoja; el retrato estático si no. Las
+	# nueve acabarán teniendo hoja, pero hoy solo hay dos y un hueco donde
+	# debería haber un bicho se lee como un fallo de la pantalla.
+	var tex := _repro.textura()
+	if tex == null:
+		var cr := CatalogoRecuperable.por_id(_elegido_en(1))
+		if cr != null:
+			tex = _sprite(cr.ruta_sprite())
+	if tex != null:
+		_lienzo.draw_texture_rect(tex, caja, false)
 
 func _boton(caja: Rect2, texto: String, marcado: bool) -> void:
 	_lienzo.draw_rect(caja, Color(C_METAL, 1.0 if marcado else 0.75))

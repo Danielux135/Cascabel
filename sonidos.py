@@ -29,6 +29,10 @@ Vocabulario de parámetros (todos opcionales menos `dur`):
     submuestreo mantener cada N muestras; 1 = sin tocar
     vol         0..1
     mezcla      lista de capas, cada una con estos mismos parámetros
+    retardo     dentro de una capa de `mezcla`, cuántos segundos entra tarde.
+                Existe para los sonidos que son un gesto y no un golpe: una
+                caída es aire y LUEGO el impacto, y sin poder separarlos en el
+                tiempo lo único que se puede sintetizar es un golpe más
     notas       lista de frecuencias, para arpegios; usa dur_nota
     dur_ultima  duración de la última nota del arpegio; por defecto, dur_nota
     caida_ultima  caída de la última nota; por defecto, la de las demás
@@ -80,6 +84,45 @@ SONIDOS = {
         onda="triangulo", f0=420, f1=120, dur=0.32, caida=8,
         vibrato=(18.0, 0.9), filtro=3000, crush=5, vol=0.50,
     ),
+
+    # La rampa que no corona. Es el sonido más raro de la mesa —medido: 5 veces
+    # en 60 cazas— y no es un castigo, es información: `PROPÓSITO.md` §6 quiere
+    # rampas nunca aseguradas, y una rampa que falla en silencio es una rampa
+    # que el jugador diagnostica como rota.
+    #
+    # Va con el MISMO material que `rampa_entrada` —seno con ruido y el mismo
+    # filtro— a propósito: tiene que oírse como el mismo gesto, no como un
+    # sonido nuevo. Lo que cambia es que no llega arriba y se descuelga: sube
+    # hasta 520 en vez de hasta 980, se queda sin sitio, y 110 ms después baja.
+    # Con el vibrato de la bajada suena a que se ha quedado sin fuerza, que es
+    # exactamente lo que ha pasado.
+    "rampa_fallada": dict(vol=0.5, mezcla=[
+        dict(onda="seno", f0=300, f1=520, dur=0.14, caida=9, ataque=0.010,
+             ruido=0.26, filtro=5200, vol=0.55),
+        dict(retardo=0.11, onda="seno", f0=500, f1=190, dur=0.26, caida=7,
+             ruido=0.18, vibrato=(11.0, 0.7), filtro=4200, vol=0.50),
+    ]),
+
+    # CAERSE DE UNA ALTURA. Sale 1,7 veces por caza y nunca dos veces seguidas
+    # —medido: cero pares por debajo de 200 ms—, así que se puede permitir cola.
+    #
+    # El problema no era inventar un sonido descendente: es que la mesa YA tiene
+    # tres —`drenaje`, `platillo` y `rampa_salida`— y un cuarto barrido hacia
+    # abajo no se distingue de ninguno. Lo que separa a una caída de los tres es
+    # que los tres se APAGAN y una caída TERMINA EN UN GOLPE: hay suelo. De ahí
+    # el `retardo`, que es lo único que hacía falta añadir al sintetizador.
+    #
+    # El golpe va seco (caída 22) y por debajo del de `ataque`, que es el otro
+    # grave sucio del juego: aquel dura el triple y cae despacio. Aquí lo que
+    # importa es que se acabe rápido, porque la bola sigue viva y en juego.
+    "caida": dict(vol=0.58, mezcla=[
+        dict(onda="triangulo", f0=620, f1=180, dur=0.16, caida=11,
+             ruido=0.30, filtro=3400, crush=5, vol=0.55),
+        dict(retardo=0.13, onda="cuadrada", f0=140, f1=52, dur=0.20, caida=22,
+             filtro=1300, crush=4, vol=0.62),
+        dict(retardo=0.13, onda="ruido", dur=0.09, caida=40, filtro=1600,
+             crush=4, vol=0.40),
+    ]),
 
     # El cañón, el recorrido que suelta la bola dentro del racimo: golpe gordo
     # y grave, para que se distinga de la salida de rampa normal.
@@ -262,7 +305,13 @@ def sintetizar(par, semilla=0):
         return np.concatenate(trozos)
 
     if "mezcla" in par:
-        capas = [_capa(c, rng) for c in par["mezcla"]]
+        capas = []
+        for c in par["mezcla"]:
+            x = _capa(c, rng)
+            hueco = int(c.get("retardo", 0.0) * FS)
+            if hueco:
+                x = np.concatenate([np.zeros(hueco), x])
+            capas.append(x)
         n = max(len(c) for c in capas)
         suma = np.zeros(n)
         for c in capas:

@@ -348,6 +348,8 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	mesa.rampa_entrada.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("rampa_entrada"))
 	mesa.rampa_salida.connect(_al_salir_de_rampa)
+	mesa.rampa_fallada.connect(_al_fallar_rampa)
+	mesa.bola_cayo.connect(_al_caer_bola)
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
 	mesa.bola_drenada.connect(_al_drenar_bola)
@@ -642,6 +644,11 @@ func _process(delta: float) -> void:
 	# congeladas y no caducarían nunca, que es la trampa de "todo efecto tiene
 	# que caducar solo".
 	if panel_enemigo != null:
+		# Y de paso le decimos si estamos en hitstop. Las partículas siguen
+		# corriendo durante el parón —son la capa visual—, pero los fotogramas
+		# de la hoja no: 70 ms de parón se comerían justo el fotograma de golpe
+		# que el parón quiere enseñar.
+		panel_enemigo.enemigo.congelado = _hitstop > 0.0
 		panel_enemigo.avanzar(delta)
 	_numeros = _caducar(_numeros, delta)
 	# La ruleta va en `_process` y no en la física: es animación, no simulación,
@@ -790,6 +797,35 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 		_:
 			_sonido.reproducir("rampa_salida")
 			impactos.onda(punto, C_ORO, 0.7)
+
+## LA RAMPA QUE NO CORONA. Existía desde las capas de altura y no sonaba ni se
+## veía, o sea que no existía: es la avería del platillo otra vez —un sistema que
+## el jugador no ve se diagnostica como que falta—. Y ahora pasa de verdad, que
+## es lo que la trae a esta tanda: la subida a la isla suelta a quien no le pega
+## fuerte.
+##
+## El `ratio` (lo cerca que se quedó) NO toca el tono, y eso es una decisión
+## medida, no un olvido: en 60 cazas sale entre 0,47 y 0,57 —cinco veces, todas
+## en la misma banda—, así que mapearlo daría un ±5 % de tono que no se oye y
+## haría creer que la información está dada. Cuando la subida sea fallable en
+## grados y no en binario, aquí es donde se engancha.
+func _al_fallar_rampa(punto: Vector2, _indice: int, _ratio: float) -> void:
+	_sonido.reproducir("rampa_fallada")
+	impactos.onda(punto, C_PIEDRA_LUZ, 0.5)
+
+## CAERSE DE UNA ALTURA, las dos formas en el mismo sitio porque son el mismo
+## evento (invariante de `CLAUDE.md`): salirse del borde de la isla y
+## desprenderse de una rampa abierta se sienten igual en la mano.
+##
+## El polvo sale hacia arriba porque la bola llega de arriba: es material que
+## salta del suelo, no chispas que salen de un golpe. Y no sacude la cámara — la
+## sacudida está reservada al ataque del enemigo y a la búsqueda de bola, y
+## caerse de la isla pasa 1,7 veces por caza: sacudir por algo tan corriente
+## gasta el gesto. Si al jugarlo se pide peso, ese es el mando.
+func _al_caer_bola(punto: Vector2, _desde: int, _hasta: int) -> void:
+	_sonido.reproducir("caida")
+	impactos.onda(punto, C_PIEDRA_LUZ, 0.8)
+	impactos.polvo(punto, Vector2.UP, C_PIEDRA, 0.9)
 
 func _al_girar_girador(_punto: Vector2, indice: int, fuerza: float) -> void:
 	var ratio := clampf(fuerza / mesa.p.velocidad_maxima, 0.2, 1.0)

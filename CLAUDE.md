@@ -238,6 +238,20 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   se puede atrapar en la cuna, no se queda encerrada rebotando—: una gravedad
   baja con rebote alto deja la bola botando en un palmo de mesa para siempre, y
   eso no da ningún error.
+- **LA CRIATURA VA DELANTE DE LA CÁSCARA, y eso NO es indiferente.** En el
+  retrato de 64 de la preparación se dibuja primero la cáscara y encima la
+  criatura: así las manos de `cr_calavera` se agarran al borde de la ranura y
+  las dos capas se leen como UN bicho asomándose. Al revés la cáscara la tapa
+  **entera** y lo que queda es una bola con una ranura negra — el bicho
+  desaparece y no da ningún error. Mirado en un mosaico de las dos criaturas
+  contra tres cáscaras antes de escribir la línea, que es lo que costó dos
+  minutos y habría costado una sesión al revés.
+- **Una hoja de fotogramas se pide por CATÁLOGO y la batería sujeta el candado.**
+  `HojaAnimada.CATALOGO` dice qué carpetas y qué filas pide el juego, igual que
+  `NodoSonido.AJUSTES` con los wav, y hay dos pruebas que comprueban que no
+  queda ni una carpeta ni un PNG en disco fuera de la tabla. Es literalmente la
+  avería que abrió la tanda 7: `cr_brasa` y `cr_calavera` llevaban cortadas,
+  limpias y con sus ocho fotogramas **sin que las cargara nadie**.
 - **Un modificador NO es una mecánica.** Los nueve cascabeles se montaron como
   bolsa de modificadores —reutilizando el sistema de reliquias— y salieron
   medidos, equilibrados y **completamente invisibles**: un ×1,19 al daño no se ve
@@ -730,6 +744,65 @@ todas comparten arco.
   `flipper_velocidad_giro`: subirlo NO acelera el juego —está medido que la
   ventana de reacción y la duración de bola no se mueven, porque las fija la
   gravedad al caer— solo alarga lo que tú tiras.
+### Una señal que nadie escucha es un evento mudo, y no da error (ago-2026)
+
+`bola_cayo` y `rampa_fallada` se construyeron con el sistema de capas, se
+emitían perfectamente y **no las escuchaba nadie**. Cero errores, batería en
+verde, y dos eventos de la mesa que para el jugador no existían: es la avería
+del platillo con otra cara.
+
+Y no eran dos: la prueba que se escribió para cerrarlo —leer las señales de
+`sim/mesa.gd` y comprobar que `vista_mesa.gd` conecta todas— destapó una
+tercera, **`flipper_golpeado`**, que sigue muda. Lo que suena al dar a la pala es
+el solenoide al pulsar la tecla, así que fallar un tiro suena igual que clavarlo.
+
+**La regla: una señal sin oyente se comprueba en la batería, no se recuerda.**
+Vale igual para los assets — un wav generado y no enganchado es el mismo fallo—,
+y las dos comprobaciones se escriben **leyendo el fichero**, nunca con una lista
+a mano: una lista copiada se queda vieja en cuanto alguien añada una señal, y
+entonces la prueba da falsos negativos y se acaba desactivando.
+
+### Una cadencia de animación se juzga contra la PANTALLA, no contra el reloj (ago-2026)
+
+Dos cosas del reproductor de fotogramas que no dan ningún error y las dos se
+ven como "la animación va rara":
+
+1. **La cadencia tiene que dividir a 60 sin resto.** Con una que no divide, el
+   reproductor gasta unos fotogramas en 3 ticks y otros en 4, y a ocho
+   fotogramas de bucle eso se lee como un cojeo. Es la rejilla de píxeles, pero
+   en el tiempo. 10 → 6 ticks, 20 → 3, 15 → 4, 12 → 5. Hay una prueba.
+2. **Y el acumulador se RESTA, nunca se pone a cero.** Poner a cero pierde el
+   sobrante de cada fotograma, y con delta de 60 Hz eso no se nota —la cadencia
+   divide a 60 justo para eso—, así que **hay que medirlo en una pantalla que no
+   sea de 60**: a 144 Hz un fotograma de 10 fps cuesta 14,4 ticks y poniendo a
+   cero cuesta 15, o sea **96 fotogramas en diez segundos en vez de 100**. La
+   animación un 4 % más lenta solo en las pantallas rápidas, y sin un error.
+
+Y la tercera, que es de la misma familia que el resto de esta lista: **un estado
+que la hoja no tiene no puede dejar el sprite en blanco.** Hoy ninguna criatura
+trae `golpe`, así que `Reproductor` se cae a `idle` y guarda en `estado_pedido`
+lo que se le pidió — la diferencia se ve en una prueba en vez de descubrirse
+jugando con un bicho invisible.
+
+### Un sonido descendente más no se distingue: mira la FORMA, no el tono
+
+Al diseñar el sonido de caerse, la mesa ya tenía tres sonidos que bajan de tono
+(`drenaje`, `platillo`, `rampa_salida`) y dos graves sucios (`ataque`,
+`rampa_fuerte`). El primer candidato salió al **0,98 de parecido espectral** con
+`rampa_fuerte`.
+
+Lo que lo arregló no fue mover frecuencias: fue **la envolvente**. Los seis
+sonidos viejos tienen el pico de energía en el primer instante —se APAGAN—;
+una caída **termina en un golpe**, porque hay suelo. Con el impacto retrasado
+130 ms, el pico cae en el tramo 5 de 10 y es el único del juego, con
+`rampa_fallada`, que llega tarde. De ahí el parámetro `retardo` de `sonidos.py`.
+
+**Y ojo con el método**: el 0,98 contra `rampa_fuerte` era un espejismo del
+espectro medio, que promedia el tiempo — o sea justo lo único que los separaba.
+Comparados en los primeros 100 ms, donde el oído decide, el parecido cae a 0,74
+contra otro sonido distinto. **Una medida de timbre que ignora el tiempo no
+sirve para decidir si dos sonidos se confunden.**
+
 - **Regenerar un wav no basta: hay que reimportarlo.** Godot sirve la copia
   de `.godot/imported/`, así que tras `python sonidos.py` el juego y las
   pruebas siguen oyendo el sonido viejo. Hay que lanzar

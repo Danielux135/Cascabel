@@ -17,7 +17,19 @@ extends Node2D
 const RUTA_SHADER := "res://render/enemigo.gdshader"
 
 var p: ParametrosAnimacion
+## El sprite de siempre, para los bichos que NO tienen hoja de fotogramas. Los
+## nueve enemigos siguen aquí: sus hojas son la tanda 5 de
+## `assets/prompts_animacion.md`.
 var textura: Texture2D
+## Y la hoja, cuando la hay. Manda sobre `textura`: si el bicho trae fotogramas,
+## el estático deja de dibujarse. `rect_dibujo()` no cambia — el squash y el
+## stretch de píxel entero siguen valiendo igual, y para un bicho con hoja se
+## apagan poniendo `respiracion_pixeles` a 0.
+var reproductor := Reproductor.new()
+## El hitstop congela la simulación y NO el dibujado, a propósito. Pero sí tiene
+## que congelar los fotogramas: si no, los 70 ms del parón se comen justo el
+## fotograma de golpe que el parón quiere enseñar.
+var congelado := false
 ## Los pies del enemigo. La respiración pivota aquí: crece hacia arriba.
 var suelo := Vector2(200, 158)
 var flota := false
@@ -47,25 +59,51 @@ func configurar(tex: Texture2D, es_flotante: bool) -> void:
 	_muriendo = false
 	_embestida = 0.0
 	_embestida_subiendo = false
-	if tex != null:
+	reproductor.poner(null)
+	_medir_textura()
+
+## Un bicho CON hoja de fotogramas. La respiración por código se apaga fuera,
+## en los parámetros: aquí no se decide tacto.
+func configurar_hoja(hoja: HojaAnimada, es_flotante: bool) -> void:
+	configurar(null, es_flotante)
+	reproductor.poner(hoja)
+	_medir_textura()
+
+## El shader necesita el tamaño de lo que se está dibujando AHORA. Con hoja
+## cambia de fotograma a fotograma, así que se remide en cada dibujo en vez de
+## una vez al configurar: los ocho fotogramas de una hoja no tienen por qué
+## medir lo mismo, y con un tamaño viejo la disolución sale desplazada.
+func _medir_textura() -> void:
+	var t := tex_actual()
+	if t != null:
 		_material.set_shader_parameter("tam_textura",
-			Vector2(tex.get_width(), tex.get_height()))
+			Vector2(t.get_width(), t.get_height()))
+
+## Lo que se dibuja ahora mismo: el fotograma si hay hoja, el estático si no.
+func tex_actual() -> Texture2D:
+	var t := reproductor.textura()
+	return t if t != null else textura
 
 func recibir_dano() -> void:
 	_destello = 1.0
+	reproductor.pedir("golpe")
 
 func embestir() -> void:
 	_embestida_subiendo = true
+	reproductor.pedir("ataque")
 
 func morir() -> void:
 	_muriendo = true
 	_destello = 1.0
+	reproductor.pedir("muerte")
 
 func disuelto() -> bool:
 	return _muriendo and _disolucion >= 1.0
 
 func _process(delta: float) -> void:
 	_tiempo += delta
+	reproductor.avanzar(delta, congelado)
+	_medir_textura()
 	if _destello > 0.0:
 		_destello = maxf(_destello - delta / p.destello_duracion, 0.0)
 	if _muriendo:
@@ -107,17 +145,19 @@ func _desplazamiento() -> float:
 ## poder comprobar en headless las dos cosas que importan: que todo cae en
 ## píxeles enteros y que los pies no se mueven al respirar.
 func rect_dibujo() -> Rect2:
-	if textura == null:
+	var tex := tex_actual()
+	if tex == null:
 		return Rect2()
 	var paso := _paso_respiracion()
-	var ancho := textura.get_width() - paso
-	var alto := textura.get_height() + paso
+	var ancho := tex.get_width() - paso
+	var alto := tex.get_height() + paso
 	var esquina := Vector2(
 		suelo.x - float(ancho) * 0.5,
 		suelo.y - float(alto) + _desplazamiento())
 	return Rect2(esquina.round(), Vector2(ancho, alto))
 
 func _draw() -> void:
-	if textura == null or disuelto():
+	var tex := tex_actual()
+	if tex == null or disuelto():
 		return
-	draw_texture_rect(textura, rect_dibujo(), false)
+	draw_texture_rect(tex, rect_dibujo(), false)
