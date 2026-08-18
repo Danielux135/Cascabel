@@ -172,6 +172,10 @@ func _mesa_limpia() -> Mesa:
 	m.targets.clear()
 	m.bancos.clear()
 	m.giradores.clear()
+	# Y LAS PLATAFORMAS. Desde la tanda 0i la planta alta trae una isla de verdad,
+	# y una isla olvidada aquí tira al tablero a la bola de prueba en cuanto sale
+	# de su región: B1 daba "la atraviesa (MAL)" contra un sistema que funciona.
+	m.plataformas.clear()
 	m.umbral = -1
 	m.regreso = -1
 	return m

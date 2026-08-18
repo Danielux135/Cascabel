@@ -43,11 +43,17 @@ func _draw() -> void:
 
 ## Baldosa de 128x128 que repite sin costuras, teselada sobre todo el campo.
 func _dibujar_suelo() -> void:
-	# La zona alta es hueco de raíl, no mesa: se queda oscura.
+	# Lo que queda oscuro es el hueco de verdad: por encima del techo de la planta
+	# alta y los 12 px que separan su embudo del arco de abajo.
 	draw_rect(VistaMesa.ZONA_ALTA, C_HUECO)
-	draw_rect(VistaMesa.CAMPO, C_MESA)      # base por si faltara la textura
-	if _tex_suelo != null:
-		draw_texture_rect(_tex_suelo, VistaMesa.CAMPO, true)
+	# Y LAS DOS PLANTAS LLEVAN EL MISMO SUELO, porque las dos son mesas. Mientras
+	# la de arriba fue un pasillo por el que subía la órbita, dejarla en hueco era
+	# correcto; con palas, isla, túneles y órbita propia, lo que se ve es una mesa
+	# flotando en un pozo.
+	for campo in [VistaMesa.CAMPO_ALTO, VistaMesa.CAMPO]:
+		draw_rect(campo, C_MESA)            # base por si faltara la textura
+		if _tex_suelo != null:
+			draw_texture_rect(_tex_suelo, campo, true)
 
 func _dibujar_adornos() -> void:
 	for adorno in VistaMesa.ADORNOS:

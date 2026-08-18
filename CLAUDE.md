@@ -86,7 +86,7 @@ acabar se mueven a `_to_delete/`.
 
 **Sin `assets/` la batería da 20 fallos que no son fallos** —todos "no existe tal
 PNG"—, así que si lo que se toca es física, con el paquete de código basta; si se
-toca cualquier cosa que dibuje, hay que subir los dos y entonces sale 497/497.
+toca cualquier cosa que dibuje, hay que subir los dos y entonces sale 499/499.
 
 ## Herramientas del repo
 
@@ -145,21 +145,29 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   comentario que decía "esto está medido": lo estaba, contra una bola que caía.
 - **LA MESA TIENE DOS PLANTAS Y LAS DOS SON MESAS, con sus palas.** La planta
   alta tiene dos palas —con las MISMAS teclas que las de abajo, como un flipper
-  superior de verdad—, racimo, bancos de targets, slingshots, giradores y órbita
-  propia.
+  superior de verdad— y **una mesa que no se parece a la de abajo**: palas
+  CORTAS, sin slingshots, sin outlanes, sin carriles de retorno, sin postes, sin
+  giradores y sin targets; con una ISLA elevada, dos TÚNELES, una SUBIDA con
+  cuesta y su ÓRBITA por la franja izquierda. **Y las dos plantas llevan el mismo
+  suelo**: mientras la de arriba fue un pasillo se dibujaba en hueco oscuro, y
+  con palas dentro eso se lee como una mesa flotando en un pozo.
 - **UNA REJILLA DE PINES ES UN COMEDOR DE ENERGÍA PASIVO.** La primera versión de
   la planta alta era un campo de pines y Daniel la tumbó jugándola: *"el pachinko
   es literalmente que caiga la bola, y que luego no pase de la primera línea"*.
   La primera fila se lleva la velocidad y el resto es caída, así que no hay tiro,
   hay embudo. **Lo que hace que una zona de pinball se juegue son palas.**
-- **PERO LA PLANTA ALTA DE HOY ES UNA RÉPLICA, Y ESO NO VALE.** Su zona de palas
-  está calcada de la de abajo —se hizo así para heredar tres sesiones de
-  arreglos— y Daniel la rechazó por eso: *"el mapa de arriba no puede ser una
-  réplica, ha de sentirse diferente"*. Lo que pidió: **"diferente diseño,
-  bumpers, zonas, plataformas, túneles"**. Está pendiente en `PLAN.md` §1d, y va
-  DESPUÉS del sistema de capas de altura (§1c) porque plataformas y túneles son
-  capas. **No la des por buena porque esté medida y en verde: está medida y
-  rechazada.**
+- **LA PLANTA ALTA FUE UNA RÉPLICA Y ESO NO VALÍA.** Su zona de palas estaba
+  calcada de la de abajo —se hizo así para heredar tres sesiones de arreglos— y
+  Daniel la tumbó mirándola: *"el mapa de arriba no puede ser una réplica, ha de
+  sentirse diferente"*. Rehecha en la tanda 0i contra `CAZA.md` §3. **Si algún
+  día vuelve a hacer falta una pieza arriba, no se copia de abajo: se decide.**
+- **LAS CAPAS DE ALTURA YA NO ESTÁN APAGADAS, y solo las usa la planta alta.**
+  Lo restringido son cuatro paredes —la falda de la isla, que solo existe en el
+  tablero— y una rampa con cuesta y cambio de altura, la subida a la isla. **La
+  planta de abajo sigue entera en `TODAS` las capas y sin cuesta**, y hay dos
+  pruebas que lo sujetan: si algo de abajo aparece restringido, el balance medido
+  deja de valer sin avisar. El párrafo de abajo sigue valiendo palabra por
+  palabra para entender el sistema.
 - **LA MESA TIENE CAPAS DE ALTURA, Y ENTRARON APAGADAS.** `Bola.capa` dice a qué
   altura va cada bola y `Colisionador.capas` en qué alturas existe cada cosa; una
   plataforma es una región con borde y salirse de él es caerse; un túnel es el
@@ -189,7 +197,10 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   izquierda), como los habitrails de una máquina real. Un recorrido que cruza el
   campo por dentro se dibuja encima del racimo y de los targets y no se entiende.
 - **Todo lo que se cuente sobre `bumpers`, `bancos`, `giradores` o `rampas`
-  cuenta LAS DOS PLANTAS.** Media batería contaba "3 bumpers" y "2 bancos" y se
+  cuenta LAS DOS PLANTAS, y desde la tanda 0i no reparten igual**: los 6 bumpers
+  son 3 abajo y 3 arriba, las 9 rampas son 3 abajo, 4 arriba y 2 que las unen, y
+  los 2 bancos y los 2 giradores son TODOS de abajo. Una prueba que cuente sin
+  decir de qué planta habla mide otra cosa.** Media batería contaba "3 bumpers" y "2 bancos" y se
   puso en rojo con la mesa perfecta: los huecos del racimo salían "entre 24 y
   521", y el 521 era la distancia de un racimo al otro. Cualquier prueba de
   geometría tiene que decir de qué planta habla.
@@ -202,6 +213,14 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   ahí arriba llega a las palas a **1500 px/s, o sea 67 ms**, cuando el cañón ya
   se tuvo que ablandar porque 900 px/s era incazable. Abrir el arco y dejar caer
   la bola es regalar ese tiro en cada visita.
+- **LA CAZA ES UN BONUS, Y UN BONUS NO SE PIERDE.** Decisión de Daniel
+  jugándola (ago-2026): *"esta fase debería sentirse como un bonus, algo
+  especial, no algo tan fácil de perder"*. **Drenar en la planta alta no te
+  echa**: la mesa vuelve a servir la bola por donde entró (`caza_salvabolas`) y
+  lo único que acaba la caza es el tiempo. El precio de estar ahí arriba es el
+  que siempre fue —el reloj del enemigo, que no para—, y ese no se toca: lo que
+  se quitó fue un SEGUNDO castigo encima del primero. Lo que sí se sigue
+  pudiendo perder es la criatura al bajar, que es donde vive la tensión.
 - **El regreso NO TIENE BOCA, y el umbral no traga con multibola.** Lo primero
   porque una boca en el suelo del piso de arriba haría que la caza durase lo que
   tarda la bola en encontrarla, no lo que dice `caza_tiempo`: al acabarse el
@@ -282,6 +301,62 @@ La regla que sale de la tabla: **la capa −2 tapa todo lo que haya detrás dent
 de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 
 ## Trampas que ya nos han costado tiempo
+
+### Una pared que muere EN el eje de la pala es una trampa para la bola (ago-2026)
+
+Al construir la planta alta, las dos paredes lisas se hicieron acabar
+**exactamente en el eje de su pala**, y con buena intención: acabar *cerca* deja
+un rincón del tamaño de la bola entre la pared y la cápsula del eje, y acabar
+*en* el eje parecía cerrarlo del todo. Cierra el hueco y abre otro peor.
+
+La bola que baja rodando por la pendiente llega al final y se encuentra la
+cápsula del eje como un **bordillo que no puede subir**. Se para ahí, y el sitio
+es estable: la pared la empuja hacia el campo, el eje hacia arriba, y entre las
+dos aguantan a la gravedad.
+
+Medido con una sonda de usar y tirar, 60 cazas: **33 bolas muertas y 29 de ellas
+en el mismo píxel**. El ball search las despertaba a los 2 s, así que **no daba
+ningún error y no era un cuelgue**: eran dos segundos de mesa parada en cada
+visita. Y tapaba otra cosa más gorda — con la bola muriéndose en la esquina, los
+cuatro recorridos de la planta alta registraban **cero entradas**; después del
+arreglo, 105, 57, 36 y 26.
+
+Lo que lo arregla: **subir el codo del muro el radio del eje y cuatro más**, de
+forma que el muro del desagüe pase POR ENCIMA del eje. Entonces la bola no puede
+tocar nunca la cápsula —queda a 24 px cuando necesita 17— y lo primero que se
+encuentra al final de la pendiente es la paleta, que es donde tiene que caer.
+Cuesta el 7 % del largo de la pala.
+
+**La regla, y vale para cualquier rincón nuevo: no basta con preguntarse si la
+bola CABE, hay que preguntarse si se queda.** Un hueco donde no cabe está bien;
+uno donde cabe justo y no puede salir por arriba es una silla. Y la forma de
+saberlo no es mirar la geometría: es soltar sesenta bolas y **apuntar en qué
+píxel se paran** — con el mapa de dónde mueren, la causa salta a la vista; con el
+número de bolas muertas a secas, no.
+
+### Perseguir el objetivo escrito en vez de la sensación (ago-2026)
+
+`CAZA.md` §6 pedía un número muy concreto para cerrar la planta alta: *"un
+jugador que solo aporrea drena arriba en 3-4 s"*. Se construyó contra él, se
+barrieron las palas, se eligió la fila que más se acercaba (7,6 s) y se anotó
+como decisión pendiente lo que faltaba para llegar.
+
+**Y el objetivo estaba mal.** Daniel la jugó y lo dijo en una frase: *"esta fase
+debería sentirse como un bonus, algo especial, no algo tan fácil de perder"*.
+Buscar que el jugador malo pierda rápido es diseñar un CASTIGO; el modo era un
+premio que se gana con un tiro de 3 entre 100. Los dos números —el que se
+perseguía y el que salió— eran correctos y ninguno de los dos medía lo que
+importaba.
+
+**La regla: un objetivo numérico escrito antes de jugar nada es una hipótesis,
+no un criterio.** Cuando la medida se acerca al objetivo y aun así algo no
+convence, lo primero que hay que poner en duda es el objetivo, no la geometría.
+Y el aviso de que iba a pasar estaba escrito en la propia nota: el criterio de
+salida decía *"no se lee, se juega"*.
+
+*(Y su corolario, que ya está más abajo con otras palabras: cuando el maniquí y
+la persona dicen cosas distintas, gana la persona. El maniquí no notó que la
+planta alta era más blanda que la de abajo; Daniel lo notó en dos bolas.)*
 
 ### Dar por bueno el techo que hay (ago-2026)
 
@@ -1006,6 +1081,25 @@ todas comparten arco.
   tablero por los cuatro lados. Ahora hay `NueveTrozos.dibujar_hueco`. **Regla
   general: un nueve-trozos en una caja menor que 2× su esquina va a salir mal,
   y no da ningún aviso.**
+- **Un rótulo indexado por PREMIO miente en cuanto hay dos recorridos que pagan
+  igual.** Los carteles de las bocas salían de un diccionario `premio → texto`, y
+  eso funcionó mientras cada premio tenía un solo recorrido. La subida a la isla
+  de la planta alta paga `DANO_FUERTE` igual que el cañón, así que su boca decía
+  **"CANON DANO x2"** a media mesa del cañón de verdad. No da error, la batería
+  no lo ve y en el código se lee perfectamente razonable. **Lo que se dibuja se
+  indexa por NOMBRE**; el premio dice lo que paga, que es otra pregunta.
+- **Un comentario que justifica un dibujo caduca cuando cambia lo dibujado.**
+  `NodoSuelo` pintaba los 660 px de arriba en hueco oscuro con su razón escrita al
+  lado: *"la zona alta es hueco de raíl, no mesa"*. Era verdad cuando arriba solo
+  pasaba la órbita, y siguió pintándose igual cuando arriba hubo palas, isla y
+  túneles: una mesa flotando en un pozo. **Cuando construyas donde antes no había
+  nada, busca quién dibujaba ese "nada"** — el comentario correcto de ayer es la
+  avería de hoy, y solo se ve mirando.
+- **El orden de dibujo es la ALTURA, y con capas son tres, no dos.** Túneles
+  (bajo el tablero), plataformas (terreno elevado) y rampas (vuelan). Con las
+  plataformas antes que los túneles, el túnel que pasa por debajo de la isla se
+  dibujaba encima de la losa y se leía como un puente: exactamente lo contrario
+  de lo que es.
 - **Un identificador no es un rótulo.** La rareza, el tiro de una misión y el
   eje de una reliquia se guardaban en una sola tabla que servía a la vez para
   leer el JSON y para PINTAR. Como la clave del JSON va sin tilde, la tele

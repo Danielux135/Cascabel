@@ -85,10 +85,19 @@ const GROSOR_CARA_TARGET := 2.0
 
 ## El campo de juego de verdad: la mesa validada, con su suelo de piedra.
 const CAMPO := Rect2(20, 660, 360, 620)
-## Los 660 px de arriba NO son campo de juego: son el hueco por el que sube la
-## órbita. Van en oscuro para que se lea que el raíl va elevado por detrás y no
-## que la mesa sigue.
+## Los 660 px de arriba fueron durante mucho tiempo el hueco por el que sube la
+## órbita, y por eso iban en oscuro: se leía que el raíl va elevado por detrás y
+## no que la mesa sigue.
 const ZONA_ALTA := Rect2(20, 20, 360, 640)
+## Y AHORA LA PLANTA ALTA ES UNA MESA, así que tiene el mismo suelo de piedra que
+## la de abajo. Con el hueco oscuro debajo de una planta con palas, isla, túneles
+## y órbita, lo que se veía era una mesa flotando en un pozo — y el invariante
+## dice lo contrario: LAS DOS PLANTAS SON MESAS.
+##
+## Lo que se queda oscuro es lo que de verdad no es mesa: por encima del techo, y
+## los 12 px entre el fondo del embudo de arriba (648) y el arco de abajo (660),
+## que son el hueco que impide que las dos plantas se comuniquen por gravedad.
+const CAMPO_ALTO := Rect2(20, 150, 360, 498)
 ## Por donde cae la bola al drenar, bajo los flippers. Nada de adornos aquí
 ## salvo la rejilla, que va justo ahí a propósito.
 const CORREDOR_DRENAJE := Rect2(170, 1200, 60, 100)
@@ -197,6 +206,8 @@ var _catalogo: Array = []
 var _depuracion := false
 var _sacudida: float = 0.0
 var _tiempo: float = 0.0
+## Cuánto está apagada la planta de abajo, de 0 a 1. Sube mientras dura la caza.
+var _dormida: float = 0.0
 var flash_enemigo: float = 0.0
 var flash_jugador: float = 0.0
 ## El platillo acaba de devolver tiempo. Enciende la BARRA DEL RELOJ, que está
@@ -329,6 +340,7 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 		_sonido.reproducir("rampa_fuerte"))
 	mesa.caza_terminada.connect(func(_pt: Vector2) -> void:
 		_sonido.reproducir("banco"))
+	mesa.bola_salvada.connect(_al_salvar_bola)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
 	mesa.target_abatido.connect(_al_abatir_target)
@@ -603,6 +615,7 @@ func _sacudir(cantidad: float) -> void:
 
 func _process(delta: float) -> void:
 	_tiempo += delta
+	_dormida = move_toward(_dormida, 1.0 if mesa.en_caza else 0.0, delta * 2.0)
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
 	flash_jugador = maxf(flash_jugador - delta * 2.2, 0.0)
@@ -670,15 +683,18 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 			if _depuracion and combate != null and not combate.terminado():
 				mesa.soltar_bola_extra()
 		KEY_F3:
-			# MONTA EL ANDAMIO DE CAPAS EN LA PLANTA ALTA, y solo con la
-			# depuración encendida (F1 primero). Existe porque el sistema de
-			# capas entró APAGADO —ninguna geometría lo usa hasta `PLAN.md` §1d—
-			# y un sistema que no se puede tocar no se puede juzgar: sin esto,
-			# la única forma de saber si una plataforma se lee es creerse una
-			# tabla. No es geometría de la mesa y no está al empezar: se pide.
+			# SUBE LA BOLA A LA PLANTA ALTA A MANO, y solo con la depuración
+			# encendida (F1 primero). El andamio de capas que había aquí ya no
+			# hace falta: la geometría de la planta alta usa capas de verdad
+			# desde la tanda 0i.
+			#
+			# Lo pidió Fátima con estas palabras: *"si es de prueba vale, pero no
+			# quiero cosas aleatorias para probar"*. El umbral se abre hoy en 3 de
+			# cada 100 entradas al racimo, así que juzgar la planta alta por el
+			# camino normal es juzgarla dos veces por run: lo que se está midiendo
+			# es LA MESA, no la puerta de entrada (`CAZA.md` §5, puerta B).
 			if _depuracion:
-				mesa.montar_andamio_de_capas()
-				queue_redraw()
+				mesa.abrir_caza_a_mano()
 		KEY_ESCAPE:
 			# ESC cierra lo que haya abierto ANTES de salir del juego. Antes
 			# salía siempre, y con un menú de Inicio delante eso es cerrar la
@@ -920,6 +936,24 @@ func _al_curar(cantidad: int, punto: Vector2) -> void:
 	_numeros.append({"pos": punto, "t": 1.0, "texto": "+%d" % cantidad,
 		"col": C_VERDE, "tam": 16.0, "subida": 24.0})
 
+## LA CAZA TE HA SALVADO LA BOLA. Se dice EN EL DESAGÜE de la planta alta, o
+## sea donde el jugador acaba de ver desaparecer la bola: es el mismo criterio
+## que la red de seguridad de abajo —un efecto se enseña donde se mide— y aquí
+## importa el doble, porque una bola que se cae por un agujero y reaparece
+## arriba sin decir nada no se lee como un salvabolas, se lee como un fallo.
+##
+## Va en verde y con el sonido del reloj —no con el de drenaje— a propósito: lo
+## que ha pasado es bueno. Y lleva la cuenta, que es la única forma de que el
+## jugador sepa que la mesa lo está sujetando y cuánto.
+func _al_salvar_bola(punto: Vector2, salvadas: int) -> void:
+	var donde := Vector2(Mesa.ANCHO * 0.5, mesa.p.arena_fondo_y - 30.0)
+	_numeros.append({"pos": donde, "t": 1.2,
+		"texto": "SALVADA x%d" % salvadas if salvadas > 1 else "SALVADA",
+		"col": C_VERDE})
+	impactos.onda(donde, C_VERDE, 1.4)
+	impactos.chispas(punto, Vector2.UP, C_VERDE, 1.0)
+	_sonido.reproducir("atrasar")
+
 ## La red de seguridad se ha comido el drenaje. Se dice donde se MIDE el
 ## castigo: sobre el corredor de drenaje, que es de donde no ha salido el golpe.
 func _al_perdonar_drenaje() -> void:
@@ -981,10 +1015,15 @@ func _draw() -> void:
 	# El enemigo NO se dibuja aquí ni está en la mesa: vive en `panel_enemigo`,
 	# en la banda derecha, con material propio para el destello y la disolución.
 	_dibujar_inlanes()
-	# Las plataformas van DEBAJO de las rampas y encima del suelo: son terreno,
-	# no adorno. Una rampa que cruce por encima de una tiene que verse cruzando.
+	# EL ORDEN ES LA ALTURA, y hay tres capas de terreno, no dos. Primero los
+	# TÚNELES, que van por debajo del tablero; encima las plataformas, que son
+	# terreno elevado; y encima de todo las rampas, que vuelan. Con las
+	# plataformas antes que los túneles, el túnel que pasa por debajo de la isla
+	# se dibujaba ENCIMA de la losa y se leía como un puente: exactamente lo
+	# contrario de lo que es.
+	_dibujar_rampas(true)
 	_dibujar_plataformas()
-	_dibujar_rampas()
+	_dibujar_rampas(false)
 	_dibujar_platillos()
 	_dibujar_paredes()
 	_dibujar_objetos()
@@ -994,9 +1033,29 @@ func _draw() -> void:
 	_dibujar_atrape()
 	_dibujar_numeros()
 	_dibujar_lanzador()
+	_dibujar_planta_dormida()
 	_dibujar_velo()
 	if _depuracion:
 		_dibujar_depuracion()
+
+## LA PLANTA DE ABAJO SE APAGA MIENTRAS JUEGAS ARRIBA (`CAZA.md` §3.7). Ya era
+## medio cierto —las dos plantas no se juegan a la vez, el umbral no traga con
+## multibola— y lo que faltaba era que SE VIERA: si las dos se dibujan igual de
+## encendidas, la planta alta parece la misma mesa con la cámara subida, que es
+## exactamente la queja que tumbó la versión anterior.
+##
+## No hace falta congelar nada: con una sola bola y esa bola arriba, abajo no hay
+## nada que simular. Lo que cuesta es el píxel, y es un rectángulo.
+##
+## Entra y sale con una rampa de medio segundo: de golpe sería un corte de
+## pantalla, y lo que se está contando es que te has ido a otro sitio, no que ha
+## cambiado la escena.
+func _dibujar_planta_dormida() -> void:
+	if _dormida <= 0.005:
+		return
+	var y := mesa.p.arena_fondo_y
+	draw_rect(Rect2(0, y, Mesa.ANCHO, mesa.p.y_drenaje + 8.0 - y),
+		Color(C_CABINA, 0.82 * _dormida))
 
 ## El velo de la ruleta: apaga la mesa entera menos la tele, que sube por encima
 ## por z_index. Va aquí, en el mundo, y no en una capa de pantalla, porque lo que
@@ -1093,10 +1152,20 @@ func _dibujar_lanzador() -> void:
 ## Qué paga cada recorrido, escrito en su boca. `DISEÑO.md` §1 dice que la mesa
 ## es un menú de tiros, y un menú sin los platos escritos no es un menú: Daniel
 ## jugó una tanda entera sin llegar a saber qué era el platillo.
+## Y VA POR NOMBRE, NO POR PREMIO. Estuvo indexada por premio y en cuanto la
+## planta alta tuvo recorridos propios empezó a mentir: la subida a la isla paga
+## `DANO_FUERTE` igual que el cañón, así que el rótulo de la boca de arriba decía
+## "CANON DANO x2" a un metro de donde está el cañón de verdad. Es la trampa de
+## "un identificador no es un rótulo" otra vez, y se ve jugando, no en la batería.
+##
+## Lo que se lee tiene que decir A DÓNDE VA ese recorrido; lo que paga lo decide
+## el premio, y son dos cosas distintas.
 const ETIQUETA_RAMPA := {
-	Rampa.Premio.MULTIPLICADOR: "MULTIPLICADOR",
-	Rampa.Premio.DANO_FUERTE: "CANON  DANO x2",
-	Rampa.Premio.DANO: "OTRA PALA",
+	"orbita": "MULTIPLICADOR",
+	"retorno": "OTRA PALA",
+	"canon": "CANON  DANO x2",
+	"orbita_alta": "MULTIPLICADOR",
+	"subida_isla": "A LA ISLA",
 }
 
 ## UNA PLATAFORMA SE TIENE QUE VER, O ES UNA TRAMPA. Lo único que hace en la
@@ -1160,8 +1229,13 @@ func _tapar_a_trozos(puntos: PackedVector2Array) -> void:
 			d += 14.0
 		recorrido += tramo
 
-func _dibujar_rampas() -> void:
+## `bajo_tierra` parte el dibujo en las dos alturas: los túneles se pintan antes
+## que las plataformas y las rampas después, porque un túnel pasa por debajo de
+## una isla y una rampa por encima.
+func _dibujar_rampas(bajo_tierra: bool) -> void:
 	for r in mesa.rampas:
+		if r.subterranea != bajo_tierra:
+			continue
 		# UN TÚNEL VA POR DEBAJO DEL TABLERO y se dibuja como tal: sin la tira
 		# clara que hace que una rampa parezca elevada, y con la boca apagada.
 		# Es lo único que lo separa de una rampa, porque en la física son la
@@ -1189,7 +1263,7 @@ func _dibujar_rampas() -> void:
 			draw_circle(extremo, r.entrada_radio, Color(C_ORO, 0.30))
 			draw_circle(extremo, r.entrada_radio, C_ORO, false, 1.0)
 		for boca in bocas:
-			_etiqueta(boca, str(ETIQUETA_RAMPA.get(r.premio, "")))
+			_etiqueta(boca, str(ETIQUETA_RAMPA.get(r.nombre, "")))
 
 ## Rótulo pequeño y apagado junto a una boca. Va tenue a propósito: tiene que
 ## poder leerse entre bola y bola, no competir con la bola.
@@ -1222,6 +1296,13 @@ func _dibujar_inlanes() -> void:
 
 func _dibujar_paredes() -> void:
 	for c in mesa.colisionadores:
+		# UNA PARED QUE SOLO EXISTE EN UNA CAPA NO ES UNA PARED DE LA MESA: es lo
+		# que sostiene algo. Hoy son las cuatro de la falda de la isla, y la isla
+		# ya dibuja su cara, su canto y su sombra en `_dibujar_plataformas`;
+		# pintarlas otra vez como pared deja un recuadro claro metido 8 px dentro
+		# de la losa, que se lee como un marco y no como un bloque.
+		if c.capas != Colisionador.TODAS:
+			continue
 		match c.tipo:
 			Colisionador.Tipo.PARED:
 				draw_line(c.a, c.b, C_PARED, 3.0)

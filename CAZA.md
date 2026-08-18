@@ -7,6 +7,17 @@ Documento de diseño, no de estado. Se escribe entero antes de tocar geometría
 porque la planta alta ya ha salido mal dos veces y las dos por construir antes
 de decidir.
 
+> **⚠ CORREGIDO EL 18-AGO, JUGÁNDOLO.** La geometría de §3 se construyó y Daniel
+> la probó (puerta B de §5). Veredicto: *"es extremadamente fácil drenar e irte
+> de la zona de caza"*, *"no he sido capaz de aguantar los 20 segundos ni de
+> lejos"*, *"flippers extremadamente cortos"*, y sobre todo **la frase que cambia
+> el diseño**: *"esta fase debería sentirse como un bonus, algo especial, no algo
+> tan fácil de perder"* — *"ni siquiera me gusta la idea de que te puedas salir
+> de esa zona tan fácil"*.
+>
+> Lo que se cae de esta nota: **el castigo**. Lo que entra: **un salvabolas**.
+> Está marcado sección por sección abajo; §3.1, §5 y §6 son las que cambian.
+
 ---
 
 ## 0. La pregunta que desbloqueaba todo, y la respuesta es que no
@@ -104,6 +115,35 @@ Con eso, la caza deja de ser un modo suelto:
 
 ---
 
+## 1b. LA CAZA ES UN BONUS, Y UN BONUS NO SE PIERDE *(nuevo, 18-ago)*
+
+Lo decidió Daniel jugando la geometría, y reordena media nota:
+
+> **Drenar en la planta alta ya no te echa.** La mesa vuelve a servir la bola por
+> donde entró y la caza sigue. Lo único que la acaba es el tiempo.
+
+Por qué es coherente y no es un regalo:
+
+- **El precio ya existía y no se ha tocado**: el reloj del enemigo corre mientras
+  estás arriba (`DISEÑO.md` §5). Subir cuesta tiempo de combate, y eso es lo que
+  impide que cazar sea gratis. Lo que se quita es un SEGUNDO castigo —perder el
+  bonus— que estaba encima del primero.
+- **Un bonus que se pierde en cuatro segundos no es un bonus, es un peaje.** Y
+  medido: con las palas cortas, el que aporrea duraba arriba 7,6 s de los 20, o
+  sea que se perdía dos tercios del modo por el que ha tenido que pagar un tiro
+  difícil de 3 entre 100.
+- **Lo que se juega arriba pasa a ser cuánto aprovechas**, no cuánto aguantas.
+  Aguantar la bola ya es la habilidad de la planta de abajo; repetirla arriba con
+  palas peores era pedir lo mismo y más difícil.
+
+Vive en `caza_salvabolas`, y `caza_coste_salvada` (a 0) deja la variante
+"salvabolas con coste en segundos" a un número de distancia, sin tocar código.
+
+**Lo que esto NO cambia:** la captura sigue acabando la caza (§2, fase 3) y el
+regreso sigue pudiendo costarte lo capturado (§2, fase 4). Perder la bola arriba
+y perder la CRIATURA al bajar son dos cosas distintas, y la que da la tensión es
+la segunda.
+
 ## 2. La captura: acorralar, no restar vida
 
 La forma que **no** se hace: pegarle N veces a una barra. Es un contador, y un
@@ -189,12 +229,21 @@ teclas** — lo que hace una máquina real con un flipper superior.
 
 Lo que cambia es el tamaño. Abajo la pala mide 64. Arriba, **más corta**.
 
-Y la razón no es estética, la dijo ella: *«pasa de ser random a skill»*. Una
-pala corta perdona menos, y arriba **drenar no cuesta vida, cuesta la caza**
-(tanda 0g). O sea:
+Y la razón no es estética, la dijo ella: *«pasa de ser random a skill»*.
 
-> **El hueco entre palas de arriba ES el reloj de la caza.** Los 20 s son el
-> techo; el suelo lo pone tu mano.
+> **⚠ CORREGIDO (18-ago).** Aquí ponía además: *"el hueco entre palas de arriba
+> ES el reloj de la caza; los 20 s son el techo, el suelo lo pone tu mano"*.
+> **Eso se cae con el salvabolas de §1b**: el reloj es el reloj, y punto.
+>
+> Y el tamaño también. Se construyó con 38 —la mitad que abajo— y Daniel lo
+> tumbó jugándolo: *"flippers extremadamente cortos"*. Queda en **54**, con los
+> ejes a 136 para que el hueco baje a 24 px, o sea la MITAD que abajo.
+>
+> Lo que sobrevive de la decisión de Fátima, y es lo importante: **la pala de
+> arriba sigue siendo más corta que la de abajo y se nota en la mano**. Lo que
+> no sobrevive es usarla como castigo. Medido, 60 cazas con un jugador que
+> aporrea: con 38 la mesa tenía que salvarle la bola una y otra vez; con 54 y el
+> hueco a 24, **cero salvadas** y 6,3 golpes por caza (contra 3,7).
 
 Ojo con el invariante: lo cerrado es el **ancho de mesa (400)** y el **tamaño de
 bola**, porque de ellos cuelga el hueco de ABAJO. El largo de una pala de la
@@ -350,14 +399,30 @@ Nada de esto se decide a ojo. Se expone como parámetro y se barre.
 | `caza_tope` | 20 s | ya existe, y hoy no se alcanza nunca |
 | `umbral_boca`, `umbral_entrada_radio`, `umbral_velocidad_minima` | 3 % | cada cuánto se abre la caza |
 
-**La medida que cierra la geometría de arriba**, y sustituye a "el hueco será de
-X px":
+**La medida que cierra la geometría de arriba.**
 
-> Un jugador que solo aporrea drena arriba en **3-4 s**. Un jugador bueno llega
-> al techo de 20. Hoy son **5,2 s de media y 52 de 60 acaban drenando, ninguna
-> por tiempo**: la brecha no existe.
-
-Se corre con el medidor de la tanda 0g, que ya sabe puntuar la caza.
+> **⚠ CORREGIDA (18-ago), y no por el número: por la pregunta.** Aquí ponía *"un
+> jugador que solo aporrea drena arriba en 3-4 s"*. Se construyó, se midió —7,6 s
+> con las palas a 38— y al jugarlo resultó que **el objetivo estaba mal**: buscar
+> que el malo drene rápido es diseñar un castigo, y esto es un bonus.
+>
+> Con salvabolas, la duración es SIEMPRE el tope, así que medirla no dice nada.
+> Lo que dice algo:
+>
+> **Cuántas veces tiene que salvarte la mesa** —o sea cuánto bonus tiras— y
+> **cuánto llegas a tocar mientras estás arriba**. Medido con
+> `tests/medir_planta_alta.gd`, 60 cazas por celda, jugador que aporrea:
+>
+>     largo  separ  hueco   salvadas   golpes
+>        46    136   38.8       1.3      3.7
+>        54    128   16.6       0.0      6.8
+>        54    136   24.6       0.0      6.3   <- el elegido
+>        54    144   32.6       0.4      6.5
+>        64    136    7.0       0.0      6.5
+>
+> Y el otro número, el que dice si la planta se JUEGA o se mira: con 54/136 el
+> que aporrea da **6,3 golpes y 7 recorridos** en el bonus, y pasa el 37 % del
+> tiempo por encima de la zona de palas y solo el 21 % metido en una curva.
 
 ---
 
@@ -373,6 +438,18 @@ pregunta de la lista de abajo.
 corta, dos castigos a la vez. Si la medida da 1-2 s para un jugador normal, se
 devuelve UNO de los dos: primero la pala, que es la que Fátima eligió, y los
 slingshots se quedan fuera.
+
+> **⚠ PASÓ, Y AL REVÉS DE COMO SE ESCRIBIÓ (18-ago).** El riesgo estaba bien
+> visto —fue de frenada— pero por el sitio que no se miraba: **con los dos
+> castigos puestos, la medida decía que la planta alta era MÁS BLANDA que la de
+> abajo** (12,2 s arriba contra 8,1 s abajo), porque al quitar los slingshots se
+> quitaron también los OUTLANES, que son los que se comen la bola abajo. El
+> maniquí no lo notaba; Daniel jugándolo, sí. **Se devolvió la pala, como decía
+> esta nota, y los slingshots siguen fuera.**
+>
+> La lección, que es de las de anotar: *dos castigos a la vez* y *dos válvulas
+> quitadas a la vez* se compensan sin que se vea, y lo único que separa una cosa
+> de la otra es jugarlo.
 
 **3. Cuatro fases pueden ser demasiadas para 20 segundos.** Rastro + acoso +
 cierre + regreso en 20 s es apretado. Plan B si al jugarlo se atropella:

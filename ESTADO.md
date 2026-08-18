@@ -14,29 +14,155 @@ pasa de una pantalla, sobra algo.
 Lo mínimo que hay que saber si esta conversación empieza de cero.
 
 **Dónde estamos.** La mesa tiene **dos plantas, y las dos son mesas de pinball
-de verdad**. Encima del arco hay una planta alta con **sus propias dos palas**,
-su racimo, dos bancos de targets, dos slingshots, dos giradores y su órbita. Se
-sube por el **umbral** y se baja por el **regreso**, y los dos van por las
-franjas de 20 px de fuera de las bandas, que estaban muertas. Y desde el 16 de
-agosto la mesa **tiene capas de altura**, aunque todavía no las use ninguna
-geometría: `Bola.capa`, máscara por colisionador, plataformas con borde, túneles
-y rampas con cuesta, todo apagado por defecto. Batería **497/497** con `assets/`
-en la caja (sin `assets/`, 20 fallos que son todos "no existe tal PNG").
+de verdad**. Se sube por el **umbral** y se baja por el **regreso**, los dos por
+las franjas de 20 px de fuera de las bandas.
+
+**Y LA PLANTA ALTA ESTÁ REHECHA (tanda 0i, 18-ago).** Ya no es una réplica de la
+de abajo: dos palas CORTAS con las mismas teclas, **sin slingshots, sin
+outlanes, sin carriles de retorno, sin postes, sin giradores y sin targets**, una
+ISLA elevada en el centro que solo se alcanza subiendo, DOS TÚNELES por debajo
+del tablero, una SUBIDA con cuesta que cruza por encima de un túnel, TRES
+BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
+ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
+construir ningún sistema, solo encender el que ya estaba medido**.
+
+Batería **499/499** con `assets/` en la caja (sin `assets/`, 20 fallos que son
+todos "no existe tal PNG").
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
-**Y LA PLANTA ALTA DE HOY SIGUE RECHAZADA, aunque la batería esté en verde.** Es
-una réplica de la de abajo y Daniel la tumbó mirándola: *"el mapa de arriba no
-puede ser una réplica, ha de sentirse diferente"*. El sistema de capas ya está;
-**lo que toca ahora es rehacerla encima**. Ver "Siguiente" 0i.
+**Y LA PUERTA B YA SE HA JUGADO (18-ago).** Daniel la probó y tumbó el
+planteamiento, no la construcción: *"es extremadamente fácil drenar e irte de la
+zona de caza"*, *"flippers extremadamente cortos"*, y la frase que reordena el
+diseño — *"esta fase debería sentirse como un bonus, algo especial, no algo tan
+fácil de perder"*.
 
-**El diseño de esa planta ya no hay que inventarlo: está en `CAZA.md`** (tanda
-0i-diseño, 17-ago). Ahí está también el sistema de CAPTURA, que no existía
-escrito en ningún sitio. La siguiente tanda es construir la geometría, no
-decidirla.
+**Lo que se hizo con eso, y son dos decisiones suyas:**
+
+1. **SALVABOLAS.** Drenar arriba ya no te echa: la mesa vuelve a servir la bola
+   por donde entró y la caza solo se acaba por tiempo. El precio de estar ahí
+   sigue siendo el reloj del enemigo, que no para.
+2. **Palas de 38 a 54**, con los ejes a 136: el hueco baja de 61 px a 24, o sea
+   la mitad que abajo. Medido: de tener que salvarle la bola al que aporrea, a
+   **cero salvadas** y 6,3 golpes por caza (antes 3,7).
+
+Sigue estando **F1 y luego F3** para subir a mano: el umbral se gana en 3 de cada
+100 entradas al racimo, así que por el camino normal la planta alta se ve dos
+veces por run y no se puede juzgar.
+
+**El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
+CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
+son las fases de la captura (§2) y las nueve criaturas.
+
+## LA PLANTA ALTA, REHECHA (tanda 0i · 18-ago)
+
+`CAZA.md` §3 construido entero. **499/499**, y la planta de abajo da los mismos
+números al decimal: 8,142 s de duración de bola, 120 golpes, huella 16621,1901.
+
+| Lo que se fue | Lo que entró |
+|---|---|
+| 2 slingshots, 2 postes, 2 giradores, 2 bancos de targets, el racimo | 3 búmperes sueltos pegados a las bocas |
+| la zona de palas calcada de abajo | 2 palas **cortas** (38) y dos paredes lisas que mueren en el eje |
+| — | la **isla** con su falda por capa, 2 **túneles**, la **subida** con cuesta y la **órbita** por la franja izquierda |
+| el andamio de capas de F3 | F3 sube la bola por el umbral a mano (puerta B) |
+| **drenar arriba te echaba** | **salvabolas: la mesa te sirve otra bola y sigues** |
+
+**El sistema de capas ya no está apagado**: la isla es una `Plataforma` con
+cuatro paredes que solo existen en el tablero, los túneles son `subterranea`, la
+subida lleva `velocidad_escape` y `capa_salida = CAPA_ALTA`, y cruza por encima
+del túnel hondo sin tocarlo. Cero código de sistema nuevo.
+
+### La avería que se cazó midiendo, y es la de la tanda
+
+Con la pared diagonal muriendo EN el eje de la pala, la bola que baja rodando
+llega al final de la pendiente y se encuentra la cápsula del eje como un bordillo
+que no puede subir. Se queda ahí, y el rincón es **estable**: la pared la empuja
+al campo, el eje hacia arriba, y entre las dos aguantan a la gravedad.
+
+Medido con una sonda de usar y tirar, 60 cazas: **33 bolas muertas, 29 de ellas
+en el mismo píxel** —(260,540), el rincón de la pala derecha—. El ball search la
+despertaba a los 2 s, así que no era un cuelgue: eran dos segundos de mesa parada
+en cada visita, sin decir por qué. Subiendo el codo del muro 12 px (el radio del
+eje y cuatro más), el muro pasa POR ENCIMA del eje, la bola no puede tocar la
+cápsula y lo primero que se encuentra al final de la pendiente es la paleta.
+**Bolas muertas: 33 → 2**, y las dos que quedan son de la planta de abajo.
+
+Y de paso destapó lo otro: antes del arreglo la planta alta no se jugaba nada
+—cero entradas a la órbita, a la subida y al túnel hondo en 60 cazas—; después,
+105 · 57 · 26. La bola no llegaba a los recorridos porque se moría en la esquina.
+
+### Y la puerta B lo cambió: el bonus (18-ago, después de jugarlo)
+
+El barrido de abajo está hecho contra la pregunta vieja —"cuánto tarda en drenar
+el que aporrea"— y **esa pregunta se cayó al jugarlo**. Con salvabolas la caza
+dura siempre el tope, así que la duración no informa. Lo que informa ahora, y es
+lo que mide el medidor:
+
+    largo  separ  hueco   salvadas   golpes
+       46    136   38.8       1.3      3.7
+       54    128   16.6       0.0      6.8
+       54    136   24.6       0.0      6.3   <- el elegido
+       54    144   32.6       0.4      6.5
+       64    136    7.0       0.0      6.5
+
+Con 54/136 el que aporrea da 6,3 golpes y 7 recorridos en el bonus, pasa el 37 %
+del tiempo por encima de la zona de palas y solo el 21 % metido en una curva. Y
+**la mesa no tiene que salvarle ni una vez**, que es lo que pedía Daniel.
+
+Comprobado además contra atascos, que es donde muerde un hueco de 24 px con una
+bola de 18: **2 bolas quietas de 60 y en sitios distintos**, cero disparos del
+ball search. No hay rincón nuevo.
+
+### Los diales, barridos (`tests/medir_planta_alta.gd`, nuevo) — LA TANDA ANTERIOR
+
+60 cazas por celda, jugador que aporrea. El medidor mide **dos jugadores**, que
+es lo que le faltaba a `medir_caza.gd`: una brecha son dos números.
+
+    largo  separ  hueco   dura     drena
+       46    130   32.8   18.2 s   pocas   <- la caza no se acaba nunca
+       46    144   46.8   12.2 s   33/60
+       38    144   60.9    7.6 s   48/60   <- el elegido
+       38    158   74.9    6.6 s   49/60
+
+El 46/144 —el mismo hueco que abajo— dejaba al que aporrea **12,2 s arriba, más
+que los 8,1 s que dura una bola abajo**: la planta alta salía más blanda que la
+de abajo teniendo la pala más corta, porque aquí no hay outlanes.
+
+**Y `arena_desague_medio` salió INERTE**: 50 u 80, el mismo 7,6 s al decimal. Lo
+que decide es el hueco central, no lo ancho que sea el embudo. Se queda como
+parámetro con la medida escrita al lado, que es más útil que un número mágico.
+
+### Dos fallos que la batería no ve y las capturas sí
+
+Lanzada con `Xvfb` (ver `CLAUDE.md`, "sesión remota con ventana"):
+
+- **El rótulo de la subida a la isla decía "CANON DANO x2"**, a media mesa del
+  cañón de verdad. `ETIQUETA_RAMPA` estaba indexada por PREMIO, y la subida paga
+  `DANO_FUERTE` igual que el cañón. Ahora va por nombre y dice "A LA ISLA".
+- **La planta alta se dibujaba sobre un pozo negro.** `NodoSuelo` pintaba los 660
+  px de arriba en hueco *"porque es raíl, no mesa"* — cierto cuando era un
+  pasillo, falso desde que tiene palas, isla y túneles. Ahora las dos plantas
+  llevan el mismo suelo de piedra y lo oscuro es solo lo que no es mesa: por
+  encima del techo y los 12 px que separan las dos plantas.
+- Y un tercero de orden: el túnel que pasa por debajo de la isla se dibujaba
+  ENCIMA de la losa, o sea como un puente. Ahora hay tres alturas de dibujo:
+  túneles, plataformas, rampas.
+
+### Lo del "3-4 s" de `CAZA.md` §6: cerrado, y era la pregunta lo que estaba mal
+
+Se persiguió el objetivo escrito —que el que aporrea drene en 3-4 s— y se llegó a
+7,6. Al jugarlo quedó claro que **el objetivo era el equivocado**: buscar que el
+malo pierda rápido es diseñar un castigo, y esto es un bonus. `CAZA.md` §6 está
+corregido con la medida nueva.
+
+Y `CAZA.md` §7 (riesgo 2) se cumplió **al revés de como estaba escrito**: se temía
+que quitar slingshots Y acortar la pala fuese pasarse de castigo; lo medido es que
+con los dos puestos la planta alta salía MÁS BLANDA que la de abajo (12,2 s contra
+8,1 s), porque al quitar los slingshots se quitaron también los outlanes. Dos
+castigos y dos válvulas quitadas a la vez se compensan sin que se vea.
 
 ## LA PLANTA ALTA Y LA CAPTURA, DECIDIDAS (tanda 0i-diseño · sin tocar código)
 
@@ -1482,34 +1608,39 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 0i-d. ~~**DISEÑAR LA PLANTA ALTA Y LA CAPTURA**~~ **HECHA.** Sale `CAZA.md`. Sin
    tocar código. Ver arriba.
 
-0i. **LA PLANTA ALTA, REHECHA — LA GEOMETRÍA** (Opus, alto + Daniel y Fátima).
-   `PLAN.md` §1d y **`CAZA.md` §3 y §5, que ya la tienen decidida entera**: es
-   construirla, no diseñarla. Y **es lo siguiente**. El sistema de capas ya está
-   debajo, que era lo único que no se podía hacer al revés.
-   Lo que entra: palas cortas con las mismas dos teclas, **fuera los
-   slingshots**, fuera outlanes y carriles de retorno, plataforma central con
-   borde, dos túneles que cruzan por debajo, tres búmperes sueltos pegados a las
-   bocas, órbita por la franja izquierda libre (y=150 a 670), y la planta de
-   abajo congelada y atenuada. La de hoy se tira entera.
-   Lo que ya se puede usar sin construir nada: plataformas con borde, túneles
-   que cruzan por debajo, rampas que hay que pegar fuerte para coronar y carriles
-   que te sueltan al tablero si no llegas.
-   **Y se cierra con un objetivo de mentira, sin bichos** (`CAZA.md` §5, puerta
-   B): si la planta alta no se siente distinta sin captura, la captura no la
-   salva. El criterio no se lee, se juega.
-   La medida que la cierra: aporrear drena arriba en 3-4 s, jugar bien llega a
-   los 20. Hoy 5,2 s y 52 de 60 drenando.
+0i. ~~**LA PLANTA ALTA, REHECHA — LA GEOMETRÍA**~~ **HECHA Y MEDIDA.** 499/499 y
+   la planta de abajo igual al decimal. Ver arriba. Lo que queda de esta tanda es
+   la puerta B, que es la de abajo.
+
+0i-B. ~~**JUGAR LA PLANTA ALTA Y JUZGARLA**~~ **JUGADA (18-ago), y con
+   consecuencias**: salvabolas y palas de 54. Ver arriba. **Falta volver a
+   jugarla con eso puesto**, que es la segunda vuelta de la misma puerta:
+   **P1.** ¿Ahora sí se siente como un bonus —algo que te ha tocado— en vez de
+   como un sitio del que te echan?
+   **P2.** Con el hueco a la mitad (24 px) y la pala a 54, ¿la zona de palas de
+   arriba se siente distinta de la de abajo, o ya se parecen demasiado?
+   **P3.** La salvada avisa con un "SALVADA" verde y el sonido del reloj en el
+   desagüe de arriba. ¿Se entiende a la primera que la mesa te está sujetando?
+   Medido, con un jugador que aporrea **no salta ni una vez**, así que puede que
+   no la veas: si nunca aparece, sobra o hay que apretar el hueco.
+   **P4.** La isla: ¿se entiende que está ALTA y que hay que subir a ella?
+   **P5.** ¿Los túneles se leen como agujeros por debajo, o como rampas oscuras?
+   **P6.** La planta de abajo se atenúa mientras cazas. ¿Ayuda o distrae?
+   Y falta por construir de `CAZA.md` §3.7: la **ventana de recuperación de
+   disco** que la cáscara tenía que abrir encima durante la caza.
 
 0h2. **QUE CAERSE SUENE** (Sonnet, medio). `bola_cayo` y `rampa_fallada` no
    tienen sonido, y un evento que no se oye se diagnostica como que no existe
-   —es la avería del platillo—. Hay que generarlos en `sonidos.py`, reimportar y
-   engancharlos en `vista_mesa.gd`. Va después de 0i para que se ajusten oyendo
-   la mesa de verdad y no una de prueba.
+   —es la avería del platillo—. **Y ahora los dos pasan de verdad**: la isla tira
+   al tablero a quien se sale de su borde y la subida suelta a quien no le pega
+   fuerte, así que son los dos eventos nuevos de la mesa y no se oyen. Hay que
+   generarlos en `sonidos.py`, reimportar y engancharlos en `vista_mesa.gd`.
 
-0j. **JUGAR LA CAZA Y MIRARLA** (Daniel). Baja de puesto: no tiene sentido
-   afinar el 3 % de entrada ni los 20 s de la caza sobre una planta que se va a
-   rehacer entera. Lo que sí vale la pena mirar ya es **la cámara cruzando las
-   dos plantas**, que es lo único que no depende de la geometría.
+0j. **EL 3 % DE ENTRADA AL UMBRAL** (Daniel y Fátima). Con la planta alta ya
+   rehecha, la pregunta vuelve a estar viva y es la primera de `CAZA.md` §7: una
+   caza de cuatro fases hay que APRENDERLA, y no se aprende lo que ves dos veces
+   por run. ¿Una vez por combate garantizada, o sigue siendo un tiro que se
+   busca? Se decide ANTES de construir la captura.
 
 0k. **BICHOS EN LA ARENA: LA CAPTURA** (Opus, alto). `CAZA.md` §2 y §5, puertas
    C y D — ya está diseñada entera: rastro, acoso por MIEDO, cierre que acaba la
@@ -1661,6 +1792,33 @@ la derecha se queda en y=903 sin tocar nada. O sea que hay UN tiro de cuna
 de geometría fina y se hace jugando, no midiendo.
 
 ## Abierto
+
+- **El racimo de abajo pasa de 3,09 a 3,08 golpes por entrada, y NO es una
+  regresión.** La huella de 60 bolas jugadas enteras es idéntica al decimal
+  (16621,1901), así que la física de abajo no se ha movido. Lo que se mueve es
+  A2, que suelta 240 bolas contra el racimo: **8 de esas 240 se van por el umbral
+  a la planta alta** —es el 3 % medido de `medir_caza.gd`, igual antes que
+  ahora—, y ahí arriba ahora hay otra mesa, así que esas ocho vuelven distintas.
+  El número es determinista: dos lanzamientos dan 3,08 los dos.
+- **`arena_desague_medio` está medido INERTE** (50 u 80 dan el mismo 7,6 s). Se
+  queda como parámetro porque es la forma del embudo y con la medida escrita al
+  lado vale más que un número mágico, pero **no sirve como dial de dificultad**:
+  el que manda es el hueco entre palas.
+- **`medir_caza.gd` y `medir_planta_alta.gd` se solapan a medias.** El viejo mide
+  la ENTRADA (el 3 %) y el REGRESO, que el nuevo no toca; el nuevo mide lo de
+  arriba con dos jugadores, que el viejo hacía con uno. Antes de tocar ninguno de
+  los dos, mirar cuál contesta la pregunta: fusionarlos sin pensarlo perdería la
+  parte A y la C, que son las que dicen si la caza se alcanza y si bajar cuesta
+  la bola.
+- **El jugador que "atrapa" del medidor nuevo es flojo, y hay que saberlo al leer
+  la brecha.** Sube las dos palas y suelta a los 0,9 s con la bola posada; no
+  apunta, así que la brecha que sale (x1,1 a x1,8) mide lo que perdona la mesa,
+  no lo que da la habilidad. Un maniquí no mide una mesa —es la misma trampa que
+  la tabla de balance calibrada contra un jugador inventado—, y por eso la puerta
+  B la juzgáis vosotros.
+- **La planta de abajo se atenúa durante la caza, pero la cáscara no reacciona.**
+  `CAZA.md` §3.7 pedía además una **ventana de recuperación de disco** encima
+  mientras cazas, y eso no está: es trabajo de `NodoSistema`, no de la mesa.
 
 - **NO HAY BOLA-BOLA DENTRO DE LAS RAMPAS NI EN EL PLATILLO, y es a propósito.**
   Una bola enganchada a una curva está en otro plano —las rampas son elevadas—,

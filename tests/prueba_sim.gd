@@ -311,13 +311,20 @@ func _prueba_ball_search() -> void:
 
 func _prueba_targets() -> void:
 	var m := _nueva_mesa()
-	# CUATRO BANCOS: dos por planta. Desde que hay planta alta, todo lo que se
-	# cuente sobre `m.bancos`, `m.bumpers`, `m.giradores` o `m.rampas` cuenta LAS
-	# DOS MESAS. Contarlo sin decirlo es de donde salen las pruebas que miden
-	# otra cosa sin enterarse.
-	_comprobar("hay dos bancos de tres targets por planta",
-		m.bancos.size() == 4 and m.targets.size() == 12,
+	# DOS BANCOS, Y LOS DOS SON DE ABAJO. La planta alta tuvo los suyos mientras
+	# fue una réplica de la de abajo; la tanda 0i se los quitó junto con los
+	# slingshots, los outlanes, los postes y los giradores, porque su zona de
+	# palas es LO MÍNIMO y eso es la mitad de lo que la hace otra mesa.
+	#
+	# Aun así la regla sigue en pie y hay que leerla al contar: `m.bumpers` y
+	# `m.rampas` SÍ cuentan las dos plantas. Contarlo sin decirlo es de donde
+	# salen las pruebas que miden otra cosa sin enterarse.
+	_comprobar("hay dos bancos de tres targets, y los dos abajo",
+		m.bancos.size() == 2 and m.targets.size() == 6,
 		"%d bancos, %d targets" % [m.bancos.size(), m.targets.size()])
+	for c in m.targets:
+		_comprobar("ningun target se ha quedado en la planta alta",
+			c.centro().y > 660.0, "hay uno en y=%.0f" % c.centro().y)
 
 	# El target es una PLANCHA, no un bolo: la cápsula mide `target_ancho` de
 	# punta a punta y solo `target_canto` de fondo. Con el círculo de radio 13 de
@@ -845,10 +852,46 @@ func _prueba_zona_alta() -> void:
 		mesa_palas_altas(m) == 2, "%d palas arriba" % mesa_palas_altas(m))
 	_comprobar("y las cuatro palas están en la lista que recorre la física",
 		m.flippers.size() == 4, "%d palas" % m.flippers.size())
-	_comprobar("tiene bumpers, targets y su propia órbita",
-		m.bumpers.size() == 6 and m.bancos.size() == 4 and m.rampas.size() == 6,
-		"%d bumpers, %d bancos, %d rampas"
-			% [m.bumpers.size(), m.bancos.size(), m.rampas.size()])
+	# Y NO ES UNA RÉPLICA DE LA DE ABAJO, que es por lo que Daniel tumbó la
+	# versión anterior. Las diferencias son comprobables una a una, y esta prueba
+	# existe para que volver a copiar la zona de palas de abajo se ponga en rojo.
+	_comprobar("la planta alta no tiene slingshots",
+		_cuantos_arriba(m, Colisionador.Tipo.SLINGSHOT) == 0,
+		"%d slingshots arriba" % _cuantos_arriba(m, Colisionador.Tipo.SLINGSHOT))
+	_comprobar("ni postes de inlane",
+		_cuantos_arriba(m, Colisionador.Tipo.POSTE) == 0,
+		"%d postes arriba" % _cuantos_arriba(m, Colisionador.Tipo.POSTE))
+	_comprobar("ni bancos de targets ni giradores",
+		m.bancos.size() == 2 and m.giradores.size() == 2,
+		"%d bancos, %d giradores" % [m.bancos.size(), m.giradores.size()])
+	# TRES BÚMPERES SUELTOS, no un racimo: un tercer racimo sería más de lo mismo.
+	# Se comprueba por el hueco, que es lo que los separa de verdad — el racimo de
+	# abajo deja 24 px entre bordes y estos están a más de una bola de distancia.
+	var altos: Array[Vector2] = []
+	for c in m.bumpers:
+		if (c as Vector2).y < 660.0:
+			altos.append(c)
+	var mas_juntos := INF
+	for i in altos.size():
+		for j in range(i + 1, altos.size()):
+			mas_juntos = minf(mas_juntos, altos[i].distance_to(altos[j]))
+	_comprobar("y tres búmperes sueltos, no un racimo",
+		altos.size() == 3 and mas_juntos > m.p.bumper_radio * 2.0 + 40.0,
+		"%d bumpers arriba, los mas juntos a %.0f px" % [altos.size(), mas_juntos])
+	# LA ISLA, LOS DOS TÚNELES Y LA SUBIDA: las piezas que la tanda 0h dejó
+	# construidas y apagadas, y que esta geometría enciende.
+	_comprobar("tiene una isla elevada con su falda",
+		m.plataformas.size() == 1
+		and (m.plataformas[0] as Plataforma).capa == Mesa.CAPA_ALTA)
+	var tuneles := 0
+	for r in m.rampas:
+		if r.subterranea:
+			tuneles += 1
+	_comprobar("y dos túneles por debajo del tablero",
+		tuneles == 2, "%d tuneles" % tuneles)
+	_comprobar("y en total hay seis bumpers y nueve recorridos en las dos plantas",
+		m.bumpers.size() == 6 and m.rampas.size() == 9,
+		"%d bumpers, %d rampas" % [m.bumpers.size(), m.rampas.size()])
 
 	# EL REGRESO NO TIENE BOCA. Si la tuviera sería un agujero en el suelo del
 	# piso de arriba y la caza duraría lo que tarda la bola en encontrarlo, no lo
@@ -868,7 +911,7 @@ func _prueba_zona_alta() -> void:
 		var m2 := _nueva_mesa()
 		m2.nueva_bola()
 		m2.bola.en_carril = false
-		m2.bola.pos = Vector2(rng.randf_range(60.0, 340.0), rng.randf_range(260.0, 560.0))
+		m2.bola.pos = _punto_en_la_arena(m2, rng)
 		m2.bola.vel = Vector2(rng.randf_range(-600.0, 600.0), rng.randf_range(-600.0, 600.0))
 		var t := 0.0
 		while t < 6.0 and m2.bola.viva:
@@ -894,8 +937,10 @@ func _prueba_zona_alta() -> void:
 	m3.bola.vel = Vector2(0, -(m3.p.umbral_velocidad_minima + 200.0))
 	var abierta := [0]
 	var cerrada := [0]
+	var salvadas := [0]
 	m3.caza_empezada.connect(func(_p: Vector2) -> void: abierta[0] += 1)
 	m3.caza_terminada.connect(func(_p: Vector2) -> void: cerrada[0] += 1)
+	m3.bola_salvada.connect(func(_p: Vector2, _n: int) -> void: salvadas[0] += 1)
 	var t3 := 0.0
 	var t_abre := -1.0
 	var t_cierra := -1.0
@@ -907,16 +952,26 @@ func _prueba_zona_alta() -> void:
 		if cerrada[0] > 0 and t_cierra < 0.0:
 			t_cierra = t3
 	_comprobar("el umbral abre la caza", abierta[0] == 1, "%d veces" % abierta[0])
-	# LA CAZA SE ACABA DE DOS MANERAS, y esa es la diferencia entre una mesa y un
-	# paseo: drenando ahí arriba —o sea jugando mal, que es lo que hace un
-	# jugador que no toca las palas— o agotando el tiempo. Con la versión de
-	# pines solo existía la segunda y por eso daba igual lo que hicieras.
-	_comprobar("y se acaba, sin tocar las palas y por drenaje",
-		t_cierra > 0.0 and m3.caza_por_drenaje,
-		"cerró a los %.1f s, por drenaje: %s" % [t_cierra - t_abre, m3.caza_por_drenaje])
-	_comprobar("y nunca dura más que el tope",
-		t_cierra > 0.0 and (t_cierra - t_abre) <= m3.p.caza_tiempo + 0.5,
+	# LA CAZA ES UN BONUS, Y UN BONUS NO SE PIERDE. Lo decidió Daniel jugándola:
+	# *"debería sentirse como algo especial, no algo tan fácil de perder"*, *"ni
+	# siquiera me gusta la idea de que te puedas salir de esa zona tan fácil"*.
+	# Así que drenar arriba ya NO te echa: la mesa vuelve a servir la bola y lo
+	# único que acaba la caza es el tiempo. Lo que se paga por estar ahí sigue
+	# siendo el reloj del enemigo, que no para.
+	#
+	# Aquí no se toca ni una pala en toda la caza, o sea el peor jugador posible:
+	# tiene que llegar al tope igual, y con la mesa salvándole la bola varias
+	# veces.
+	_comprobar("la caza dura el tope entero aunque no toques las palas",
+		t_cierra > 0.0 and absf((t_cierra - t_abre) - m3.p.caza_tiempo) < 0.6,
 		"duró %.1f s y el tope es %.1f" % [t_cierra - t_abre, m3.p.caza_tiempo])
+	_comprobar("y no se acaba por drenaje", not m3.caza_por_drenaje)
+	# Y LA SALVADA TIENE QUE AVISAR. Una bola que se cae por un agujero y
+	# reaparece arriba sin decir nada no se lee como un salvabolas: se lee como
+	# un fallo del juego. La señal existe para que suene y se vea.
+	_comprobar("y la mesa avisa cada vez que salva la bola",
+		salvadas[0] > 0 and salvadas[0] == m3.caza_salvadas,
+		"%d avisos, %d salvadas" % [salvadas[0], m3.caza_salvadas])
 
 	# Y LA QUE PUEDE TIRAR EL MODO ENTERO: al bajar, ¿se caza la bola?
 	var m4 := _nueva_mesa()
@@ -961,6 +1016,26 @@ func _prueba_zona_alta() -> void:
 	for _i in int(1.0 / DT):
 		m5.avanzar(DT)
 	_comprobar("con dos bolas en juego el umbral no traga", abierta5[0] == 0)
+
+## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
+## qué planta hablas es de donde salen las pruebas que miden otra cosa.
+func _cuantos_arriba(m: Mesa, tipo: int) -> int:
+	var n := 0
+	for c in m.colisionadores:
+		if c.tipo == tipo and c.centro().y < 660.0:
+			n += 1
+	return n
+
+## UN PUNTO DENTRO DEL CAMPO DE LA PLANTA ALTA, y el detalle importa: por debajo
+## de `arena_diagonal_y` el campo se estrecha con las dos paredes lisas que bajan
+## hacia las palas, así que soltar la bola en el rectángulo entero la deja a veces
+## POR FUERA de la mesa —detrás de la diagonal, donde no hay suelo— y desde ahí se
+## cae al vacío. Eso no mide que la arena tenga un agujero: mide que la prueba ha
+## soltado la bola fuera de la mesa.
+func _punto_en_la_arena(m: Mesa, rng: RandomNumberGenerator) -> Vector2:
+	var y := rng.randf_range(260.0, m.p.arena_y_pala)
+	var estrechado := maxf(y - m.p.arena_diagonal_y, 0.0)
+	return Vector2(rng.randf_range(40.0 + estrechado, Mesa.ANCHO - 40.0 - estrechado), y)
 
 func mesa_palas_altas(m: Mesa) -> int:
 	var n := 0
@@ -1232,14 +1307,24 @@ func _prueba_identidad_recorridos() -> void:
 			var r := m.rampas[i] as Rampa
 			if r.puntos[0].y < float(planta["min"]) or r.puntos[0].y > float(planta["max"]):
 				continue
+			# LOS DOS TÚNELES PAGAN LO MISMO A PROPÓSITO, y no rompen la regla:
+			# un túnel no es un tiro de premio, es un agujero por donde la
+			# criatura se esconde y donde el miedo drena (`CAZA.md` §2). Lo que
+			# los distingue es A DÓNDE TE SACAN, que es geometría, no recompensa.
+			# Pedirles identidad de premio sería la misma equivocación que
+			# pedírsela al regreso.
+			if r.subterranea:
+				continue
 			premios[r.premio] = true
 			cuantos += 1
 			nombres.append(r.nombre)
 		_comprobar("los recorridos de %s pagan cosas distintas" % planta["q"],
 			premios.size() == cuantos,
 			"%d premios en %d recorridos" % [premios.size(), cuantos])
-	_comprobar("y están los cuatro de abajo más la órbita de arriba",
-		nombres.size() == 4, str(nombres))
+	# Tres abajo (órbita, retorno, cañón) y dos arriba (la subida a la isla y su
+	# órbita). Los dos túneles quedan fuera de la cuenta por lo de arriba.
+	_comprobar("y están los tres de abajo más los dos de arriba",
+		nombres.size() == 5, str(nombres))
 
 	# La órbita sube el multiplicador de tramo, sin encadenar golpes.
 	var c := Combate.new()
@@ -1277,9 +1362,13 @@ func _prueba_identidad_recorridos() -> void:
 ## retorno, que sí te la deja servida. Si esta prueba falla, el cañón ha vuelto
 ## a ser un segundo carril de retorno.
 func _prueba_canon_escupe(m: Mesa) -> void:
+	# POR NOMBRE, no por premio. Buscarlo por `DANO_FUERTE` se quedaba con el
+	# ÚLTIMO de la lista, y desde la tanda 0i hay dos: el cañón y la subida a la
+	# isla de la planta alta. La prueba pasaba a medir otra rampa sin decirlo, que
+	# es la avería de "un identificador no es un rótulo" con otra cara.
 	var indice := -1
 	for i in m.rampas.size():
-		if (m.rampas[i] as Rampa).premio == Rampa.Premio.DANO_FUERTE:
+		if (m.rampas[i] as Rampa).nombre == "canon":
 			indice = i
 	var r: Rampa = m.rampas[indice]
 	m.nueva_bola()
@@ -1885,30 +1974,53 @@ func _prueba_sonido() -> void:
 func _prueba_capas() -> void:
 	var m := _nueva_mesa()
 
-	# 1. Lo primero: que nadie haya restringido nada por su cuenta. Si un día
-	# alguien pone una máscara en `_construir` sin querer, el balance entero se
-	# mueve y no da ningún error: la bola atraviesa una pared y ya está.
+	# 1. LO QUE USA CAPAS ESTÁ ARRIBA, Y SOLO ARRIBA. La tanda 0h dejó el sistema
+	# entero apagado y esta prueba comprobaba que no lo había encendido nadie sin
+	# querer —una máscara puesta de más mueve el balance sin dar ningún error, y
+	# lo único que se ve es una bola atravesando una pared—. Desde la tanda 0i sí
+	# está encendido, así que lo que se comprueba ya no es "cero", es DÓNDE:
+	# la planta de abajo tiene que seguir plana, entera y sin cuesta, porque su
+	# física está medida al decimal y es lo que no se puede mover.
+	var restringidos_abajo := 0
 	var restringidos := 0
 	for c in m.colisionadores:
-		if c.capas != Colisionador.TODAS:
-			restringidos += 1
+		if c.capas == Colisionador.TODAS:
+			continue
+		restringidos += 1
+		if c.centro().y > 660.0:
+			restringidos_abajo += 1
 	for f in m.flippers:
 		if f.capas != Colisionador.TODAS:
 			restringidos += 1
-	_comprobar("la mesa de hoy sigue entera en TODAS las capas",
-		restringidos == 0, "%d colisionadores restringidos" % restringidos)
+			if f.eje.y > 660.0:
+				restringidos_abajo += 1
+	_comprobar("la planta de ABAJO sigue entera en TODAS las capas",
+		restringidos_abajo == 0, "%d colisionadores restringidos abajo" % restringidos_abajo)
+	# Y arriba lo que hay restringido es exactamente la falda de la isla: cuatro
+	# paredes que solo existen en el tablero. Ni una más, y el número está escrito
+	# para que añadir una máscara nueva obligue a venir aquí a decir por qué.
+	_comprobar("y arriba solo esta restringida la falda de la isla",
+		restringidos == 4, "%d colisionadores restringidos" % restringidos)
 	_comprobar("una bola nueva sale en el tablero",
 		m.bola.capa == Mesa.CAPA_TABLERO, "capa %d" % m.bola.capa)
-	var con_cuesta := 0
-	var con_capa := 0
+	var con_cuesta: Array[String] = []
+	var con_capa: Array[String] = []
+	var abajo_tocada: Array[String] = []
 	for r in m.rampas:
 		if r.velocidad_escape > 0.0:
-			con_cuesta += 1
+			con_cuesta.append(r.nombre)
 		if r.capa_entrada != Mesa.CAPA_TABLERO or r.capa_salida != Mesa.CAPA_TABLERO:
-			con_capa += 1
-	_comprobar("y ningun recorrido de hoy tiene cuesta ni cambia de altura",
-		con_cuesta == 0 and con_capa == 0,
-		"%d con cuesta, %d con capa" % [con_cuesta, con_capa])
+			con_capa.append(r.nombre)
+		if (r.velocidad_escape > 0.0 or r.subterranea) and r.puntos[0].y > 660.0:
+			abajo_tocada.append(r.nombre)
+	# La subida a la isla es LA rampa con cuesta y LA que cambia de altura, y es
+	# la misma: si no le pegas fuerte te quedas sin subida, y como es carril y no
+	# tubo, quedarte sin subida es caerte al tablero.
+	_comprobar("solo la subida a la isla tiene cuesta y cambia de altura",
+		con_cuesta == ["subida_isla"] and con_capa == ["subida_isla"],
+		"cuesta %s, capa %s" % [str(con_cuesta), str(con_capa)])
+	_comprobar("y ningun recorrido de la planta de abajo se ha tocado",
+		abajo_tocada.is_empty(), str(abajo_tocada))
 
 	# 2. La máscara: la misma pared, dos capas, dos resultados.
 	for capa in [Mesa.CAPA_TABLERO, Mesa.CAPA_ALTA]:
@@ -2077,17 +2189,32 @@ func _mesa_pelada() -> Mesa:
 	m.targets.clear()
 	m.bancos.clear()
 	m.giradores.clear()
+	m.plataformas.clear()
 	m.umbral = -1
 	m.regreso = -1
 	return m
 
+## A QUÉ ALTURA está una boca. Hace falta desde que la planta alta usa capas de
+## verdad: la subida a la isla entra por el tablero y sale ARRIBA, así que su
+## salida cae dentro de la falda de la isla y no está empotrada en nada — la
+## falda solo existe en el tablero. Sin esto, la comprobación mide una mesa
+## plana que ya no existe.
+func _capa_de_punto(m: Mesa, punto: Vector2) -> int:
+	for ra in m.rampas:
+		if punto.distance_to(ra.boca(1)) < 0.5:
+			return ra.capa_entrada
+		if punto.distance_to(ra.punto_en(ra.largo)) < 0.5:
+			return ra.capa_salida
+	return Mesa.CAPA_TABLERO
+
 func _prueba_rampas() -> void:
 	var m := _nueva_mesa()
-	# Tres abajo (órbita, retorno, cañón) y dos de la zona alta (umbral y
-	# regreso), que son las dos mitades de la misma idea: a la arena no se sube
-	# ni se baja por gravedad.
-	_comprobar("hay seis recorridos y un platillo",
-		m.rampas.size() == 6 and m.platillos.size() == 1,
+	# NUEVE. Tres abajo (órbita, retorno, cañón), cuatro en la planta alta
+	# (los dos túneles, la subida a la isla y su órbita) y los dos que unen las
+	# plantas: umbral y regreso, que son las dos mitades de la misma idea —a la
+	# arena no se sube ni se baja por gravedad.
+	_comprobar("hay nueve recorridos y un platillo",
+		m.rampas.size() == 9 and m.platillos.size() == 1,
 		"%d rampas, %d platillos" % [m.rampas.size(), m.platillos.size()])
 	var r: Rampa = m.rampas[0]
 	_comprobar("la orbita llega a la zona alta",
@@ -2148,9 +2275,16 @@ func _prueba_rampas() -> void:
 
 	# Ninguna boca ni salida puede caer dentro de un colisionador, o la bola
 	# aparecería empotrada y el solver la escupiría a cualquier sitio.
+	# Y "dentro de un colisionador" se mide EN LA CAPA DE LA BOCA: la subida
+	# suelta la bola encima de la isla, o sea dentro de la falda que la sostiene,
+	# y eso no es estar empotrada —la falda solo existe en el tablero y la bola
+	# sale en la capa alta—. Medirlo sin la capa es medir una mesa plana que ya
+	# no existe.
 	var empotradas: Array[String] = []
 	for punto in bocas + salidas_finales:
 		for c in m.colisionadores:
+			if not c.en_capa(_capa_de_punto(m, punto)):
+				continue
 			if c.punto_mas_cercano(punto).distance_to(punto) < c.radio + m.p.radio_bola:
 				empotradas.append(str(punto))
 				break
@@ -3158,8 +3292,10 @@ func _prueba_regiones_clic() -> void:
 
 func _prueba_giradores() -> void:
 	var m := _nueva_mesa()
-	_comprobar("hay un girador en cada carril de retorno de cada planta",
-		m.giradores.size() == 4, "%d giradores" % m.giradores.size())
+	# DOS, y los dos abajo: un girador va dentro de un carril de retorno, y la
+	# planta alta se quedó sin carriles de retorno en la tanda 0i.
+	_comprobar("hay un girador en cada carril de retorno",
+		m.giradores.size() == 2, "%d giradores" % m.giradores.size())
 
 	# Hay que soltarla BAJANDO POR EL CARRIL: el carril de retorno izquierdo va
 	# en diagonal, y a plomo desde arriba la bola cae fuera, sobre el slingshot.

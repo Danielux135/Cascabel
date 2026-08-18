@@ -369,12 +369,15 @@ nueva sin su wav pone la batería en rojo.
 
 ---
 
-## Fase 1d — La planta alta, rediseñada
+## Fase 1d — La planta alta, rediseñada · GEOMETRÍA HECHA, FALTA JUGARLA
 
-**LA PLANTA ALTA DE HOY NO VALE Y HAY QUE REHACERLA.** Está montada como una
-COPIA de la de abajo —misma zona de palas, mismos slingshots, mismos carriles— y
-Daniel la rechazó por eso: *"el mapa de arriba no puede ser una réplica, ha de
-sentirse diferente"*.
+*La geometría se construyó el 18 de agosto (tanda 0i) y está medida: 499/499 y la
+planta de abajo igual al decimal. **Lo que queda de la fase es la puerta B, que no
+se lee: se juega.***
+
+**LA PLANTA ALTA ERA UNA COPIA de la de abajo** —misma zona de palas, mismos
+slingshots, mismos carriles— y Daniel la rechazó por eso: *"el mapa de arriba no
+puede ser una réplica, ha de sentirse diferente"*.
 
 Lo que pidió, con sus palabras: **"diferente diseño, bumpers, zonas,
 plataformas, túneles"**.
@@ -408,8 +411,29 @@ abajo, y la derecha de 150 a 258 y de 730 abajo**. Son unos 1.470 px de carril
 muerto, más de lo que hay usado. Una bola mide 18 y la franja 20: es carril
 exacto, no margen.
 
+### Lo que quedó construido (tanda 0i)
+
+| Pieza | Cómo |
+|---|---|
+| Palas cortas | `pala_alta_largo` 54 y `pala_alta_separacion` 136 — barridos, y **corregidos jugándolos**: con 38 Daniel las tumbó por cortas |
+| Salvabolas | drenar arriba no te echa: la mesa sirve otra bola y la caza solo se acaba por tiempo (`caza_salvabolas`) |
+| Sin slingshots ni outlanes | dos paredes lisas que mueren 12 px por encima del eje de su pala |
+| La isla | `Plataforma` en `CAPA_ALTA` con cuatro paredes de falda que solo existen en el tablero |
+| Dos túneles | `Rampa.subterranea`, uno por debajo de la isla y otro hondo |
+| La subida | `velocidad_escape` 640, `abierta`, `capa_salida = CAPA_ALTA`, y **cruza por encima del túnel hondo** |
+| Tres búmperes | sueltos, pegados a las bocas; ni racimo ni rejilla |
+| La órbita | por la franja izquierda, de y=186 a 424, pegada al borde |
+
+**Y no hizo falta construir ningún sistema.** Todo eso es la tanda 0h encendida,
+que era exactamente el motivo de haberla hecho apagada y medida antes.
+
+**Y la puerta B se jugó**, con dos correcciones de Daniel que están en `CAZA.md`:
+la caza es un **bonus** y por tanto no se pierde por drenar, y las palas suben de
+38 a 54. La medida de §6 —"3-4 s para el que aporrea"— se retiró: perseguía un
+castigo donde había que diseñar un premio.
+
 **Criterio de salida:** alguien que juegue las dos plantas las distingue por cómo
-se juegan, no por cómo se ven.
+se juegan, no por cómo se ven. **Sigue abierto: se juega, no se mide.**
 
 ---
 
@@ -431,8 +455,15 @@ Reabrirlas cuesta más de lo que aportan.
 - **La mesa tiene DOS PLANTAS**, y no se comunican por gravedad: la bola sube
   643 px por sus medios y una caída libre desde arriba llega a las palas a
   1500 px/s, o sea 67 ms. Se sube y se baja por recorrido.
-- **La planta alta NO puede ser una réplica de la de abajo.** La de hoy lo es y
-  está pendiente de rehacer (Fase 1d).
+- **La planta alta NO puede ser una réplica de la de abajo.** Rehecha en la tanda
+  0i: palas cortas, sin slingshots, sin outlanes, sin carriles de retorno, sin
+  postes, sin giradores y sin targets — con isla, túneles y órbita propia.
+- **La caza es un BONUS: drenar arriba no te echa.** Decisión de Daniel
+  (ago-2026). Lo que la acaba es el tiempo, y lo que se paga por estar ahí es el
+  reloj del enemigo. Perder la criatura al bajar sí sigue siendo posible.
+- **Los túneles no pagan identidad de tiro, y es a propósito.** Un túnel no es un
+  tiro de premio: es el agujero por donde se esconde la criatura y donde drena el
+  miedo. Lo que los distingue es a dónde te sacan, no lo que pagan.
 - **El ALTO de la mesa no es invariante; el ANCHO sí.** 400 px de ancho sostienen
   el hueco entre palas y toda la física medida. Los 1300 de alto se pueden subir
   si las capas lo piden.

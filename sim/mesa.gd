@@ -15,6 +15,11 @@ signal target_abatido(punto: Vector2, banco: int)
 ## tiempo. `Combate` las escucha para el aviso y para no parar el reloj.
 signal caza_empezada(punto: Vector2)
 signal caza_terminada(punto: Vector2)
+## LA MESA HA SALVADO LA BOLA EN LA PLANTA ALTA. No es un drenaje: no cuesta
+## vida, no corta el combo y no acaba la caza. Existe como señal propia porque
+## tiene que SONAR y verse — una bola que desaparece por abajo y reaparece por
+## arriba sin decir nada se lee como un fallo del juego, no como un salvabolas.
+signal bola_salvada(punto: Vector2, salvadas: int)
 signal girador_girado(punto: Vector2, indice: int, fuerza: float)
 signal banco_completado(punto: Vector2, banco: int)
 ## Ha caído LA ÚLTIMA bola: esto es un drenaje de verdad, con su vida y su combo.
@@ -118,13 +123,19 @@ var regreso: int = -1
 ## El modo de caza está abierto, y cuánto le queda.
 var en_caza := false
 var caza_restante: float = 0.0
+## Cuántas veces te ha salvado la mesa en esta caza. Se lee al acabar: es el
+## único número que dice si has jugado la planta alta o te la han jugado.
+var caza_salvadas: int = 0
 ## Si la última caza acabó porque drenaste arriba (true) o porque se agotó el
-## tiempo (false). Lo lee el cartel: no es lo mismo "se acabó" que "la has
+## tiempo (false). **Con `caza_salvabolas` puesto no puede pasar**: se queda para
+## el día en que alguien lo apague. Lo lee el cartel: no es lo mismo "se acabó" que "la has
 ## perdido", y contar las dos igual sería quitarle el mérito a aguantar.
 var caza_por_drenaje := false
 var platillos: Array[Platillo] = []
-## Regiones elevadas. HOY ESTÁ VACÍA a propósito: el sistema entra sin tocar
-## geometría, y la planta alta se rediseña encima después (`PLAN.md` §1d).
+## Regiones elevadas. Desde la tanda 0i tiene una: la ISLA de la planta alta.
+## Estuvo vacía a propósito toda la tanda 0h —el sistema entró sin tocar
+## geometría, para poder medir que la mesa no se movía ni un decimal— y esta es
+## la geometría que lo enciende.
 var plataformas: Array[Plataforma] = []
 
 var carga_lanzador: float = 0.0
@@ -302,15 +313,19 @@ func _construir() -> void:
 		p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
 
-	# LAS DE LA PLANTA ALTA. Mismo largo, mismo ángulo y misma velocidad que las
-	# de abajo: la planta alta se aprende como mesa, no como control.
+	# LAS DE LA PLANTA ALTA. Mismas teclas, mismo ángulo y misma velocidad que las
+	# de abajo —la planta alta se aprende como mesa, no como control— pero MÁS
+	# CORTAS y más juntas, que es lo que la separa de ser una réplica (`CAZA.md`
+	# §3.1). No heredan `flipper_longitud_der`: las palas desiguales de la capa de
+	# Preparación son una elección sobre la mesa de abajo, y colarlas aquí
+	# arriba mezclaría dos decisiones que no tienen nada que ver.
+	var media_alta := p.pala_alta_separacion * 0.5
 	flipper_alto_izq = Flipper.new(
-		Vector2(p.flipper_eje_izq.x, p.arena_y_pala), p.flipper_longitud,
+		Vector2(ANCHO * 0.5 - media_alta, p.arena_y_pala), p.pala_alta_largo,
 		p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_izq, p.flipper_activo_izq, p.flipper_velocidad_giro)
 	flipper_alto_der = Flipper.new(
-		Vector2(p.flipper_eje_der.x, p.arena_y_pala),
-		p.flipper_longitud_der if p.flipper_longitud_der > 0.0 else p.flipper_longitud,
+		Vector2(ANCHO * 0.5 + media_alta, p.arena_y_pala), p.pala_alta_largo,
 		p.flipper_radio, p.flipper_rebote,
 		p.flipper_reposo_der, p.flipper_activo_der, p.flipper_velocidad_giro)
 	flippers = [flipper_izq, flipper_der, flipper_alto_izq, flipper_alto_der]
@@ -444,28 +459,49 @@ func _girador(centro: Vector2) -> void:
 
 # --------------------------------------------------------- la zona alta
 
-## LA PLANTA ALTA. `DISEÑO.md` §5 y §7: un tiro difícil abre el umbral, subes,
-## juegas arriba un tiempo limitado con el reloj del enemigo corriendo, y bajas.
+## LA PLANTA ALTA, REHECHA. `CAZA.md` §3, y es la TERCERA versión: la primera fue
+## un campo de pines —*"el pachinko es literalmente que caiga la bola, y que luego
+## no pase de la primera línea"*— y la segunda una RÉPLICA de la planta de abajo,
+## que Daniel tumbó mirándola: *"el mapa de arriba no puede ser una réplica, ha de
+## sentirse diferente"*. Lo que pidió, con sus palabras: **"diferente diseño,
+## bumpers, zonas, plataformas, túneles"**.
 ##
-## Y ES UNA MESA, NO UN CAMPO DE PINES. La primera versión era una rejilla al
-## tresbolillo, y Daniel la tumbó jugándola con una frase que es el diagnóstico
-## entero: *"el pachinko es literalmente que caiga la bola, y que luego no pase
-## de la primera línea"*. Tenía razón y se ve en la física: una rejilla es un
-## comedor de energía pasivo —la primera fila se lleva la velocidad y el resto es
-## caída—, así que no hay tiro, hay embudo. **Lo que hace que una zona de pinball
-## se juegue son palas**, y aquí arriba hay dos.
+## Las diferencias, y ninguna es decorado:
 ##
-## Es un PISO APARTE, no la misma mesa estirada, y eso sigue siendo aritmética:
-## la bola sube 643 px por sus medios (desde las palas de abajo, hasta y=557) y
-## una caída libre desde aquí llega abajo a 1500 px/s, o sea 67 ms, cuando el
-## cañón ya se tuvo que ablandar porque 900 px/s era incazable.
+##   1. PALAS CORTAS, con las mismas dos teclas. Lo decidió Fátima: *"pasa de ser
+##      random a skill"*. Y arriba drenar no cuesta vida, cuesta la caza, así que
+##      **el hueco entre palas de arriba es el reloj de la caza**.
+##   2. SIN SLINGSHOTS. En su sitio, paredes lisas en diagonal. Un slingshot es
+##      lo que mantiene viva a una bola que ya habías perdido, y patea al azar:
+##      quitarlo es "de random a skill" literal, por dos nodos borrados.
+##   3. SIN OUTLANES, SIN CARRILES DE RETORNO, SIN POSTES, SIN GIRADORES Y SIN
+##      TARGETS. La zona de palas es lo mínimo, y por eso se lee como otro sitio
+##      en la primera bola, sin aprender nada nuevo.
+##   4. UNA ISLA ELEVADA con borde, que **desde el tablero no se alcanza**: ahí
+##      vive la criatura y hay que subir.
+##   5. DOS TÚNELES por debajo del tablero, uno bajo la isla y otro hondo, y
+##      salen lejos de donde entran. Es donde la criatura se esconde.
+##   6. TRES BÚMPERES SUELTOS pegados a las bocas, no un racimo. Su trabajo no es
+##      puntuar, es que la criatura no quiera meterse ahí.
+##   7. LA ÓRBITA POR LA FRANJA IZQUIERDA, que eran 1.470 px de carril muerto.
+##      Sin un tiro largo, una mesa pequeña es un pasillo con palas.
+##
+## **Y no hay ni un sistema nuevo.** La isla, los túneles, el cruce y la cuesta
+## son la tanda 0h encendida: ahí es donde se cobra haber construido el sistema
+## de capas apagado y medido antes de que lo usara ninguna geometría.
+##
+## Sigue siendo un PISO APARTE, y eso es aritmética: la bola sube 643 px por sus
+## medios (desde las palas de abajo, hasta y=557) y una caída libre desde aquí
+## llega abajo a 1500 px/s, o sea 67 ms, cuando el cañón ya se tuvo que ablandar
+## porque 900 px/s era incazable.
 func _arena() -> void:
 	var cx := ANCHO * 0.5
 	var rx := cx - 20.0
 	var yp := p.arena_y_pala
+	var media := p.pala_alta_separacion * 0.5
 
 	# El techo, teselado igual que el arco de abajo para que las dos plantas se
-	# lean como la misma mesa.
+	# lean como la misma mesa. Es lo ÚNICO que se hereda de la versión anterior.
 	for i in SEGMENTOS_ARCO:
 		var t0 := PI * float(i) / float(SEGMENTOS_ARCO)
 		var t1 := PI * float(i + 1) / float(SEGMENTOS_ARCO)
@@ -473,116 +509,156 @@ func _arena() -> void:
 			Vector2(cx + rx * cos(t0), p.arena_hombro_y - p.arena_techo_ry * sin(t0)),
 			Vector2(cx + rx * cos(t1), p.arena_hombro_y - p.arena_techo_ry * sin(t1)))
 
-	# Las bandas, y bajan POR DEBAJO de las palas: ese tramo es la pared de fuera
-	# del outlane, igual que abajo. Cortarlas a la altura de las palas dejaría a
-	# la bola salirse de lado por el hueco.
-	_pared(Vector2(20.0, p.arena_hombro_y), Vector2(20.0, yp + 30.0))
-	_pared(Vector2(ANCHO - 20.0, p.arena_hombro_y), Vector2(ANCHO - 20.0, yp + 30.0))
+	# --- La zona de palas: dos palas cortas, dos paredes lisas y el desagüe ---
+	#
+	# Las bandas ya no bajan por debajo de las palas, porque lo que bajaba ahí era
+	# la pared de fuera del outlane y aquí no hay outlane. Acaban donde arranca su
+	# diagonal, y la cadena banda → diagonal → embudo no deja ni un hueco: sin
+	# hueco no hay bolsa donde acuñar la bola, que es lo que el poste resolvía
+	# abajo a base de solapar radios.
+	#
+	# Y LA DIAGONAL NO ACABA EN EL EJE DE LA PALA, ACABA POR ENCIMA DE ÉL — 12 px,
+	# o sea el radio del eje y cuatro más. **Esto está medido, no elegido**, y es
+	# la avería que se cazó al construir esta planta: con la pared muriendo EN el
+	# eje, la bola que baja rodando llega al final de la pendiente y se encuentra
+	# la cápsula del eje como un bordillo que no puede subir. Se queda parada en
+	# el rincón entre las dos, y ahí es estable: la pared la empuja hacia el campo
+	# y el eje hacia arriba, y las dos juntas aguantan a la gravedad.
+	#
+	# Medido con la sonda, 60 cazas: **33 bolas muertas, y 29 de las 33 en el
+	# mismo píxel** —(260,540), que es exactamente ese rincón de la pala derecha—.
+	# El ball search la despierta a los 2 s, así que no es un cuelgue: es peor,
+	# son dos segundos de mesa parada en cada visita y sin decir por qué.
+	#
+	# Subiendo el vértice, el muro del desagüe pasa POR ENCIMA del eje, así que la
+	# bola nunca puede tocar la cápsula —queda a 24 px cuando necesita 17— y lo
+	# primero que se encuentra al final de la pendiente es LA PALETA, que es donde
+	# tiene que caer. Se come el 7 % de la pala, que es el precio.
+	var alza := p.flipper_radio + 4.0
+	var codo_izq := Vector2(cx - media, yp - alza)
+	var codo_der := Vector2(cx + media, yp - alza)
+	_pared(Vector2(20.0, p.arena_hombro_y), Vector2(20.0, p.arena_diagonal_y))
+	_pared(Vector2(ANCHO - 20.0, p.arena_hombro_y),
+		Vector2(ANCHO - 20.0, p.arena_diagonal_y))
+	_pared(Vector2(20.0, p.arena_diagonal_y), codo_izq)
+	_pared(Vector2(ANCHO - 20.0, p.arena_diagonal_y), codo_der)
+	# El embudo arranca en el codo y no en la banda, así que por fuera de la pala
+	# queda un pasillo: por ahí se drena sin tocar el hueco central. Es la otra
+	# mitad de "la bola que se te va por el lado de la pala está muerta", y el
+	# pasillo se estrecha hacia arriba, o sea que es un embudo y no una bolsa: una
+	# bola que sube por él se para y se vuelve a caer.
+	_pared(codo_izq, Vector2(cx - p.arena_desague_medio, p.arena_fondo_y))
+	_pared(codo_der, Vector2(cx + p.arena_desague_medio, p.arena_fondo_y))
 
-	# --- La zona de palas, calcada de la de abajo y por buenas razones ---
-	# La de abajo costó tres sesiones de averías —la bola acuñada en el inlane,
-	# el slingshot que pateaba por la espalda, el outlane que tragaba demasiado—
-	# y todas están resueltas en esas seis líneas. Copiarlas es heredar los
-	# arreglos; inventarse otra zona de palas es volver a comprarlos.
-	_pared(Vector2(20.0 + p.ancho_outlane, yp - 86.0), Vector2(99.0, yp - 16.0))
-	_slingshot(Vector2(64.0, yp - 112.0), Vector2(117.0, yp - 42.0))
-	_poste(Vector2(102.0, yp - 4.0))
-	_pared(Vector2(ANCHO - 20.0 - p.ancho_outlane, yp - 88.0), Vector2(301.0, yp - 16.0))
-	_slingshot(Vector2(318.0, yp - 108.0), Vector2(278.0, yp - 44.0))
-	_poste(Vector2(298.0, yp - 4.0))
+	# --- LA ISLA ---
+	# La región manda en la física: mientras la bola esté dentro va en CAPA_ALTA,
+	# y en cuanto su centro sale, se cae. Las cuatro paredes son la FALDA, y solo
+	# existen en el tablero: una bola de abajo choca contra la isla y una de
+	# arriba pasa por encima. Eso —una máscara de capa— es todo lo que hace falta
+	# para que una losa se lea como alta, y es lo que la tanda 0h dejó listo.
+	var isla := Plataforma.new(p.plataforma_region, CAPA_ALTA, CAPA_TABLERO)
+	isla.nombre = "isla"
+	plataformas.append(isla)
+	_falda(p.plataforma_region.grow(-p.plataforma_falda), CAPA_TABLERO)
 
-	# --- Un racimo propio, arriba del todo ---
-	# Dos bumpers en la cara de entrada, que aquí también es la de abajo: a la
-	# planta alta se sube igual que a la de abajo, tirando desde una pala.
-	_racimo(p.arena_bumper_centro)
+	# --- LOS DOS TÚNELES ---
+	# El de arriba pasa POR DEBAJO DE LA ISLA y sale al otro lado: entras por un
+	# flanco, desapareces bajo la losa y apareces en el contrario. El de abajo va
+	# hondo, por debajo de todo el campo bajo.
+	_tunel(PackedVector2Array([
+		Vector2(66, 296), Vector2(120, 316), Vector2(200, 326),
+		Vector2(280, 316), Vector2(334, 296),
+	]), "tunel_isla")
+	_tunel(PackedVector2Array([
+		Vector2(96, 446), Vector2(150, 490), Vector2(200, 500),
+		Vector2(250, 490), Vector2(304, 446),
+	]), "tunel_hondo")
 
-	# --- Dos bancos de targets, y NO pegados a las bandas ---
-	# Abajo van pegados porque por fuera queda un carril de 23 px. Aquí por fuera
-	# va la ÓRBITA, y una boca de recorrido a 20 px de un target se traga la bola
-	# que acaba de rebotar en él. Metidos hacia dentro, el carril de la órbita
-	# queda limpio y los bancos se leen como lo que son: un tiro del centro.
-	_banco_targets(Vector2(100.0, p.arena_y_targets),
-		Vector2(100.0, p.arena_y_targets + 80.0), 3)
-	_banco_targets(Vector2(ANCHO - 100.0, p.arena_y_targets),
-		Vector2(ANCHO - 100.0, p.arena_y_targets + 80.0), 3)
-
-	# --- Un girador en cada carril de retorno ---
-	_girador(Vector2(87.0, yp - 55.0))
-	_girador(Vector2(ANCHO - 100.0, yp - 55.0))
-
-	# --- Y la órbita corta: el tiro largo de la planta ---
-	# Va por fuera de los bancos, pegada a las bandas, y da la vuelta por encima
-	# del racimo. Es lo que hace que aquí arriba se APUNTE en vez de aguantar:
-	# sin un tiro largo, una mesa pequeña es un pasillo con palas. Bidireccional,
-	# como la de abajo: entras por un lado y sales por el otro.
-	var o := Rampa.new(PackedVector2Array([
-		Vector2(42.0, yp - 120.0),
-		Vector2(34.0, 400.0), Vector2(36.0, 320.0), Vector2(60.0, 262.0),
-		Vector2(120.0, 226.0), Vector2(200.0, 216.0), Vector2(280.0, 226.0),
-		Vector2(340.0, 262.0), Vector2(364.0, 320.0), Vector2(366.0, 400.0),
-		Vector2(358.0, yp - 120.0),
-	]))
-	o.entrada_radio = p.rampa_entrada_radio
-	o.velocidad_minima = p.arena_orbita_velocidad_minima
-	o.nombre = "orbita_alta"
-	o.premio = Rampa.Premio.MULTIPLICADOR
-	rampas.append(o)
-
-	# --- El suelo: un embudo que lleva al desagüe ---
-	# No es una pared que pare la bola, es por donde se va. Drenar en la planta
-	# alta no cuesta vida: cuesta la caza, que es exactamente el castigo que
-	# tiene que tener.
-	_pared(Vector2(20.0, yp + 30.0), Vector2(cx - 40.0, p.arena_fondo_y))
-	_pared(Vector2(ANCHO - 20.0, yp + 30.0), Vector2(cx + 40.0, p.arena_fondo_y))
-
-## EL ANDAMIO DE CAPAS. No es geometría de la mesa y no se monta al empezar: lo
-## pide F1+F3 desde la vista, y lo que monta va en la PLANTA ALTA, que es la que
-## está rechazada y se tira entera en `PLAN.md` §1d.
-##
-## Por qué existe. El sistema de capas entró apagado —esa era la mitad del
-## trabajo, porque encenderlo sin comprobarlo mueve el balance medido sin
-## avisar—, y eso deja el juego exactamente igual que el día anterior. Un
-## sistema que no se puede tocar no se puede juzgar: sin esto, la única forma
-## de saber si una plataforma se lee como alta es creerse una tabla, y aquí las
-## tablas verdes ya han tapado dos averías que se cazaron jugando.
-##
-## Monta las cuatro cosas de golpe y encadenadas, que es como se juzgan:
-## un carril con cuesta que SUBE a una plataforma —si no le pegas fuerte, te
-## suelta a mitad—, la plataforma con su borde —te sales y te caes—, y un túnel
-## que cruza por debajo del tablero.
-##
-## Se puede llamar dos veces sin que se apile: si ya está, no hace nada.
-func montar_andamio_de_capas() -> void:
-	if not plataformas.is_empty():
-		return
-
-	# La losa, en el hueco que queda entre los dos bancos de targets y por
-	# debajo del racimo.
-	plataformas.append(Plataforma.new(Rect2(140.0, 396.0, 120.0, 84.0), CAPA_ALTA))
-
-	# El carril que sube a ella desde la pala izquierda. ABIERTO a propósito:
-	# es lo que hace que fallar sea caerse y no que te devuelvan.
+	# --- LA SUBIDA A LA ISLA: el tiro difícil, y el que se puede fallar ---
+	# Boca en el centro-bajo, con la tangente hacia arriba y a la derecha, o sea
+	# la línea de tiro de la pala IZQUIERDA (una pala manda la bola al lado
+	# contrario). Lleva cuesta: por debajo del 60 % de la velocidad de escape te
+	# quedas sin subida, y como es CARRIL y no tubo, quedarte sin subida es
+	# CAERTE AL TABLERO desde donde te quedaste. Es `PROPÓSITO.md` §6 encendido.
+	#
+	# Y CRUZA POR ENCIMA DEL TÚNEL HONDO sin tocarlo, que es el criterio de
+	# salida de la Fase 1c. No hace falta nada: la boca de cada recorrido tiene
+	# capa, así que el túnel no le engancha la bola a quien va por el puente.
+	#
+	# Sale por el BORDE DE ABAJO de la isla y apuntando ARRIBA, no de lado, y eso
+	# es lo que decide cuánto dura la visita: una bola lanzada hacia arriba dentro
+	# de la región tarda 2v/g en volver a salir por donde entró —0,67 s entrando a
+	# 700— mientras que cruzándola de lado se sale por el borde en un suspiro.
 	var subida := Rampa.new(PackedVector2Array([
-		Vector2(78.0, 528.0), Vector2(110.0, 470.0), Vector2(168.0, 430.0)]))
+		Vector2(176, 520), Vector2(206, 478), Vector2(216, 432),
+		Vector2(208, 384), Vector2(200, 340),
+	]))
 	subida.entrada_radio = p.rampa_entrada_radio
-	subida.velocidad_minima = 260.0
+	subida.velocidad_minima = p.subida_velocidad_minima
 	subida.bidireccional = false
-	subida.velocidad_escape = 700.0
 	subida.abierta = true
+	subida.velocidad_escape = p.subida_velocidad_escape
 	subida.capa_salida = CAPA_ALTA
-	subida.nombre = "andamio_subida"
+	subida.nombre = "subida_isla"
+	subida.premio = Rampa.Premio.DANO_FUERTE
 	rampas.append(subida)
 
-	# Y el túnel, del lado derecho al centro. Las dos bocas en el tablero: baja,
-	# cruza por debajo y vuelve a salir.
-	var tunel := Rampa.new(PackedVector2Array([
-		Vector2(330.0, 500.0), Vector2(300.0, 410.0), Vector2(268.0, 352.0)]))
-	tunel.entrada_radio = p.rampa_entrada_radio
-	tunel.velocidad_minima = 260.0
-	tunel.bidireccional = false
-	tunel.subterranea = true
-	tunel.nombre = "andamio_tunel"
-	rampas.append(tunel)
+	# --- TRES BÚMPERES SUELTOS, cada uno pegado a una boca ---
+	# No es un racimo y no puede serlo: abajo ya hay dos y un tercero sería más de
+	# lo mismo. Y no es pachinko —los pines se tiraron en la tanda 0f porque una
+	# rejilla es un comedor de energía pasivo—: tres bumpers separados con hueco
+	# de sobra son justo lo contrario.
+	_bumper(Vector2(96, 264))
+	_bumper(Vector2(304, 264))
+	_bumper(Vector2(134, 424))
+
+	# --- LA ÓRBITA, POR LA FRANJA IZQUIERDA ---
+	# Los 20 px de fuera de la banda izquierda estaban libres enteros de y=150 a
+	# 670 —el regreso no entra hasta 672—, y una bola mide 18: es carril exacto,
+	# no margen. Sube pegada al borde como un habitrail de verdad, da la vuelta
+	# por debajo del techo y vuelve a entrar por encima de la isla.
+	#
+	# Bidireccional, como las órbitas de verdad: se coge desde abajo con un tiro
+	# de la pala derecha, y desde arriba por quien venga cruzando el corredor del
+	# techo. Es lo único LARGO que tiene esta planta.
+	var orbita := Rampa.new(PackedVector2Array([
+		Vector2(48, 424), Vector2(26, 378), Vector2(13, 320), Vector2(13, 250),
+		Vector2(34, 205), Vector2(86, 183), Vector2(146, 186),
+	]))
+	orbita.entrada_radio = p.rampa_entrada_radio
+	orbita.velocidad_minima = p.arena_orbita_velocidad_minima
+	orbita.nombre = "orbita_alta"
+	orbita.premio = Rampa.Premio.MULTIPLICADOR
+	rampas.append(orbita)
+
+## Las cuatro paredes que sostienen una región elevada. Existen SOLO en la capa
+## que se les diga —la de abajo—, así que la bola que va por el tablero choca con
+## ellas y la que va por encima ni las ve.
+##
+## Van metidas hacia dentro `plataforma_falda` px respecto de la región a
+## propósito: la bola cae cuando su CENTRO sale de la región, y en ese instante
+## tiene que estar YA fuera de la pared o aparece penetrándola su radio entero y
+## el solver la escupe de un salto.
+func _falda(caja: Rect2, capa: int) -> void:
+	var esquinas := [
+		caja.position, Vector2(caja.end.x, caja.position.y),
+		caja.end, Vector2(caja.position.x, caja.end.y),
+	]
+	for i in 4:
+		var m := _pared(esquinas[i], esquinas[(i + 1) % 4])
+		m.capas = Colisionador.bit(capa)
+
+## Un túnel: el mismo spline de siempre, pero por DEBAJO del tablero. No cambia
+## la física —una rampa nunca colisiona con nada— pero sí el dibujo, y sobre todo
+## es donde la criatura se esconde y donde el miedo drena (`CAZA.md` §2).
+func _tunel(control: PackedVector2Array, nombre: String) -> void:
+	var t := Rampa.new(control)
+	t.entrada_radio = p.rampa_entrada_radio
+	t.velocidad_minima = p.arena_tunel_velocidad_minima
+	t.subterranea = true
+	t.nombre = nombre
+	t.premio = Rampa.Premio.DANO
+	rampas.append(t)
 
 ## El mismo triángulo del racimo de abajo, en el sitio que se le diga. Se saca a
 ## función porque ahora hay dos, y porque `bumper_giro` —que es la corrección de
@@ -648,6 +724,7 @@ func _empezar_caza(punto: Vector2) -> void:
 		return
 	en_caza = true
 	caza_restante = p.caza_tiempo
+	caza_salvadas = 0
 	caza_empezada.emit(punto)
 
 ## LA CAZA SE ACABA DE DOS MANERAS, y esa es la diferencia entre una mesa y un
@@ -667,6 +744,57 @@ func _terminar_caza(por_drenaje: bool = false) -> void:
 			punto = b.pos
 			_meter_en_regreso(b)
 	caza_terminada.emit(punto)
+
+## SUBE LA BOLA POR EL UMBRAL A MANO. Es depuración —F1 y F3 desde la vista— y
+## existe por una razón de medida, no de comodidad: el umbral se gana en 3 de
+## cada 100 entradas al racimo, así que juzgar la planta alta jugando entera es
+## verla dos veces por run. Lo pidió Fátima al cerrar el diseño: *"si es de prueba
+## vale, pero no quiero cosas aleatorias para probar"* (`CAZA.md` §5, puerta B).
+##
+## No se salta el recorrido: mete la bola EN el umbral, así que sube por su curva
+## y la caza se abre al salir, igual que por el camino bueno. Lo único que se
+## salta es el tiro.
+func abrir_caza_a_mano() -> bool:
+	if umbral < 0 or en_caza:
+		return false
+	for b in bolas:
+		if not (b.viva and b.libre()) or en_la_arena(b):
+			continue
+		var r := rampas[umbral]
+		b.rampa = umbral
+		b.rampa_sentido = 1
+		b.rampa_subida = 1
+		b.rampa_velocidad = maxf(b.velocidad(), p.umbral_velocidad_minima * 2.0)
+		b.rampa_distancia = 0.0
+		b.pos = r.punto_en(0.0)
+		b.vel = Vector2.ZERO
+		b.en_carril = false
+		rampa_entrada.emit(b.pos, umbral)
+		return true
+	return false
+
+## VUELVE A PONER LA BOLA ARRIBA, por donde entró. Es el salvabolas de la caza.
+##
+## Se sirve en la BOCA DE SALIDA DEL UMBRAL y con la velocidad con la que sale de
+## él, o sea exactamente como si acabaras de subir. Podría dejarse caer desde el
+## techo, y sería peor por dos razones: el jugador ya ha aprendido de dónde viene
+## la bola cuando entra en la caza —repetirlo no le enseña nada nuevo— y una bola
+## que aparece en mitad del campo no se puede anticipar.
+##
+## Lo que NO hace: emitir `rampa_salida` ni `_empezar_caza`. La bola no ha
+## recorrido el umbral, así que cobrar su premio otra vez sería pagar por drenar.
+func _servir_en_la_arena(b: Bola) -> void:
+	if umbral < 0:
+		return
+	var r := rampas[umbral]
+	var d := r.largo
+	b.pos = r.punto_en(d)
+	b.vel = r.tangente_en(d) * p.regreso_velocidad * p.umbral_factor_salida
+	b.capa = r.capa_salida
+	b.rampa = -1
+	b.platillo = -1
+	b.busqueda = 0.0
+	_limitar_velocidad(b)
 
 func _meter_en_regreso(b: Bola) -> void:
 	if regreso < 0:
@@ -694,11 +822,21 @@ func _avanzar_caza(h: float) -> void:
 	# EL DRENAJE DE ARRIBA VA ANTES QUE EL RELOJ. Es una línea, no una boca:
 	# una boca se puede esquivar cayendo por su lado y entonces la bola se queda
 	# en el hueco entre las dos plantas, que es un sitio del que no se sale.
+	#
+	# Y CON SALVABOLAS NO TE ECHA: la mesa vuelve a servir la bola arriba y la
+	# caza sigue. Es lo que la convierte en un bonus —lo decidió Daniel
+	# jugándola—, y lo que se paga por estar aquí sigue siendo el reloj del
+	# enemigo, que no para. Ver `caza_salvabolas`.
 	for b in bolas:
 		if b.viva and b.libre() and b.pos.y > p.arena_drenaje_y \
 				and b.pos.y < p.arena_fondo_y + 40.0:
-			_terminar_caza(true)
-			return
+			if not p.caza_salvabolas:
+				_terminar_caza(true)
+				return
+			caza_salvadas += 1
+			caza_restante = maxf(caza_restante - p.caza_coste_salvada, 0.0)
+			_servir_en_la_arena(b)
+			bola_salvada.emit(b.pos, caza_salvadas)
 	caza_restante -= h
 	if caza_restante <= 0.0:
 		_terminar_caza(false)

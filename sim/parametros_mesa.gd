@@ -161,15 +161,101 @@ var bumper_giro: float = 60.0
 var arena_techo_ry: float = 70.0
 ## Donde el techo se encuentra con las bandas.
 var arena_hombro_y: float = 220.0
-## LA ALTURA DE LAS PALAS DE ARRIBA. Todo el resto de la planta cuelga de aquí:
-## slingshots, postes, carriles de retorno y giradores se colocan en relación a
-## este número, exactamente igual que abajo, así que moverlo mueve la zona de
-## palas entera sin descuadrar nada.
+## LA ALTURA DE LAS PALAS DE ARRIBA. Todo el resto de la zona de palas cuelga de
+## aquí: las dos paredes lisas y el embudo del desagüe se colocan en relación a
+## este número, así que moverlo mueve la zona de palas entera sin descuadrar nada.
 var arena_y_pala: float = 560.0
-## Dónde va el racimo de la planta alta.
-var arena_bumper_centro := Vector2(200.0, 300.0)
-## Y dónde empiezan los dos bancos de targets.
-var arena_y_targets: float = 380.0
+
+## LAS PALAS DE ARRIBA SON CORTAS, Y LO DECIDIÓ FÁTIMA. La planta alta sin palas
+## se descartó —gobernarla pedía botones nuevos y esto es un pinball de dos
+## teclas—, así que lo que cambia no es el control, es el tamaño: *"pasa de ser
+## random a skill"*. Una pala corta perdona menos, y como arriba drenar no cuesta
+## vida sino la caza, **el hueco entre palas de arriba ES el reloj de la caza**.
+##
+## OJO CON EL INVARIANTE: lo cerrado es el ANCHO de mesa (400) y el radio de la
+## bola, porque de ellos cuelga el hueco de ABAJO y toda la física medida. El
+## largo y la separación de estas dos son geometría de una planta que se está
+## rediseñando, y se tocan aquí (`CAZA.md` §3.1).
+##
+## El hueco libre entre puntas sale de los dos: `separacion − 2·largo·cos(reposo)
+## − 2·radio`. Abajo son 176, 64 y 8 → 47 px. Aquí, 144 y 38 → **60,9 px**.
+##
+## Y ESTOS DOS NÚMEROS ESTÁN BARRIDOS, no elegidos (`tests/medir_planta_alta.gd`,
+## 60 cazas por celda, jugador que aporrea):
+##
+##     largo  separ  hueco   dura     drena
+##        46    130   32.8   18.2 s   pocas   <- la caza no se acaba nunca
+##        46    144   46.8   12.2 s   33/60
+##        46    158   60.8    7.7 s   —
+##        38    130   46.9    9.5 s   —
+##        38    144   60.9    7.6 s   48/60   <- el elegido
+##        38    158   74.9    6.6 s   49/60
+##
+## El 46/144 —el mismo hueco que abajo— deja al que aporrea 12,2 s ARRIBA, o sea
+## más que los 8,1 s que dura una bola abajo: la planta alta salía más blanda que
+## la de abajo teniendo la pala más corta, porque aquí no hay outlanes que se
+## coman la bola. Con 38/144 baja a 7,6 y ocho de cada diez cazas acaban
+## drenando, que es lo que hace que el tope de 20 s sea un techo y no un trámite.
+##
+## **Lo que NO alcanza es el objetivo de `CAZA.md` §6** —3-4 s para el que
+## aporrea—, y con esta geometría no hay fila que lo dé: 38/158 se queda en 6,6
+## abriendo un hueco de 75 px, que es medio campo. Está anotado en `ESTADO.md`
+## como decisión pendiente, y la salida que apunta `CAZA.md` §7 (devolver uno de
+## los dos castigos) es al revés de lo que hace falta aquí.
+## **Y 38 SE JUGÓ Y SE CAYÓ.** Daniel las probó: *"flippers extremadamente
+## cortos"*, *"es extremadamente fácil drenar e irte de la zona de caza"*, *"no he
+## sido capaz de aguantar los 20 segundos ni de lejos"*. La medida decía 7,6 s
+## para el que aporrea y eso era exactamente lo que se buscaba; **lo que estaba
+## mal era lo que se buscaba**, no el número.
+##
+## Punto intermedio elegido por Daniel: **54**, con los ejes más juntos para que
+## el hueco baje de 61 px a 24. Conserva la idea de Fátima —la pala de arriba es
+## más corta que la de abajo, y eso se nota en la mano— sin que la planta alta
+## sea una trampa. Ver `CAZA.md` §3.1.
+var pala_alta_largo: float = 54.0
+## Distancia entre los dos ejes. No puede salir de `flipper_eje_*`: esas son las
+## de abajo y su separación está atada al hueco medido de la planta baja.
+##
+## 136 con largo 54 deja **24 px de hueco**, o sea la mitad que abajo: arriba
+## drenar por el medio tiene que ser un accidente, no la forma normal de acabar.
+var pala_alta_separacion: float = 136.0
+
+## LA MITAD DEL DESAGÜE, medida desde el centro. Es el tercer dial de la planta
+## alta y el que no estaba escrito en `CAZA.md` §6, porque hasta medirlo no se
+## veía que hiciera falta: sin outlanes, lo único que decide cuánta bola se
+## pierde por FUERA de las palas es lo ancho que sea el embudo por el que se cae.
+## Subirlo abre los dos pasillos que quedan por fuera de las puntas; bajarlo los
+## cierra y deja el hueco central como única salida.
+var arena_desague_medio: float = 50.0
+
+## DONDE ARRANCAN LAS DOS PAREDES LISAS. Van de la banda al eje de su pala, sin
+## slingshot, sin outlane y sin carril de retorno (`CAZA.md` §3.2 y §3.3): una
+## bola que baja por el lado llega POSADA a la pala en vez de recibir un patadón
+## al azar. Y como acaban EN el eje, no queda ni un rincón donde acuñarse.
+var arena_diagonal_y: float = 452.0
+
+## LA ISLA. Región elevada (`CAPA_ALTA`) en mitad de la planta: ahí vive la
+## criatura y **desde el tablero no se la alcanza**, hay que subir por la rampa.
+## Salirse de su borde es caerse, que es lo único que hace una plataforma.
+var plataforma_region := Rect2(150.0, 250.0, 100.0, 96.0)
+## LA FALDA: cuánto se meten hacia dentro las paredes que la sostienen. Esas
+## paredes existen SOLO en el tablero, así que una bola de abajo choca contra la
+## isla y una de arriba pasa por encima — que es lo que hace que se lea alta.
+##
+## Y el número no es estética: la bola cae cuando su CENTRO sale de la región, y
+## en ese instante tiene que estar ya FUERA de la pared. Con la falda a 8 y radio
+## 9, la bola aparece penetrando 1 px en vez de 9, o sea que no da el salto.
+var plataforma_falda: float = 8.0
+
+## LA RAMPA QUE SUBE A LA ISLA. Lleva cuesta (`PROPÓSITO.md` §6): por debajo del
+## 60 % de la velocidad de escape te sueltas a mitad, y como es CARRIL y no tubo,
+## soltarte es caerte al tablero. Es el tiro difícil de la planta.
+var subida_velocidad_escape: float = 640.0
+var subida_velocidad_minima: float = 300.0
+## Los dos túneles cruzan por DEBAJO del tablero y salen lejos. Su velocidad
+## mínima es baja porque no son el tiro difícil: son por donde la criatura se
+## esconde, y taparles la boca es el modo entero (`CAZA.md` §2).
+var arena_tunel_velocidad_minima: float = 240.0
 ## Velocidad mínima para engancharse a la órbita corta. Más baja que la de abajo
 ## (500) porque aquí arriba las distancias son la mitad: con 500 no engancharía
 ## nunca.
@@ -191,6 +277,27 @@ var arena_drenaje_y: float = 630.0
 ## planta alta. Con la versión de pines solo existía el tiempo, y por eso daba
 ## igual lo que hicieras.
 var caza_tiempo: float = 20.0
+
+## EL SALVABOLAS DE LA CAZA, Y ES LO QUE LA CONVIERTE EN UN BONUS.
+##
+## Lo decidió Daniel jugándola: *"esta fase debería sentirse como un bonus, algo
+## especial, no algo tan fácil de perder"*, *"ni siquiera me gusta la idea de que
+## te puedas salir de esa zona tan fácil"*.
+##
+## Con esto en `true`, **drenar en la planta alta ya no te echa**: la mesa vuelve
+## a servir la bola por donde entró y la caza sigue. Lo único que la acaba es el
+## tiempo, y el precio de estar ahí arriba sigue siendo el que siempre fue —el
+## reloj del enemigo corre mientras tanto (`DISEÑO.md` §5)—, que es lo que impide
+## que un bonus sin riesgo sea gratis.
+##
+## Esto tumba media frase de `CAZA.md` §3.1: el hueco entre palas de arriba YA NO
+## es el reloj de la caza, porque el reloj es el reloj. Lo que decide el hueco es
+## cuántas veces te salvan, o sea cuánto tiempo del bonus tiras a la basura.
+var caza_salvabolas: bool = true
+## Lo que cuesta cada salvada, en segundos de caza. A 0 la salvada es gratis, que
+## es lo que Daniel eligió. Subirlo es la variante "salvabolas con coste" sin
+## tocar una línea de código: jugar mal acorta el bonus en vez de terminarlo.
+var caza_coste_salvada: float = 0.0
 
 ## LA BOCA DEL UMBRAL, Y ESTÁ DONDE LA PUSO LA MEDIDA, NO DONDE QUEDABA BONITO.
 ##
