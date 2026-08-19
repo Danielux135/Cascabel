@@ -379,11 +379,25 @@ func _prueba_bumper_no_repite() -> void:
 	# El bumper de más a la izquierda del racimo, sacado de la mesa y no escrito
 	# a mano: el racimo se recoloca solo desde `bumper_hueco` y una coordenada
 	# fija aquí se quedaría vieja al primer ajuste.
+	#
+	# **Y HAY QUE FILTRAR POR PLANTA, que es un fallo que llevaba aquí desde que
+	# la arena tiene bumpers.** `m.bumpers` es la lista de DIBUJO y las dos
+	# plantas escriben en ella: hoy son tres del racimo (y≈769-823) y tres de la
+	# planta alta (96,264), (304,264) y (134,424). El "más a la izquierda" de las
+	# seis es el de la arena, así que esta prueba llevaba tiempo midiendo el
+	# bumper de arriba mientras su nombre y su comentario decían "del racimo".
+	# Pasaba igual —un bumper es un bumper— pero no comprobaba lo que dice.
+	#
+	# El corte en y=660 es el arco de la planta baja, el mismo que usa
+	# `_cuantos_arriba`.
 	var m := _nueva_mesa()
-	var arriba: Vector2 = m.bumpers[0]
+	var arriba := Vector2.INF
 	for b in m.bumpers:
-		if (b as Vector2).x < arriba.x:
-			arriba = b
+		var v: Vector2 = b
+		if v.y > 660.0 and (arriba == Vector2.INF or v.x < arriba.x):
+			arriba = v
+	_comprobar("(montaje) el racimo de la planta baja tiene bumpers",
+		arriba != Vector2.INF)
 	m.nueva_bola()
 	m.bola.en_carril = false
 	m.bola.pos = arriba - Vector2(0, m.p.bumper_radio + m.p.radio_bola + 40.0)
@@ -1017,6 +1031,79 @@ func _prueba_zona_alta() -> void:
 	for _i in int(1.0 / DT):
 		m5.avanzar(DT)
 	_comprobar("con dos bolas en juego el umbral no traga", abierta5[0] == 0)
+
+	# EL CUELGUE ENTRE LAS DOS PLANTAS, que es el que describió Fátima: *"la bola
+	# se puede quedar entre la parte de arriba y abajo infinitamente al drenar la
+	# bola arriba sin tocar la salida"*.
+	#
+	# Cómo pasaba: `_terminar_caza` bajaba a las bolas que en ESE INSTANTE
+	# estuvieran libres y en la arena, y una bola metida en un túnel no lo está.
+	# Cuando salía, la caza ya se había cerrado y no quedaba nadie mirando; y
+	# arriba no hay forma de bajar sola —el arco de abajo es macizo y el regreso
+	# tiene `velocidad_minima` infinita—, así que se quedaba posada en el fondo del
+	# embudo con el ball search despertándola cada dos segundos para nada.
+	#
+	# Se reproduce donde de verdad pasa —dentro del túnel de la isla, que es por
+	# donde se esconde la criatura— y con el reloj forzado, que es la única forma
+	# de que la prueba sea determinista.
+	var m6 := _nueva_mesa()
+	m6.nueva_bola()
+	m6.bola.en_carril = false
+	m6.bola.pos = m6.p.umbral_boca
+	m6.bola.vel = Vector2(0, -(m6.p.umbral_velocidad_minima + 200.0))
+	var t6 := 0.0
+	while t6 < 6.0 and not m6.en_caza:
+		m6.avanzar(DT)
+		t6 += DT
+	_comprobar("(montaje) la caza se abre para la prueba del cuelgue", m6.en_caza)
+
+	var i_tunel := -1
+	for i in m6.rampas.size():
+		if m6.rampas[i].nombre == "tunel_isla":
+			i_tunel = i
+	_comprobar("(montaje) el túnel de la isla existe", i_tunel >= 0)
+	var r6: Rampa = m6.rampas[i_tunel]
+	m6.bola.pos = r6.punto_en(0.0)
+	m6.bola.vel = r6.tangente_en(0.0) \
+		* (m6.p.arena_tunel_velocidad_minima + 150.0)
+	m6.avanzar(DT)
+	_comprobar("(montaje) y la bola se mete en él", m6.bola.rampa == i_tunel)
+
+	# El reloj se acaba con la bola DENTRO del túnel. Aquí es donde se colgaba.
+	m6.caza_restante = DT * 0.5
+	var t6b := 0.0
+	var bajo := false
+	while t6b < 12.0 and m6.bola.viva:
+		m6.avanzar(DT)
+		t6b += DT
+		if m6.bola.pos.y > m6.p.arena_fondo_y + 120.0:
+			bajo = true
+			break
+	_comprobar("se acaba la caza con la bola en un túnel y la bola BAJA igual",
+		bajo, "se quedó en y=%.0f a los %.1f s" % [m6.bola.pos.y, t6b])
+
+	# Y EL INVARIANTE DEL QUE SALE EL ARREGLO, escrito como prueba en vez de como
+	# comentario: **fuera de la caza no puede quedar ninguna bola libre arriba**.
+	# Da igual cómo haya llegado ahí; si está, no puede bajar sola. Se comprueba
+	# soltándola directamente en mitad de la arena con la caza cerrada, que es el
+	# caso que ninguna ruta del juego produce hoy y que cualquier tanda futura
+	# —una rampa nueva, una bola extra, una reliquia— puede producir mañana.
+	var m7 := _nueva_mesa()
+	m7.nueva_bola()
+	m7.bola.en_carril = false
+	_comprobar("(montaje) la caza está cerrada", not m7.en_caza)
+	m7.bola.pos = Vector2(Mesa.ANCHO * 0.5, 300.0)
+	m7.bola.vel = Vector2.ZERO
+	var t7 := 0.0
+	var bajo7 := false
+	while t7 < 12.0 and m7.bola.viva:
+		m7.avanzar(DT)
+		t7 += DT
+		if m7.bola.pos.y > m7.p.arena_fondo_y + 120.0:
+			bajo7 = true
+			break
+	_comprobar("una bola libre arriba sin caza abierta no se queda colgada",
+		bajo7, "se quedó en y=%.0f a los %.1f s" % [m7.bola.pos.y, t7])
 
 ## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
 ## qué planta hablas es de donde salen las pruebas que miden otra cosa.
@@ -2610,6 +2697,61 @@ func _prueba_camara() -> void:
 	# que hay que comprobar que la de arriba sigue cumpliéndose.
 	_comprobar("y la bola sigue sin esconderse tras la barra de titulo",
 		bola_tapada == 0, "%d fotogramas tapada" % bola_tapada)
+
+	# --- LA CÁMARA FIJA DE LA CAZA ---
+	# *"Un modo de cámara fija para el modo de caza no estaría mal SI CABE TODO EN
+	# LA PANTALLA"* — Fátima. Las dos mitades se comprueban: que cabe, y que
+	# cuando no cabe se apaga sola en vez de encuadrar mal.
+	var pmc := ParametrosMesa.new()
+	var arena_arriba := pmc.arena_hombro_y - pmc.arena_techo_ry
+	var arena_abajo := pmc.arena_fondo_y
+	var cam4 := CamaraMesa.new(cp, Mesa.ALTO, Mesa.ANCHO * 0.5)
+	cam4.y_actual = cam4.limite_abajo()
+	cam4.fijar_banda(arena_arriba - cp.caza_margen, arena_abajo + cp.caza_margen)
+	_comprobar("la planta alta cabe entera en pantalla", cam4.esta_fija(),
+		"la arena mide %.0f px y la banda útil %.0f"
+			% [arena_abajo - arena_arriba, cp.alto_visible - cp.alto_franja_hud])
+	# Se deja llegar al encuadre, que se llega con el muelle y no de un salto.
+	for _i in int(3.0 / DT):
+		cam4.avanzar(DT, 300.0, 0.0, true)
+	var borde_sup := cam4.y_actual - cp.alto_visible * 0.5 + cp.alto_franja_hud
+	var borde_inf := cam4.y_actual + cp.alto_visible * 0.5
+	_comprobar("y el encuadre de la caza la enseña de punta a punta",
+		borde_sup <= arena_arriba and borde_inf >= arena_abajo,
+		"se ve de %.0f a %.0f y la arena va de %.0f a %.0f"
+			% [borde_sup, borde_inf, arena_arriba, arena_abajo])
+
+	# LA QUE DE VERDAD SE PODÍA ROMPER: con la bola en el fondo del embudo, el
+	# "suelo garantizado" de las cuatro reglas pide bajar la cámara 283 px. Si la
+	# red del final de `avanzar` se aplicara con la cámara fija, ganaría ella y la
+	# planta alta se saldría de plano justo peleando por no drenar.
+	var fijo := cam4.y_actual
+	for _i in int(1.0 / DT):
+		cam4.avanzar(DT, pmc.arena_fondo_y - 8.0, 900.0, true)
+	_comprobar("y no se descuelga aunque la bola esté en el desagüe de la arena",
+		absf(cam4.y_actual - fijo) < 1.0,
+		"se movió %.0f px" % absf(cam4.y_actual - fijo))
+
+	# Soltar la banda devuelve la cámara a las cuatro reglas. Sin esto, salir de
+	# la caza dejaría la mesa de abajo fuera de plano para siempre.
+	cam4.soltar_banda()
+	_comprobar("al acabar la caza la cámara se suelta", not cam4.esta_fija())
+	for _i in int(3.0 / DT):
+		cam4.avanzar(DT, 1200.0, 600.0, true)
+	_comprobar("y vuelve a bajar con la bola",
+		cam4.y_actual > fijo + 200.0, "quedó en %.0f" % cam4.y_actual)
+
+	# Y EL APAGADO. La arena cabe por 18 px, así que es un encuadre justo: en una
+	# ventana más baja tiene que apagarse solo. Se comprueba con la misma banda y
+	# una pantalla que no da.
+	var cp_baja := ParametrosCamara.new()
+	cp_baja.alto_visible = arena_abajo - arena_arriba + cp_baja.alto_franja_hud - 20.0
+	var cam5 := CamaraMesa.new(cp_baja, Mesa.ALTO, Mesa.ANCHO * 0.5)
+	cam5.fijar_banda(arena_arriba, arena_abajo)
+	_comprobar("si la arena no cabe, la cámara fija se apaga sola",
+		not cam5.esta_fija())
+	cam4.free()
+	cam5.free()
 
 	# Y nunca se enseña fuera de la mesa.
 	_comprobar("la camara no se sale de la mesa",

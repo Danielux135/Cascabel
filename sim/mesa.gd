@@ -738,6 +738,10 @@ func _terminar_caza(por_drenaje: bool = false) -> void:
 	en_caza = false
 	caza_restante = 0.0
 	caza_por_drenaje = por_drenaje
+	# Este bucle YA NO ES LA GARANTÍA de que la bola baja —eso lo hace
+	# `_desalojar_arena`, cada subpaso y sin excepciones—. Lo que sigue haciendo
+	# aquí es sacar el PUNTO desde el que se anuncia el final, que es donde estaba
+	# la bola, y bajarla en el mismo instante en vez de un subpaso después.
 	var punto := Vector2(ANCHO * 0.5, p.arena_fondo_y)
 	for b in bolas:
 		if b.viva and b.libre() and en_la_arena(b):
@@ -840,6 +844,47 @@ func _avanzar_caza(h: float) -> void:
 	caza_restante -= h
 	if caza_restante <= 0.0:
 		_terminar_caza(false)
+
+## INVARIANTE DE LA PLANTA ALTA: **fuera de la caza no puede quedar ni una bola
+## libre por encima de la línea de drenaje de la arena.** Y es un invariante que
+## se comprueba cada subpaso, no un remate al cerrar el modo.
+##
+## LA AVERÍA QUE ARREGLA, que es la de "la bola se queda entre las dos plantas
+## para siempre": `_terminar_caza` metía en el regreso a las bolas que en ESE
+## INSTANTE estuvieran libres y en la arena. Una bola dentro de un túnel, de la
+## subida a la isla o de la órbita corta NO está libre, así que no la metía; y
+## cuando salía del recorrido —medio segundo después— la caza ya se había
+## acabado y no quedaba nadie mirando.
+##
+## Y a partir de ahí la bola no puede bajar POR NINGÚN SITIO, que es lo que lo
+## convierte en un cuelgue y no en un fallo estético:
+##
+##   - las dos plantas no se comunican por gravedad: entre el fondo del embudo
+##     (`arena_fondo_y`) y el arco de la mesa de abajo hay 12 px de nada, y el
+##     arco es macizo;
+##   - el regreso tiene `velocidad_minima` INFINITA a propósito, así que la bola
+##     no puede meterse en él por su cuenta ni queriendo;
+##   - el salvabolas solo mira cuando `en_caza`, o sea que tampoco la recoge.
+##
+## Resultado: la bola se posa en el fondo del embudo y ahí se queda, con el ball
+## search despertándola cada dos segundos para nada. **Sin tocar la salida**, que
+## es exactamente como lo describió Fátima.
+##
+## Y LOS TÚNELES SON DONDE MÁS PASA, que no es casualidad: son por donde la
+## criatura se esconde (`CAZA.md` §2), o sea justo donde el jugador tiene la bola
+## metida cuando se le acaba el reloj.
+##
+## La línea es `arena_drenaje_y` (630) y no `en_la_arena` (654) a propósito: los
+## 12 px muertos entre las dos plantas también son un sitio del que no se sale, y
+## esta línea los deja del lado de arriba. Por debajo no puede haber falsos
+## positivos: una bola de la planta baja no pasa nunca de y=669, porque el arco
+## está en 660 y el radio es 9.
+func _desalojar_arena() -> void:
+	if en_caza:
+		return
+	for b in bolas:
+		if b.viva and b.libre() and b.pos.y < p.arena_drenaje_y:
+			_meter_en_regreso(b)
 
 ## Cuánto aire queda entre un círculo puesto en `centro` y lo más cercano que ya
 ## haya en la mesa. Negativo si se solapan. Lo usan las pruebas de la planta alta
@@ -1056,6 +1101,10 @@ func _subpaso(h: float) -> void:
 			_avanzar_bola(b, h)
 	_colisionar_bolas()
 	_avanzar_caza(h)
+	# Y DESPUÉS de la caza, no antes: mientras el modo está abierto quien manda
+	# arriba es el salvabolas; en cuanto se cierra manda esto, y lo que hace es
+	# garantizar que no queda ninguna bola atrapada en un piso sin salida.
+	_desalojar_arena()
 	if (flipper_atrapando != null) != _atrapada_antes:
 		_atrapada_antes = flipper_atrapando != null
 		atrape_cambiado.emit(_atrapada_antes)

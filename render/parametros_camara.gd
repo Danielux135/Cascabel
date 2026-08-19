@@ -95,6 +95,32 @@ var margen_debajo_bola: float = 300.0
 var alto_franja_hud: float = 24.0
 var margen_superior: float = 16.0
 
+## LA CÁMARA FIJA DE LA CAZA, Y ES UNA REGLA NUEVA QUE SOLO VALE ARRIBA.
+##
+## La pidió Fátima: *"un modo de cámara fija para el modo de caza no estaría mal
+## si cabe todo en la pantalla: además, da sensación de estar en un bonus"*. Y las
+## dos mitades de la frase son la especificación entera.
+##
+## **"Si cabe" es aritmética y sale que sí, por poco.** La arena va del techo
+## (`arena_hombro_y − arena_techo_ry` = 150) al fondo del embudo
+## (`arena_fondo_y` = 648), o sea 498 px. La banda útil de pantalla son los 540
+## de `alto_visible` menos los 24 que tapa la barra de título: **516**. Sobran 18
+## px, nueve por punta. Es justo, y por eso `y_de_banda()` devuelve −1 cuando no
+## cabe en vez de encuadrar mal: en una ventana más baja la caza vuelve a jugarse
+## con la cámara de siempre y no se rompe nada.
+##
+## **"Da sensación de bonus" es lo que justifica saltarse las cuatro reglas.**
+## Una cámara que sigue a la bola dice "esto es la mesa"; una que se planta y no
+## se mueve dice "esto es otro sitio". Es el mismo recurso que usan las fases de
+## bonus de las máquinas de verdad, y es gratis: la garantía del flipper —el
+## motivo por el que existen las cuatro reglas— aquí no hace falta, porque las
+## palas de arriba están DENTRO del encuadre todo el rato.
+var caza_camara_fija: bool = true
+## Aire que se le pide por arriba y por abajo a la arena dentro del encuadre. Con
+## 9 px de sobra reales, subir esto de 9 apaga la cámara fija: es el dial con el
+## que se comprueba que el apagado funciona.
+var caza_margen: float = 6.0
+
 ## REGLA 2 — ancla inferior. Con la bola por debajo de esta línea (medida desde
 ## el fondo de la mesa) la cámara se fija abajo y no se mueve más: el tercio de
 ## los flippers es intocable.

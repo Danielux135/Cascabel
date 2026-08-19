@@ -96,8 +96,18 @@ Se generan, no se dibujan ni se editan a mano:
 |---|---|
 | `python3 fuente.py` | la fuente pixelart y los cinco marcos de nueve trozos — **OJO: los marcos que saca hoy NO son los del repo**, ver Trampas |
 | `python3 sonidos.py` | los sonidos sintetizados (y luego hay que reimportar) |
+| `python3 sonidos_pruebas.py` | **el banco de prototipos**: sonidos que aún no dispara nadie, en `assets/sonido_pruebas/`. Ver abajo |
 | `python3 procesar.py hoja.png ...` | recorta una hoja de IA con fondo magenta |
 | `python3 limpiar.py assets/` | repara sprites YA recortados de los que no queda hoja |
+
+**`sonidos.py` y `sonidos_pruebas.py` están separados por un candado, no por
+orden.** La batería falla si el juego pide un wav que no existe Y si existe un wav
+que el juego no pide: un wav generado y sin enganchar es un evento mudo esperando,
+que es la avería que abrió la tanda 0h2. Eso deja sin sitio a lo que hay que **oír
+antes de construir**, y ese sitio es el banco. La regla: **un sonido vive en el
+banco mientras no exista la cosa que lo dispara; el día que exista, su receta se
+MUEVE a `sonidos.py` y su ajuste a `nodo_sonido.gd`, en el mismo commit.** Nunca
+antes, nunca en los dos sitios.
 
 `limpiar.py` va en simulacro por defecto: imprime qué tocaría y no escribe
 nada hasta que se le pasa `--aplicar`. Arregla tres cosas —sal de

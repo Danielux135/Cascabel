@@ -22,6 +22,15 @@ var _antes: float = 0.0
 ## forma de que la aceleración fuera continua, que es lo único que se nota.
 var _velocidad: float = 0.0
 
+## LA BANDA QUE HAY QUE ENCUADRAR CUANDO LA CÁMARA ESTÁ FIJA, y se guarda la
+## BANDA y no la posición a propósito: `alto_visible` no es una constante —la
+## vista lo reescribe con el tamaño real del viewport al arrancar y cada vez que
+## cambia la ventana—, así que una posición calculada una sola vez se quedaría
+## vieja en cuanto alguien mueve un borde. Con la banda, el encuadre se recalcula
+## solo. `_banda_abajo` negativo = cámara suelta, que es lo normal.
+var _banda_arriba: float = 0.0
+var _banda_abajo: float = -1.0
+
 func _init(parametros: ParametrosCamara, el_alto: float, el_centro_x: float) -> void:
 	p = parametros
 	alto_mesa = el_alto
@@ -35,6 +44,40 @@ func limite_arriba() -> float:
 
 func limite_abajo() -> float:
 	return maxf(alto_mesa - p.alto_visible * 0.5, limite_arriba())
+
+## PLANTAR LA CÁMARA para que se vea entera la banda [arriba, abajo]. Lo usa el
+## modo de caza. Enciende `_siguiendo` porque si no, la zona muerta de la REGLA 4
+## podría decidir que el salto no merece arrancar y la cámara se quedaría a medio
+## camino del encuadre para siempre.
+func fijar_banda(arriba: float, abajo: float) -> void:
+	_banda_arriba = arriba
+	_banda_abajo = abajo
+	_siguiendo = true
+
+func soltar_banda() -> void:
+	_banda_abajo = -1.0
+	_siguiendo = true
+
+func esta_fija() -> bool:
+	return y_de_banda() >= 0.0
+
+## DÓNDE HAY QUE PLANTARSE PARA QUE LA BANDA QUEPA ENTERA, o −1 si no cabe o si
+## no hay banda. Devolver −1 es la mitad importante: *"si cabe todo en la
+## pantalla"* era la condición que puso Fátima, y una cámara fija que encuadra mal
+## es peor que no tenerla, así que en una ventana demasiado baja esto se apaga
+## solo y la caza se juega con las cuatro reglas de siempre.
+##
+## Lo que se encuadra es la BANDA ÚTIL, no la pantalla: los primeros
+## `alto_franja_hud` píxeles los tapa la barra de título de la ventana de la
+## mesa. De ahí el medio `alto_franja_hud` que se le resta al centro — sin eso, la
+## arena queda centrada en la pantalla y descentrada en lo que se ve.
+func y_de_banda() -> float:
+	if _banda_abajo < 0.0:
+		return -1.0
+	if _banda_abajo - _banda_arriba > p.alto_visible - p.alto_franja_hud:
+		return -1.0
+	return clampf((_banda_arriba + _banda_abajo) * 0.5 - p.alto_franja_hud * 0.5,
+		limite_arriba(), limite_abajo())
 
 ## Cuánto mira la cámara por debajo de la bola. En una bola que cae el adelanto
 ## útil no son píxeles, son SEGUNDOS: lo que hay que enseñar es dónde va a estar
@@ -88,6 +131,14 @@ func objetivo(bola_y: float, bola_vy: float, hay_bola: bool) -> float:
 ## a DÓNDE hay que ir y el suavizado decide CÓMO se llega, que es lo que hace que
 ## se lea como una cámara y no como un corte.
 func objetivo_completo(bola_y: float, bola_vy: float, hay_bola: bool) -> float:
+	# LA CÁMARA FIJA MANDA SOBRE LAS CUATRO REGLAS, y es la única cosa en todo
+	# este fichero que lo hace. Se puede porque durante la caza no hay nada que
+	# garantizar: las palas de arriba están dentro del encuadre, así que la razón
+	# de ser de las garantías —no perder de vista dónde cae la bola— ya está
+	# cumplida por construcción y no hace falta perseguir nada.
+	var fija := y_de_banda()
+	if fija >= 0.0:
+		return fija
 	var obj := objetivo(bola_y, bola_vy, hay_bola)
 	if hay_bola:
 		var media := p.alto_visible * 0.5
@@ -137,7 +188,13 @@ func avanzar(delta: float, bola_y: float, bola_vy: float, hay_bola: bool) -> voi
 	#
 	# Y cuando muerde, el salto es pequeño justamente porque el muelle ya venía
 	# de camino: lo que antes eran 113 px de corte ahora son unos pocos.
-	if hay_bola:
+	#
+	# Y NO SE APLICA CON LA CÁMARA FIJA, que es el detalle sin el cual la cámara
+	# fija no funcionaría. Con la bola en el fondo del embudo de la arena (y=640)
+	# el suelo garantizado pide 670 y el encuadre de la caza está en 387: la red
+	# ganaría, la cámara se descolgaría 283 px y la planta alta se saldría de
+	# plano justo cuando el jugador está peleando por no drenar.
+	if hay_bola and not esta_fija():
 		var media := p.alto_visible * 0.5
 		# El techo también es red, y por el mismo motivo que el suelo: dentro de
 		# la zona muerta la cámara NO se mueve, así que el objetivo no se aplica

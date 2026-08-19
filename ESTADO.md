@@ -64,6 +64,157 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
+## LAS DOS PLANTAS: EL CUELGUE, LA CÁMARA FIJA Y LAS PUERTAS (tanda 0i-C · 18-ago)
+
+**Lo que abrió la tanda fue un cuelgue de Fátima:** *"la bola se puede quedar
+entre la parte de arriba y abajo infinitamente al drenar la bola arriba sin tocar
+la salida"*. Era real y era gordo: `_terminar_caza` solo bajaba a las bolas
+**libres** en ese instante, así que una bola dentro de un túnel salía medio
+segundo después con la caza ya cerrada — y arriba no hay forma de bajar sola, el
+arco de abajo es macizo y el regreso tiene `velocidad_minima` infinita. Se
+quedaba en el fondo del embudo para siempre. **Los túneles son donde más pasa**, o
+sea justo donde el jugador tiene la bola cuando se le acaba el reloj.
+
+**Arreglado con un invariante, no con un caso especial:** `_desalojar_arena`,
+cada subpaso — *fuera de la caza no puede quedar ni una bola libre por encima de
+`arena_drenaje_y`*. Dos pruebas nuevas lo sujetan.
+
+**Y de paso cazó una prueba que llevaba tiempo midiendo otra cosa:** `un golpe de
+bumper da exactamente un aviso` cogía "el bumper más a la izquierda" de
+`m.bumpers` — que es la lista de DIBUJO y lleva las dos plantas — y se llevaba
+uno de la ARENA mientras su nombre decía "del racimo". Ahora filtra por planta.
+
+**CÁMARA FIJA EN LA CAZA, y cabe.** La pidió Fátima —*"si cabe todo en la
+pantalla: además, da sensación de estar en un bonus"*— y las dos mitades están
+puestas. La arena mide 498 px y la banda útil de pantalla 516: entra por 18 px.
+`fijar_banda`/`y_de_banda` encuadran la BANDA y no una posición, así que se
+recalcula solo al cambiar la ventana, y **si no cabe se apaga sola** y la caza
+vuelve a las cuatro reglas. Medido jugándolo con ventana de verdad: `y_banda=387`,
+`y_actual=387` durante toda la caza y suelta al acabar. Cinco pruebas nuevas.
+
+**LA SALVAGUARDA TIENE SONIDO PROPIO.** Sonaba con el wav de `atrasar`, o sea el
+de la red de seguridad de abajo, y eran dos mensajes distintos con la misma voz.
+`salvaguarda` **baja y vuelve a subir**, que es la forma de lo que ha pasado y no
+la tiene ningún otro sonido de la mesa. **Hay que lanzar `python3 sonidos.py` y
+reimportar**, o la batería avisa de que falta el wav.
+
+**Y LA GRANDE, QUE NO SE HA CONSTRUIDO A PROPÓSITO: `CAZA.md` §9.** Fátima abrió
+las puertas de entrada y salida con requisitos, y al pensarlo entero sale que la
+avería de fondo no era el cuelgue: **es que las dos plantas no se comunican por
+gravedad** (12 px de nada y un arco macizo), y de ahí cuelgan la salida que no se
+puede apuntar, el salvabolas y el hecho de que *"la bola cae"* y *"pasa por
+debajo"* — que es para lo que Fátima quiere la doble altura — sean hoy imposibles.
+La §9 propone abrir el suelo, deja las dos puertas escritas con sus candidatas y
+su recomendación, y **acaba en una sola pregunta que no se contesta leyendo:
+¿se abre el suelo, sí o no?**
+
+**SUNO QUEDA DESCARTADO PARA EFECTOS** (`assets/prompts_sonido.md` §7). Se
+probó la tanda de nueve prompts y Fátima lo tumbó: *"hace mucho lo que le da la
+gana: sonidos muy largos, con hasta 2 secciones, trozos de sonidos diferentes en
+el mismo audio"*. **La causa es una sola: no hay control de duración** —la ayuda
+de Suno lo confirma, *Sounds* solo trae Tipo, BPM y Tonalidad, y sigue en beta—,
+así que si el clip le sale de veinte segundos y le has descrito un golpe de 200
+ms, rellena los diecinueve que sobran. **Para la música no cambia nada.**
+
+Y la trampa que se llevó por delante media hipótesis: los prompts largos parecían
+mejores que los cortos, pero con una tirada por prompt y esa varianza **no se
+puede atribuir el resultado al texto**. Es *"no se puede iterar una generación"*
+de `CLAUDE.md` con otra cara.
+
+**Lo que lo sustituye ya está hecho y sale ganando:** las tres puertas de
+`CAZA.md` §9 están **sintetizadas** en `sonidos.py` (`puerta_abre` 750 ms,
+`puerta_niega` 90 ms, `puerta_cierra` 300 ms), marcadas como PROTOTIPO porque
+todavía no hay puertas en la mesa y no las reproduce nadie. Duran exactamente lo
+que se les pidió —lo único que Suno no supo hacer— y las tres viven por debajo de
+150 Hz, donde el bumper tiene el 0,1 % de su energía. El argumento de fondo:
+**una puerta es la misma estructura que `caida`**, una cosa que dura y LUEGO un
+golpe, y eso ya se sabe hacer desde que existe `retardo`.
+
+**Y OYENDO LAS PUERTAS SALIÓ UN MATERIAL NUEVO, que es lo más gordo de la
+tanda.** Fátima tumbó `puerta_cierra` —*"es simple y se puede confundir con un
+bumper"*— y eso destapó el eje que estaba mal: lo que separa una puerta de un
+bumper no es el timbre, es que **una puerta tiene un antes y un después y un
+bumper no puede permitirse ninguno de los dos**. De las cuatro variantes eligió la
+**c** (doble golpe), pero de la **d** dijo *"tiene un toque especial, necesitamos
+más sonidos así"* — y esa era el control.
+
+**El toque especial tiene nombre: `armonicos` acepta múltiplos NO ENTEROS**, y
+siempre los ha aceptado. Toda la mesa es armónica, que es lo que la hace sonar a
+madera y piedra; un parcial en 1,83 se lee como METAL sin margen de duda. **Un
+material entero que estaba disponible sin escribir una línea de sintetizador.** Y
+destapa una deuda vergonzosa: **el juego se llama Cascabel y no tenía sonido de
+cascabel.** Ahora lo hay. `CAZA.md` §9.11.
+
+**`sonidos_pruebas.py`, nuevo:** el banco de prototipos, en
+`assets/sonido_pruebas/`. Existe porque el candado *"ningún wav sin enganchar"* es
+bueno y no se toca, pero deja sin sitio a lo que hay que oír antes de construir.
+La regla está en `CLAUDE.md`: **un sonido vive en el banco mientras no exista la
+cosa que lo dispara.** Catorce dentro hoy.
+
+**Y LA PUERTA CAMBIÓ DE FAMILIA AL REESCUCHARLA.** Fátima eligió la `c` y se
+desdijo: *"era la B: un sonido de cierre como con un eco o grave de fondo"*. No se
+lió — **la primera escucha fue de estructura y la segunda de sensación**, y la
+cola grave dice algo que el doble golpe no puede decir: que hay una sala detrás.
+Lo que le faltaba a la `b` era una sola cosa, **el cerrojo**: sin él es un portazo
+en una cueva, no una puerta cerrada. Cuatro variantes nuevas (`b2`..`b5`).
+
+**Y el cascabel se rehízo entero** —*"es el sonido que más currado debería
+estar"*—: estaba hecho como efecto de mesa, o sea optimizado para lo contrario.
+Dos cascarones con batido de 7 Hz, una envolvente por parcial y ataque de 12 ms en
+vez de 2. Medido: **suena 315-577 ms por encima del 10 % del pico contra 163 de
+antes**, y el centroide baja de 2230 a 1234-1721 Hz. Cuatro variantes
+(`cascabel_a`..`d`). Veintidós prototipos en el banco. `CAZA.md` §9.12.
+
+**Y EL CASCABEL, TERCERA VUELTA.** *"Parece que sean 2 sonidos que acaban de
+distinta forma"* — y lo era, con dos causas y las dos medibles. **Una:** capas con
+`retardo` distinto y `caida` de 2,2 a 9,0, así que el agudo por sextos iba
+5,0 → 14,5 → 2,6; un segundo sonido que llega tarde y se va antes. **Dos, y es la
+fina:** `armonicos` sobre un TRIÁNGULO no da los parciales que pides —el triángulo
+ya trae su serie en 3f, 5f, 7f— así que salen dos peines superpuestos, uno
+armónico (una NOTA) y otro inarmónico (una CAMPANA). Con `seno` de portadora suena
+lo que está escrito. **La regla nueva: para un sonido que sea UN objeto, todas las
+capas con el mismo dur, caida y ataque, sin retardo, y seno cuando los parciales
+importen** — y NO vale para los que son un gesto (`caida`, las puertas), que
+necesitan el retardo justamente por lo contrario. Agudo por sextos ahora: 18,3 →
+18,2, plano. Y `cascabel_4` es *literalmente* `cascabel_1` con la cola larga:
+mesa y arranque tienen que leerse como el mismo objeto. `CAZA.md` §9.13.
+
+**Y un fallo del banco que salió por el camino:** sembraba con
+`abs(hash(nombre))`, y el hash de una cadena en Python **es aleatorio por
+proceso** — 609, 773 y 614 en tres arranques. El banco daba un wav distinto cada
+vez. Arreglado con `crc32`.
+
+**LO QUE HAY QUE OÍR Y DECIDIR, por orden:**
+**S0.** **CERRADO a medias:** el cascabel de mesa es el `1` (brillante) o el `2`
+(cálido), los dos valen. **Y que se caiga el `3` —el que llevaba la cuantización
+de la máquina— fija una regla de estilo nueva: el cascabel es lo único del juego
+que NO es barato**, igual que el violeta arcano es el único color mágico. Falta
+elegir entre 1 y 2, y eso puede esperar a oírlo en contexto.
+**S0b.** **El de ARRANQUE sigue abierto**: el `cascabel_4` era el 1 con la cola
+larga y *"no tanto"*, porque un toque largo no es una entrada. Cuatro candidatos
+nuevos, `arranque_a`..`d`, cada uno moviendo una palanca distinta que no es el
+tiempo. La `b` —sin badajo, ataque de 45 ms— contesta a la hipótesis concreta: si
+lo que estorbaba era la percusión en un momento en que nadie golpea nada.
+**S0c.** `campana_arcana_2`: la vieja tenía los dos defectos de §9.13. **No se
+borra la vieja hasta que alguien confirme de oído que la nueva la supera.**
+Y `puerta_cierra_b2`..`b5` siguen sin oírse (ojo a la `b5`: la cola de la familia
+`b` vive bajo 60 Hz, donde un portátil se rinde).
+**S1.** `bumper_metal` (130 ms) es la prueba de esfuerzo. **¿El metal sobrevive a
+velocidad de bumper?** Si sí, hay tanda de rehacer la paleta de sonido entera; si
+suena a chasquido sucio, el metal es un acento y no una paleta. Las dos respuestas
+sirven, y las dos hay que saberlas antes de tocar `sonidos.py`.
+**S2.** `cascabel` no está asignado a nada a propósito: es el sonido de la marca y
+dónde suena —bola, menú, logotipo al arrancar— no se decide de pasada.
+**S3.** `campana_arcana` es candidata al ÚNICO sonido bonito del juego. Si aparece
+en más de un sitio, deja de significar nada.
+
+Queda abierta **la voz de la criatura**, que es lo único que la síntesis no tapa
+sola, y va detrás de la puerta B igual que su arte.
+
+Batería **541/541** en la caja con `assets/` (13 pruebas nuevas), y la planta de
+abajo **igual al decimal**: huella 16621,1901 · 8,142 s · 120 golpes, los mismos
+tres números de la tanda 0i.
+
 ## EL REPRODUCTOR DE FOTOGRAMAS (tanda 7 · 18-ago)
 
 **La avería que abre la tanda no era que faltara el subsistema: era que el arte
@@ -1845,6 +1996,19 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    **P6.** La planta de abajo se atenúa mientras cazas. ¿Ayuda o distrae?
    Y falta por construir de `CAZA.md` §3.7: la **ventana de recuperación de
    disco** que la cáscara tenía que abrir encima durante la caza.
+
+0i-C. ~~**EL CUELGUE ENTRE PLANTAS, LA CÁMARA FIJA Y EL SONIDO DE SALVAGUARDA**~~
+   **HECHAS Y MEDIDAS** (18-ago). Ver arriba. Lo que queda de esta tanda es
+   **oír la salvaguarda** y **mirar la cámara fija jugando**: la captura de la
+   caja lo enseña encuadrado, pero el "da sensación de bonus" no se mide.
+
+0i-D. **ABRIR EL SUELO** (`CAZA.md` §9). **No es una tanda hasta que Daniel o
+   Fátima contesten §9.2: ¿se abre el suelo, sí o no?** Si sí, es la más pequeña
+   de las cuatro que vienen detrás —un agujero en el arco y una boca de verdad
+   para el regreso, que hoy tiene `velocidad_minima` infinita— y es la que
+   desbloquea las dos puertas, *"la bola cae"* y *"pasar por debajo"*. Criterio de
+   salida: la bola cae de arriba abajo y llega a la pala por debajo de 650 px/s,
+   que es la prueba que ya existe.
 
 0h2. ~~**QUE CAERSE SUENE**~~ **HECHA Y MEDIDA.** 506/506, dos sonidos nuevos,
    `retardo` en `sonidos.py` y dos candados de batería. Ver arriba. Lo que queda

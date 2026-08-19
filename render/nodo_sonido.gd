@@ -28,6 +28,7 @@ const AJUSTES := {
 	"combo":         {"db":  1.0, "tono": 0.00},
 	"reloj":         {"db": -4.0, "tono": 0.00},
 	"atrasar":       {"db": -1.0, "tono": 0.00},
+	"salvaguarda":   {"db": -2.0, "tono": 0.00},
 	"ataque":        {"db":  0.0, "tono": 0.00},
 	"drenaje":       {"db": -2.0, "tono": 0.00},
 	"muerte":        {"db":  0.0, "tono": 0.00},
@@ -39,7 +40,12 @@ const AJUSTES := {
 ##
 ## El reloj y su golpe van igual, y por el mismo motivo: los tres son
 ## información, no adorno, y los tres suenan justo cuando hay más ruido.
-const PROPIOS := ["combo", "reloj", "ataque", "atrasar"]
+##
+## Y la salvaguarda de la planta alta, que es el caso extremo de eso: suena en el
+## desagüe de la arena, o sea en el momento en que el jugador cree que la ha
+## perdido. Si se la come otro golpe, el mensaje no llega y la bola reaparece
+## arriba sin explicación.
+const PROPIOS := ["combo", "reloj", "ataque", "atrasar", "salvaguarda"]
 
 var _voces: Array[AudioStreamPlayer] = []
 var _propias: Dictionary = {}

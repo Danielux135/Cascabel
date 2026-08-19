@@ -337,9 +337,11 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	# del banco. Un sonido nuevo por cada cosa nueva acaba en un banco que nadie
 	# distingue, y estos dos ya significan "algo grande" y "algo se ha cerrado".
 	mesa.caza_empezada.connect(func(_pt: Vector2) -> void:
-		_sonido.reproducir("rampa_fuerte"))
+		_sonido.reproducir("rampa_fuerte")
+		_encuadrar_la_caza())
 	mesa.caza_terminada.connect(func(_pt: Vector2) -> void:
-		_sonido.reproducir("banco"))
+		_sonido.reproducir("banco")
+		camara.soltar_banda())
 	mesa.bola_salvada.connect(_al_salvar_bola)
 	mesa.busqueda_bola.connect(_al_buscar_bola)
 	mesa.girador_girado.connect(_al_girar_girador)
@@ -972,15 +974,41 @@ func _al_curar(cantidad: int, punto: Vector2) -> void:
 	_numeros.append({"pos": punto, "t": 1.0, "texto": "+%d" % cantidad,
 		"col": C_VERDE, "tam": 16.0, "subida": 24.0})
 
+## PLANTAR LA CÁMARA EN LA PLANTA ALTA. Lo pidió Fátima: *"un modo de cámara
+## fija para el modo de caza no estaría mal si cabe todo en la pantalla: además,
+## da sensación de estar en un bonus"*.
+##
+## La banda se saca de los parámetros de la mesa y no de dos números escritos
+## aquí, que es la diferencia entre un encuadre y un encuadre que se queda viejo:
+## la planta alta se está rediseñando (`CAZA.md` §3.1) y `arena_hombro_y`,
+## `arena_techo_ry` y `arena_fondo_y` se van a mover.
+##
+## Si no cabe, `fijar_banda` no rompe nada: `y_de_banda()` devuelve −1 y la caza
+## se juega con las cuatro reglas de siempre. Y el viaje hasta el encuadre lo hace
+## el muelle, o sea que la cámara SUBE a la planta alta en vez de aparecer allí:
+## ese cuarto de segundo de subida es la mitad de la sensación de bonus.
+func _encuadrar_la_caza() -> void:
+	if not camara.p.caza_camara_fija:
+		return
+	var m := camara.p.caza_margen
+	camara.fijar_banda(
+		mesa.p.arena_hombro_y - mesa.p.arena_techo_ry - m,
+		mesa.p.arena_fondo_y + m)
+
 ## LA CAZA TE HA SALVADO LA BOLA. Se dice EN EL DESAGÜE de la planta alta, o
 ## sea donde el jugador acaba de ver desaparecer la bola: es el mismo criterio
 ## que la red de seguridad de abajo —un efecto se enseña donde se mide— y aquí
 ## importa el doble, porque una bola que se cae por un agujero y reaparece
 ## arriba sin decir nada no se lee como un salvabolas, se lee como un fallo.
 ##
-## Va en verde y con el sonido del reloj —no con el de drenaje— a propósito: lo
-## que ha pasado es bueno. Y lleva la cuenta, que es la única forma de que el
-## jugador sepa que la mesa lo está sujetando y cuánto.
+## Va en verde y con SU PROPIO SONIDO. Estuvo sonando con el de `atrasar`, que
+## es el de la red de seguridad de la planta baja, y eran dos mensajes distintos
+## con la misma voz: aquel dice que el reloj se ha movido hacia atrás y este dice
+## que sigues dentro del bonus. `salvaguarda` baja y vuelve a subir, que es la
+## forma de lo que acaba de pasar y no la tiene ningún otro sonido de la mesa.
+##
+## Y lleva la cuenta, que es la única forma de que el jugador sepa que la mesa lo
+## está sujetando y cuánto.
 func _al_salvar_bola(punto: Vector2, salvadas: int) -> void:
 	var donde := Vector2(Mesa.ANCHO * 0.5, mesa.p.arena_fondo_y - 30.0)
 	_numeros.append({"pos": donde, "t": 1.2,
@@ -988,7 +1016,7 @@ func _al_salvar_bola(punto: Vector2, salvadas: int) -> void:
 		"col": C_VERDE})
 	impactos.onda(donde, C_VERDE, 1.4)
 	impactos.chispas(punto, Vector2.UP, C_VERDE, 1.0)
-	_sonido.reproducir("atrasar")
+	_sonido.reproducir("salvaguarda")
 
 ## La red de seguridad se ha comido el drenaje. Se dice donde se MIDE el
 ## castigo: sobre el corredor de drenaje, que es de donde no ha salido el golpe.

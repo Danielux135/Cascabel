@@ -190,6 +190,27 @@ SONIDOS = {
         filtro=5000, vol=0.46,
     ),
 
+    # LA MESA TE SUJETA LA BOLA ARRIBA. Sonaba con el wav de `atrasar` —el mismo
+    # que la red de seguridad de la planta baja— y por eso los dos mensajes se
+    # confundían: uno dice "el reloj se ha movido hacia atrás" y el otro "sigues
+    # dentro del bonus", y no son ni parecidos.
+    #
+    # LA FORMA ES LO QUE LO IDENTIFICA, no el timbre: BAJA Y VUELVE A SUBIR POR
+    # ENCIMA DE DONDE EMPEZÓ. Es el único gesto de este tipo en toda la mesa, y
+    # es literalmente lo que ha pasado —la bola se cayó y la han vuelto a poner
+    # arriba—. Los otros tres candidatos estaban todos cogidos y ninguno vale:
+    # `atrasar` solo baja, `combo` solo sube, `rampa_fallada` sube y se descuelga.
+    #
+    # Tercer armónico y no segundo para que suene hueco, que es lo que lo aleja
+    # del arpegio del multiplicador; y sin `crush`, porque esto no es un golpe de
+    # mesa: es la mesa hablando.
+    "salvaguarda": dict(
+        onda="triangulo", armonicos=[(3.0, 0.16)],
+        notas=[523, 349, 698], dur_nota=0.070, dur_ultima=0.34,
+        caida=14, caida_ultima=5, ataque=0.010, ruido=0.06,
+        vibrato=(6.0, 0.4), filtro=5200, vol=0.48,
+    ),
+
     # --- Perder la bola y matar al enemigo. Los dos largos, que son los dos
     # momentos en los que el juego se para a decirte algo. ---
     "drenaje": dict(
