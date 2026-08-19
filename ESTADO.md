@@ -2084,13 +2084,20 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    destino final (¿`reliquias/`? ¿carpeta nueva?), decidir si se acepta el
    contorno más suave o se regenera, correr `procesar.py` real para
    confirmar el resultado, y conectar el nodo que la use
-3. **Tanda de assets C: piezas de bandeja de sistema** (Sonnet, medio). Es lo
-   único que queda de `assets/prompts_cascara.md` §2 sin generar: reloj con
-   sprite propio, separador, altavoz e icono de sin-red. La barra de tareas
-   dibuja su bandeja con `draw_rect` a mano hasta entonces. **Guardar la hoja**
-4. **Tanda de assets D: los 27 iconos de reliquia que faltan** (Sonnet,
-   medio), con `assets/prompts_reliquias.md`. Se ven en tres sitios —tele,
-   escritorio y tooltip—, así que se notan
+3. ~~**Tanda de assets C: piezas de bandeja de sistema**~~ **HECHA ENTERA
+   (19-ago).** Las cuatro piezas de §11-12 conectadas: separador, altavoz y
+   sin-red en `assets/ui/bandeja/`, y `bandeja_reloj` (el panel hundido del
+   reloj) en `assets/ui/bandeja_reloj.png` — llegó suelta, más tarde que las
+   otras tres. Como su ancho depende de cuántas cifras tenga la hora, se
+   dibuja con `draw_texture_rect(..., tile=true)`, igual que `canal.png` en
+   la barra de progreso: se TEJE, no se estira. 541/541.
+4. ~~**Tanda de assets D: los 27 iconos de reliquia que faltan**~~ **HECHA
+   (19-ago).** Ya había dos generaciones por hoja (12-13 ago y una redo del
+   19) sin documentar ni integrar: comparadas icono a icono a 32 px (tamaño
+   real de escritorio), v2 gana en 3 (`carga_polvora`, `cojin_correa`,
+   `pagare_daga`), v1 en el resto. Ver `assets/INVENTARIO_HOJAS.md`. De paso
+   salió un número escrito a mano en `_prueba_iconos` (esperaba exactamente
+   18 con icono) que `CLAUDE.md` ya avisaba que no vale — arreglado. 541/541.
 5. **Fase 5: juzgarla jugando** (Daniel). El código está escrito entero y sin
    ejecutar. Lo que queda no se lee, se juega: las preguntas N1-N8 de arriba. Si
    N2 o N4 salen mal, lo que vuelve a la mesa es reversible en un rato

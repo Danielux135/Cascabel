@@ -93,6 +93,51 @@ genera, van aquí en su propia fila cuando lleguen.
 (`_fondos_acto`, línea ~89-92). Hace falta un array de variantes por acto y
 un sorteo al entrar en el escritorio. Detalle en `ESTADO.md`.
 
+## Tanda del 19 de agosto (2) — bandeja de sistema y 27 iconos de reliquia, ya en el repo sin documentar
+
+Seis hojas que ya estaban en `assets/` y `assets/ui/` (guardadas ahí en vez de
+en `Desktop\Sprites`), generadas entre el 12 y el 19 de agosto y **sin
+integrar ni documentar** hasta ahora. Tres de ellas son redos de las otras
+tres — mismo prompt, tirada distinta — así que hubo que comparar a 32 px,
+tamaño real de escritorio, antes de elegir.
+
+| Fichero | Hoja | Destino |
+|---|---|---|
+| `ui/ChatGPT Image 19 ago 2026, 09_07_17.png` | §12, bandeja (separador, altavoz, sin-red) | `ui/bandeja/*` — **única versión, usada entera** |
+| `ChatGPT Image 12 ago 2026, 18_20_09.png` | Hoja 1 de `prompts_reliquias.md` (combo/golpe único) | v1 |
+| `ChatGPT Image 19 ago 2026, 10_50_34.png` | Hoja 1, redo | v2 |
+| `ChatGPT Image 13 ago 2026, 10_47_07.png` | Hoja 2 (supervivencia/escalado) | v1 |
+| `ChatGPT Image 19 ago 2026, 10_59_44.png` | Hoja 2, redo | v2 |
+| `ChatGPT Image 13 ago 2026, 10_47_14.png` | Hoja 3 (caos y resto) | v1 |
+| `ChatGPT Image 19 ago 2026, 11_09_28.png` | Hoja 3, redo | v2 |
+
+**La bandeja del reloj (`bandeja_reloj`, §11) llegó aparte, más tarde.**
+`ChatGPT Image 19 ago 2026, 11_56_00.png` → `assets/ui/bandeja_reloj.png`,
+64×16, único objeto en la hoja, sin rejilla. Al no tener un ancho fijo en
+juego (depende de cuántas cifras tenga la hora), no se recortó a un tamaño
+cuadrado con `procesar.py --tam`: se cortó a mano conservando el 64×16 exacto
+del prompt y se dibuja con `draw_texture_rect(..., tile=true)`, tejida como
+`canal.png` en vez de estirada. Con esto §11 y §12 quedan las dos integradas.
+
+**Comparación v1/v2, icono por icono, a 32 px sobre gris medio** (no se mira
+a la escala del prompt, se mira a la escala del juego): de 27 iconos, v2 gana
+en 3 —`carga_polvora` (v1 era un saco irreconocible, v2 es una bomba con
+mecha clarísima), `cojin_correa` (v1 leía a bolsa con hebilla, v2 a cojín de
+verdad) y `pagare_daga` (v2 trae un sello de lacre visible que v1 no tenía,
+se lee como carta y no como papel arrugado)—; **v1 gana o empata en las otras
+24**, sobre todo en `cincel_frio`: en v2 el cincel se volvió un frasco con
+escarcha, que ya no dice "cincel". El resto de la tabla completa de qué
+reliquia lleva cada icono está en `assets/prompts_reliquias.md` §"Qué
+reliquia se lleva cada icono".
+
+Procesadas con `procesar.py --tam 64` y `--tam 32` (silueta, no rejilla,
+como manda la nota del propio fichero de prompts), mezclando la versión
+ganadora de cada icono. Mosaico de revisión a 32 px mirado antes de tocar
+`data/reliquias.json`. 27 reliquias que llevaban `icono` ausente ahora lo
+tienen; las cinco de multibola (`bifurcacion`, `proceso_hijo`,
+`bomba_de_procesos`, `condicion_de_carrera`, `hilo_unico`) siguen sin icono
+propio — no las cubre esta tanda.
+
 ## Tanda del 17 de agosto — `cr_brasa` ANIMADA, la primera hoja de criatura sola
 
 **La hoja piloto de `prompts_animacion.md` §4, y es la primera que sale sin arco

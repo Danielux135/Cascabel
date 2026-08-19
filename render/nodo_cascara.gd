@@ -120,6 +120,16 @@ var _texturas: Dictionary = {}
 var _tex_botones: Dictionary = {}
 var _tex_inicio: Texture2D
 var _tex_inicio_pulsado: Texture2D
+## Los tres detalles de la bandeja del sistema (§12 de `prompts_cascara.md`):
+## el separador entre la pestaña del proceso y la bandeja, y los dos iconos
+## que se sientan junto al reloj. Antes eran `draw_rect` a mano.
+var _tex_separador: Texture2D
+var _tex_altavoz: Texture2D
+var _tex_sin_red: Texture2D
+## El panel hundido del reloj (§11): se TEJE (`tile=true`), no se estira, igual
+## que `canal.png` en la barra de progreso, porque su ancho depende de cuántas
+## cifras tenga la hora.
+var _tex_bandeja_reloj: Texture2D
 ## Los iconos decorativos del escritorio. No hacen nada, como cualquier icono de
 ## escritorio real.
 const ICONOS_DECORATIVOS := ["mi_maquina", "papelera", "carpeta", "disquete",
@@ -160,6 +170,10 @@ func _ready() -> void:
 			_tex_botones[nombre] = t
 	_tex_inicio = _cargar("res://assets/ui/inicio/inicio.png")
 	_tex_inicio_pulsado = _cargar("res://assets/ui/inicio/inicio_pulsado.png")
+	_tex_separador = _cargar("res://assets/ui/bandeja/separador.png")
+	_tex_altavoz = _cargar("res://assets/ui/bandeja/altavoz.png")
+	_tex_sin_red = _cargar("res://assets/ui/bandeja/sin_red.png")
+	_tex_bandeja_reloj = _cargar("res://assets/ui/bandeja_reloj.png")
 	for nombre in ICONOS_DECORATIVOS:
 		_tex_iconos_decorativos.append(_cargar("res://assets/ui/iconos/%s.png" % nombre))
 	_lienzo = Node2D.new()
@@ -613,8 +627,31 @@ func dibujar_barra_tareas(en: CanvasItem) -> void:
 	var ancho_bandeja := 12.0 + ancho_hora
 	var bandeja := Rect2(p.x - ancho_bandeja - 6.0, caja.position.y + 5.0,
 		ancho_bandeja, ALTO_BARRA - 10.0)
-	en.draw_rect(bandeja, C_VACIO)
-	en.draw_rect(bandeja, Color(C_METAL, 0.6), false, 1.0)
+
+	# Los dos iconos de la bandeja, pegados a la izquierda del reloj: "sin red"
+	# —siempre, es la broma: el sistema no tiene con qué conectarse— y el
+	# altavoz. Y un separador que marca dónde empieza la bandeja de verdad.
+	var icono_lado := 16.0
+	var icono_y := caja.position.y + (ALTO_BARRA - icono_lado) * 0.5
+	var x_icono := bandeja.position.x - 4.0 - icono_lado
+	if _tex_altavoz != null:
+		en.draw_texture_rect(_tex_altavoz,
+			Rect2(x_icono, icono_y, icono_lado, icono_lado), false)
+	x_icono -= icono_lado + 2.0
+	if _tex_sin_red != null:
+		en.draw_texture_rect(_tex_sin_red,
+			Rect2(x_icono, icono_y, icono_lado, icono_lado), false)
+	if _tex_separador != null:
+		var sep_size := _tex_separador.get_size()
+		var sep_alto := ALTO_BARRA - 8.0
+		en.draw_texture_rect(_tex_separador, Rect2(x_icono - 4.0 - sep_size.x,
+			caja.position.y + 4.0, sep_size.x, sep_alto), false)
+
+	if _tex_bandeja_reloj != null:
+		en.draw_texture_rect(_tex_bandeja_reloj, bandeja, true)
+	else:
+		en.draw_rect(bandeja, C_VACIO)
+		en.draw_rect(bandeja, Color(C_METAL, 0.6), false, 1.0)
 	en.draw_string(_fuente, Vector2(bandeja.position.x + 6.0,
 		bandeja.position.y + 12.0), texto_hora,
 		HORIZONTAL_ALIGNMENT_LEFT, bandeja.size.x - 8.0, 8, C_VERDE)

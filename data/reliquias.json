@@ -45,6 +45,7 @@
       "eje": "combo",
       "rareza": "rara",
       "gancho": "al empezar la bola",
+      "icono": "brasa_pinzas",
       "texto": "Cada bola nueva te llega con cinco golpes de combo ya puestos.",
       "efectos": {
         "suma_golpes_inicio": 5
@@ -56,6 +57,7 @@
       "eje": "combo",
       "rareza": "comun",
       "gancho": "al drenar",
+      "icono": "nudo_soga",
       "texto": "Drenar ya no te tira el multiplicador entero: conservas la mitad.",
       "efectos": {
         "suma_golpes_conservados": 0.5
@@ -67,6 +69,7 @@
       "eje": "combo",
       "rareza": "comun",
       "gancho": "al completar un recorrido",
+      "icono": "engranajes",
       "texto": "Completar cualquier recorrido cuenta como tres golpes más de combo.",
       "efectos": {
         "suma_golpes_por_recorrido": 3
@@ -90,6 +93,7 @@
       "eje": "combo",
       "rareza": "rara",
       "gancho": "pasivo condicional",
+      "icono": "metronomo",
       "cuando": "combo_alto",
       "umbral": 3,
       "texto": "Mientras vayas por x3 o más, todo tu daño sube un tercio.",
@@ -103,6 +107,7 @@
       "eje": "combo",
       "rareza": "comun",
       "gancho": "pasivo condicional",
+      "icono": "carrete_seda",
       "cuando": "sin_drenar",
       "texto": "Mientras no drenes en este combate, cada target le roba reloj al enemigo.",
       "efectos": {
@@ -127,6 +132,7 @@
       "eje": "golpe unico",
       "rareza": "comun",
       "gancho": "al agotar un banco",
+      "icono": "cincel_frio",
       "texto": "Cerrar un banco entero paga el doble.",
       "efectos": {
         "factor_dano_banco": 2.0
@@ -150,6 +156,7 @@
       "eje": "golpe unico",
       "rareza": "comun",
       "gancho": "al golpear un target",
+      "icono": "mira_bronce",
       "texto": "Cada target pega 12 más, antes del multiplicador.",
       "efectos": {
         "suma_dano_target": 12
@@ -161,6 +168,7 @@
       "eje": "golpe unico",
       "rareza": "rara",
       "gancho": "pasivo condicional",
+      "icono": "carga_polvora",
       "cuando": "enemigo_intacto",
       "umbral": 0.6,
       "texto": "Mientras al enemigo le quede más del 60% de vida, el cañón pega el doble.",
@@ -188,6 +196,7 @@
       "eje": "golpe unico",
       "rareza": "arcana",
       "gancho": "al completar un recorrido",
+      "icono": "via_aguja",
       "texto": "Los recorridos pegan la mitad más; el racimo pega mucho menos.",
       "efectos": {
         "factor_dano_recorrido": 1.5,
@@ -224,6 +233,7 @@
       "eje": "supervivencia",
       "rareza": "comun",
       "gancho": "al drenar",
+      "icono": "aro_goma",
       "texto": "Drenar cuesta la mitad de vida.",
       "efectos": {
         "factor_drenaje": 0.5
@@ -259,6 +269,7 @@
       "eje": "supervivencia",
       "rareza": "comun",
       "gancho": "pasivo",
+      "icono": "chapa_remaches",
       "texto": "63 de vida máxima, y te la da puesta.",
       "efectos": {
         "suma_vida_maxima": 63
@@ -270,6 +281,7 @@
       "eje": "supervivencia",
       "rareza": "rara",
       "gancho": "pasivo",
+      "icono": "amortiguador",
       "texto": "Todo lo que te pega el enemigo pega un cuarto menos.",
       "efectos": {
         "factor_ataque_enemigo": 0.75
@@ -281,6 +293,7 @@
       "eje": "supervivencia",
       "rareza": "comun",
       "gancho": "al completar un recorrido",
+      "icono": "valvula_vapor",
       "texto": "Cada recorrido completado te cura 10.",
       "efectos": {
         "suma_vida_por_recorrido": 10
@@ -319,6 +332,7 @@
       "eje": "supervivencia",
       "rareza": "rara",
       "gancho": "pasivo condicional",
+      "icono": "cojin_correa",
       "cuando": "reloj_cargado",
       "umbral": 0.66,
       "texto": "El último tercio del reloj corre mucho más lento: te da tiempo a llegar.",
@@ -356,6 +370,7 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
+      "icono": "losa_muescas",
       "texto": "12 de vida máxima por cada combate ganado, y te la lleva puesta.",
       "efectos": {
         "suma_vida_maxima_por_victoria": 12
@@ -367,6 +382,7 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
+      "icono": "ladrillo_caliente",
       "texto": "Cada combate ganado suma un golpe al combo con el que te llega la bola.",
       "efectos": {
         "suma_golpes_inicio_por_victoria": 1
@@ -378,6 +394,7 @@
       "eje": "escalado",
       "rareza": "rara",
       "gancho": "al matar",
+      "icono": "bobina_escarcha",
       "texto": "El reloj del enemigo carga un 2% más lento por cada combate ganado.",
       "efectos": {
         "factor_carga_reloj_por_victoria": -0.02
@@ -389,6 +406,7 @@
       "eje": "escalado",
       "rareza": "arcana",
       "gancho": "pasivo",
+      "icono": "pagare_daga",
       "texto": "Pegas un 60% más desde ya, pero el reloj se acelera un 3% por combate ganado.",
       "efectos": {
         "factor_dano_global": 1.6,
@@ -401,6 +419,7 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
+      "icono": "teja_dorada",
       "texto": "Cada combate ganado te cura un poco más al ganar el siguiente.",
       "efectos": {
         "suma_curacion_al_matar_por_victoria": 0.007
@@ -412,6 +431,7 @@
       "eje": "escalado",
       "rareza": "comun",
       "gancho": "al matar",
+      "icono": "libro_pestanas",
       "texto": "Cerrar un banco paga 12 más por cada combate ganado.",
       "efectos": {
         "suma_dano_banco_por_victoria": 12
@@ -435,6 +455,7 @@
       "eje": "caos",
       "rareza": "comun",
       "gancho": "pasivo",
+      "icono": "jaula_rota",
       "texto": "Un 12% más de probabilidad de crítico. Los críticos pegan el doble.",
       "efectos": {
         "suma_prob_critico": 0.12
@@ -446,6 +467,7 @@
       "eje": "caos",
       "rareza": "rara",
       "gancho": "al drenar",
+      "icono": "llaves_gemelas",
       "texto": "El primer drenaje de cada combate no cuesta vida ni multiplicador.",
       "efectos": {
         "bandera_red_de_seguridad": true
@@ -483,6 +505,7 @@
       "eje": "caos",
       "rareza": "arcana",
       "gancho": "pasivo condicional",
+      "icono": "manometro_rojo",
       "cuando": "vida_alta",
       "umbral": 0.8,
       "texto": "Por encima del 80% de vida pegas casi el doble, y a ti te pegan la mitad más.",
@@ -497,6 +520,7 @@
       "eje": "caos",
       "rareza": "rara",
       "gancho": "pasivo condicional",
+      "icono": "jarra_monedas",
       "cuando": "combo_alto",
       "umbral": 4,
       "texto": "Con el multiplicador a tope, uno de cada cuatro golpes es crítico.",
@@ -510,6 +534,7 @@
       "eje": "caos",
       "rareza": "rara",
       "gancho": "al drenar",
+      "icono": "mano_madera",
       "texto": "Pegas la mitad más, y drenar duele el doble.",
       "efectos": {
         "factor_dano_global": 1.5,
@@ -522,6 +547,7 @@
       "eje": "caos",
       "rareza": "arcana",
       "gancho": "pasivo condicional",
+      "icono": "serpiente_anillo",
       "cuando": "reloj_frio",
       "umbral": 0.33,
       "texto": "Justo después de que el enemigo pegue, mientras su reloj está frío, pegas un 80% más.",
@@ -535,6 +561,7 @@
       "eje": "caos",
       "rareza": "arcana",
       "gancho": "pasivo condicional",
+      "icono": "campana_rajada",
       "cuando": "vida_baja",
       "umbral": 0.25,
       "texto": "Por debajo del 25% de vida pegas dos veces y media.",
