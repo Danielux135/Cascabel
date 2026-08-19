@@ -184,6 +184,28 @@ mesa y arranque tienen que leerse como el mismo objeto. `CAZA.md` §9.13.
 proceso** — 609, 773 y 614 en tres arranques. El banco daba un wav distinto cada
 vez. Arreglado con `crc32`.
 
+**Y CANCIONES, que es una categoría nueva** (`assets/prompts_canciones.md`).
+Fátima: *"los prompts de canciones funcionan muy bien"*. No son música de fondo:
+**una canción de este juego es un ARCHIVO** que está en el disco de la máquina y
+que el jugador abre en `MUSICA/`. Eso resuelve tres cosas de golpe — justifica que
+haya voz (prohibida en las diez piezas, y con razón), justifica que TERMINEN (todo
+`prompts_musica.md` pelea contra Suno para que no cierre las piezas; aquí eso deja
+de ser un defecto), y es historia sin guion, que es `DISEÑO.md` §3.
+
+**Y trae un desbloqueable de verdad: `los_nueve_cascabeles` se desbloquea POR
+ESTROFAS.** Es una canción de contar, nueve estrofas, una por cascabel, y el
+reproductor solo toca las de los que tienes. Coste de producción cero —se genera
+entera una vez y se corta en nueve por frontera de compás— y da un contador de
+colección que no es una lista: sabes cuántos te faltan porque la canción tiene
+agujeros. La novena estrofa es la que dice quién eres, así que **la canción no se
+completa hasta que el juego te lo ha explicado, y te lo explica cantando**. Su
+estribillo es cita literal de `DISEÑO.md` §3.
+
+Las otras tres: `sin_titulo` (la que el autor dejó a medias — la voz tararea
+porque nunca hubo letra), `cascabel_sa` (el jingle de fábrica de cuando esto era
+solo un pinball: lo único alegre del juego, y la única pieza que SÍ resuelve) y
+`nana` (cantada a la bola, o sea a ti).
+
 **LO QUE HAY QUE OÍR Y DECIDIR, por orden:**
 **S0.** **CERRADO a medias:** el cascabel de mesa es el `1` (brillante) o el `2`
 (cálido), los dos valen. **Y que se caiga el `3` —el que llevaba la cuantización

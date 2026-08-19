@@ -1,5 +1,13 @@
 # Prompts para la MÚSICA — la banda sonora que la máquina nunca recibió
 
+> **Y hay un documento hermano: `prompts_canciones.md`.** Esto son diez piezas
+> INSTRUMENTALES que se repiten mientras juegas. Aquello son CANCIONES —con voz y
+> con letra en castellano— que no suenan de fondo: son ficheros que están en el
+> disco de la máquina y que el jugador abre. Las dos reglas que aquí más pelean
+> —*nada resuelve* y *sin voz*— allí se levantan a propósito, y por un motivo:
+> **la única música de este juego a la que se le permite acabar es la que ya
+> estaba acabada antes de que llegaras.**
+
 Hoy el juego no tiene música. Tiene `assets/sonido/*.wav`, catorce efectos
 sintetizados por `sonidos.py`, y nada más. Esto es el otro lado.
 
