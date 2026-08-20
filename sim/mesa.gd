@@ -36,6 +36,20 @@ signal rampa_salida(punto: Vector2, indice: int)
 ## es un castigo, es información: pasa siempre por aquí, tanto si el tubo la
 ## devuelve como si el carril la suelta.
 signal rampa_fallada(punto: Vector2, indice: int, ratio: float)
+## LA BOLA HA VUELTO POR DONDE ENTRÓ, o sea que el recorrido NO se ha
+## completado. Va aparte de `rampa_salida` y esa separación es la mitad
+## importante de la cuesta: **las rampas se cobran al SALIR**, así que si un tubo
+## fallado saliera por `rampa_salida` te pagaría el cañón entero por un tiro que
+## no ha llegado, y el umbral te abriría la caza por no llegar al umbral. Hasta
+## esta tanda no podía pasar —la única rampa con cuesta era un carril, y un
+## carril no vuelve, se cae— y por eso el fallo no estaba puesto.
+signal rampa_devuelta(punto: Vector2, indice: int)
+
+## LA BARRA DE CARGA (`PROPÓSITO.md` §6). `fraccion` va de 0 a 1; `armada` es que
+## está llena y esperando a la próxima rampa completada.
+signal carga_cambiada(fraccion: float, armada: bool)
+signal descarga_empezada(punto: Vector2, segundos: float)
+signal descarga_terminada()
 ## HA CAÍDO DE UNA CAPA A OTRA. Es el mismo evento para las dos formas de caerse
 ## —salirte del borde de una plataforma y desprenderte de una rampa abierta—
 ## porque en la mano se sienten igual.
@@ -140,6 +154,28 @@ var plataformas: Array[Plataforma] = []
 
 var carga_lanzador: float = 0.0
 var cargando := false
+
+# ------------------------------------------------------- la barra de carga
+#
+# `PROPÓSITO.md` §6, y es la otra mitad de la cuesta: sin ella, poner cuesta a
+# cuatro rampas es quitarle a la mesa un tercio de lo que paga y no darle nada.
+#
+#     "Toda entrada de rampa carga la barra, LLEGUES O NO, en proporción a
+#      (velocidad_entrada / velocidad_escape)². Una rampa fallada carga poco.
+#      Una justa carga. Una limpia carga el triple."
+#
+# Lo que hace que enganche es la primera coma: **un tiro fallado sigue pagando**,
+# así que sigues tirando a la rampa que se te resiste en vez de dejar de mirarla.
+# Es la válvula, y es la razón de que fallar sea información y no castigo.
+
+## De 0 a 1. Es de la partida y no de la bola: se acumula entre bolas —como el
+## combo— y la reinicia `Combate.iniciar()`.
+var carga: float = 0.0
+## Llena y esperando. La descarga NO salta al llenarse: salta en la siguiente
+## rampa que completes, que es lo que la convierte en un tiro y no en un aviso.
+var descarga_armada := false
+## Segundos que le quedan a la descarga. Mientras corre, `Combate` dobla el daño.
+var descarga_restante: float = 0.0
 
 var _contactos: Array[Contacto] = []
 ## La pala que tiene la bola atrapada en su cuna ahora mismo, o null. Es estado
@@ -266,7 +302,7 @@ func _construir() -> void:
 		Vector2(140, 340), Vector2(215, 315), Vector2(290, 360),
 		Vector2(332, 470), Vector2(342, 620), Vector2(338, 780),
 		Vector2(334, 940), Vector2(330, 1085),
-	]), "retorno", Rampa.Premio.DANO)
+	]), "retorno", Rampa.Premio.DANO, 1.0, p.retorno_velocidad_escape)
 
 	# EL CAÑÓN. El golpe gordo de un solo impacto, y el tiro que se paga caro:
 	# no te deja la bola puesta, te la escupe CRUZADA Y RÁPIDA hacia la pala
@@ -290,7 +326,8 @@ func _construir() -> void:
 		Vector2(258, 342), Vector2(190, 312), Vector2(120, 350),
 		Vector2(78, 440), Vector2(62, 580), Vector2(60, 750),
 		Vector2(64, 860), Vector2(100, 940), Vector2(160, 985),
-	]), "canon", Rampa.Premio.DANO_FUERTE, p.canon_factor_salida)
+	]), "canon", Rampa.Premio.DANO_FUERTE, p.canon_factor_salida,
+		p.canon_velocidad_escape)
 
 	# --- Platillo, metido bajo el arco a la izquierda ---
 	# Hay que buscarlo: no está en el camino de la bola. Captura, pausa, y
@@ -434,13 +471,14 @@ func _orbita() -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
+	r.velocidad_escape = p.orbita_velocidad_escape
 	r.nombre = "orbita"
 	r.premio = Rampa.Premio.MULTIPLICADOR
 	rampas.append(r)
 
 ## Carril de retorno: como la órbita pero de un solo sentido.
 func _carril(control: PackedVector2Array, nombre: String, premio: int,
-		factor_salida: float = 1.0) -> void:
+		factor_salida: float = 1.0, velocidad_escape: float = 0.0) -> void:
 	var r := Rampa.new(control)
 	r.entrada_radio = p.rampa_entrada_radio
 	r.velocidad_minima = p.rampa_velocidad_minima
@@ -448,6 +486,7 @@ func _carril(control: PackedVector2Array, nombre: String, premio: int,
 	r.nombre = nombre
 	r.premio = premio
 	r.factor_salida = factor_salida
+	r.velocidad_escape = velocidad_escape
 	rampas.append(r)
 
 func _platillo(centro: Vector2, direccion: Vector2) -> void:
@@ -627,6 +666,7 @@ func _arena() -> void:
 	]))
 	orbita.entrada_radio = p.rampa_entrada_radio
 	orbita.velocidad_minima = p.arena_orbita_velocidad_minima
+	orbita.velocidad_escape = p.arena_orbita_velocidad_escape
 	orbita.nombre = "orbita_alta"
 	orbita.premio = Rampa.Premio.MULTIPLICADOR
 	rampas.append(orbita)
@@ -749,6 +789,36 @@ func _terminar_caza(por_drenaje: bool = false) -> void:
 			_meter_en_regreso(b)
 	caza_terminada.emit(punto)
 
+## CORTA LA CAZA SIN JUGARLA. Lo llama `nueva_bola()`, o sea el servicio de una
+## bola nueva: empieza otro combate, o el anterior te ha drenado.
+##
+## **LA AVERÍA QUE ARREGLA, y la cazó Fátima jugando:** *"si te pasas la pantalla
+## en modo caza, al empezar a jugar la partida, la caza continúa, haciendo que la
+## cámara quede fija, e impidiendo jugar en la parte de abajo (se juega pero no se
+## ve)"*. Y era literal: `Combate.iniciar()` llama a `nueva_bola()`, que no sabía
+## nada de la caza, así que `en_caza` cruzaba de un combate al siguiente con sus
+## 20 s intactos. Nadie emitía `caza_terminada`, la vista no soltaba la banda, y
+## la cámara se quedaba plantada en la arena mientras se jugaba 640 px más abajo.
+## Medido: **20,0 s de mesa jugándose fuera de plano.**
+##
+## Es la misma familia que "los estados no cruzan de un combate a otro"
+## (`Combate.iniciar`): lo que es de la bola que se ha acabado no puede seguir
+## puesto cuando entra la siguiente.
+##
+## Y NO ES `_terminar_caza`, a propósito. Aquel BAJA las bolas que estén arriba
+## por el regreso, que es lo que hay que hacer cuando la caza se acaba jugando;
+## aquí las bolas se van a reponer enteras un par de líneas más abajo, así que
+## meterlas en una curva sería mandarlas por un recorrido que nadie va a
+## terminar. Lo único que hace falta es cerrar el estado **y decirlo**: el aviso
+## no es cosmético, es lo que suelta la cámara.
+func cortar_caza() -> void:
+	if not en_caza:
+		return
+	en_caza = false
+	caza_restante = 0.0
+	caza_por_drenaje = false
+	caza_terminada.emit(Vector2(ANCHO * 0.5, p.arena_fondo_y))
+
 ## SUBE LA BOLA POR EL UMBRAL A MANO. Es depuración —F1 y F3 desde la vista— y
 ## existe por una razón de medida, no de comodidad: el umbral se gana en 3 de
 ## cada 100 entradas al racimo, así que juzgar la planta alta jugando entera es
@@ -806,6 +876,12 @@ func _meter_en_regreso(b: Bola) -> void:
 	var r := rampas[regreso]
 	b.rampa = regreso
 	b.rampa_sentido = 1
+	# Y LA BOCA, que antes se quedaba la del recorrido anterior. Con las rampas
+	# llanas daba igual —nadie leía `rampa_subida`—, pero desde que la cuesta
+	# cobra ALTURA es lo que dice desde qué extremo se mide: una bola que venía
+	# de la órbita alta entraba en el regreso con `subida` a −1 y la cuenta de
+	# energía lo leía como una subida de 458 px en vez de la bajada que es.
+	b.rampa_subida = 1
 	# Velocidad FIJA, no la que traía: una caza que acaba con la bola posada
 	# tardaría siglos en bajar los 400 px del carril.
 	b.rampa_velocidad = p.regreso_velocidad
@@ -968,6 +1044,12 @@ func _preparar_bola(b: Bola) -> void:
 ## hubiera desaparecen. Reutiliza el objeto de `bolas[0]` a propósito, porque hay
 ## quien se guarda la referencia (la vista, para dibujarla) entre bola y bola.
 func nueva_bola() -> void:
+	# LA CAZA NO CRUZA DE UNA BOLA A LA SIGUIENTE. Va lo primero de todo: si se
+	# hiciera después de reponer, `_desalojar_arena` vería la bola nueva ya
+	# puesta en el carril y no habría a quién desalojar, pero la cámara ya se
+	# habría quedado un subpaso fija sobre una arena vacía.
+	cortar_caza()
+	cortar_descarga()
 	var b := bolas[0]
 	bolas.clear()
 	bolas.append(b)
@@ -1101,6 +1183,7 @@ func _subpaso(h: float) -> void:
 			_avanzar_bola(b, h)
 	_colisionar_bolas()
 	_avanzar_caza(h)
+	_avanzar_descarga(h)
 	# Y DESPUÉS de la caza, no antes: mientras el modo está abierto quien manda
 	# arriba es el salvabolas; en cuanto se cierra manda esto, y lo que hace es
 	# garantizar que no queda ninguna bola atrapada en un piso sin salida.
@@ -1213,14 +1296,18 @@ func _recoger_drenadas() -> void:
 ## a mitad de rampa.
 func _avanzar_rampa(b: Bola, h: float) -> void:
 	var r := rampas[b.rampa]
-	# La velocidad se CALCULA desde la distancia, no se acumula. Con la rampa
-	# llana (`velocidad_escape` a 0) devuelve la de entrada tal cual y esto es
-	# palabra por palabra lo de antes; con cuesta, no hay deriva de integración,
-	# así que subir y volver a bajar devuelve exactamente la velocidad de
-	# entrada en vez de un número parecido.
+	# La velocidad se CALCULA desde la ALTURA, no se acumula. Con la rampa llana
+	# —`velocidad_escape` a 0, o una curva que no sube— devuelve la de entrada tal
+	# cual y esto es palabra por palabra lo de antes; con cuesta, no hay deriva de
+	# integración, así que subir y volver a bajar devuelve exactamente la
+	# velocidad de entrada en vez de un número parecido.
+	var subida_max := r.subida_maxima(b.rampa_subida)
 	var v := r.velocidad_en(b.rampa_velocidad,
-		r.recorrido(b.rampa_distancia, b.rampa_subida))
-	# ¿Se ha quedado sin cuesta? Solo cuenta subiendo: bajando la velocidad crece.
+		r.altura_ganada(b.rampa_distancia, b.rampa_subida), subida_max)
+	# ¿Se ha quedado sin cuesta? Solo cuenta yendo en el sentido en que entró:
+	# después de estancarse en un tubo la bola vuelve, y volviendo la velocidad
+	# crece — pero en el instante justo de dar la vuelta todavía es cero, así que
+	# sin esta condición se estancaría otra vez y se quedaría oscilando.
 	if r.velocidad_escape > 0.0 and b.rampa_sentido == b.rampa_subida \
 			and v <= Rampa.VELOCIDAD_ESTANCADA:
 		_estancar(b, r)
@@ -1229,18 +1316,40 @@ func _avanzar_rampa(b: Bola, h: float) -> void:
 	if b.rampa_distancia > 0.0 and b.rampa_distancia < r.largo:
 		b.pos = r.punto_en(b.rampa_distancia)
 		return
-	# Salida: vuelve a la física con la velocidad tangente.
+	# Salida, Y HAY DOS desde que las rampas tienen cuesta: completar el
+	# recorrido, o volver por donde entraste después de quedarte sin subida. Se
+	# distinguen por si se sigue yendo en el sentido en el que se entró, y hay
+	# que distinguirlas porque lo que paga es COMPLETAR.
 	var d := clampf(b.rampa_distancia, 0.0, r.largo)
 	var indice := b.rampa
+	var completado := b.rampa_sentido == b.rampa_subida
 	var v_salida := r.velocidad_en(b.rampa_velocidad,
-		r.recorrido(d, b.rampa_subida))
+		r.altura_ganada(d, b.rampa_subida), subida_max)
+	# LA DESCARGA SALE POR AQUÍ y no por un gancho aparte, porque es una
+	# propiedad de la salida: "la bola sale al doble de velocidad". El tope de la
+	# mesa se respeta — el doble de un tiro rápido se saldría del rango en el que
+	# el resto de la física está medida.
+	var descarga := completado and descarga_armada
+	if descarga:
+		v_salida = minf(v_salida * p.descarga_factor_salida, p.velocidad_maxima)
 	b.pos = r.punto_en(d)
+	# `factor_salida` es DEL RECORRIDO COMPLETADO, no de la curva. El cañón sale
+	# al 50 % porque cruzar el campo a 900 px/s era imposible de cazar; una bola
+	# que se ha quedado a medias y vuelve no ha cruzado nada, y frenarla otro
+	# 50 % la dejaría muerta en la boca. Eso convertiría fallar en castigo, que
+	# es justo lo que `PROPÓSITO.md` §6 dice que no puede ser.
 	b.vel = r.tangente_en(d) * float(b.rampa_sentido) \
-		* v_salida * r.factor_salida
+		* v_salida * (r.factor_salida if completado else 1.0)
 	# La capa a la que sale es la de la boca por la que sale, que con las dos
-	# bocas en el tablero —toda rampa de hoy— no cambia nada.
+	# bocas en el tablero —toda rampa de hoy— no cambia nada. Sale bien en las
+	# dos salidas porque mira el sentido de avance y no la boca de entrada.
 	b.capa = r.capa_salida if b.rampa_sentido > 0 else r.capa_entrada
 	b.rampa = -1
+	if not completado:
+		rampa_devuelta.emit(b.pos, indice)
+		return
+	if descarga:
+		gastar_descarga(b.pos)
 	rampa_salida.emit(b.pos, indice)
 	if indice == umbral:
 		_empezar_caza(b.pos)
@@ -1319,6 +1428,95 @@ func _comprobar_plataformas(b: Bola) -> void:
 func _umbral_abierto() -> bool:
 	return not en_caza and bolas_vivas() == 1
 
+## Lo que carga una entrada. Va en la ENTRADA y no en la salida a propósito: si
+## fuera en la salida solo pagaría lo que llega, que es exactamente lo contrario
+## de lo que la barra existe para hacer.
+##
+## `velocidad_escape` es el divisor natural —la barra mide "cómo de fuerte le has
+## pegado A ESTA RAMPA"—, pero seis de las nueve no tienen cuesta y dividir por
+## cero no es una opción. Las llanas se miden contra `carga_escape_llano`, que es
+## el mismo orden que las cuestas calibradas: así un tiro de 900 al túnel carga lo
+## que un tiro de 900 a la órbita, que es lo que el jugador espera al mirar la
+## barra sin saberse los números de dentro.
+## Es pública porque `tests/medir_daniel.gd` la conduce a mano: ese modelo no
+## juega la mesa con las palas, le dice al combate qué tiros mete Daniel, y sin
+## un sitio por el que cargar la barra la descarga no se podría medir contra la
+## tabla de vida de los enemigos — que es exactamente lo que `PROPÓSITO.md` §6
+## exige hacer ANTES de escribirla.
+func cargar_barra(r: Rampa, v_entrada: float) -> void:
+	if descarga_armada or descarga_restante > 0.0:
+		return
+	var escape := r.velocidad_escape if r.velocidad_escape > 0.0 \
+		else p.carga_escape_llano
+	var ratio := v_entrada / maxf(escape, 1.0)
+	# El cuadrado es del diseño y no es adorno: es energía, la misma unidad en la
+	# que está escrita la cuesta. Con la frontera en el 60 %, un tiro fallado
+	# carga como mucho 0,36 y uno limpio pasa de 1 — el triple del diseño sale
+	# solo, sin una tabla de casos.
+	var suma := ratio * ratio / maxf(p.carga_entradas, 0.001)
+	var antes := carga
+	carga = minf(carga + suma, 1.0)
+	if carga >= 1.0:
+		descarga_armada = true
+	if not is_equal_approx(antes, carga):
+		carga_cambiada.emit(carga, descarga_armada)
+
+## GASTA LA DESCARGA si estaba armada, y dice si la ha gastado. Se llama al
+## COMPLETAR una rampa, nunca al fallarla: la barra llena es una promesa y lo que
+## la cobra es meter el tiro siguiente.
+##
+## Pública por lo mismo que `cargar_barra()`: `tests/medir_daniel.gd` no juega la
+## mesa con las palas, le dice al combate qué tiros mete Daniel, y sin esta
+## puerta la barra se llenaría y no se gastaría nunca — o sea que el modelo
+## mediría el coste de la cuesta sin lo que lo compensa, que es la peor forma de
+## equivocarse porque el número sale plausible.
+func gastar_descarga(punto: Vector2) -> bool:
+	if not descarga_armada:
+		return false
+	_empezar_descarga(punto)
+	return true
+
+## La barra estaba llena y acabas de completar una rampa. Se vacía AL GASTARLA,
+## no al llenarse.
+func _empezar_descarga(punto: Vector2) -> void:
+	descarga_armada = false
+	carga = 0.0
+	descarga_restante = p.descarga_tiempo
+	carga_cambiada.emit(carga, false)
+	descarga_empezada.emit(punto, descarga_restante)
+
+func _avanzar_descarga(h: float) -> void:
+	if descarga_restante <= 0.0:
+		return
+	descarga_restante = maxf(descarga_restante - h, 0.0)
+	if descarga_restante <= 0.0:
+		descarga_terminada.emit()
+
+## CORTA LA DESCARGA SIN GASTARLA. Lo llama `nueva_bola()`, y es la misma lección
+## que `cortar_caza()`: lo que es de la bola que se ha acabado no puede seguir
+## puesto cuando entra la siguiente. Cuatro segundos de daño doble corriendo
+## mientras te sirven bola serían cuatro segundos regalados, y encima invisibles.
+##
+## LA CARGA NO SE TOCA, y esa es la diferencia con la caza: la barra es de la
+## partida igual que el combo —se construye a lo largo del combate— y quien la
+## vacía es `reiniciar_carga()`, que llama `Combate.iniciar()`.
+func cortar_descarga() -> void:
+	if descarga_restante <= 0.0 and not descarga_armada:
+		return
+	descarga_restante = 0.0
+	descarga_armada = false
+	carga_cambiada.emit(carga, false)
+	descarga_terminada.emit()
+
+## Vacía la barra entera. Es de combate, no de bola: lo llama `Combate.iniciar()`
+## al lado de `reiniciar_targets()`, por el invariante de que los estados no
+## cruzan de un combate al siguiente.
+func reiniciar_carga() -> void:
+	carga = 0.0
+	descarga_armada = false
+	descarga_restante = 0.0
+	carga_cambiada.emit(0.0, false)
+
 func _comprobar_rampas(b: Bola) -> void:
 	if not b.libre():
 		return
@@ -1344,6 +1542,7 @@ func _comprobar_rampas(b: Bola) -> void:
 		b.pos = rampas[i].punto_en(b.rampa_distancia)
 		b.vel = Vector2.ZERO
 		rampa_entrada.emit(b.pos, i)
+		cargar_barra(rampas[i], b.rampa_velocidad)
 		return
 
 # ------------------------------------------------------------ platillos

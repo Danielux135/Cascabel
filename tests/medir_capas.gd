@@ -22,23 +22,46 @@ extends SceneTree
 const DT := 1.0 / 120.0
 const SEMILLAS := [7, 13, 271, 4242, 90210, 31337]
 
-## LA LÍNEA QUE NO SE PUEDE CRUZAR. Medida en la caja el 16 de agosto de 2026,
-## con el repo SIN una sola línea del sistema de capas, y reproducida exacta
-## después de escribirlo entero. No se comparan a mano dentro del script a
-## propósito: esto no es una prueba, y un umbral escrito aquí se quedaría viejo
-## el día que alguien cambie la mesa QUERIENDO. Se miran.
-const REF_DURACION := 8.142      # s de media, 60 bolas
-const REF_DRENAJE := "izq 0 · centro 60 · der 0 · no drena 0"
-const REF_GOLPES := 120
-const REF_HUELLA := 16621.1901
-const REF_RACIMO := 3.09         # golpes de bumper por entrada, 240 entradas
+## LA LÍNEA QUE NO SE PUEDE CRUZAR, Y SE HA CRUZADO QUERIENDO (tanda 0k, 20-ago).
+##
+## La referencia de arriba se midió el 16 de agosto con el repo sin una sola
+## línea del sistema de capas, y aguantó exacta cuatro tandas seguidas: 8,142 s ·
+## 120 golpes · huella 16621,1901. La tumba la petición de Fátima de que **todas
+## las rampas se puedan fallar**, y no de refilón: la duración de bola del
+## maniquí SE DUPLICA.
+##
+## Y merece la pena entender por qué antes de dar por buena la nueva, porque el
+## número no dice qué ha cambiado. No es un bucle nuevo: **el maniquí ya se
+## pasaba el 73 % de la bola dentro de la órbita** (180 entradas en 60 bolas,
+## medido sin cuesta). Lo que cambió es DÓNDE le deja la bola. La órbita
+## completa la escupe por la boca contraria, que baja al drenaje; una fallada la
+## devuelve a la boca por la que entró, o sea a la pala. La cuesta no metió un
+## bucle: le quitó a la órbita el ser un billete rápido al desagüe.
+##
+## Se comprueba con `tests/medir_daniel.gd`, que es donde vive el balance de
+## verdad: contra el jugador con reliquias, la mesa paga **838 de daño por bola
+## contra los 835 de antes de la cuesta**. La planta baja se juega el doble de
+## tiempo y cobra lo mismo, que es exactamente lo que se buscaba.
+##
+## LA REFERENCIA VIEJA SE DEJA ESCRITA, y no por nostalgia: es la única forma de
+## que la próxima vez que esto se mueva se pueda decir si fue queriendo.
+const REF_DURACION := 18.351     # s de media, 60 bolas
+const REF_DRENAJE := "izq 6 · centro 12 · der 34 · no drena 8"
+const REF_GOLPES := 387
+const REF_HUELLA := 23563.4970
+const REF_RACIMO := 3.11         # golpes de bumper por entrada, 240 entradas
+
+## La de antes de que las rampas de abajo tuvieran cuesta (16-ago a 19-ago).
+const REF_VIEJA := "8.142 s · izq 0 · centro 60 · der 0 · 120 golpes · huella 16621.1901 · racimo 3.09"
 
 func _initialize() -> void:
 	print("")
 	print("=== A · LA MESA DE HOY, ¿SIGUE DANDO LOS MISMOS NÚMEROS? ===")
-	print("   la referencia, medida sin el sistema de capas:")
+	print("   la referencia, medida con la cuesta puesta en las cinco rampas:")
 	print("   %.3f s · %s · %d golpes · huella %.4f · racimo %.2f"
 		% [REF_DURACION, REF_DRENAJE, REF_GOLPES, REF_HUELLA, REF_RACIMO])
+	print("   y la de antes de la cuesta, para saber de dónde viene:")
+	print("   %s" % REF_VIEJA)
 	print("")
 	_a1_duracion_y_drenaje()
 	_a2_golpes_por_entrada()

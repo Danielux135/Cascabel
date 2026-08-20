@@ -20,6 +20,9 @@ extends SceneTree
 ## cuando les toca en vez de no encenderse nunca.
 
 const DT := 1.0 / 60.0
+## Semilla fija: el modelo tiene que dar el mismo número dos veces seguidas o no
+## se puede comparar un cambio de balance contra el de ayer.
+var _rng := RandomNumberGenerator.new()
 const MAX_BOLAS := 200
 const SEMILLAS := [13, 271, 4242, 90210, 31337]
 
@@ -47,6 +50,7 @@ const CANDIDATOS := [
 ]
 
 func _initialize() -> void:
+	_rng.seed = 20260820
 	var enemigos := CatalogoEnemigos.cargar()
 	var reliquias := CatalogoReliquias.cargar()
 	var misiones := CatalogoMisiones.cargar()
@@ -360,16 +364,64 @@ func _evento(c: Combate, cual: String) -> void:
 		"platillo": c.mesa.platillo_expulsado.emit(punto, 0)
 		_: _rampa(c, cual, punto)
 
+## UN TIRO A UNA RAMPA, Y DESDE QUE LAS RAMPAS TIENEN CUESTA NO ES LO MISMO QUE
+## COMPLETARLA. El perfil dice "Daniel mete una órbita por bola"; lo que eso
+## significa ahora es que la INTENTA, y si entra por debajo de la velocidad de
+## escape se queda a medias y no cobra. Las dos mitades hacen falta para medir:
+##
+##   - **el fallo quita ingresos**, que es el coste de la cuesta.
+##   - **el intento carga la barra igual**, que es lo que lo devuelve.
+##
+## Si el modelo siguiera emitiendo `rampa_salida` a pelo, mediría una mesa que ya
+## no existe y diría que la cuesta es gratis.
+##
+## Las velocidades salen medidas de `tests/sonda_rampas.gd`: mínimo, los tres
+## cuartiles y máximo de las entradas de verdad. **Se sortea POR CUARTILES y no
+## uniforme entre el mínimo y el máximo**, y esa diferencia no es un refinamiento:
+## las entradas se agolpan abajo —en la órbita, la mitad cae entre 505 y 613 y la
+## otra mitad se estira hasta 1169— así que un sorteo uniforme pondría casi todo
+## el peso por encima de la frontera y mediría una cuesta que no falla nunca.
+##
+## Sorteando por cuartiles el modelo reproduce los fallos medidos jugando (23 %
+## en la órbita, 25 % en el cañón), que es la única forma de que lo que salga de
+## aquí sea el balance de la mesa y no el de un histograma inventado.
+const ENTRADA_RAMPA := {
+	"orbita": [505.0, 573.0, 613.0, 723.0, 1169.0],
+	# El retorno lleva la del cañón: misma boca, misma subida, mismo número de
+	# escape. Se juega menos —paga menos— y su muestra propia es de seis.
+	"retorno": [545.0, 602.0, 642.0, 786.0, 892.0],
+	"canon": [545.0, 602.0, 642.0, 786.0, 892.0],
+}
+
+## Un sorteo dentro de la distribución medida: cuartil al azar y uniforme dentro
+## de él. Cinco números y sale la forma, sin guardar la muestra entera.
+func _velocidad_de_entrada(cual: String) -> float:
+	var q: Array = ENTRADA_RAMPA.get(cual, [])
+	if q.size() != 5:
+		return 700.0
+	var i := _rng.randi_range(0, 3)
+	return _rng.randf_range(float(q[i]), float(q[i + 1]))
+
 func _rampa(c: Combate, cual: String, punto: Vector2) -> void:
 	var premio := Rampa.Premio.MULTIPLICADOR
 	if cual == "canon":
 		premio = Rampa.Premio.DANO_FUERTE
 	elif cual == "retorno":
 		premio = Rampa.Premio.DANO
+	var v := _velocidad_de_entrada(cual)
 	for i in c.mesa.rampas.size():
-		if (c.mesa.rampas[i] as Rampa).premio == premio:
-			c.mesa.rampa_salida.emit(punto, i)
+		var r := c.mesa.rampas[i] as Rampa
+		if r.premio != premio:
+			continue
+		c.mesa.cargar_barra(r, v)
+		if not r.corona(v):
 			return
+		# Completarla es lo que gasta la descarga, y hay que decirlo a mano: el
+		# modelo no recorre la curva, así que no pasa por la salida de
+		# `Mesa._avanzar_rampa()`, que es quien lo hace jugando.
+		c.mesa.gastar_descarga(punto)
+		c.mesa.rampa_salida.emit(punto, i)
+		return
 
 ## Drenar de mentira: el perfil no juega con las palas, así que la bola no se
 ## pierde sola. RETIRA TODAS LAS BOLAS, no solo la principal: con multibola,

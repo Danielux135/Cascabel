@@ -236,6 +236,34 @@ Es exactamente el Pokémon Pinball: a veces no llegas, y no llegar **no es un
 castigo, es información**. Y sigue siendo determinista y sin atascos, que era la
 razón de que las rampas fueran splines.
 
+### CONSTRUIDO (tanda 0k, 20-ago) — y lo que se cobra es ALTURA
+
+Las cinco rampas que suben tienen cuesta. Las cuatro que no la tienen es porque
+**no suben**: los dos túneles entran y salen a la misma altura y el regreso solo
+baja, así que su cuesta se apaga sola por geometría y no por una excepción. El
+umbral sube 513 px y se queda a cero por decisión de Daniel: va a ser una puerta,
+y una puerta no se falla, se abre.
+
+Lo que hizo falta cambiar del modelo de arriba fue el denominador. Cobrar por
+`recorrido/largo` solo es correcto en una rampa que sube y ya está; en una órbita,
+que sube 660 px y vuelve a bajar, deja la bola más lenta ABAJO que en lo alto.
+Cobrando la ALTURA ganada sobre la propia curva, la bola frena subiendo y
+**recupera bajando**, que es lo que la mesa ya le hace a la bola libre — y por eso
+las dos se sienten igual en la mano.
+
+| rampa | sube | escape | frontera | falla | se cae al |
+|---|---|---|---|---|---|
+| órbita | 660 | 950 | 570 | 23 % | 86 % |
+| cañón | 478 | 1000 | 600 | 25 % | 91 % |
+| retorno | 476 | 1000 | 600 | — | — |
+| subida a la isla | 180 | 800 | 480 | 45 % | 77 % |
+| órbita alta | 242 | 700 | 420 | 32 % | 80 % |
+
+**La columna que manda no es "falla", es "se cae al":** quedarse a medias tiene
+que ser subir casi entera y soltarse desde arriba. Un escape más alto sube el
+porcentaje y BAJA ese número, y entonces el fallo se lee como un rebote en la
+boca y no como no llegar.
+
 ### Y con capas de altura, fallar es CAERSE
 
 *Añadido ago-2026, cuando Daniel pidió capas de altura y plataformas.*

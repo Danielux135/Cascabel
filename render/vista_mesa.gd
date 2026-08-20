@@ -351,6 +351,10 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 		_sonido.reproducir("rampa_entrada"))
 	mesa.rampa_salida.connect(_al_salir_de_rampa)
 	mesa.rampa_fallada.connect(_al_fallar_rampa)
+	mesa.rampa_devuelta.connect(_al_devolver_rampa)
+	mesa.carga_cambiada.connect(_al_cambiar_carga)
+	mesa.descarga_empezada.connect(_al_empezar_descarga)
+	mesa.descarga_terminada.connect(_al_terminar_descarga)
 	mesa.bola_cayo.connect(_al_caer_bola)
 	mesa.platillo_capturado.connect(func(_pt: Vector2, _i: int) -> void:
 		_sonido.reproducir("platillo"))
@@ -460,6 +464,16 @@ func _al_completar_mision(mision: Mision) -> void:
 		return
 	_en_ruleta = true
 	_pantalla_mapa.visible = false
+	# LA CÁMARA FIJA DE LA CAZA SE SUELTA PARA LA RULETA, y no es un detalle:
+	# `objetivo_completo` deja que la banda mande sobre las cuatro reglas, así que
+	# durante la caza la cámara se queda plantada en la arena y la ruleta gira
+	# 643 px por debajo de lo que se está viendo. Medido: la tele está en y=1030
+	# y la cámara no se movía de y=387. **Ganabas la reliquia y no la veías.**
+	#
+	# Y se suelta aquí y no dentro de la cámara porque la razón es de juego, no
+	# de encuadre: la banda existe para que la caza se lea como un bonus, y
+	# mientras la ruleta está delante no se está jugando la caza.
+	camara.soltar_banda()
 	tele.empezar()
 
 ## Lo llama la tele al cerrarse: la reliquia ya está en la bolsa. Se vuelve al
@@ -472,6 +486,14 @@ func terminar_ruleta() -> void:
 	# fase sin salidas y la pantalla no respondía a nada.
 	if combate.terminado():
 		_cerrar_combate()
+		return
+	# Y SI LA CAZA SIGUE ABIERTA, SE VUELVE A ENCUADRAR. La bola no se ha movido
+	# —la ruleta congela la simulación— así que sigue arriba y el bonus sigue
+	# corriendo: dejar la cámara suelta la devolvería a las cuatro reglas con la
+	# bola en el fondo del embudo, que es exactamente el encuadre que la caza
+	# quería evitar. El muelle hace el viaje de vuelta, igual que el de ida.
+	if mesa.en_caza:
+		_encuadrar_la_caza()
 
 func sonar_ruleta(avance: float) -> void:
 	# El mismo tic del reloj, subiendo de tono según se acerca la parada: es el
@@ -619,6 +641,10 @@ func _sacudir(cantidad: float) -> void:
 
 func _process(delta: float) -> void:
 	_tiempo += delta
+	# El reloj de la descarga lo lleva la mesa; aquí solo se copia para poder
+	# dibujarla vaciándose entre subpasos. Copiar en vez de restar por nuestra
+	# cuenta es lo que impide que la barra y el daño doblado dejen de cuadrar.
+	_descarga = mesa.descarga_restante if mesa != null else 0.0
 	_dormida = move_toward(_dormida, 1.0 if mesa.en_caza else 0.0, delta * 2.0)
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
@@ -814,6 +840,44 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 func _al_fallar_rampa(punto: Vector2, _indice: int, _ratio: float) -> void:
 	_sonido.reproducir("rampa_fallada")
 	impactos.onda(punto, C_PIEDRA_LUZ, 0.5)
+
+## LA BOLA VUELVE A APARECER POR LA BOCA POR LA QUE ENTRÓ. `rampa_fallada` ya
+## sonó al quedarse sin cuesta, medio recorrido antes; lo que falta aquí es
+## DÓNDE reaparece, que es lo único que el jugador necesita para llegar a
+## tiempo. Sin la onda, la bola sale de un tubo oscuro sin avisar y lo que se
+## siente es que el juego la ha escupido de la nada.
+##
+## Sin sonido a propósito: el fallo ya sonó. Dos sonidos para un fallo lo
+## convierten en el evento más ruidoso de la mesa, y es el más corriente.
+func _al_devolver_rampa(punto: Vector2, _indice: int) -> void:
+	impactos.onda(punto, C_PIEDRA_LUZ, 0.7)
+
+# ------------------------------------------------------- la barra de carga
+
+var _carga: float = 0.0
+var _carga_armada := false
+## Cuánto queda de descarga, para dibujarla vaciándose. Se lleva aparte del reloj
+## de la mesa porque la vista dibuja entre subpasos.
+var _descarga: float = 0.0
+var _descarga_total: float = 1.0
+
+func _al_cambiar_carga(fraccion: float, armada: bool) -> void:
+	# El aviso de LLENA suena una vez, cuando se llena: es una promesa que el
+	# jugador tiene que oír aunque esté mirando la bola y no la barra.
+	if armada and not _carga_armada:
+		_sonido.reproducir("combo")
+	_carga = fraccion
+	_carga_armada = armada
+
+func _al_empezar_descarga(punto: Vector2, segundos: float) -> void:
+	_descarga = segundos
+	_descarga_total = maxf(segundos, 0.001)
+	_carga_armada = false
+	_sonido.reproducir("rampa_fuerte")
+	impactos.onda(punto, C_ORO_CLARO, 1.6)
+
+func _al_terminar_descarga() -> void:
+	_descarga = 0.0
 
 ## CAERSE DE UNA ALTURA, las dos formas en el mismo sitio porque son el mismo
 ## evento (invariante de `CLAUDE.md`): salirse del borde de la isla y
@@ -1097,6 +1161,7 @@ func _draw() -> void:
 	_dibujar_atrape()
 	_dibujar_numeros()
 	_dibujar_lanzador()
+	_dibujar_carga()
 	_dibujar_planta_dormida()
 	_dibujar_velo()
 	if _depuracion:
@@ -1210,6 +1275,48 @@ func _dibujar_lanzador() -> void:
 	draw_rect(Rect2(366, 1200, 6, 50), C_CABINA)
 	var alto := 50.0 * mesa.carga_lanzador
 	draw_rect(Rect2(366, 1250 - alto, 6, alto), C_ORO)
+
+## LA BARRA DE CARGA, y es literalmente una barra de progreso de Windows
+## (`PROPÓSITO.md` §6). Va en el delantal, abajo del todo y cruzando la mesa: es
+## el único trozo de tablero que no se juega, y es donde una máquina de verdad
+## pone la chapa serigrafiada.
+##
+## VA EN EL MUNDO Y NO EN EL HUD, por lo mismo que el medidor del lanzador: lo
+## que mide es cómo de fuerte le estás pegando A LA MESA, y leerlo obliga a
+## mirar el tablero, no el marco. Un dato de mesa en el HUD se convierte en un
+## número, y `DISEÑO.md` dice que la mesa es un menú de tiros, no un marcador.
+##
+## Tres estados y se leen de un vistazo, que es todo lo que se le pide:
+##   - **llenándose**: bloques de oro sobre el hueco hundido.
+##   - **llena**: parpadea entera. Es una promesa sin cobrar.
+##   - **descargando**: se vacía de derecha a izquierda en cuatro segundos, en
+##     claro. Es un cronómetro, y por eso se vacía en vez de llenarse.
+const CARGA_CAJA := Rect2(56, 1264, 288, 14)
+const CARGA_BLOQUES := 24
+
+func _dibujar_carga() -> void:
+	var caja := CARGA_CAJA
+	# El hueco hundido: claro abajo-derecha, oscuro arriba-izquierda. Es el
+	# bisel de Windows y es lo que hace que se lea como un hueco y no como una
+	# pegatina.
+	draw_rect(caja.grow(1.0), C_PARED_LUZ)
+	draw_rect(caja, C_CABINA)
+	draw_line(caja.position, Vector2(caja.end.x, caja.position.y), C_PARED, 1.0)
+	draw_line(caja.position, Vector2(caja.position.x, caja.end.y), C_PARED, 1.0)
+	var lleno := _carga
+	var color := C_ORO
+	if _descarga > 0.0:
+		lleno = _descarga / _descarga_total
+		color = C_ORO_CLARO
+	elif _carga_armada:
+		# Parpadeo de medio segundo. No se apaga del todo: una barra llena que
+		# desaparece se lee como que se ha perdido.
+		color = C_ORO_CLARO if fmod(_tiempo, 0.5) < 0.25 else C_ORO
+	var bloques := int(round(lleno * float(CARGA_BLOQUES)))
+	var ancho := (caja.size.x - 4.0) / float(CARGA_BLOQUES)
+	for i in bloques:
+		draw_rect(Rect2(caja.position.x + 2.0 + float(i) * ancho,
+			caja.position.y + 2.0, ancho - 1.0, caja.size.y - 4.0), color)
 
 ## La órbita es una curva, no paredes, así que se dibuja como lo que es: un
 ## carril elevado. La bola se pinta después, encima, porque va por arriba.

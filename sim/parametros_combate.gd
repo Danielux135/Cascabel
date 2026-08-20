@@ -153,6 +153,17 @@ var dano_rampa_fuerte: int = 78
 ## robo de reloj sería un extra y no una decisión. Lo que da es tiempo.
 var dano_platillo: int = 24
 
+## LO QUE DOBLA LA DESCARGA (`PROPÓSITO.md` §6). Vive aquí y no en
+## `ParametrosMesa` porque es balance de combate y no física: la mesa sabe
+## cuándo está encendida la descarga y cuánto dura; cuánto vale, lo dice la tabla
+## de vida de los enemigos.
+##
+## **Y es el número que `PROPÓSITO.md` marcó como el riesgo de la idea:** *"el
+## riesgo, y hay que medirlo antes de escribirlo: duplicar el daño cuatro
+## segundos puede cargarse la tabla de vida de enemigos entera."* Medido con
+## `tests/medir_daniel.gd` antes de tocar la mesa, no después.
+var descarga_factor_dano: float = 2.0
+
 ## Cuánta carga del reloj le quita sacar la bola del platillo, en fracción.
 ## Con 0,35 y un reloj de 18 s son unos 6 s regalados: se nota de verdad, que
 ## es lo que hace que merezca la pena buscar un tiro escondido.

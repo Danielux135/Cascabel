@@ -38,6 +38,7 @@ func _initialize() -> void:
 	_prueba_regiones_clic()
 	_prueba_rampas()
 	_prueba_capas()
+	_prueba_carga()
 	_prueba_sonido()
 	_prueba_impactos()
 	_prueba_racimo()
@@ -1104,6 +1105,47 @@ func _prueba_zona_alta() -> void:
 			break
 	_comprobar("una bola libre arriba sin caza abierta no se queda colgada",
 		bajo7, "se quedó en y=%.0f a los %.1f s" % [m7.bola.pos.y, t7])
+
+	# --- LA CAZA NO CRUZA DE UNA BOLA A LA SIGUIENTE ---
+	# La cazó Fátima jugando: *"si te pasas la pantalla en modo caza, al empezar a
+	# jugar la partida, la caza continúa, haciendo que la cámara quede fija, e
+	# impidiendo jugar en la parte de abajo (se juega pero no se ve)"*.
+	#
+	# Y era exacto. `Combate.iniciar()` llama a `mesa.nueva_bola()`, que no sabía
+	# nada de la caza: `en_caza` seguía puesto con sus 20 s enteros, nadie emitía
+	# `caza_terminada`, y la vista no tenía por qué soltar la banda. Medido antes
+	# del arreglo: **20,0 s jugando la planta baja con la cámara clavada arriba.**
+	#
+	# Se comprueban las DOS mitades, porque el estado sin el aviso no arregla
+	# nada: la que hace que la cámara vuelva es la señal, no el booleano.
+	var m8 := _nueva_mesa()
+	var cerrada8 := [0]
+	m8.caza_terminada.connect(func(_p: Vector2) -> void: cerrada8[0] += 1)
+	m8.nueva_bola()
+	m8.bola.en_carril = false
+	var t8 := 0.0
+	while t8 < 6.0 and not m8.en_caza:
+		if not m8.abrir_caza_a_mano() and m8.bola.pos.y > m8.p.y_drenaje - 200.0:
+			break
+		m8.avanzar(DT)
+		t8 += DT
+	_comprobar("(montaje) la caza se abre para la prueba del combate siguiente",
+		m8.en_caza, "no se abrió en %.1f s" % t8)
+	var avisos_antes: int = cerrada8[0]
+	# Esto es literalmente lo que hace empezar un combate nuevo.
+	m8.reiniciar_targets()
+	m8.nueva_bola()
+	_comprobar("servir bola nueva cierra la caza", not m8.en_caza,
+		"le quedaban %.1f s" % m8.caza_restante)
+	_comprobar("y lo AVISA, que es lo que suelta la camara",
+		cerrada8[0] == avisos_antes + 1,
+		"%d avisos" % (cerrada8[0] - avisos_antes))
+	# Y no avisa dos veces: servir otra bola con la caza ya cerrada no es un
+	# evento, y un aviso de más volvería a mover la cámara sin motivo.
+	m8.nueva_bola()
+	_comprobar("y no avisa dos veces si la caza ya estaba cerrada",
+		cerrada8[0] == avisos_antes + 1,
+		"%d avisos" % (cerrada8[0] - avisos_antes))
 
 ## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
 ## qué planta hablas es de donde salen las pruebas que miden otra cosa.
@@ -2182,14 +2224,111 @@ func _prueba_capas() -> void:
 			con_capa.append(r.nombre)
 		if (r.velocidad_escape > 0.0 or r.subterranea) and r.puntos[0].y > 660.0:
 			abajo_tocada.append(r.nombre)
-	# La subida a la isla es LA rampa con cuesta y LA que cambia de altura, y es
-	# la misma: si no le pegas fuerte te quedas sin subida, y como es carril y no
-	# tubo, quedarte sin subida es caerte al tablero.
-	_comprobar("solo la subida a la isla tiene cuesta y cambia de altura",
-		con_cuesta == ["subida_isla"] and con_capa == ["subida_isla"],
-		"cuesta %s, capa %s" % [str(con_cuesta), str(con_capa)])
-	_comprobar("y ningun recorrido de la planta de abajo se ha tocado",
-		abajo_tocada.is_empty(), str(abajo_tocada))
+	# QUÉ RAMPAS TIENEN CUESTA, ESCRITO A MANO. La lista está aquí y no se
+	# calcula para que añadir o quitar una obligue a venir a esta línea a decir
+	# por qué: la cuesta cambia el balance de la planta entera sin dar un solo
+	# error, y lo único que se ve jugando es que la mesa paga menos.
+	#
+	# Hasta la tanda 0k la lista era `["subida_isla"]` y esta prueba decía "solo
+	# la subida a la isla tiene cuesta". Lo abrió Fátima: *"TODAS las rampas han
+	# de tener esa mecánica de que puede no llegar."*
+	#
+	# LAS CUATRO QUE FALTAN NO SON UNA EXCEPCIÓN, SON GEOMETRÍA. Los dos túneles
+	# entran y salen a la misma altura y el regreso solo baja, así que su
+	# `subida_maxima` es 0 y la cuesta se apaga sola. El umbral sí sube 513 px y
+	# se queda a 0 por una decisión de Daniel —va a ser una puerta, y una puerta
+	# no se falla, se abre—, así que ese es el único cero escrito a mano.
+	const CON_CUESTA := ["orbita", "retorno", "canon", "subida_isla", "orbita_alta"]
+	_comprobar("tienen cuesta exactamente las cinco rampas que suben",
+		con_cuesta == CON_CUESTA, "cuesta %s" % str(con_cuesta))
+	_comprobar("y la unica que ademas cambia de altura sigue siendo la subida",
+		con_capa == ["subida_isla"], "capa %s" % str(con_capa))
+	# Y LO QUE NO PUEDE FALLAR, QUE ES LA MITAD IMPORTANTE. Una bola estancada en
+	# el regreso es el cuelgue entre plantas de la tanda 0i-C otra vez: te deja
+	# en un tubo del que la planta alta ya no tira. Ahora es imposible por
+	# construcción —el regreso solo baja— y esto es lo que lo sujeta el día que
+	# alguien mueva un punto de control.
+	for r in m.rampas:
+		if not (r.nombre in ["tunel_isla", "tunel_hondo", "regreso"]):
+			continue
+		# Por las bocas por las que SE PUEDE ENTRAR, que en el regreso es una
+		# sola: su otra punta está 410 px más abajo, o sea que por ahí sí sería
+		# una cuesta, pero no es bidireccional y su velocidad mínima es infinita
+		# —no se entra en él, te mete la planta alta—. Comprobar la boca que
+		# nadie puede usar sería pedirle a la geometría que arregle algo que ya
+		# arregla la entrada.
+		var sube := r.subida_maxima(1)
+		if r.bidireccional:
+			sube = maxf(sube, r.subida_maxima(-1))
+		_comprobar("%s no puede fallar: no sube" % r.nombre,
+			sube < Rampa.SUBIDA_MINIMA, "sube %.0f" % sube)
+
+	# --- Y LA CUESTA TIENE QUE ESTAR CALIBRADA CONTRA LA MESA DE VERDAD ---
+	# La avería que esto sujeta la cazó Fátima jugando: *"no he sido capaz de
+	# quedarme a medias en ninguna rampa"*. Y no era la geometría ni el modelo de
+	# energía —los dos están medidos ahí arriba, banda por banda—: era que
+	# **el número estaba fuera de lo que la mesa puede producir.**
+	#
+	# La bola entra en la subida entre `subida_velocidad_minima` (por debajo la
+	# rampa la ignora y rebota de largo) y `velocidad_maxima` (el tope de la
+	# mesa). La frontera de "no llego" está en `escape · UMBRAL_CORONA`, así que:
+	#
+	#   - si la frontera cae POR DEBAJO del mínimo de enganche, no se puede
+	#     fallar: todo lo que engancha, corona. Era el caso — 384 contra 300, o
+	#     sea una ventana de 84 px/s en un rango de 1200. **El 4 % de las
+	#     entradas medidas jugando.**
+	#   - si cae POR ENCIMA del tope de la mesa, no se puede coronar NUNCA. Con
+	#     escape 2800 medimos 100 % de fallos: la rampa deja de ser una rampa.
+	#
+	# El criterio NO es el valor exacto —eso es tacto, se eligió barriendo seis
+	# valores por dos maniquíes y vive comentado en `ParametrosMesa`—: es que las
+	# dos cosas que la rampa sabe hacer sean las dos alcanzables. Los dos límites
+	# salen de la medida, no de un número redondo:
+	#
+	#   - **por abajo, 1,4 veces el mínimo de enganche.** Con 640 la frontera caía
+	#     en 384 contra un mínimo de 300, o sea 1,28 veces, y eso dio el 4 % de
+	#     fallos medido jugando: una ventana de ese ancho la mesa no la acierta.
+	#   - **por arriba, el 80 % del tope de la mesa.** Por encima, un tiro a toda
+	#     velocidad tampoco corona: con escape 2800 medimos 100 % de fallos y la
+	#     rampa deja de ser una rampa.
+	# Y VALE PARA LAS CINCO, PERO CONTRA LA MEDIDA Y NO CONTRA UNA REGLA.
+	#
+	# La versión de la tanda 0j comparaba la frontera con
+	# `velocidad_minima * 1,4`, y esa regla era un apaño que solo valía para la
+	# subida a la isla: daba por hecho que las entradas se reparten por todo el
+	# rango entre el enganche mínimo y el tope de la mesa. No es verdad en
+	# ninguna. En la órbita, que engancha a 500, las entradas se agolpan entre
+	# 505 y 1169 con la mitad por debajo de 613 — la regla pedía una frontera por
+	# encima de 700, que en esa población es fallar dos de cada tres.
+	#
+	# Lo que hay que comprobar es lo de siempre dicho bien: **que la frontera
+	# caiga DENTRO de lo que la mesa produce de verdad en esa boca**, ni por
+	# debajo (todo lo que engancha corona, que era la avería de Fátima) ni por
+	# encima (no corona nunca y la rampa deja de ser una rampa). La banda de cada
+	# una está medida con `tests/sonda_rampas.gd`: 90 bolas abajo con dos
+	# maniquíes y 60 cazas arriba.
+	const BANDA_ENTRADA := {
+		"orbita": [505.0, 1169.0],
+		"retorno": [545.0, 892.0],    # la del cañón: misma boca, misma subida
+		"canon": [545.0, 892.0],
+		"subida_isla": [307.0, 1500.0],
+		"orbita_alta": [325.0, 1480.0],
+	}
+	for r in m.rampas:
+		if r.velocidad_escape <= 0.0:
+			continue
+		var frontera := r.velocidad_escape * Rampa.UMBRAL_CORONA
+		var banda: Array = BANDA_ENTRADA.get(r.nombre, [])
+		_comprobar("la cuesta de %s cae dentro de lo que la mesa produce" % r.nombre,
+			banda.size() == 2 and frontera > float(banda[0])
+				and frontera < float(banda[1]),
+			"la frontera está en %.0f y las entradas medidas van de %s"
+				% [frontera, str(banda)])
+	# `abajo_tocada` ya no es una prueba de "cero": desde la tanda 0k la planta
+	# baja SÍ tiene cuesta, a petición de Fátima. Lo que se comprueba es que sea
+	# exactamente lo que se decidió, con el umbral fuera.
+	_comprobar("y abajo la cuesta es la de la orbita, el retorno y el canon",
+		abajo_tocada == ["orbita", "retorno", "canon"], str(abajo_tocada))
 
 	# 2. La máscara: la misma pared, dos capas, dos resultados.
 	for capa in [Mesa.CAPA_TABLERO, Mesa.CAPA_ALTA]:
@@ -2376,6 +2515,164 @@ func _capa_de_punto(m: Mesa, punto: Vector2) -> int:
 			return ra.capa_salida
 	return Mesa.CAPA_TABLERO
 
+## LA BARRA DE CARGA Y LA DESCARGA (`PROPÓSITO.md` §6), y la trampa que la cuesta
+## abrió en las rampas de siempre.
+##
+## Las cuatro cosas que se comprueban aquí son las cuatro que, si se rompen, no
+## dan ningún error y solo se ven jugando muchas partidas:
+##
+##   1. **un tubo fallado NO PAGA.** Las rampas se cobran al salir, y hasta esta
+##      tanda salir era una sola cosa. Con cuesta, un tubo que se queda a medias
+##      vuelve por su boca y ESO TAMBIÉN ES SALIR: si sale por `rampa_salida`, el
+##      cañón te paga el golpe gordo por un tiro que no ha llegado y el umbral te
+##      abre la caza por no llegar al umbral.
+##   2. **ninguna bola se queda dentro para siempre.** Una bola atascada en una
+##      curva no se ve, no drena y no da error: es el cuelgue entre plantas de la
+##      tanda 0i-C con otra cara.
+##   3. **la barra carga llegues o no**, que es la frase entera del diseño.
+##   4. **la descarga se gasta en la rampa siguiente**, dura lo que dice y se
+##      apaga sola.
+func _prueba_carga() -> void:
+	var m := _nueva_mesa()
+
+	# 1. UN TUBO FALLADO NO PAGA. Se entra en el cañón por debajo de su frontera
+	# (600) y por encima de su enganche (500), o sea justo en la banda de "no
+	# llego", y se mira quién avisa.
+	var i_canon := -1
+	for i in m.rampas.size():
+		if (m.rampas[i] as Rampa).nombre == "canon":
+			i_canon = i
+	var canon := m.rampas[i_canon] as Rampa
+	var pagadas: Array[int] = []
+	var devueltas: Array[int] = []
+	var falladas: Array[int] = []
+	m.rampa_salida.connect(func(_pt: Vector2, j: int) -> void: pagadas.append(j))
+	m.rampa_devuelta.connect(func(_pt: Vector2, j: int) -> void: devueltas.append(j))
+	m.rampa_fallada.connect(func(_pt: Vector2, j: int, _r: float) -> void:
+		falladas.append(j))
+	var b := m.bola
+	b.en_carril = false
+	b.viva = true
+	b.pos = canon.boca(1)
+	b.vel = canon.tangente_en(0.0) * 520.0
+	for _i in int(12.0 / DT):
+		m.avanzar(DT)
+		if b.rampa < 0 and not (devueltas.is_empty() and pagadas.is_empty()):
+			break
+	_comprobar("un tubo fallado avisa de que ha fallado",
+		falladas == [i_canon], str(falladas))
+	_comprobar("y vuelve por su boca en vez de cobrar el recorrido",
+		devueltas == [i_canon] and pagadas.is_empty(),
+		"devueltas %s, pagadas %s" % [str(devueltas), str(pagadas)])
+
+	# 2. Y SALE, SIEMPRE. Se barre la banda entera de cada rampa con cuesta, desde
+	# el enganche mínimo hasta el doble de la frontera, y ninguna entrada puede
+	# quedarse dentro. El tope de 12 s es generoso a propósito: lo que se está
+	# cazando no es lentitud, es una bola que no sale nunca.
+	for r in m.rampas:
+		if r.velocidad_escape <= 0.0:
+			continue
+		var frontera: float = r.velocidad_escape * Rampa.UMBRAL_CORONA
+		for paso in 9:
+			var v: float = r.velocidad_minima \
+				+ (frontera * 2.0 - r.velocidad_minima) * float(paso) / 8.0
+			var m2 := _mesa_pelada()
+			m2.rampas.append(r)
+			var b2 := m2.bola
+			b2.en_carril = false
+			b2.viva = true
+			b2.rampa = 0
+			b2.rampa_sentido = 1
+			b2.rampa_subida = 1
+			b2.rampa_velocidad = v
+			b2.rampa_distancia = 0.0
+			b2.pos = r.punto_en(0.0)
+			b2.vel = Vector2.ZERO
+			var dentro := true
+			for _i in int(12.0 / DT):
+				m2.avanzar(DT)
+				if b2.rampa < 0:
+					dentro = false
+					break
+			_comprobar("%s suelta la bola entrando a %.0f px/s" % [r.nombre, v],
+				not dentro, "sigue dentro a los 12 s")
+
+	# 3. LA BARRA CARGA LLEGUES O NO, que es la frase del diseño y la razón de que
+	# fallar no sea un castigo. Se comparan las dos entradas al MISMO cañón: una
+	# que no corona y otra que sí.
+	var m3 := _nueva_mesa()
+	m3.cargar_barra(canon, 520.0)
+	var carga_fallada := m3.carga
+	var m4 := _nueva_mesa()
+	m4.cargar_barra(canon, 1040.0)
+	_comprobar("una rampa fallada tambien carga la barra",
+		carga_fallada > 0.0, "cargo %.3f" % carga_fallada)
+	_comprobar("y una limpia carga cuatro veces mas, porque va al cuadrado",
+		absf(m4.carga - carga_fallada * 4.0) < 0.02 or m4.carga >= 1.0,
+		"fallada %.3f, limpia %.3f" % [carga_fallada, m4.carga])
+
+	# 4. LA DESCARGA: se arma al llenarse, se gasta en la rampa SIGUIENTE y se
+	# apaga sola. Y no se gasta en una fallada: lo que la cobra es completar.
+	var m5 := _nueva_mesa()
+	for _i in 40:
+		m5.cargar_barra(canon, 1200.0)
+	_comprobar("la barra se llena y se queda armada, sin dispararse sola",
+		m5.carga >= 1.0 and m5.descarga_armada and m5.descarga_restante <= 0.0,
+		"carga %.2f, armada %s, restante %.2f"
+			% [m5.carga, str(m5.descarga_armada), m5.descarga_restante])
+	var b5 := m5.bola
+	b5.en_carril = false
+	b5.viva = true
+	b5.pos = canon.boca(1)
+	b5.vel = canon.tangente_en(0.0) * 520.0
+	for _i in int(12.0 / DT):
+		m5.avanzar(DT)
+		if b5.rampa < 0 and b5.pos.distance_to(canon.boca(1)) < 40.0 \
+				and m5.bola.velocidad() > 0.0:
+			break
+	_comprobar("una rampa fallada NO gasta la descarga",
+		m5.descarga_armada and m5.descarga_restante <= 0.0,
+		"armada %s, restante %.2f" % [str(m5.descarga_armada), m5.descarga_restante])
+	# Y ahora una que sí corona.
+	b5.rampa = -1
+	b5.pos = canon.boca(1)
+	b5.vel = canon.tangente_en(0.0) * 1300.0
+	var descargas: Array[float] = []
+	m5.descarga_empezada.connect(func(_pt: Vector2, seg: float) -> void:
+		descargas.append(seg))
+	for _i in int(12.0 / DT):
+		m5.avanzar(DT)
+		if not descargas.is_empty():
+			break
+	_comprobar("y una completada la gasta y enciende los cuatro segundos",
+		descargas.size() == 1 and absf(descargas[0] - m5.p.descarga_tiempo) < 0.01
+			and not m5.descarga_armada and is_zero_approx(m5.carga),
+		"descargas %s, carga %.2f" % [str(descargas), m5.carga])
+	var apagadas := [0]
+	m5.descarga_terminada.connect(func() -> void: apagadas[0] += 1)
+	for _i in int((m5.p.descarga_tiempo + 0.5) / DT):
+		m5.avanzar(DT)
+	_comprobar("y se apaga sola, que es lo que impide sostenerla sin las palas",
+		apagadas[0] == 1 and m5.descarga_restante <= 0.0,
+		"%d avisos, quedan %.2f s" % [apagadas[0], m5.descarga_restante])
+
+	# 5. Y NO CRUZA DE UNA BOLA A LA SIGUIENTE. Es la lección de `cortar_caza()`
+	# repetida: lo que es de la bola que se ha acabado no puede seguir puesto
+	# cuando entra la siguiente. La CARGA sí sobrevive —es del combate, como el
+	# combo—, y esa diferencia es la que se comprueba.
+	var m6 := _nueva_mesa()
+	m6.cargar_barra(canon, 700.0)
+	var carga_antes := m6.carga
+	m6.descarga_restante = m6.p.descarga_tiempo
+	m6.nueva_bola()
+	_comprobar("servir bola corta la descarga pero no vacia la barra",
+		m6.descarga_restante <= 0.0 and absf(m6.carga - carga_antes) < 0.001,
+		"restante %.2f, carga %.3f (era %.3f)"
+			% [m6.descarga_restante, m6.carga, carga_antes])
+	m6.reiniciar_carga()
+	_comprobar("y empezar combate si la vacia",
+		is_zero_approx(m6.carga) and not m6.descarga_armada, "carga %.3f" % m6.carga)
+
 func _prueba_rampas() -> void:
 	var m := _nueva_mesa()
 	# NUEVE. Tres abajo (órbita, retorno, cañón), cuatro en la planta alta
@@ -2412,9 +2709,19 @@ func _prueba_rampas() -> void:
 			and (salidas[0] as Vector2).distance_to(salida) < 4.0,
 			"salio en %s, se esperaba %s" % [str(salidas), str(salida)])
 		var segundos := float(pasos) * DT
-		_comprobar("y el viaje dura lo que dice la curva (sentido %d)" % sentido,
-			absf(segundos - r.largo / 700.0) < 0.25,
-			"tardo %.2f s, la curva mide %.0f px a 700 px/s" % [segundos, r.largo])
+		# Y TARDA MÁS QUE LA CURVA LISA, porque hay cuesta: entrando a 700 con
+		# la frontera en 570 la bola corona, pero llega arriba a menos de la
+		# mitad de la velocidad y por eso el viaje se estira. Lo que se comprueba
+		# es la banda, no el número exacto — el exacto es una integral sobre la
+		# forma de la curva y se movería con cualquier punto de control.
+		#
+		# El caso liso —"el viaje dura EXACTAMENTE largo/velocidad"— sigue
+		# medido, en su prueba, con una rampa sin cuesta: los dos hacen falta.
+		var liso := r.largo / 700.0
+		_comprobar("y el viaje por la cuesta dura mas que la curva lisa (sentido %d)"
+			% sentido,
+			segundos > liso * 1.05 and segundos < liso * 2.0,
+			"tardo %.2f s y la curva lisa serian %.2f s" % [segundos, liso])
 
 	# Los tres recorridos tienen que devolver la bola a sitios DISTINTOS, y sus
 	# bocas tienen que estar separadas: si se solapan, no puedes elegir a cuál
@@ -2732,14 +3039,55 @@ func _prueba_camara() -> void:
 		absf(cam4.y_actual - fijo) < 1.0,
 		"se movió %.0f px" % absf(cam4.y_actual - fijo))
 
+	# LA RULETA DURANTE LA CAZA, que es la avería que cazó Fátima: *"si ganas una
+	# reliquia, la cámara no te lleva a la televisión, y no se ve lo que ganas"*.
+	#
+	# La causa no está en la cámara —la banda mandando sobre las cuatro reglas es
+	# lo correcto y es lo que hace que la caza se lea como un bonus—: está en que
+	# `VistaMesa` abría la ruleta sin soltarla. La ruleta le pasa a la cámara una
+	# mesa SIN BOLA, o sea "vete al ancla de abajo, que es donde está la tele", y
+	# con la banda puesta ese objetivo no lo mira nadie.
+	#
+	# Aquí se comprueba el mecanismo del que depende el arreglo: **con la banda
+	# puesta la tele es inalcanzable, y soltándola se llega.** Si algún día
+	# alguien hace que la banda deje de mandar, esta prueba se cae y la de arriba
+	# —"no se descuelga aunque la bola esté en el desagüe"— también, que es
+	# exactamente lo que se quiere: las dos son la misma decisión vista por sus
+	# dos caras.
+	var antes_ruleta := cam4.y_actual
+	for _i in int(2.0 / DT):
+		cam4.avanzar(DT, 0.0, 0.0, false)
+	_comprobar("con la camara fija, la ruleta no puede bajar a la tele",
+		absf(cam4.y_actual - antes_ruleta) < 1.0
+			and cam4.y_actual < cam4.limite_abajo() - 100.0,
+		"se quedó en %.0f y la tele está en %.0f"
+			% [cam4.y_actual, cam4.limite_abajo()])
+
 	# Soltar la banda devuelve la cámara a las cuatro reglas. Sin esto, salir de
 	# la caza dejaría la mesa de abajo fuera de plano para siempre.
 	cam4.soltar_banda()
 	_comprobar("al acabar la caza la cámara se suelta", not cam4.esta_fija())
+	# Y SOLTÁNDOLA SÍ LLEGA, que es la otra mitad del arreglo de la ruleta.
+	for _i in int(3.0 / DT):
+		cam4.avanzar(DT, 0.0, 0.0, false)
+	_comprobar("y soltandola, la ruleta llega a la tele",
+		absf(cam4.y_actual - cam4.limite_abajo()) < 1.0,
+		"quedó en %.0f y la tele está en %.0f"
+			% [cam4.y_actual, cam4.limite_abajo()])
 	for _i in int(3.0 / DT):
 		cam4.avanzar(DT, 1200.0, 600.0, true)
 	_comprobar("y vuelve a bajar con la bola",
 		cam4.y_actual > fijo + 200.0, "quedó en %.0f" % cam4.y_actual)
+
+	# Y VOLVER A FIJARLA TIENE QUE FUNCIONAR, que es lo que hace `terminar_ruleta`
+	# cuando la caza sigue abierta: se sale de la ruleta con la bola todavía
+	# arriba y el reloj del bonus corriendo, así que la cámara tiene que volver.
+	cam4.fijar_banda(arena_arriba - cp.caza_margen, arena_abajo + cp.caza_margen)
+	for _i in int(3.0 / DT):
+		cam4.avanzar(DT, pmc.arena_fondo_y - 8.0, 400.0, true)
+	_comprobar("y al cerrar la ruleta con la caza abierta vuelve a la arena",
+		absf(cam4.y_actual - fijo) < 1.0,
+		"volvió a %.0f y el encuadre es %.0f" % [cam4.y_actual, fijo])
 
 	# Y EL APAGADO. La arena cabe por 18 px, así que es un encuadre justo: en una
 	# ventana más baja tiene que apagarse solo. Se comprueba con la misma banda y

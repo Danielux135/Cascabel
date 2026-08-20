@@ -26,15 +26,20 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **528/528** con `assets/` en la caja (sin `assets/`, 20 fallos que son
+Batería **612/612** con `assets/` en la caja (sin `assets/`, 28 fallos que son
 todos "no existe tal PNG"). **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y
 `rampa_fallada` llevaban desde la 0h sin que nadie las escuchara.
 
 **Y DESDE LA TANDA 7 EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` +
 `Reproductor`: `cr_brasa` y `cr_calavera` llevaban cortadas y limpias **sin que
 las cargara nadie**. Se ven animadas en el retrato de 64 de la pantalla de
-preparación, con la cáscara elegida detrás. La física no se ha movido — huella
-**16621,1901**, 8,142 s, 120 golpes, igual al decimal.
+preparación, con la cáscara elegida detrás.
+
+**Y LA HUELLA DE LA PLANTA BAJA HA CAMBIADO, POR PRIMERA VEZ Y QUERIENDO** (tanda
+0k): 16621,1901 → **23563,4970**, 8,142 s → **18,351 s**. La tumba que todas las
+rampas que suben se puedan fallar, que lo pidió Fátima. Las dos referencias están
+escritas juntas en `tests/medir_capas.gd`, y el balance de verdad —el de
+`medir_daniel.gd`— no se ha movido: 838 de daño por bola contra 835.
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
@@ -63,6 +68,130 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## TODAS LAS RAMPAS SE PUEDEN FALLAR, Y LA BARRA DE CARGA (tanda 0k · 20-ago)
+
+**Lo abrió Fátima de una frase:** *"TODAS las rampas han de tener esa mecánica de
+que puede no llegar. Si hay que poner altura a las rampas, se pone."*
+
+**No hubo que poner altura a ninguna.** La mesa ya la tenía; lo que le faltaba
+era que la cuesta la leyera. El modelo cobraba energía por `recorrido/largo`, y
+eso solo es correcto en una rampa que sube y ya está —la subida a la isla, que
+era la única con cuesta—. En una órbita, que sube 660 px y vuelve a bajar,
+cobrar por longitud deja la bola **más lenta abajo que en lo alto**. Ahora se
+cobra la **ALTURA** ganada sobre la propia curva: frena subiendo y recupera
+bajando, que es lo que la mesa ya le hace a la bola libre.
+
+Tres cosas salen gratis de ese cambio, y las tres eran casos especiales que
+habría habido que acordarse de escribir:
+
+- un **túnel llano no cuesta nada** (entra y sale a la misma altura),
+- el **regreso no se puede fallar** porque solo baja — que es el cuelgue entre
+  plantas de la tanda 0i-C hecho imposible **por construcción**, no por acordarse,
+- y **mover un punto de control recalibra la rampa** sin tocar ningún número.
+
+**Las cinco que suben, calibradas contra lo que la mesa produce de verdad**
+(`tests/sonda_rampas.gd`: 90 bolas abajo con dos maniquíes + 60 cazas):
+
+| rampa | sube | escape | frontera | falla | se cae al |
+|---|---|---|---|---|---|
+| órbita | 660 | 950 | 570 | 23 % | 86 % |
+| cañón | 478 | 1000 | 600 | 25 % | 91 % |
+| retorno | 476 | 1000 | 600 | — | — |
+| subida a la isla | 180 | 800 | 480 | 45 % | 77 % |
+| órbita alta | 242 | 700 | 420 | 32 % | 80 % |
+
+El cañón y el retorno llevan **el mismo número a propósito**: misma boca (y=790),
+misma subida, y los dos son tiros apuntados desde la pala contraria. Si tuvieran
+cuestas distintas, la diferencia entre los dos tiros dejaría de ser dónde te deja
+la bola y pasaría a ser cuál es más fácil, que es un dial escondido.
+
+**Y EL UMBRAL SE QUEDA SIN CUESTA**, por decisión de Daniel: va a ser una puerta,
+y una puerta no se falla, se abre. Es el único cero escrito a mano de los cuatro.
+
+**LO QUE LA CUESTA ROMPIÓ, Y NO DABA ERROR.** Las rampas se cobran al SALIR, y
+hasta ahora salir era una sola cosa. Con cuesta, un tubo que se queda a medias
+vuelve por su boca y eso también es salir: el cañón te pagaba el golpe gordo por
+un tiro que no había llegado y el umbral te abría la caza por no llegar al
+umbral. Ahora son dos señales, `rampa_salida` y `rampa_devuelta`, y **completar**
+es lo que paga. No se podía haber visto antes: la única rampa con cuesta era un
+carril, y un carril no vuelve, se cae.
+
+**LA BARRA DE CARGA (`PROPÓSITO.md` §6), que es la otra mitad y sin ella esto es
+quitarle dinero a la mesa.** Toda entrada carga la barra **llegues o no**, en
+proporción a `(velocidad / escape)²`; al llenarse queda armada, y la siguiente
+rampa que COMPLETES es una descarga: la bola sale al doble y durante cuatro
+segundos todo cuenta el doble. Es una barra de progreso de Windows en el delantal
+de la mesa, en el mundo y no en el HUD, por lo mismo que el medidor del lanzador.
+
+**El dial está medido, no elegido.** Con `medir_daniel.gd`, contra la mesa de
+antes de la cuesta (835 de daño por bola, combates de 128 s):
+
+| carga_entradas | d/bola | s/combate |
+|---|---|---|
+| sin barra | 747 | 143 |
+| **3,0** | **838** | **127** |
+| 2,0 | 875 | 123 |
+| 1,0 | 974 | 111 |
+
+La primera fila es el coste de la cuesta a pelo: **la mesa paga un 11 % menos**.
+Con 3 paga 838 contra 835 — la planta baja se juega el doble de tiempo y cobra lo
+mismo. Y la última contesta al riesgo que `PROPÓSITO.md` marcó por escrito: sí,
+existe; con 1 la mesa pega un 17 % más y los combates se acortan 17 s.
+
+**Batería 612/612.** La planta baja **ya no da los números de siempre, y es a
+propósito**: 8,142 s → **18,351 s**, 120 → **387 golpes**, huella 16621,1901 →
+**23563,4970**. Antes de darlo por bueno se partió el cambio en trozos: no es un
+bucle nuevo — el maniquí **ya se pasaba el 73 % de la bola dentro de la órbita**
+sin cuesta. Lo que cambió es dónde le deja la bola: la órbita completa la escupe
+por la boca contraria, que baja al drenaje, y una fallada la devuelve a la pala.
+La referencia vieja se deja escrita en `medir_capas.gd` al lado de la nueva.
+
+**LO QUE SIGUE ABIERTO DE LAS RAMPAS:**
+
+- **La bola lenta no engancha, rebota de largo.** 81 de cada 100 veces que roza
+  la boca va por debajo del mínimo y la rampa la ignora. Es la única de las
+  cuatro palancas que sigue cerrada.
+- **`retorno` y `canon` se calibran con la muestra del cañón** porque ningún
+  maniquí los mete: 40 pasos por la boca contra 6. Es el sitio donde la medida
+  es más floja de las cinco, y el primero que hay que rehacer si alguien juega y
+  dice que uno de los dos se siente distinto del otro.
+- **Ocho de cada 60 bolas del maniquí no drenan en 30 s.** Antes drenaban todas.
+  Ninguna se queda atascada —la batería barre las cinco cuestas entrando a nueve
+  velocidades y comprueba que la bola siempre sale—, pero es un cambio de ritmo
+  que solo se juzga jugando.
+
+**Y LAS DOS IDEAS NUEVAS, sin empezar y a propósito** (`CLAUDE.md`: la mecánica
+entera se piensa antes de construir, no se eligen requisitos sobre la marcha):
+
+- **LA MESA QUE EVOLUCIONA.** Fátima: *"que la mesa vaya evolucionando. Por
+  ejemplo, la concha gigante del suelo puede pasar a desbloquearse según avanzas
+  la run: desbloqueándola, etc. Y se añaden misiones relacionadas con ese nuevo
+  objeto."* Toca `DISEÑO.md` (misiones) y el suelo de `NodoSuelo`.
+- **LA RAMA DE HABILIDADES POR CRIATURA, Y LA CAPTURA BLOQUEADA.** *"El cascabel
+  empieza sin monstruo en el tutorial, hasta que capturas tu primera mascota:
+  entonces el juego te enseña que hay rama de habilidades para ese personaje
+  según juegues/farmees/subas de experiencia. Por ejemplo, primer bicho: fuego.
+  Incrementos como que el fuego dura más, puedes crear una llama que explota al
+  darle a un búmper haciendo que los demás también les des, etc. Capturar está
+  bloqueado hasta que consigas X cosas/misiones/compra de desbloqueos."*
+  Cruza `CAZA.md` §2 (las fases de la captura, sin construir), `PROPÓSITO.md` §2
+  (recuperar es el juego) y el invariante de que **un modificador no es una
+  mecánica**: una rama de habilidades hecha de porcentajes sería el error de los
+  nueve cascabeles otra vez, así que lo que hay que diseñar son EVENTOS.
+
+## LOS TRES BUGS DE FÁTIMA (tanda 0j · 19-ago) — resumido
+
+Tres bugs cazados jugando, ninguno daba error. **1)** La ruleta pedía el ancla de
+abajo y la banda de la caza mandaba sobre ella: la tele giraba 643 px fuera de
+plano. **2)** `Combate.iniciar()` llama a `nueva_bola()`, que no sabía nada de la
+caza: `en_caza` cruzaba al combate siguiente con sus 20 s intactos y nadie emitía
+`caza_terminada` — ahora `nueva_bola()` llama a `cortar_caza()`, y **el aviso es
+la mitad que arregla la cámara, no el booleano**. **3)** *"No he sido capaz de
+quedarme a medias en ninguna rampa"*: la física estaba bien y el número estaba
+fuera del alcance de la mesa, `subida_velocidad_escape` 640 → 800. El porqué
+entero de los tres vive donde toca — en `VistaMesa`, en `Mesa.cortar_caza()` y en
+`ParametrosMesa` — con la tabla de barrido al lado.
 
 ## LAS DOS PLANTAS: EL CUELGUE, LA CÁMARA FIJA Y LAS PUERTAS (tanda 0i-C · 18-ago)
 
@@ -229,6 +358,23 @@ sirven, y las dos hay que saberlas antes de tocar `sonidos.py`.
 dónde suena —bola, menú, logotipo al arrancar— no se decide de pasada.
 **S3.** `campana_arcana` es candidata al ÚNICO sonido bonito del juego. Si aparece
 en más de un sitio, deja de significar nada.
+
+**Y LAS DIEZ PIEZAS DE `prompts_musica.md` YA ESTÁN GENERADAS Y BAJADAS**
+(19-ago). Las ocho con bucle —`combate`, `escritorio`, `recuperado`, `jefe`,
+`mapa`, `caza`, `tienda`— están en `assets/musica/` con **sus dos tomas**
+(`_a`/`_b`), sin recortar ni convertir a OGG todavía: falta elegir versión,
+sacar el ciclo estable de 20-40 s en frontera de compás y exportar (§2 del
+documento). `arranque` y `tilt` están con una sola toma ya elegida (la de
+duración y número de reproducciones más sensato de las candidatas).
+
+**NINGUNA PIEZA DE AUDIO LLEVA VOZ, invariante nuevo en `CLAUDE.md`** (19-ago).
+Se probó con voz en las cuatro piezas-archivo de `prompts_canciones.md` y se
+descartó por completo; la `nana` que se llegó a generar con voz no vale y no
+cuenta. **El documento está reescrito entero como instrumental puro** —mismo
+concepto de ficheros que el jugador abre en `MUSICA/`, misma idea de que
+`los_nueve_cascabeles` se desbloquea por tramos (ahora un motivo por cascabel
+en vez de una estrofa cantada)— y **las cuatro piezas siguen sin generar**:
+`los_nueve_cascabeles`, `sin_titulo`, `cascabel_sa`, `nana`.
 
 Queda abierta **la voz de la criatura**, que es lo único que la síntesis no tapa
 sola, y va detrás de la puerta B igual que su arte.

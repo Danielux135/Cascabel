@@ -207,6 +207,12 @@ func iniciar(el_enemigo: Enemigo, vida_inicial: int = -1,
 	golpes = int(round(bolsa.suma("suma_golpes_inicio")))
 	_publicar_contexto()
 	mesa.reiniciar_targets()
+	# LA BARRA DE CARGA NO CRUZA DE UN COMBATE A OTRO. Va aquí, al lado de los
+	# targets, porque es del mismo tipo: estado de mesa que se construye a lo
+	# largo del combate. La descarga de una bola la corta `Mesa.nueva_bola()`;
+	# esto vacía la barra entera, que es lo que impide entrar al combate
+	# siguiente con una descarga ya pagada y sin haberla tirado.
+	mesa.reiniciar_carga()
 	mesa.nueva_bola()
 	_soltar_bolas(int(round(bolsa.suma("suma_bolas_al_servir"))))
 	combo_cambiado.emit(multiplicador(), golpes)
@@ -446,7 +452,7 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true,
 		if ahora != antes:
 			combo_cambiado.emit(ahora, golpes)
 	var dano_f := float(base) * float(multiplicador() if escala else 1) \
-		* factor_local * bolsa.factor("factor_dano_global")
+		* factor_local * bolsa.factor("factor_dano_global") * factor_descarga()
 	# El gancho "al empezar la bola" se cobra en el primer impacto de verdad.
 	if _primer_golpe:
 		_primer_golpe = false
@@ -572,6 +578,18 @@ func _soltar_bolas(cuantas: int) -> int:
 		_publicar_contexto()
 		bola_extra_soltada.emit(puestas, mesa.bolas_vivas())
 	return puestas
+
+## LA DESCARGA (`PROPÓSITO.md` §6): mientras corre, todo lo que la bola toca
+## cuenta el doble. Se lee de la mesa en vez de guardarse aquí a propósito —la
+## barra es de la mesa, la enciende una rampa y la apaga un reloj de la mesa—, y
+## dos copias del mismo booleano es la avería que se arregla dos veces.
+##
+## Entra por `_golpear` y por ningún sitio más, o sea por el MISMO punto que las
+## reliquias y el multiplicador. Es lo que hace que "el doble" siga siendo el
+## doble cuando además hay un crítico y un factor de reliquia encima, en vez de
+## una regla aparte que hay que acordarse de aplicar en cada golpe nuevo.
+func factor_descarga() -> float:
+	return p.descarga_factor_dano if mesa.descarga_restante > 0.0 else 1.0
 
 ## Suma golpes al combo sin pegar. Es lo que hace que "cerrar un banco sube el
 ## combo" no tenga que ser un caso especial dentro de `_golpear`.

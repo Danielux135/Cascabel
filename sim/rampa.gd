@@ -54,13 +54,14 @@ var subterranea := false
 ## `PROPÓSITO.md` §6. A 0 esto está APAGADO y la rampa es la determinista de
 ## siempre: entras y sales. Por encima de 0, la curva tiene cuesta.
 ##
-## El modelo es energía, no una escalera de casos: subir la rampa entera cuesta
-## la energía cinética de `velocidad_escape * UMBRAL_CORONA`, así que
+## El modelo es energía, no una escalera de casos: subir la rampa hasta su punto
+## MÁS ALTO cuesta la energía cinética de `velocidad_escape * UMBRAL_CORONA`, así
+## que
 ##
-##     v(recorrido)² = v_entrada² − (velocidad_escape·0,6)² · recorrido/largo
+##     v(d)² = v_entrada² − (velocidad_escape·0,6)² · altura_ganada(d)/subida_maxima
 ##
 ## y de ahí salen solas las tres bandas del diseño, sin fronteras escritas a
-## mano y sin integrar nada (la velocidad se calcula desde la distancia, no se
+## mano y sin integrar nada (la velocidad se calcula desde la POSICIÓN, no se
 ## acumula, así que no hay deriva y el recorrido sigue siendo determinista):
 ##
 ## | Entras a           | Qué pasa                                   |
@@ -68,6 +69,31 @@ var subterranea := false
 ## | < 60 % de escape   | se para a mitad de cuesta                  |
 ## | 60-100 %           | corona y sale despacio                     |
 ## | > 100 %            | sale limpia y cada vez más rápido          |
+##
+## **Y LO QUE SE COBRA ES ALTURA, NO LONGITUD DE CURVA.** Es el cambio que abrió
+## Fátima al pedir que TODAS las rampas se pudieran fallar. La primera versión
+## cobraba por `recorrido/largo`, y eso solo es correcto en una rampa que sube y
+## ya está —la subida a la isla, que era la única con cuesta—. En una órbita, que
+## sube 660 px y vuelve a bajar, cobrar por longitud deja a la bola más lenta
+## ABAJO que en lo alto: justo al revés de lo que hace una bola. Cobrando altura,
+## frena subiendo, va despacio en la corona y **recupera bajando**, que es lo que
+## la mesa entera le hace ya a la bola libre.
+##
+## Tres cosas salen GRATIS de ese cambio, y las tres eran casos especiales que
+## habría habido que acordarse de escribir a mano:
+##
+##   - **un túnel llano no cuesta nada.** `tunel_isla` entra y sale a la misma
+##     altura, así que su `subida_maxima` es 0 y la cuesta se apaga sola.
+##   - **el regreso NO PUEDE FALLAR, y no por una excepción.** Solo baja: su
+##     `subida_maxima` es 0. Es lo que salva el invariante de `_desalojar_arena`
+##     —una bola atascada en el regreso es el cuelgue entre plantas de la tanda
+##     0i-C otra vez— sin que nadie tenga que acordarse de él.
+##   - **la altura sale de la propia curva**, o sea que mover un punto de control
+##     recalibra la rampa sin tocar ningún número.
+##
+## La altura es `−y`: la mesa se dibuja de arriba abajo, así que subir es que la
+## `y` baje. Es LA MISMA cuenta que la gravedad de la bola libre, y por eso las
+## dos se sienten igual en la mano.
 var velocidad_escape: float = 0.0
 ## Dónde está la frontera de "no llego", en fracción de `velocidad_escape`. Es
 ## el 60 % del diseño y está aquí y no escrito dentro de la cuenta porque es
@@ -82,28 +108,52 @@ const VELOCIDAD_ESTANCADA := 8.0
 ## tablero. Es una propiedad por rampa, no una decisión global.
 var abierta := false
 
-## Cuánto ha subido la bola desde la boca por la que entró.
-func recorrido(distancia: float, subida: int) -> float:
-	return distancia if subida > 0 else largo - distancia
+## Por debajo de esta subida la curva se considera LLANA y la cuesta se apaga.
+## Una bola mide 18 px de diámetro: una curva que sube menos que su radio no es
+## una cuesta, es ruido de los puntos de control, y dividir por ella daría
+## cuestas absurdas —un túnel que sube 2 px pediría coronarlo—.
+const SUBIDA_MINIMA := 9.0
 
-## La velocidad que le queda a la bola tras haber subido `recorrido`. Con
-## `velocidad_escape` a 0 devuelve la de entrada tal cual, que es lo que deja
-## intacta toda la mesa de hoy.
-func velocidad_en(v_entrada: float, recorrido_hecho: float) -> float:
-	if velocidad_escape <= 0.0 or largo <= 0.0:
+## Cuánto SUBE la bola desde la boca por la que entró hasta `distancia`, en px de
+## mesa. Sale negativo si va por debajo de la boca, y se recorta a 0 al cobrarla:
+## bajar por debajo de donde entraste no REGALA velocidad. Eso lo decide
+## `factor_salida`, y regalarla aquí rompería que subir y volver a bajar devuelva
+## exactamente la velocidad de entrada.
+func altura_ganada(distancia: float, subida: int) -> float:
+	return _y_boca(subida) - punto_en(clampf(distancia, 0.0, largo)).y
+
+## Lo más que puede subir quien entra por esa boca: de la boca al punto más alto
+## de la curva. Es el denominador de la cuenta de energía, y sale de la
+## geometría, no de un parámetro.
+func subida_maxima(subida: int) -> float:
+	return maxf(_y_boca(subida) - _y_minima, 0.0)
+
+func _y_boca(subida: int) -> float:
+	return puntos[0].y if subida > 0 else puntos[puntos.size() - 1].y
+
+## La velocidad que le queda a la bola tras haber subido `altura`. Con
+## `velocidad_escape` a 0 —o con una curva que no sube— devuelve la de entrada
+## tal cual, que es lo que deja intacta toda la mesa de antes de la cuesta.
+func velocidad_en(v_entrada: float, altura: float, subida_max: float) -> float:
+	if velocidad_escape <= 0.0 or subida_max < SUBIDA_MINIMA:
 		return v_entrada
 	var coste := velocidad_escape * UMBRAL_CORONA
 	var v2 := v_entrada * v_entrada \
-		- coste * coste * clampf(recorrido_hecho / largo, 0.0, 1.0)
+		- coste * coste * clampf(altura / subida_max, 0.0, 1.0)
 	return sqrt(maxf(v2, 0.0))
 
-## ¿Llega arriba entrando a esta velocidad? Es la cuenta de arriba con el
-## recorrido entero, y sirve para dibujar la banda antes de que pase.
-func corona(v_entrada: float) -> bool:
+## ¿Corona entrando a esta velocidad POR ESA BOCA? Es la cuenta de arriba en el
+## punto más alto, y sirve para dibujar la banda antes de que pase. Lleva boca
+## porque una órbita bidireccional sube distinto por cada lado.
+func corona(v_entrada: float, subida: int = 1) -> bool:
 	return velocidad_escape <= 0.0 \
+		or subida_maxima(subida) < SUBIDA_MINIMA \
 		or v_entrada > velocidad_escape * UMBRAL_CORONA
 
 var _acumulado := PackedFloat32Array()
+## La `y` más pequeña de la curva, o sea su punto MÁS ALTO de la mesa. Se mide
+## una vez al construirla, igual que el largo.
+var _y_minima: float = 0.0
 
 func _init(control: PackedVector2Array, resolucion: int = 14) -> void:
 	puntos = _muestrear(control, resolucion)
@@ -141,6 +191,9 @@ func _medir() -> void:
 	for i in range(1, puntos.size()):
 		_acumulado[i] = _acumulado[i - 1] + puntos[i - 1].distance_to(puntos[i])
 	largo = _acumulado[_acumulado.size() - 1]
+	_y_minima = puntos[0].y
+	for pt in puntos:
+		_y_minima = minf(_y_minima, pt.y)
 
 func _indice(d: float) -> int:
 	var lo := 0

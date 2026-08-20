@@ -133,6 +133,23 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   de juego. No se le asigna ninguna habilidad a ese gesto.
 - **Las rampas son curvas, no física simulada.** La bola se desengancha,
   recorre un spline y vuelve con la velocidad tangente.
+- **Una rampa se cobra al COMPLETARLA, no al salir de ella.** Desde que tienen
+  cuesta hay dos salidas —completarla, o volver por tu boca sin llegar— y solo
+  la primera paga. Son dos señales distintas, `rampa_salida` y `rampa_devuelta`,
+  y no se pueden juntar: si el fallo saliera por `rampa_salida`, el cañón te
+  pagaría el golpe gordo por un tiro que no ha llegado y el umbral te abriría la
+  caza por no llegar al umbral.
+- **LA CUESTA COBRA ALTURA, NO LONGITUD DE CURVA.** `Rampa.velocidad_escape`
+  descuenta energía por los píxeles que la bola SUBE, medidos sobre la propia
+  curva. De ahí salen solas tres cosas que si no habría que escribir a mano: un
+  túnel llano no cuesta nada, el regreso no se puede fallar porque solo baja, y
+  mover un punto de control recalibra la rampa sin tocar ningún número.
+- **TODAS las rampas que suben se pueden fallar.** Decisión de Fátima
+  (ago-2026): *"todas las rampas han de tener esa mecánica de que puede no
+  llegar; si hay que poner altura a las rampas, se pone."* Las cuatro que no la
+  tienen es porque no suben —los dos túneles y el regreso— o porque Daniel la
+  dejó cerrada a propósito: el umbral va a ser una puerta, y una puerta no se
+  falla, se abre.
 - **El daño se aplica al golpear, no al drenar.** No hay cuenta de bolas:
   hay vida, y drenar cuesta vida.
 - **Con multibola, drenar es que caiga LA ÚLTIMA.** Perder una bola mientras
@@ -268,6 +285,15 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   jugando. **Una bolsa de modificadores solo sabe producir porcentajes; para que
   pasen cosas hacen falta EVENTOS** (`sim/estados.gd`). Cuando algo "no se nota"
   y los números dicen que está bien, mira la forma antes que el número.
+- **NINGUNA pieza de audio del juego lleva voz.** Decisión de Fátima (19-ago):
+  se probó con voz —letra en castellano, muestra de 8 bits, tarareo, locutor—
+  en las piezas-archivo de `MUSICA/` (`assets/prompts_canciones.md`) y se
+  descartó por completo. La categoría de piezas-archivo se mantiene —siguen
+  siendo ficheros que el jugador encuentra y abre, no bucles de fondo—, pero
+  **instrumental, no vocals** va en todos los prompts sin excepción, igual que
+  en `prompts_musica.md`. Si un candidato de Suno sale con voz, muestra vocal
+  o algo que se le parezca, se descarta y se regenera: no se recorta la voz
+  después.
 - **La cáscara va en PIXELART, con marcos de nueve trozos.** Misma rejilla y
   misma paleta que el resto. Se acabó dibujarla por código con degradados y
   biselados en resolución nativa: era más cara y peleaba con el arte.
@@ -772,6 +798,66 @@ y las dos comprobaciones se escriben **leyendo el fichero**, nunca con una lista
 a mano: una lista copiada se queda vieja en cuanto alguien añada una señal, y
 entonces la prueba da falsos negativos y se acaba desactivando.
 
+### Un número de tacto fuera del alcance de la mesa no es un número (ago-2026)
+
+Fátima, jugando: *"no he sido capaz de quedarme a medias en ninguna rampa, hay
+que revisar esas físicas"*. **Y la física no tenía nada que revisar.** El modelo
+de energía de la cuesta está medido banda por banda en la batería, con sus dos
+formas de fallar, tubo y carril, y las tres bandas de `PROPÓSITO.md` §6 salen
+solas de la fórmula. Todo correcto.
+
+Lo que estaba mal era el número. La bola engancha la subida por encima de 300
+px/s y la mesa la limita a 1500, así que las entradas viven en `[300, 1500]`; la
+frontera de "no llego" estaba en **384**. Una ventana de 84 px/s en un rango de
+1200. Medido jugando: **3 fallos de 74 entradas, el 4 %** — y con la mediana de
+entrada en 1500, que es el tope de la mesa, o sea que la mitad de los tiros
+llegaban con cuatro veces la energía necesaria.
+
+**La regla: un parámetro de tacto se mide contra lo que la mesa PRODUCE, no
+contra sí mismo.** 640 es un número perfectamente razonable mirando la rampa; es
+absurdo mirando el histograma de velocidades con las que se entra en ella. Y el
+histograma cuesta una sonda de una tarde.
+
+**Y el corolario, que es lo que hace la prueba escribible:** el rango de entrada
+tiene dos extremos y los dos son fallos distintos. Por debajo del mínimo de
+enganche, no se puede fallar. Por encima del tope de velocidad de la mesa, no se
+puede coronar — con escape 2800 medimos **100 % de fallos**, o sea una rampa que
+ya no es una rampa. La batería sujeta que la frontera cae entre los dos.
+
+**Y hay una trampa dentro de la trampa: la distribución se REALIMENTA.** El
+primer intento de barrer esto fue analítico —medir las velocidades de entrada una
+vez con la cuesta apagada y aplicar la cuenta a cada valor de escape— y dio 35 %
+de fallos donde jugando salían 2 %. La causa: con la cuesta apagada la bola
+corona siempre, se queda en un bucle que vuelve a entrar a la misma velocidad y
+ese bucle infla la muestra; con la cuesta puesta, el primer fallo lo rompe.
+**Una bola que falla juega distinto**, así que un parámetro que cambia lo que
+hace la bola se barre jugando, aunque cueste diez veces más.
+
+### La cámara fija manda sobre las cuatro reglas, y hay que acordarse de soltarla (ago-2026)
+
+Fátima: *"cuando estás en modo de caza, si ganas una reliquia, la cámara no te
+lleva a la televisión, y no se ve lo que ganas"*. `objetivo_completo` deja que la
+banda de la caza gane a todo —y tiene que hacerlo, o la planta alta se sale de
+plano en cuanto la bola baja al embudo—, así que la ruleta pedía el ancla de
+abajo y no la escuchaba nadie: **la tele giraba 643 px por debajo de lo que se
+estaba viendo.**
+
+**La regla: cualquier momento que necesite su propio encuadre suelta la banda al
+entrar y la vuelve a poner al salir, y eso es de la VISTA, no de la cámara.** La
+cámara no sabe si se está jugando; sabe encuadrar. Y "al salir" tiene su propio
+caso: la ruleta congela la simulación, así que se sale de ella con la bola
+todavía arriba y el reloj del bonus corriendo — dejarla suelta devolvería la
+cámara a la bola justo cuando la caza sigue.
+
+**Y su gemela, que es la misma avería por el otro lado:** el estado de la caza
+vivía en la mesa y **no se cerraba al servir bola nueva**, así que pasarse la
+pantalla dentro de la caza lo colaba entero en el combate siguiente. Medido:
+**20,0 s jugando la planta baja con la cámara clavada arriba** — *"se juega pero
+no se ve"*. Es la misma familia que *"los estados no cruzan de un combate a
+otro"*: lo que es de la bola que se acabó no puede seguir puesto cuando entra la
+siguiente. Y no basta con apagar el booleano — **hay que AVISAR**, porque quien
+suelta la cámara es la señal.
+
 ### Una cadencia de animación se juzga contra la PANTALLA, no contra el reloj (ago-2026)
 
 Dos cosas del reproductor de fotogramas que no dan ningún error y las dos se
@@ -1232,6 +1318,42 @@ sirve para decidir si dos sonidos se confunden.**
   tamaño que quepa**: `_tam_que_cabe` en `nodo_hud.gd`, que prueba por
   múltiplos de la celda. Todo texto de ancho variable que venga de un JSON
   (nombres de enemigo, de reliquia, de misión) tiene que pasar por ahí.
+
+### Una regla sacada de UNA rampa no vale para las nueve (ago-2026)
+
+La tanda 0j dejó en la batería la comprobación de que la cuesta está calibrada:
+*la frontera de "no llego" tiene que caer por encima de `velocidad_minima * 1,4`*.
+El 1,4 salía de una medida buena —con la frontera en 384 contra un enganche de
+300, la subida a la isla no se podía fallar— y **como regla general es falsa**:
+da por hecho que las entradas se reparten por igual entre el enganche mínimo y el
+tope de la mesa.
+
+No se reparten así en ninguna rampa. En la órbita, que engancha a 500, la mitad
+de las entradas cae entre 505 y 613 y la otra mitad se estira hasta 1169. La
+regla pedía una frontera por encima de 700: en esa población es fallar dos de
+cada tres, o sea lo contrario de lo que la regla creía estar protegiendo.
+
+Al encender la cuesta en las cinco rampas, la regla tumbó cuatro pruebas de
+valores que estaban MEDIDOS y bien. Lo que la sustituye es la medida:
+`tests/sonda_rampas.gd` saca la banda de entrada real de cada boca y la prueba
+comprueba que la frontera caiga dentro. **Una constante derivada de un caso se
+escribe con el caso al lado, o el día que haya un segundo caso miente.**
+
+### La cuesta cambió la mesa de abajo el DOBLE de lo que parecía (ago-2026)
+
+Encender la cuesta en la órbita, el cañón y el retorno subió la duración de bola
+del maniquí de **8,142 s a 17,874 s** y la huella de 16621 a 23569. Parece un
+bucle nuevo y no lo es: **el maniquí ya se pasaba el 73 % de la bola dentro de la
+órbita** (180 entradas en 60 bolas, sin cuesta). Lo que cambió no es cuántas
+veces entra, es DÓNDE le deja la bola — la órbita completa la escupía por la boca
+contraria, que baja al drenaje, y una fallada la devuelve a la boca por la que
+entró, o sea a la pala. La cuesta no alargó la bola metiendo un bucle: le quitó a
+la órbita el ser un billete rápido al desagüe.
+
+Vale la pena por lo que enseña de cómo mirar una medida: **un número que se
+duplica no dice qué ha cambiado.** Partirlo (cuesta sola / cuesta + descarga) y
+contar entradas y tiempo-dentro-de-rampa costó una sonda de diez líneas y evitó
+buscar un bucle que no existía.
 
 ## Cómo trabajar
 

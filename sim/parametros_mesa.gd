@@ -250,8 +250,49 @@ var plataforma_falda: float = 8.0
 ## LA RAMPA QUE SUBE A LA ISLA. Lleva cuesta (`PROPÓSITO.md` §6): por debajo del
 ## 60 % de la velocidad de escape te sueltas a mitad, y como es CARRIL y no tubo,
 ## soltarte es caerte al tablero. Es el tiro difícil de la planta.
-var subida_velocidad_escape: float = 640.0
+##
+## **640 ERA UN NÚMERO QUE NO SE PODÍA FALLAR, y lo cazó Fátima jugando:** *"no
+## he sido capaz de quedarme a medias en ninguna rampa, hay que revisar esas
+## físicas"*. La física estaba bien —el modelo de energía y sus tres bandas están
+## medidos banda por banda en la batería—; el número estaba fuera de lo que la
+## mesa produce. Con 640 la frontera de "no llego" cae en 384 y la rampa no
+## engancha por debajo de 300: **una ventana de 84 px/s en un rango de 1200**, o
+## sea el 4 % de las entradas medidas jugando (3 de 74). Todo lo que enganchaba,
+## coronaba.
+##
+## 800 sale de un barrido de seis valores × 40 cazas × dos maniquíes, y no se
+## eligió por el porcentaje sino por DÓNDE se cae la bola:
+##
+## | escape | corona a | falla | se cae al ... de la cuesta |
+## |--------|----------|-------|----------------------------|
+## | 640    | 384      |  9 %  | 73 %                       |
+## | 750    | 450      | 14 %  | 66 %                       |
+## | **800**| **480**  |**30 %**| **76 %**                  |
+## | 850    | 510      | 64 %  | 86 %                       |
+## | 1000   | 600      | 76 %  | 64 %                       |
+##
+## Entre 800 y 850 hay un ESCALÓN —30 % a 64 %— porque las velocidades de entrada
+## se agolpan en 480-510, y un valor puesto encima de un escalón se mueve entero
+## en cuanto alguien toque la geometría. 800 se queda del lado plano.
+##
+## Y el 76 % es lo que contesta a lo que pedía: quedarse a medias es subir casi
+## entera y caerse desde arriba, no que la rampa te escupa en la boca. Subiendo
+## más la cuesta el fallo llega antes y se lee como un rebote — con 2000, la bola
+## se suelta al 18 % del recorrido.
+var subida_velocidad_escape: float = 800.0
 var subida_velocidad_minima: float = 300.0
+## LA ÓRBITA DE ARRIBA. Es lo único LARGO de la planta alta y sube 242 px por el
+## lado de abajo — **y 3 px por el de arriba, o sea que por ahí no se puede
+## fallar, y es correcto**: quien la coge desde el corredor del techo ya está
+## arriba y lo que hace es bajar. Que una rampa bidireccional se pueda fallar por
+## un lado y no por el otro no es un caso especial escrito a mano; sale de que la
+## cuesta cobre altura.
+##
+## 700: frontera en 420 contra entradas de 325-1480, falla 1 de cada 3 y se
+## suelta al 80 % de la cuesta. A 800 sube a 44 % pero el punto de caída baja al
+## 67 %, y arriba eso importa más que abajo — la planta alta dura 20 s y se ve dos
+## veces por run, así que un fallo que se lee como rebote se ve muchas veces.
+var arena_orbita_velocidad_escape: float = 700.0
 ## Los dos túneles cruzan por DEBAJO del tablero y salen lejos. Su velocidad
 ## mínima es baja porque no son el tiro difícil: son por donde la criatura se
 ## esconde, y taparles la boca es el modo entero (`CAZA.md` §2).
@@ -356,6 +397,62 @@ var regreso_velocidad: float = 700.0
 ## antes de ablandarlo. Con 0,30 y la salida más arriba sale a 210 px/s y llega
 ## en 300 ms largos.
 var regreso_factor_salida: float = 0.30
+
+# --------------------------------------------------------- LA BARRA DE CARGA
+#
+# `PROPÓSITO.md` §6, y es la otra mitad de la cuesta. Poner cuesta a cinco rampas
+# le quita a la mesa uno de cada cuatro o cinco premios de recorrido, porque las
+# rampas **se cobran al salir** y una fallada no sale. La barra es lo que
+# devuelve ese dinero, y lo devuelve por otra puerta:
+#
+#     toda entrada carga, LLEGUES O NO → el tiro fallado sigue pagando
+#     → sigues tirando a la rampa que se te resiste.
+#
+# Si en vez de esto se hubiera compensado subiendo el daño de las rampas, fallar
+# volvería a ser una pérdida seca y la mesa tendría los mismos tiros de antes con
+# los números más gordos. Eso es un modificador, no una mecánica.
+
+## Con qué se divide la velocidad de entrada en una rampa SIN cuesta —los dos
+## túneles, el umbral, el regreso—. No hay escape con el que compararlas y
+## dividir por cero no es una opción, así que se miden contra el orden de
+## magnitud de las que sí lo tienen (700-1000). Es lo que hace que la barra sea
+## legible: el mismo tiro carga lo mismo tire donde tire.
+var carga_escape_llano: float = 900.0
+## Cuántas entradas LIMPIAS (justo a la velocidad de escape, ratio 1) llenan la
+## barra. Es EL dial de la barra: con él se decide cada cuánto hay descarga.
+##
+## **3 NO ES UN NÚMERO ELEGIDO A OJO: ES EL QUE DEVUELVE LO QUE LA CUESTA QUITA.**
+## Medido con `tests/medir_daniel.gd`, contra el jugador con reliquias y misiones
+## —que es el único modelo que reproduce a Daniel—, con la mesa antes de la
+## cuesta pagando **835 de daño por bola en combates de 128 s**:
+##
+##   | carga_entradas | d/bola | s/combate | vida al acabar |
+##   |----------------|--------|-----------|----------------|
+##   | sin barra      |   747  |    143    | 95 %           |
+##   | **3,0**        | **838**|  **127**  | 96 %           |
+##   | 2,0            |   875  |    123    | 97 %           |
+##   | 1,5            |   917  |    120    | 97 %           |
+##   | 1,0            |   974  |    111    | 98 %           |
+##
+## La primera fila es el coste de la cuesta sin nada que lo compense: **la mesa
+## paga un 11 % menos** porque una rampa fallada no cobra. Con 3, paga 838 contra
+## 835: la planta baja se juega el doble de tiempo y cobra lo mismo.
+##
+## Y la última fila es el riesgo que `PROPÓSITO.md` §6 marcó por escrito —*"el
+## riesgo, y hay que medirlo antes de escribirlo: duplicar el daño cuatro
+## segundos puede cargarse la tabla de vida de enemigos entera"*—. Existe: con 1
+## la mesa pega un 17 % más que antes y los combates se acortan 17 s. El dial no
+## es "cada cuánto mola que haya descarga", es dónde deja de compensar y empieza
+## a regalar.
+var carga_entradas: float = 3.0
+## Lo que dura la descarga. Cuatro segundos es de `PROPÓSITO.md` §6, y la razón
+## es la regla de los bucles: se apaga sola, así que no se puede sostener sin las
+## palas.
+var descarga_tiempo: float = 4.0
+## La bola sale al doble de la rampa que gasta la descarga. Se recorta al tope de
+## la mesa: el doble de un tiro rápido se saldría del rango en el que el resto de
+## la física está medida.
+var descarga_factor_salida: float = 2.0
 
 
 ## (*) Outlanes: los dos carriles que van directos al drenaje, por fuera de los
@@ -545,6 +642,67 @@ var y_drenaje: float = 1300.0
 ## tope la coge y uno flojo no: es la habilidad del tiro inicial.
 var rampa_velocidad_minima: float = 500.0
 var rampa_entrada_radio: float = 18.0
+
+# ------------------------------------------------- LA CUESTA DE CADA RAMPA
+#
+# `PROPÓSITO.md` §6, y la tanda que las encendió todas la abrió Fátima de una
+# frase: *"TODAS las rampas han de tener esa mecánica de que puede no llegar. Si
+# hay que poner altura a las rampas, se pone."*
+#
+# **NO HUBO QUE PONER ALTURA A NINGUNA.** La mesa ya la tenía; lo que le faltaba
+# era que la cuesta la leyera. El modelo cobraba por longitud de curva —correcto
+# solo en la subida a la isla, que sube y ya está— y en una órbita, que sube 660
+# px y vuelve a bajar, eso dejaba la bola más lenta ABAJO que en lo alto. Desde
+# que cobra ALTURA (`Rampa.velocidad_escape`), la subida de cada curva sale de sus
+# propios puntos de control y las nueve se calibran igual:
+#
+#   | rampa        | sube  | escape | frontera | falla | se cae al ... |
+#   |--------------|-------|--------|----------|-------|---------------|
+#   | orbita       |  660  |   950  |   570    | 23 %  | 86 %          |
+#   | canon        |  478  |  1000  |   600    | 25 %  | 91 %          |
+#   | retorno      |  476  |  1000  |   600    |  —    | —             |
+#   | subida_isla  |  180  |   800  |   480    | 45 %  | 77 %          |
+#   | orbita_alta  |  242  |   700  |   420    | 32 %  | 80 %          |
+#   | umbral       |  513  |     0  |    —     |  —    | —             |
+#   | los 2 túneles|    0  |     0  |    —     |  —    | —             |
+#   | regreso      |    0  |     0  |    —     |  —    | —             |
+#
+# Medido con `tests/sonda_rampas.gd`: 90 bolas abajo con dos maniquíes (el que
+# aporrea y el que atrapa y suelta) y 60 cazas arriba. **La columna que manda no
+# es "falla", es "se cae al":** quedarse a medias tiene que ser subir casi entera
+# y soltarse desde arriba. Un escape alto sube el porcentaje y BAJA ese número, y
+# entonces el fallo se lee como un rebote en la boca y no como no llegar.
+#
+# Y los tres ceros de abajo no son excepciones escritas a mano: esas cuatro
+# curvas no suben, así que la cuesta se apaga sola por geometría. El regreso es
+# el que importa —una bola estancada ahí es el cuelgue entre plantas de la tanda
+# 0i-C otra vez— y ahora es imposible por construcción, no por acordarse.
+
+## LA ÓRBITA, la de abajo. Sube 660 px por la boca izquierda y 605 por la
+## derecha, o sea que es la cuesta más larga de la mesa, y **es también por donde
+## engancha el lanzamiento**: con la frontera en 570 un lanzamiento flojo la coge
+## y no la corona, que es el segundo escalón de la habilidad del tiro inicial —
+## antes solo había uno, engancharla o no.
+##
+## 950 y no 1000 por el escalón: de 950 a 1000 el fallo salta de 23 % a 43 %
+## porque las entradas se agolpan en 570-600, y un número puesto encima de un
+## escalón se mueve entero en cuanto alguien toque un punto de control. De 900 a
+## 950 va de 19 % a 23 %: eso es el lado plano.
+var orbita_velocidad_escape: float = 950.0
+## EL CAÑÓN Y EL CARRIL DE RETORNO, y llevan **el mismo número a propósito.** Son
+## la pareja simétrica de la planta baja: las dos bocas a y=790, 478 y 476 px de
+## subida, y las dos son tiros apuntados desde la pala contraria. Si tuvieran
+## cuestas distintas, la diferencia entre los dos tiros dejaría de ser DÓNDE te
+## deja la bola —que es lo que las hace dos tiros— y pasaría a ser cuál es más
+## fácil, que es un dial escondido.
+##
+## 1000 sale del cañón, que es el que tiene muestra (40 pasos por la boca contra
+## 6 del retorno: el retorno se juega menos porque paga menos). Frontera en 600
+## contra entradas de 545-892: falla 1 de cada 4 y se suelta al 91 % de la
+## cuesta, que es lo más arriba que se cae ninguna de las nueve. A 1100 salta a
+## 55 %: otro escalón, y 1000 se queda debajo.
+var canon_velocidad_escape: float = 1000.0
+var retorno_velocidad_escape: float = 1000.0
 var platillo_radio: float = 14.0
 var platillo_tiempo: float = 0.9
 var platillo_impulso: float = 780.0
