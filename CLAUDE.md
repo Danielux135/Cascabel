@@ -32,6 +32,46 @@ código. Si contradice a este archivo, manda este archivo.
 abierto, qué es lo siguiente y qué necesitas que Daniel pruebe. Si no lo
 haces, la siguiente sesión empieza a ciegas.
 
+**Y actualiza la memoria del proyecto** si has tocado código significativo:
+
+    codebase-memory-mcp cli index_repository --repo-path C:\dev\tilt-os
+    git add .codebase-memory/
+    git commit -m "Update codebase memory index"
+    git push
+
+## Codebase Memory MCP — cuándo y cómo
+
+**Qué es:** El MCP indexa tu codebase (1,781 nodos, 7,351 relaciones) y pone
+esa red de conexiones a disposición de Claude, evitando la lectura archivo
+por archivo.
+
+**Cuándo SÍ lo necesitas:**
+- Buscar dónde se usa una función/clase en todo el proyecto
+- Trazar la cadena completa de llamadas (quién llama a quién)
+- Encontrar impacto arquitectónico de un cambio
+- Auditar si algo está muerto o sin usar
+- Preguntas de "¿cómo está organizado esto?" que cruzan módulos
+
+**Cuándo NO lo necesitas:**
+- Cambios locales dentro de un archivo que ya abierto
+- Cuando ya sabes dónde buscar
+- Un bugfix simple que solo toca una pieza
+- Si la batería pasa, está todo bien sin MCP
+
+**Cómo actualizar (al final de cambios significativos):**
+
+    codebase-memory-mcp cli index_repository --repo-path C:\dev\tilt-os
+
+Detecta automáticamente cambios incrementales (rápido, ~13 s). Luego:
+
+    git add .codebase-memory/graph.db.zst
+    git commit -m "Update codebase memory"
+
+**Cómo ver el grafo 3D** (arquitectura visual):
+
+    codebase-memory-mcp daemon start
+    # Luego abre: http://localhost:9749
+
 ## Godot
 
 No está en el PATH. El ejecutable de consola (el que devuelve la salida) es:
