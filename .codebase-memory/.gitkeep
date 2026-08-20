@@ -1,0 +1,3 @@
+# Codebase Memory index directory
+# The graph.db.zst artifact will be generated here automatically by codebase-memory-mcp
+# This file ensures the directory is tracked by Git
