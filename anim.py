@@ -49,7 +49,44 @@ def tramos_con_tinta(objeto, minimo=20):
     return out
 
 
-def cortar(hoja, n, tam, margen=2, base_frac=0.25, sin_arcano=True):
+def quitar_sal(color, alfa, raro=0.02):
+    """Píxeles sueltos de un color que ningún vecino comparte.
+
+    De dónde salen, medido en la hoja de `cr_calavera` (ago-2026): el hueco
+    entre el cráneo y la mano deja un halo de magenta a medio camino, y al
+    cuantizar cae al ROJO más cercano — que es justamente lo que `cuantizar`
+    hace a propósito, porque en una llama el borde rojo es correcto. En un
+    hueso es una mancha de sangre. **La cura de una criatura es la avería de
+    la otra**, así que el halo no se arregla en la paleta: se arregla después.
+
+    Solo toca lo que cumple LAS DOS condiciones: que el color sea raro en el
+    sprite y que NINGÚN vecino lo comparta. Un detalle dibujado a propósito
+    —un diente, una chispa— tiene al menos un vecino de su color o pesa lo
+    suficiente para no ser raro; ver la trampa de `limpiar.py`, que ya avisa
+    de que un arreglo automático de arte se mira antes de aplicarlo.
+    """
+    fuera = color.copy()
+    llaves = (color[..., 0].astype(int) << 16) | (color[..., 1].astype(int) << 8) | color[..., 2]
+    vals, cuentas = np.unique(llaves[alfa], return_counts=True)
+    raros = set(vals[cuentas < max(1, int(alfa.sum() * raro))].tolist())
+    ys, xs = np.where(alfa)
+    for y, x in zip(ys, xs):
+        if int(llaves[y, x]) not in raros:
+            continue
+        y0, y1 = max(0, y - 1), min(alfa.shape[0], y + 2)
+        x0, x1 = max(0, x - 1), min(alfa.shape[1], x + 2)
+        vec_k = llaves[y0:y1, x0:x1][alfa[y0:y1, x0:x1]]
+        propios = int((vec_k == llaves[y, x]).sum()) - 1
+        if propios > 0 or len(vec_k) < 2:
+            continue
+        v, c = np.unique(vec_k, return_counts=True)
+        manda = int(v[np.argmax(c)])
+        fuera[y, x] = [(manda >> 16) & 255, (manda >> 8) & 255, manda & 255]
+    return fuera
+
+
+def cortar(hoja, n, tam, margen=2, base_frac=0.25, sin_arcano=True, cerrar=False,
+           sin_sal=False, fuera_paleta=None):
     rgb = np.array(Image.open(hoja).convert("RGB"))
     objeto = ~P.mascara_fondo(rgb)
 
@@ -100,6 +137,26 @@ def cortar(hoja, n, tam, margen=2, base_frac=0.25, sin_arcano=True):
         caja = (x0, suelo - lado + 1, x0 + lado, suelo + 1)
         trozo = lienzo_grande.crop(caja)
 
+        # LA VENTANA PUEDE PISAR AL VECINO, Y ESO NO SE VE EN EL MOSAICO.
+        # `lado` sale del ALTO de la llama más alta, así que en una hoja donde
+        # el bicho es más alto que ancha su celda, la ventana se sale por los
+        # lados y se trae un trozo del fotograma de al lado. Sale como dos
+        # barritas sueltas flotando a derecha e izquierda, y a tamaño de mesa
+        # parecen chispas: no dan error y no cantan hasta que se mira el
+        # fotograma solo. Medido en la hoja de la brasa: ventana de 351 px con
+        # las celdas a 271, o sea 40 px de vecino por lado.
+        #
+        # Se recorta por TRAMO, no por componente conectado. Quedarse con la
+        # mancha más grande borraría también las chispas que sí son arte —
+        # `cr_brasa` tiene—; esto solo tira lo que pertenece a otro fotograma.
+        tx0, tx1 = tramos[i]
+        cols = np.arange(x0, x0 + lado)
+        fuera = (cols < tx0) | (cols > tx1)
+        if fuera.any():
+            a_t = np.array(trozo)
+            a_t[:, fuera] = 0
+            trozo = Image.fromarray(a_t, "RGBA")
+
         util = tam - margen * 2
         chico = trozo.resize((util, util), Image.BOX)
 
@@ -108,7 +165,31 @@ def cortar(hoja, n, tam, margen=2, base_frac=0.25, sin_arcano=True):
 
         a = np.array(celda)
         alfa = a[..., 3] > 128
-        color = cuantizar(a[..., :3], alfa, sin_arcano)
+        color = cuantizar(a[..., :3], alfa, sin_arcano, fuera_paleta)
+
+        # CERRAR EL CONTORNO. El generador pinta parte del borde exterior con
+        # el tono oscuro del cuerpo en vez de con el del contorno, y deja
+        # tramos sin línea: medido sobre los fotogramas sueltos de la brasa,
+        # falta entre el 29 % y el 45 % del perímetro, y lo que falta cae
+        # concentrado en los laterales, que es donde se ve.
+        #
+        # Es un fallo MECÁNICO —una línea que se redibuja—, así que se repite
+        # con un script mejor que pidiéndoselo otra vez. Y con fotogramas
+        # generados de uno en uno compra algo más: los deja a todos con el
+        # MISMO grosor de contorno, que si no baila de una tirada a otra.
+        #
+        # El color no se escribe a mano: es el más oscuro de la paleta que ya
+        # tiene el sprite, así que vale igual para una llama que para una
+        # calavera.
+        if cerrar:
+            lum = color.astype(float) @ [0.299, 0.587, 0.114]
+            oscuro = color[alfa][np.argmin(lum[alfa])]
+            borde = ndimage.binary_dilation(~alfa, np.ones((3, 3), bool)) & alfa
+            color[borde] = oscuro
+
+        if sin_sal:
+            color = quitar_sal(color, alfa)
+
         salida = np.dstack([color, (alfa * 255).astype(np.uint8)])
         salida[~alfa] = 0
         fotogramas.append(Image.fromarray(salida, "RGBA"))
@@ -118,7 +199,7 @@ def cortar(hoja, n, tam, margen=2, base_frac=0.25, sin_arcano=True):
 ARCANO = ("6B3F9E", "A97BD9")
 
 
-def cuantizar(rgb, mascara, sin_arcano):
+def cuantizar(rgb, mascara, sin_arcano, fuera=None):
     """Como `procesar.cuantizar`, pero pudiendo sacar el violeta arcano de la
     paleta.
 
@@ -142,7 +223,9 @@ def cuantizar(rgb, mascara, sin_arcano):
     """
     if not sin_arcano:
         return P.cuantizar(rgb, mascara)
-    keep = [i for i, h in enumerate(P.PALETA_HEX) if h not in ARCANO]
+    quitar = set(ARCANO) if sin_arcano else set()
+    quitar |= set(fuera or ())
+    keep = [i for i, h in enumerate(P.PALETA_HEX) if h not in quitar]
     pal, pal_lab = P.PALETA[keep], P.PALETA_LAB[keep]
     salida = rgb.copy()
     pts = rgb[mascara].astype(np.float32)
@@ -386,10 +469,27 @@ def main():
     p.add_argument("--con-arcano", action="store_true",
                    help="deja el violeta arcano en la paleta; solo para "
                         "criaturas que lo lleven a proposito")
+    p.add_argument("--contorno", action="store_true",
+                   help="pinta TODO el perimetro exterior con el tono mas "
+                        "oscuro del sprite. Para hojas a las que el generador "
+                        "les deja tramos de borde sin linea, y para que "
+                        "fotogramas generados por separado compartan grosor")
+    p.add_argument("--fuera", default="",
+                   help="colores de la paleta a NO usar al cuantizar, en hex "
+                        "separados por coma. El caso real: en una criatura de "
+                        "hueso el halo del fondo cae al rojo y parece sangre, "
+                        "asi que se lanza con --fuera 8C2E2E,C74A3C")
+    p.add_argument("--sin-sal", action="store_true",
+                   help="quita los pixeles sueltos de un color que ningun "
+                        "vecino comparte: el halo del fondo que cae al rojo en "
+                        "criaturas que no son de fuego. MIRALO antes de darlo "
+                        "por bueno")
     args = p.parse_args()
 
     fs = cortar(args.entrada, args.n, args.tam,
-                sin_arcano=not args.con_arcano)
+                sin_arcano=not args.con_arcano, cerrar=args.contorno,
+                sin_sal=args.sin_sal,
+                fuera_paleta=[h.strip().upper() for h in args.fuera.split(",") if h.strip()])
     if not args.sin_estabilizar:
         fs = estabilizar(fs, args.umbral)
     if args.congelar_arriba:

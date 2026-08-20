@@ -264,3 +264,40 @@ se cae la "tanda de assets A" del plan.
 `prompts_cascara.md` §11) y los tres iconos de bandeja (§12). La barra de tareas
 dibuja su bandeja con `draw_rect` a mano — y ahí estaba, de paso, el reloj
 cortado a "14:5" que se ha arreglado esta sesión.
+
+---
+
+## Tanda 0k — 20 de agosto, "hasta dónde llega una animación de una tirada"
+
+Catorce hojas de ChatGPT (GPT Image 2) más cuatro de Lovart, buscando dos cosas:
+una `cr_brasa` mejor y saber si se pueden pasar de 8 fotogramas. **Solo una hoja
+ha entrado al repo**, y lo que de verdad se ha sacado son dos reglas de
+`CLAUDE.md` y cuatro arreglos de `anim.py`.
+
+Las hojas viven en `C:\Users\Daniel\Downloads`, sin mover, con estos nombres.
+
+| Hora | Qué se pedía | Destino | Estado |
+|---|---|---|---|
+| 17:53 (×3) | E0: tira de 8, prompt de control | — | **Descartadas.** Ojos que bailan, contorno negro y grueso, una salió con 7 celdas |
+| 18:00 (×2) | E1: tira de 12 | — | **Descartadas.** 11 y 10 celdas, y el bicho a la mitad de tamaño: contorno roto |
+| 18:12 (×4) | P1: tira de 8 con núcleo y corona separados | — | **Descartadas.** Dibujo impecable, bucle plano: sube y se desinfla siete fotogramas |
+| 18:21 (×4) | P1b: lo mismo + coreografía escrita paso a paso | — | **Descartadas.** Gana el movimiento y pierde el dibujo: lienzo aplastado y llamas cortadas por arriba |
+| **Lovart, "Flame Creature Animation Sheet" 1-4** | L1: tira de 8, prompt completo, generador en frío | **`criaturas_anim/cr_brasa/`** (la nº 3) | **USADA.** La única de la tanda que entra |
+| 18:55-19:47 (×8) | Un fotograma por imagen, `f1.png`…`f8.png` | — | **Descartadas.** Cara consistente al medir y los ojos bailando 2 px al mirar |
+| 19:56 (×4) | Plan B: los 8 otra vez en una sola hoja | — | **Descartadas.** Bicho a la mitad de tinta que las demás |
+| 20:06 | `cr_calavera` con el prompt viejo de §4 | — | Buena, **pero no supera a la que ya está en el repo** |
+| 20:13 (×4) | `cr_calavera` con el prompt nuevo | — | **Descartadas.** Una con dos fotogramas pegados, una con el cráneo botando, una con un solo fotograma abierto |
+
+**Lo que decidió Daniel viéndolas animadas en pares:** la brasa nueva entra —
+*"más sencilla pero pulida"* gana a *"más compleja pero se ve peor"* —, y la
+calavera **no se toca**: la del repo gana de calle a las cinco de hoy.
+
+**Y las referencias que quedaron montadas** (en Downloads, se pueden borrar):
+`ref_brasa_tira_4x.png`, `ref_brasa_frame1_8x.png`, `ref2_*` y
+`ref_calavera_8x.png`. La forma de montarlas sí vale para la próxima tanda:
+**se adjunta una TIRA de lo ya aprobado, no PNG sueltos**, porque es lo único
+que le da al generador la escala de alturas del bucle.
+
+⚠ **`brasa_spritesheet.png`, en Downloads, NO es la tira del juego** aunque mida
+lo mismo (512×64): es la versión antigua con el arco de piedra, sobre fondo
+negro y con 19 colores. Adjuntarla como referencia es pedir el sprite viejo.

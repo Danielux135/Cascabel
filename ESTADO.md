@@ -69,6 +69,44 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
+## ANIMACIÓN DE IA: DÓNDE ESTÁ EL TECHO (tanda 0k-arte · 20-ago)
+
+La pregunta era hasta dónde llega una animación de una tirada, y si se puede
+pasar de 8 fotogramas. **Dieciocho hojas después: no, y ahora se sabe por qué.**
+
+**Lo que entra al repo:** `cr_brasa` sustituida por la hoja de Lovart (la única
+de la tanda que supera a lo que había; decidido por Daniel viendo los dos bucles
+animados a la vez). `cr_calavera` **no se toca**: la del repo gana de calle a las
+cinco de hoy. Y cuatro arreglos en `anim.py`, cada uno de un fallo real —
+recorte por tramo, `--contorno`, `--fuera` y `--sin-sal`.
+
+**Lo que de verdad se ha sacado está en `CLAUDE.md`:** el generador no dibuja en
+rejilla (el 70 % de sus tramos miden 1 px), así que **lo que hace de pixelart es
+el factor de reducción, y ese lo fija el TAMAÑO DE CELDA**: tira de 8 → ×4 →
+bloques; fotograma suelto → ×20 → papilla. Con el corolario de Daniel: a 64 px
+la complejidad es ruido, gana lo sencillo y pulido.
+
+**Pendiente, si alguien lo retoma:**
+
+- **Más de 8 fotogramas sigue sin resolverse.** La única vía que queda sin probar
+  es una **rejilla 4×4 en imagen cuadrada**, que mantiene la celda en ~310 px y
+  el factor en la zona buena. `anim.py` no sabe cortar rejillas: hoy solo parte
+  por columnas.
+- **El pegado de cara** (copiar el núcleo y los ojos del fotograma canónico en
+  todos) está probado y funciona, pero **no está en el repo**: se quedó en un
+  script de usar y tirar. Es lo que arregla que los ojos bailen 2 px.
+- **`revisar.py` merece los invariantes duros** que se corrieron a mano: baseline
+  exacto, paleta cerrada, un solo componente conectado, y el informe de cambio
+  por par con el cierre del bucle. El de componentes ya cazó un fallo real que el
+  ojo no vio en el mosaico.
+- **Las siete criaturas que faltan siguen sin animar.** El prompt que mejor ha
+  funcionado es el de Lovart (tira de 8, coreografía escrita fotograma a
+  fotograma), y está transcrito en `assets/INVENTARIO_HOJAS.md`.
+
+**Que prueben Daniel o Fátima:** la `cr_brasa` nueva dentro del juego, en el
+retrato de la pantalla de preparación — hasta ahora solo se ha visto en GIF
+aislado, sobre gris y a 4×, nunca en su sitio.
+
 ## TODAS LAS RAMPAS SE PUEDEN FALLAR, Y LA BARRA DE CARGA (tanda 0k · 20-ago)
 
 **Lo abrió Fátima de una frase:** *"TODAS las rampas han de tener esa mecánica de

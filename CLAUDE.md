@@ -1395,6 +1395,76 @@ duplica no dice qué ha cambiado.** Partirlo (cuesta sola / cuesta + descarga) y
 contar entradas y tiempo-dentro-de-rampa costó una sonda de diez líneas y evitó
 buscar un bucle que no existía.
 
+### EL GENERADOR NO DIBUJA EN REJILLA: lo que hace de rejilla es la REDUCCIÓN (ago-2026)
+
+*Una tarde entera, diez tandas de `cr_brasa`, y ninguna superó a la tercera. Lo
+cazó Daniel mirando: «ni siquiera son píxeles de verdad, miden tamaños
+diferentes». Medido después, tenía razón y era peor de lo que parecía.*
+
+Contando los tramos de color constante de cada hoja:
+
+| Hoja | Longitud de los tramos |
+|---|---|
+| Arte del repo, ampliado ×4 | 4 px 40 %, 8 px 21 %, 12 px 14 % — **todos múltiplos de 4** |
+| Cualquier hoja del generador | **1 px: del 67 % al 76 %** |
+
+O sea que **ninguna hoja de IA es pixelart**: son ilustraciones de alta
+resolución con aspecto de pixelart, con detalle a nivel de píxel suelto. Las
+líneas de prompt tipo *"make the pixel blocks visibly large and perfectly
+square"* se ignoran las diez veces, así que no sirve de nada insistir.
+
+**Lo que convierte eso en pixelart es el paso a 64, y por tanto el factor manda
+sobre todo lo demás:**
+
+| Formato | Celda | Factor a 64 | Resultado |
+|---|---|---|---|
+| Tira de 8 en una hoja de 2172 | 272 px | **×4** | bloques limpios |
+| Un fotograma por imagen de 1254 | 1254 px | **×20** | promedia 400 px por bloque: papilla |
+
+**El parámetro de pixelart es el TAMAÑO DE CELDA, no el del bicho.** Una tira de
+ocho lo deja en ×4 sin pedírselo; un fotograma suelto lo dispara a ×20 y no hay
+prompt que lo salve. Y ojo con la trampa dentro de la trampa: pedir *"dibújalo
+grande, que llene la celda"* arregla el contorno roto **y destruye la rejilla**
+— se hizo por escrito en la tanda 0k y costó dos tandas enteras.
+
+**Y probado y descartado como parche:** reducir por MODA (el color que manda en
+cada bloque) en vez de promediando. Da bordes más duros y mete sal dentro del
+cuerpo. La reducción no es el sitio donde arreglar esto.
+
+**El corolario, y es de Daniel viendo los dos bucles a la vez:** *"el de la
+izquierda es más complejo, pero se ve peor que el de la derecha, que es más
+sencillo pero pulido"*. **A 64 px la complejidad no es riqueza, es ruido.** Entre
+una hoja con más detalle y una con menos tonos y la silueta cuajada, gana la
+segunda siempre.
+
+*Y la nota que ahorra la tarde entera: si una tanda no supera a lo que ya está en
+el repo, no entra. Diez tandas después, `cr_calavera` sigue siendo la de hace
+meses — que gana porque pasó por `--pulir 3`, el paso que su propia ayuda
+recomienda para bichos de superficie plana y que esta vez me salté.*
+
+### La cura de una criatura es la avería de la otra (ago-2026)
+
+`anim.py` saca los violetas de la paleta al cuantizar para que el halo del fondo
+magenta caiga al ROJO, que es lo que debe ser el borde de una llama. En una
+criatura de HUESO ese mismo halo cae al rojo y deja **un punto de sangre entre el
+cráneo y la mano** — 25 px, y Daniel lo vio a la primera.
+
+Y no es sal: viene en grupos de 3 y 4 px, así que tienen vecinos de su color y un
+filtro de píxeles sueltos no los toca (medido: de 25 baja a 24). Lo que lo
+arregla es la paleta, con `--fuera 8C2E2E,C74A3C`: quitando los rojos, el halo
+cae al tono de hueso más cercano. **De 25 px a 0.**
+
+**La regla: un arreglo de color escrito para una criatura hay que volver a
+juzgarlo en la siguiente.** El mecanismo de `--con-arcano` ya lo decía a medias;
+ahora es general.
+
+*(Y de la misma tanda, dos arreglos más de `anim.py`, cada uno de un fallo real:
+**el recorte por tramo**, porque la ventana cuadrada se calcula con el ALTO y en
+un bicho más alto que ancha su celda se trae un trozo del fotograma vecino —
+salía como barritas flotando a los lados—; y **`--contorno`**, que pinta todo el
+perímetro con el tono más oscuro del sprite, porque al generador se le olvida
+entre el 29 % y el 45 % del borde.)*
+
 ## Cómo trabajar
 
 - **Una fase por sesión**, commit al cerrarla. Si en mitad aparece una idea
