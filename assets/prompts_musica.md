@@ -449,12 +449,19 @@ De ahí sale todo lo que ha ido mal:
 > **El bloque R se pega junto al L, y es el que de verdad decide si habrá
 > bucle.** El L pide que no haya clímax; el R pide que la sección VUELVA.
 
-> the exact same 8-bar phrase repeated identically at least eight times,
-> every repetition must be identical to the previous one, no variation between
-> repetitions, no fills, no drum fills, no turnarounds, no transitions,
-> no new instrument enters after the first bar, nothing is added and nothing
-> is taken away, the arrangement is frozen, the same loop for the entire
-> duration, at least 3 minutes long
+> the exact same 8-bar phrase repeated identically for the entire duration,
+> at least sixteen times, every repetition must be identical to the previous
+> one, no variation between repetitions, no fills, no drum fills, no
+> turnarounds, no transitions, no new instrument enters after the first bar,
+> nothing is added and nothing is taken away, the arrangement is frozen,
+> the same loop from the first second to the last
+
+**Y la duración YA NO SE PIDE POR TEXTO: Suno tiene deslizador** (21-ago). La
+primera versión de este bloque decía `at least 3 minutes long`, y escribir el
+largo en el texto teniendo un mando solo puede contradecirlo. Lo que sí cambia
+con el deslizador al máximo es el número de repeticiones que se pueden exigir:
+a 96 BPM ocho compases son 20 s, así que en ocho minutos caben veinticuatro.
+Por eso pide dieciséis y no ocho.
 
 Las tres que más trabajan:
 
@@ -478,54 +485,78 @@ tomas distintas encadenadas.
 
 ## 12. Los prompts de regeneración, ENTEROS
 
-Copiar y pegar tal cual. Llevan el bloque T, el cuerpo, el bloque R y el
-bloque L ya montados: no hay que componer nada.
+Cada uno es UN bloque para copiar y pegar entero. Llevan dentro el
+bloque T, el cuerpo, el bloque R y el bloque L: no hay que componer
+nada ni pegar nada delante.
 
-**Orden de importancia**, que no es el de aparición: `combate` suena el 80 % de
-la partida y hoy no da más de 40 s; `caza` es la que canta al oído; `mapa` es
-la más corta que hay (22,9 s).
+**Los genera `prompts_musica_gen.py`**, y por eso esta sección no se
+edita a mano: montar cuatro bloques once veces son once ocasiones de
+que a uno le falte una línea, y una línea que falta no da error —
+da una toma que no sirve y no se sabe por qué hasta medirla.
+
+### Los ajustes de la interfaz de Suno, que no van en el texto
+
+| mando | valor | por qué |
+|---|---|---|
+| **Letra** | `Instrumental` | `no vocals` en el texto no basta: se cuela un "ah" de fondo. Es invariante — ninguna pieza del juego lleva voz. |
+| **Duración** | **al máximo** | Cuanto más largo, más repeticiones de la sección, y por tanto más sitio donde el bucle puede caer bien. Es el mando que no existía cuando se cortaron las primeras ocho. |
+| **Influencia del estilo** | alta | El prompt son cuatro bloques de restricciones; bajarla es pedirle que las ignore. |
+| **Rareza** | baja | Aquí no se busca sorpresa, se busca que repita. |
+
+**Y se generan VARIAS TOMAS DE GOLPE con el mismo prompt**, sin
+ajustar entre tirada y tirada. Es la lección de `CLAUDE.md` sobre las
+hojas de animación y vale igual aquí: cada generación es una tirada
+nueva, no una edición de la anterior.
 
 ### 12.1 `combate` — 96 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, driving dungeon crawler groove, low FM bass ostinato repeating every two bars, tight dry tracker drums, dark minor mode, one sustained low drone underneath, no lead melody at all, melodic movement only in the deep bass and in occasional high metallic bells, relentless, mechanical, hypnotic, the same two bars forever, patient menace, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 96 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+**La más importante de las siete.** Suena el 80 % de la partida y hoy no da más de 40 s teniendo una toma de 141.
+
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, driving dungeon crawler groove, low FM bass ostinato repeating every two bars, tight dry tracker drums, dark minor mode, one sustained low drone underneath, no lead melody at all, melodic movement only in the deep bass and in occasional high metallic bells, relentless, mechanical, hypnotic, the same two bars forever, patient menace, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 96 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.2 `caza` — 120 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, nervous fast ostinato, high plucked FM, an audible ticking clock underneath getting slightly ahead of the beat, thin and exposed arrangement, greedy, unsafe, the feeling of stealing time, it should have stopped by now, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 120 BPM, fast and urgent tempo, minimal variation, repetitive ostinato, instrumental, no vocals
+**Ojo con el tempo en esta.** Las dos tomas anteriores pidieron 120 y salieron a 83,4 y 80,7 — la única pieza donde Suno se fue tan lejos, y encima es la que tiene que dar prisa. Por eso lleva `fast and urgent tempo` además del número. **Se mide antes de cortar** (`python musica.py analizar`): si vuelve a salir por debajo de 100, la toma no sirve aunque suene bien.
 
-**Ojo con el tempo en esta.** Las dos tomas anteriores pidieron 120 y salieron a
-83,4 y 80,7 — la única pieza donde Suno se fue tan lejos, y encima es la que
-tiene que dar prisa. Por eso lleva `fast and urgent tempo` además del número.
-**Se mide antes de cortar** (`python musica.py analizar`): si vuelve a salir por
-debajo de 100, la toma no sirve aunque suene bien.
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, nervous fast ostinato, high plucked FM, an audible ticking clock underneath getting slightly ahead of the beat, thin and exposed arrangement, greedy, unsafe, the feeling of stealing time, it should have stopped by now, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 120 BPM, fast and urgent tempo, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.3 `mapa` — 84 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, cold minimal arpeggio on a hollow FM patch, mechanical ticking pulse, one low cheap MIDI string pad, no melody, calculating, waiting, faint dread, nothing threatening yet, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 84 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, cold minimal arpeggio on a hollow FM patch, mechanical ticking pulse, one low cheap MIDI string pad, no melody, calculating, waiting, faint dread, nothing threatening yet, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 84 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.4 `jefe` — 108 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, boss theme, heavy detuned FM brass stabs, tritone interval, relentless sixteenth note bass, dry mechanical drums, one distant choir pad far back in the mix, oppressive and inevitable, no heroism, no triumph, nothing to win, the feeling of a process that cannot be killed, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 108 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, boss theme, heavy detuned FM brass stabs, tritone interval, relentless sixteenth note bass, dry mechanical drums, one distant choir pad far back in the mix, oppressive and inevitable, no heroism, no triumph, nothing to win, the feeling of a process that cannot be killed, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 108 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.5 `escritorio` — 60 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, sparse dark ambient, almost silent, a single slow detuned FM bell every four bars, deep sub drone, distant hard drive seek noise and fan hum used as percussion, one unresolved minor second held too long, vast empty room, patient, waiting, nothing is happening and that is wrong, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 60 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, sparse dark ambient, almost silent, a single slow detuned FM bell every four bars, deep sub drone, distant hard drive seek noise and fan hum used as percussion, one unresolved minor second held too long, vast empty room, patient, waiting, nothing is happening and that is wrong, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 60 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.6 `recuperado` — 56 BPM
 
-**La que menos falta hace regenerar**, porque su toma actual ya funciona a 68 s
-y es la única que mejoró al alargarla. Está aquí por si se quiere una tirada
-mejor, pero **la que hay no se tira hasta que algo la supere de verdad**, que
-es la regla de `CLAUDE.md`: si una tanda no supera a lo que ya está, no entra.
+**Lleva 16 compases en vez de 8**, y es el único caso: su frase melódica no cabe en ocho, que es literalmente por lo que a 34 s no cerraba y a 68 sí.
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, fragile and beautiful, a single unfinished melody on a detuned music box, one distant detuned choir pad, long silences between phrases, the melody stops mid-phrase and starts over from the beginning, never reaching its final note, melancholy, tender, something was here and is not here now, the exact same 16-bar phrase repeated identically at least six times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 56 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+**Y es la que menos falta hace regenerar**, porque su toma actual ya funciona a 68 s y fue la única que mejoró al alargarla. **La que hay no se tira hasta que algo la supere de verdad**, que es la regla de `CLAUDE.md`: si una tanda no supera a lo que ya está, no entra.
 
-**Lleva 16 compases en vez de 8**, y es el único caso: su frase melódica no cabe
-en ocho, que es literalmente por lo que a 34 s no cerraba y a 68 sí.
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, fragile and beautiful, a single unfinished melody on a detuned music box, one distant detuned choir pad, long silences between phrases, the melody stops mid-phrase and starts over from the beginning, never reaching its final note, melancholy, tender, something was here and is not here now, the exact same 16-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 56 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ### 12.7 `tienda` — 70 BPM
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, warm but wrong, slow detuned music box, one cheap MIDI harp, major key that keeps sliding flat, comforting and not quite right, very sparse, too much reverb for such a small room, safe for now, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 70 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, warm but wrong, slow detuned music box, one cheap MIDI harp, major key that keeps sliding flat, comforting and not quite right, very sparse, too much reverb for such a small room, safe for now, the exact same 8-bar phrase repeated identically for the entire duration, at least sixteen times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop from the first second to the last, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 70 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+```
 
 ---
 
@@ -581,32 +612,41 @@ cuatro clases.
 
 `arranque` y `tilt` no necesitan puente: ya SON transiciones enteras.
 
-### 13.4 Los prompts, enteros
+### 13.4 Los prompts de puente, ENTEROS
 
-**Aquí el bloque L NO se pega** —estas terminan— y el bloque R tampoco, que es
-lo contrario de lo que piden. El bloque T sí, porque tienen que sonar a la
-misma máquina.
+**Aquí no se pega ni el bloque R ni el bloque L.** El R pide que la
+sección vuelva y el L que no haya final: un puente es exactamente lo
+contrario de las dos cosas. El T sí, recortado, porque tienen que
+sonar a la misma máquina.
 
-#### `puente_entrar` · 2 s
+**Y la duración va al MÍNIMO**, al revés que en §12. Es el único
+sitio de este documento donde ese deslizador se baja.
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system launching a program, a hard drive spinning up and seeking, one low FM tone rising and cutting off dead, mechanical relay click at the end, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+#### `puente_entrar`
 
-#### `puente_salir` · 2 s
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system launching a program, a hard drive spinning up and seeking, one low FM tone rising and cutting off dead, mechanical relay click at the end, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+```
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system closing a program, a hard drive spinning down, one low FM tone descending and losing pitch as if the power is dropping, a soft mechanical click, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+#### `puente_salir`
 
-#### `puente_caza` · 3 s
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system closing a program, a hard drive spinning down, one low FM tone descending and losing pitch as if the power is dropping, a soft mechanical click, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+```
 
-1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, lo-fi 22 kHz sample rate, a short 3 second transition sting for a hidden bonus area opening, air pressure rising, one detuned FM bell struck once and left ringing, a distant choir pad swelling underneath and cut off before it resolves, wonder and unease at once, something you were not supposed to reach, no melody, no rhythm, no tempo, 3 seconds, ends unresolved, instrumental, no vocals
+#### `puente_caza`
 
-**Es el único de los cuatro que puede ser bonito**, y `assets/prompts_musica.md`
-§1 dice que el coro arcano va con cuentagotas: si suena aquí, ya solo puede
-sonar en `recuperado`. Es una decisión, no un adorno — el sitio donde suena lo
-único bonito de la banda sonora es lo que el jugador aprende a querer.
+```
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, a short 3 second transition sting for a hidden bonus area opening, air pressure rising, one detuned FM bell struck once and left ringing, a distant choir pad swelling underneath and cut off before it resolves, wonder and unease at once, something you were not supposed to reach, no melody, no rhythm, no tempo, 3 seconds, ends unresolved, instrumental, no vocals
+```
 
-#### `puente_ventana` · 1,5 s
+**Es el único de los cuatro que puede ser bonito**, y §1 dice que el coro arcano va con cuentagotas: si suena aquí, ya solo puede sonar en `recuperado`. Es una decisión, no un adorno — dónde suena lo único bonito de la banda sonora es lo que el jugador aprende a querer.
 
+#### `puente_ventana`
+
+```
 1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, a very short 1.5 second sting for a window opening in an old operating system, one dull wooden knock, a brief burst of tape hiss, one flat detuned bell, no melody, no rhythm, no tempo, no key, 1.5 seconds, ends in silence, instrumental, no vocals
+```
 
 ### 13.5 Y la vía que no necesita generar nada
 
