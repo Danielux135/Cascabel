@@ -66,6 +66,14 @@ var sacudida_dano: float = 2.5
 var sacudida_ataque: float = 4.0
 var sacudida_muerte: float = 5.0
 
+# --- La cáscara reacciona a la mesa (`PROPÓSITO.md` §8) ---
+## Cuánto dura el bote de los iconos al subir de tramo de multiplicador.
+var pulso_iconos_duracion: float = 0.24
+## Cuánto se queda abierto el cuadro de error que abre el cañón.
+var error_duracion: float = 1.6
+## Medio periodo del parpadeo de la barra de tareas durante una descarga.
+var parpadeo_barra_periodo: float = 0.12
+
 # --- Escritorio de los lados ---
 ## Cuánto se apaga el escritorio durante el combate. El fondo es cielo azul y
 ## hierba verde a los lados de una mesa casi negra: a plena luz se lleva el ojo

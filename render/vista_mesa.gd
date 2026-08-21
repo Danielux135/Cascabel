@@ -845,6 +845,15 @@ func _al_drenar_bola() -> void:
 	_sonido.reproducir("drenaje")
 	impactos.polvo(Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 26.0),
 		Vector2.UP, C_PIEDRA, 1.4)
+	# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): el sistema escribe una línea en
+	# el registro. Con multibola esto solo pasa con la ÚLTIMA bola —es la señal
+	# `bola_drenada`, no `bola_perdida`—, así que la línea siempre corresponde
+	# a un turno de verdad perdido.
+	if sistema != null:
+		var proceso := "cascabel.exe"
+		if combate != null and combate.enemigo != null:
+			proceso = combate.enemigo.nombre.to_lower().replace(" ", "_") + ".exe"
+		sistema.anotar_registro("fallo de segmentacion en %s" % proceso)
 
 ## Ha caído una bola pero quedan otras. NO SUENA COMO UN DRENAJE, y esa es toda
 ## la gracia: el sonido de drenar es el que dice "has perdido el turno", y aquí
@@ -878,6 +887,11 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 			_sonido.reproducir("rampa_fuerte")
 			impactos.onda(punto, C_FUEGO, 1.4)
 			impactos.chispas(punto, Vector2.DOWN, C_FUEGO, 1.2)
+			# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): el cañón abre un cuadro de
+			# error que se cierra solo. Es el golpe gordo de la mesa, así que es el
+			# único que se gana un mueble nuevo en pantalla.
+			if cascara != null:
+				cascara.mostrar_error("kernel32.dll\nha dejado de responder")
 		Rampa.Premio.MULTIPLICADOR:
 			impactos.onda(punto, C_ORO_CLARO, 1.1)
 		_:
@@ -933,6 +947,10 @@ func _al_empezar_descarga(punto: Vector2, segundos: float) -> void:
 	_carga_armada = false
 	_sonido.reproducir("rampa_fuerte")
 	impactos.onda(punto, C_ORO_CLARO, 1.6)
+	# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): la barra de tareas parpadea
+	# mientras dura la descarga, el mismo tiempo que la barra de la mesa.
+	if cascara != null:
+		cascara.parpadear_barra_tareas(segundos)
 
 func _al_terminar_descarga() -> void:
 	_descarga = 0.0
@@ -1011,6 +1029,11 @@ func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 	# más agudo, así que el oído sabe por dónde va sin mirar el número.
 	if golpes > 0:
 		_sonido.reproducir("combo", _tono_combo(multiplicador))
+		# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): los iconos del escritorio dan
+		# un salto. Solo en el paso de subida, con el mismo guardián que el
+		# sonido: el reinicio a x1 no es un premio.
+		if cascara != null:
+			cascara.pulsar_iconos()
 	if multiplicador > 1:
 		_sacudir(anim.sacudida_dano)
 

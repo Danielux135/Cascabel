@@ -93,6 +93,23 @@ var _sprites: Dictionary = {}
 var aviso_pieza: String = ""
 var aviso_tiempo: float = 0.0
 
+## EL REGISTRO EN VIVO (`PROPÓSITO.md` §8): una cola de lo que ha ido pasando
+## en la partida, en voz de sistema. No es lore escrito a mano como
+## `log_arranque` o `log_mesa` —esos son ficheros de verdad que se recuperan—,
+## es la mesa contándose a sí misma. Solo de esta sesión: no se guarda en
+## disco, porque lo que persiste es el progreso, no la crónica.
+const MAX_LINEAS_REGISTRO := 6
+var lineas_registro: Array[String] = []
+
+## Añade una línea con la hora del sistema delante, y recorta la cola. Nadie
+## necesita más de `MAX_LINEAS_REGISTRO`: es una cola que se lee de reojo, no
+## un archivo que se desplaza.
+func anotar_registro(texto: String) -> void:
+	var hora := Time.get_time_dict_from_system()
+	lineas_registro.append("%02d:%02d  %s" % [int(hora["hour"]), int(hora["minute"]), texto])
+	while lineas_registro.size() > MAX_LINEAS_REGISTRO:
+		lineas_registro.pop_front()
+
 func _init(la_vista: VistaMesa, el_guardado: Guardado) -> void:
 	vista = la_vista
 	guardado = el_guardado
@@ -732,6 +749,32 @@ func _dibujar_registro(d: Rect2, v: Rect2) -> void:
 			HORIZONTAL_ALIGNMENT_LEFT, fila.size.x - 40.0, 8,
 			C_TEXTO if lo_tengo else C_TEXTO_TENUE)
 		i += 1
+	_dibujar_registro_vivo(d, i)
+
+## LA COLA EN VIVO, debajo de los ficheros de lore. `PROPÓSITO.md` §8: "el
+## sistema escribe una línea nueva en registro.log" cada vez que la partida
+## hace algo que merece la pena contar. No sustituye a `log_arranque` ni al
+## resto —esos son historia escrita a mano, esto es la crónica de ESTA
+## partida— así que va debajo, con su propio título de sección.
+func _dibujar_registro_vivo(d: Rect2, filas_ocupadas: int) -> void:
+	if lineas_registro.is_empty():
+		return
+	var y := d.position.y + 6.0 + float(filas_ocupadas) * ALTO_FILA + 10.0
+	if y > d.end.y - 12.0:
+		return
+	_lienzo.draw_string(_fuente, Vector2(d.position.x + 4.0, y),
+		"-- sesion en curso --", HORIZONTAL_ALIGNMENT_LEFT, d.size.x - 8.0, 8,
+		C_TEXTO_TENUE)
+	y += 14.0
+	# Las últimas primero: es lo que acaba de pasar, y es lo que se quiere leer
+	# sin desplazarse.
+	for i in range(lineas_registro.size() - 1, -1, -1):
+		if y > d.end.y - 8.0:
+			break
+		_lienzo.draw_string(_fuente, Vector2(d.position.x + 4.0, y),
+			str(lineas_registro[i]), HORIZONTAL_ALIGNMENT_LEFT, d.size.x - 8.0, 8,
+			C_VERDE)
+		y += 12.0
 
 ## LA PANTALLA DE PREPARACIÓN (`DISEÑO.md` §5). Tres elecciones que definen el
 ## run, a la vista a la vez, y **abierto todo desde el primer día**: elegir antes

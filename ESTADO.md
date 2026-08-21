@@ -26,10 +26,14 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **622/622** en Windows, con todo el repo delante. **Y desde la tanda 0m
-el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno, cada una
-con su momento, y dos buses con la música por debajo de los efectos. Lo único
-que falta de esa tanda es oírla — ver U1-U10.
+Batería **623/623** en la caja remota, con todo el repo delante. **Y desde la
+tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
+cada una con su momento, y dos buses con la música por debajo de los efectos.
+Lo único que falta de esa tanda es oírla — ver U1-U10.
+
+**Y DESDE LA TANDA 0n LA CÁSCARA REACCIONA A LA MESA** (`PROPÓSITO.md` §8,
+21-ago): los cinco gestos baratos, ver el apartado de abajo. Falta oírlo y
+mirarlo jugado — ver V1-V5.
 
 **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y `rampa_fallada` llevaban
 desde la 0h sin que nadie las escuchara.
@@ -72,6 +76,51 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## LA CÁSCARA REACCIONA A LA MESA (tanda 0n · 21-ago)
+
+`PROPÓSITO.md` §8 final, sesión remota, sin `assets/`; comprobado con assets
+después (623/623). Las cinco reacciones, todas en `NodoCascara` con las
+duraciones en `ParametrosAnimacion` (`pulso_iconos_duracion`,
+`error_duracion`, `parpadeo_barra_periodo`) y el disparo desde `VistaMesa`:
+
+1. **Los iconos saltan** al subir de tramo de multiplicador (`combo_cambiado`
+   con `golpes > 0`, el mismo guardián que ya usaba el sonido). Bote de dos
+   pasos en píxeles enteros — nada de curva continua, es la rejilla.
+2. **El cañón abre un cuadro de error** (`kernel32.dll ha dejado de
+   responder`) en la banda izquierda, con el marco de diálogo que ya existía
+   para victoria/derrota. Se cierra solo a los 1,6 s.
+3. **La descarga de rampa hace parpadear la barra de tareas**, el mismo
+   tiempo que dura la barra de la mesa. Por tramos enteros de tiempo, como el
+   reloj del enemigo — nada de seno.
+4. **El drenaje escribe una línea en el registro**, con la hora y el nombre
+   del proceso-enemigo ("fallo de segmentacion en goblin_carroñero.exe").
+   Vive en `NodoSistema.lineas_registro` (solo de esta sesión, no se guarda) y
+   se lee al abrir la ventana `registro`, debajo de los ficheros de lore de
+   siempre. Engancha a `bola_drenada`, no a `bola_perdida`: con multibola solo
+   cuenta cuando cae la ÚLTIMA, que es el invariante de siempre.
+5. **El proceso del enemigo desaparece de la barra de tareas al morir**, sin
+   que nadie lo avise: `NodoCascara` lee `vista.combate.fase != VICTORIA`
+   directamente en vez de que `VistaMesa` le mande un booleano — la misma
+   trampa de `mesa.bola` contra `bolas[0]` que ya está en `CLAUDE.md`, aquí
+   evitada no duplicando el estado.
+
+**Lo que NO entró:** CAZA §3.7 (la ventana de recuperación de disco durante
+la caza) — el usuario pidió solo las cinco de §8 en esta tanda.
+
+**LO QUE NO SE HA PODIDO VER AQUÍ, sesión remota sin ventana:** las cinco
+reacciones están probadas por geometría y por que compilan (batería en
+verde), pero ninguna se ha visto jugando. **Que prueben Daniel o Fátima:**
+
+**V1.** El bote de los iconos, ¿se ve o es demasiado sutil (2 px, 0,24 s)?
+**V2.** El cuadro de error del cañón, ¿se lee a tiempo de leerlo, o pasa
+demasiado rápido (1,6 s) mientras la vista sigue a la bola?
+**V3.** El parpadeo de la barra de tareas durante la descarga, ¿se nota
+compitiendo con la barra de la mesa que ya parpadea lo mismo?
+**V4.** El registro en vivo, abierto durante una partida: ¿se lee bien mezclado
+con los ficheros de lore, o hace falta separarlo más?
+**V5.** La pestaña del enemigo en la barra, ¿ayuda a leer "hay un combate
+corriendo" o es ruido que nadie mira ahí abajo?
 
 ## POR QUÉ NINGÚN BUCLE ACABA DE CONVENCER (21-ago)
 

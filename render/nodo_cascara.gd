@@ -144,6 +144,55 @@ var icono_decorativo_marcado: int = -1
 ## está abierto.
 var inicio_hundido := false
 
+## LA CÁSCARA REACCIONA A LA MESA (`PROPÓSITO.md` §8). Cinco gestos baratos que
+## atan el escritorio a lo que pasa en el tablero, todos con la misma forma:
+## un "pídeme esto" desde `VistaMesa` y un contador que se apaga solo en
+## `_process`. Ninguno inventa un sistema nuevo — todo lo que dibujan ya
+## existía (iconos, barra de tareas, el marco de diálogo).
+
+## 1. LOS ICONOS SALTAN al subir de tramo de multiplicador. En PÍXELES ENTEROS
+## (rejilla de píxeles): dos pasos de bote y ya, no una curva continua. La
+## duración vive en `ParametrosAnimacion`, con el resto del tacto visual.
+var _pulso_iconos: float = 0.0
+
+func pulsar_iconos() -> void:
+	_pulso_iconos = _anim.pulso_iconos_duracion
+
+## Desplazamiento vertical del bote, en píxeles enteros: sube y vuelve.
+func _salto_iconos() -> int:
+	if _pulso_iconos <= 0.0:
+		return 0
+	return -2 if _pulso_iconos > _anim.pulso_iconos_duracion * 0.5 else -1
+
+## 2. EL CAÑÓN ABRE UN CUADRO DE ERROR, breve, en la banda izquierda —donde no
+## hay paneles que tapar—. Con cola de un solo mensaje: si llegan dos
+## seguidos, el segundo pisa al primero, que es lo que hace un sistema
+## real cuando un proceso ya estaba fallando.
+var _error_tiempo: float = 0.0
+var _error_texto: String = ""
+
+func mostrar_error(texto: String) -> void:
+	_error_tiempo = _anim.error_duracion
+	_error_texto = texto
+
+## 3. LA DESCARGA DE RAMPA hace parpadear la barra de tareas: el mismo gesto
+## que un proceso en primer plano pidiendo atención en la bandeja de Windows.
+var _parpadeo_barra: float = 0.0
+
+func parpadear_barra_tareas(segundos: float) -> void:
+	_parpadeo_barra = segundos
+
+## 5. EL PROCESO DEL ENEMIGO desaparece de la barra de tareas al morir. No hace
+## falta que nadie lo avise: la fase del combate ya lo dice sola, y con dos
+## sitios llevando la cuenta uno de los dos se queda desincronizado sin dar
+## ningún error — es la misma trampa del `mesa.bola` y `bolas[0]`.
+func _pestana_enemigo_visible() -> bool:
+	if vista == null or vista.combate == null or vista.combate.enemigo == null:
+		return false
+	if vista.run == null or vista.run.terminada():
+		return false
+	return vista.combate.fase != Combate.Fase.VICTORIA
+
 func _init(la_vista: VistaMesa, parametros: ParametrosCamara,
 		animacion: ParametrosAnimacion) -> void:
 	vista = la_vista
@@ -371,7 +420,10 @@ func _input(evento: InputEvent) -> void:
 		return
 	_icono_marcado = _icono_en(raton.position)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	_pulso_iconos = maxf(_pulso_iconos - delta, 0.0)
+	_error_tiempo = maxf(_error_tiempo - delta, 0.0)
+	_parpadeo_barra = maxf(_parpadeo_barra - delta, 0.0)
 	_lienzo.queue_redraw()
 
 # ------------------------------------------------- piezas que dibujan los demás
@@ -551,6 +603,7 @@ func _dibujar() -> void:
 	_dibujar_paneles()
 	_dibujar_iconos()
 	_dibujar_iconos_decorativos()
+	_dibujar_error()
 	if not get_viewport().size_changed.is_connected(_lienzo.queue_redraw):
 		get_viewport().size_changed.connect(_lienzo.queue_redraw)
 
@@ -595,10 +648,17 @@ func _dibujar_paneles() -> void:
 func dibujar_barra_tareas(en: CanvasItem) -> void:
 	var p := pantalla()
 	var caja := caja_barra_tareas()
+	# EL PARPADEO DE LA DESCARGA (`PROPÓSITO.md` §8): el mismo gesto que un
+	# proceso pidiendo atención en la bandeja de Windows. Por tramos enteros de
+	# tiempo, no por seno — la regla ya escrita para el reloj del enemigo: a
+	# medio camino quedaría medio píxel de color.
+	var parpadeando := _parpadeo_barra > 0.0 \
+		and int(_parpadeo_barra / _anim.parpadeo_barra_periodo) % 2 == 0
+	var tinte_barra := Color(C_ORO_CLARO, 1.0) if parpadeando else Color.WHITE
 	if _barra.completo():
-		_barra.dibujar(en, caja)
+		_barra.dibujar(en, caja, tinte_barra)
 	else:
-		en.draw_rect(caja, C_METAL)
+		en.draw_rect(caja, C_METAL if not parpadeando else C_ORO)
 
 	# El botón de Inicio. Con sprite propio, el cascabel de la esquina es su
 	# logo: es lo único de toda la barra con identidad, así que va primero.
@@ -674,6 +734,23 @@ func dibujar_barra_tareas(en: CanvasItem) -> void:
 		pestana.position.y + 12.0), titulo_texto,
 		HORIZONTAL_ALIGNMENT_LEFT, pestana.size.x - 10.0, 8, C_VACIO)
 
+	# 5. LA PESTAÑA DEL ENEMIGO (`PROPÓSITO.md` §8), un proceso más corriendo
+	# junto a "cascabel.exe" mientras dura el combate. Desaparece sola en el
+	# instante en que `Combate.fase` pasa a VICTORIA — no hay un segundo sitio
+	# llevando la cuenta de si el enemigo sigue vivo.
+	if _pestana_enemigo_visible():
+		var nombre := vista.combate.enemigo.nombre.to_lower().replace(" ", "_") + ".exe"
+		var ancho_e := _fuente.get_string_size(
+			nombre, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x + 16.0
+		var pestana_e := Rect2(pestana.end.x + 4.0, caja.position.y + 4.0,
+			ancho_e, ALTO_BARRA - 8.0)
+		if pestana_e.end.x < bandeja.position.x - icono_lado * 2.0 - 12.0:
+			if _boton.completo():
+				_boton.dibujar(en, pestana_e)
+			en.draw_string(_fuente, Vector2(pestana_e.position.x + 6.0,
+				pestana_e.position.y + 12.0), nombre,
+				HORIZONTAL_ALIGNMENT_LEFT, pestana_e.size.x - 10.0, 8, C_VACIO)
+
 ## LAS RELIQUIAS COMO ICONOS DEL ESCRITORIO, que es lo que pedía `DISEÑO.md` §4
 ## y a la vez arregla una pega abierta de verdad: hasta ahora lo que llevabas
 ## solo se veía en el mapa, así que una reliquia condicional se encendía y se
@@ -684,23 +761,29 @@ func _dibujar_iconos() -> void:
 		return
 	var bolsa := vista.run.bolsa
 	var banda := banda_izquierda()
+	# EL SALTO DE `PROPÓSITO.md` §8: sube de tramo el multiplicador y los
+	# iconos botan, todos a la vez, en píxeles enteros. Solo el DIBUJO se
+	# desplaza — `caja_icono(i)` sigue siendo la caja real para los clics y
+	# para el tooltip, que no tienen por qué moverse con el bote.
+	var salto := Vector2(0, _salto_iconos())
 	for i in bolsa.reliquias.size():
 		var r := bolsa.reliquias[i]
 		var caja := caja_icono(i)
+		var caja_dibujo := Rect2(caja.position + salto, caja.size)
 		var activa := bolsa.activa(r)
 		var col := NodoTele.color_de_rareza(r.rareza)
 
 		var tex := _icono(r)
 		var tinte := Color(1, 1, 1, 1.0 if activa else 0.35)
 		if tex != null:
-			_lienzo.draw_texture_rect(tex, caja, false, tinte)
+			_lienzo.draw_texture_rect(tex, caja_dibujo, false, tinte)
 		else:
-			_lienzo.draw_rect(caja, Color(col, 0.5 if activa else 0.2))
-			_lienzo.draw_rect(caja, Color(col, tinte.a), false, 1.0)
+			_lienzo.draw_rect(caja_dibujo, Color(col, 0.5 if activa else 0.2))
+			_lienzo.draw_rect(caja_dibujo, Color(col, tinte.a), false, 1.0)
 		# El halo de rareza. Es lo que dice de un vistazo qué llevas encima sin
 		# tener que leer catorce nombres.
 		if activa:
-			_lienzo.draw_rect(caja.grow(2.0), Color(col, 0.75), false, 1.0)
+			_lienzo.draw_rect(caja_dibujo.grow(2.0), Color(col, 0.75), false, 1.0)
 
 		# EL NOMBRE VA EN DOS LÍNEAS, como en un escritorio de verdad. Con una
 		# sola y 56 px de `width`, que RECORTA, cabían nueve caracteres: 41 de
@@ -727,11 +810,13 @@ func _dibujar_iconos() -> void:
 func _dibujar_iconos_decorativos() -> void:
 	if _tex_iconos_decorativos.is_empty():
 		return
+	var salto := Vector2(0, _salto_iconos())
 	for i in _tex_iconos_decorativos.size():
 		var tex := _tex_iconos_decorativos[i]
 		if tex == null:
 			continue
-		var caja := caja_icono_decorativo(i)
+		var caja := Rect2(caja_icono_decorativo(i).position + salto,
+			caja_icono_decorativo(i).size)
 		# El que tiene el ratón encima se enciende. Es lo que dice que un icono
 		# se puede pulsar: sin eso, los que hacen algo y los que no se ven igual.
 		var marcado := icono_decorativo_marcado == i
@@ -739,6 +824,27 @@ func _dibujar_iconos_decorativos() -> void:
 			_lienzo.draw_rect(caja.grow(2.0), Color(C_BLANCO, 0.18))
 		_lienzo.draw_texture_rect(tex, caja, false,
 			Color(1, 1, 1, 1.0 if marcado else 0.9))
+
+## EL CUADRO DE ERROR DEL CAÑÓN (`PROPÓSITO.md` §8): "un cañón → se abre y se
+## cierra un cuadro de diálogo de error en un lado". Cabe entero en la banda
+## izquierda, así que va en esta capa —detrás de la mesa— y no necesita la
+## capa de delante como el tooltip. Se apaga solo con `_error_tiempo`.
+func _dibujar_error() -> void:
+	if _error_tiempo <= 0.0:
+		return
+	var banda := banda_izquierda()
+	var ancho := 150.0
+	var alto := 56.0
+	var origen := Vector2(
+		roundf(banda.position.x + (banda.size.x - ancho) * 0.5),
+		roundf(banda.position.y + MARGEN_ESCRITORIO + 60.0))
+	var caja := Rect2(origen, Vector2(ancho, alto))
+	var d := dibujar_dialogo(_lienzo, caja)
+	_lienzo.draw_string(_fuente, Vector2(d.position.x, d.position.y + 12.0),
+		"Error del sistema", HORIZONTAL_ALIGNMENT_LEFT, d.size.x, 8,
+		C_TEXTO_DIALOGO)
+	_lienzo.draw_multiline_string(_fuente, Vector2(d.position.x, d.position.y + 26.0),
+		_error_texto, HORIZONTAL_ALIGNMENT_LEFT, d.size.x, 8, 2, C_TEXTO_DIALOGO)
 
 ## El tooltip amarillo, que es el sitio donde por fin se lee qué hace una
 ## reliquia después de haberla cogido. Sin esto, lo que hace tu build solo se
