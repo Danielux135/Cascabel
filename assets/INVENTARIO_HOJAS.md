@@ -322,18 +322,30 @@ oír la costura. No son assets: se pueden borrar y volver a sacar con
 | pieza | toma | recorte | largo | costura | quién la pide |
 |---|---|---|---|---|---|
 | `combate` | **b** | 42,92 s + 16 cp | 40,00 s | 0,891 | combate normal y élite |
-| `escritorio` | **a** | 32,00 s + 8 cp | 32,00 s | 0,855 | escritorio, Inicio, preparación |
-| `recuperado` | **b** | 105,91 s + 16 cp | 28,24 s | 0,341 | la carpeta `RECUPERADO` abierta |
-| `jefe` | **b** | 40,05 s + 16 cp | 35,56 s | 0,686 | nodo de mapa de tipo JEFE |
+| `escritorio` | **a** | 28,00 s + 12 cp | 48,00 s | 0,817 | escritorio, Inicio, preparación |
+| `recuperado` | **a** | 26,41 s + 16 cp | 68,57 s | 0,740 | la carpeta `RECUPERADO` abierta |
+| `jefe` | **b** | 13,38 s + 28 cp | 62,22 s | 0,795 | nodo de mapa de tipo JEFE |
 | `mapa` | **a** | 23,44 s + 8 cp | 22,86 s | 0,905 | el explorador de carpetas |
 | `caza` | **a** | 20,41 s + 12 cp | 34,53 s | 0,844 | `mesa.en_caza` |
-| `tienda` | a | 31,09 s + 8 cp | 27,43 s | 0,810 | **NADIE TODAVÍA** — ver abajo |
+| `tienda` | a | 58,52 s + 20 cp | 68,57 s | 0,562 | **NADIE TODAVÍA** — ver abajo |
 | `arranque` | única | cola cortada | 7,84 s | — | una vez, al abrir el juego |
 | `tilt` | única | cola cortada | 7,14 s | — | la pantalla azul |
 
+**LOS BUCLES SE ALARGARON DESPUÉS DE OÍRLOS** (Daniel: *"me parecen muy
+cortos"*), y el techo de §2 subió de 40 a 90 s. **No sube el mismo número en
+todas, y ahí está lo interesante:** `recuperado` pasa de 28 a 68 s y **cambia
+de toma** —con sitio suficiente, la toma a sube de 0,182 a 0,740 de costura y
+adelanta a la b, o sea que lo que le faltaba no era otra toma sino espacio para
+una frase entera—, `jefe` también gana costura al alargar (0,686 → 0,795), y
+`mapa` se queda en 23 s porque alargarla la rompe: 0,905 aquí contra 0,647 a
+68 s. `caza` no puede aunque quiera, porque su toma solo dura 62 s.
+
 **Las tomas están elegidas por MEDIDA, no de oído**, y eso es lo primero que
 hay que cerrar: la columna `costura` dice cuál de las dos CIERRA mejor el
-bucle, que no es lo mismo que cuál suena mejor. Los `_x3` están para eso.
+bucle, que no es lo mismo que cuál suena mejor. Los `_x3` están para eso — **y
+hasta el 21-ago estaban rotos**: se concatenaban con `-c copy`, que en Ogg deja
+tres bitstreams encadenados con los tiempos reiniciando, así que sonaba un
+ciclo y se quedaba pillado. Ahora se reencodifican.
 
 **`tienda` no entró al repo** y es a propósito: no hay tienda ni descanso con
 pantalla, así que no existe el momento en que sonaría. Es el invariante del

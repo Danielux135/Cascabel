@@ -97,9 +97,17 @@ Las cuatro que más trabajan y por qué:
 ### Capa 2 — el recorte
 
 Genera de 2 a 3 minutos y **tira el principio y el final**. El trozo bueno está
-en el centro: busca el ciclo más estable de 20 a 40 segundos, corta en frontera
+en el centro: busca el ciclo más estable de 20 a 90 segundos, corta en frontera
 de compás, y ponle un desvanecido minúsculo (5-10 ms) a cada punta para que no
-chasquee. Después escúchalo cinco veces seguidas en bucle: si a la tercera te
+chasquee.
+
+> **El techo era 40 s y lo subió Daniel oyéndolos** (21-ago): *"había pensado
+> en alargar los audios, me parecen muy cortos"*. **Y el largo bueno es de cada
+> pieza, no del documento** — medido: `recuperado` sube de 0,182 a 0,740 de
+> costura al pasar de 34 a 68 s, porque sus frases no caben en 34; `mapa` cae
+> de 0,905 a 0,647 haciendo lo mismo, porque la suya sí. Lo que `musica.py`
+> elige es **el corte más largo de entre los que cierran casi tan bien como el
+> mejor**, y así las que no dan más de sí se quedan cortas ellas solas. Después escúchalo cinco veces seguidas en bucle: si a la tercera te
 molesta algo, es el corte, no la música.
 
 El compás dura `60 / BPM × 4` segundos. A 96 BPM son 2,5 s, así que los cortes

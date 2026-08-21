@@ -17,12 +17,6 @@ config/icon="res://icon.svg"
 
 [audio]
 
-; LA MÚSICA VA POR DEBAJO DE LOS EFECTOS, y no es gusto: es la regla de mezcla
-; de `assets/prompts_musica.md` §3. Los efectos de `sonidos.py` son ondas
-; cuadradas que ocupan de 150 Hz a 1 kHz y suenan CONSTANTEMENTE, así que una
-; música al mismo nivel convierte cada bola en un barrizal. Los -8 dB del bus
-; `Musica` son el sitio donde eso se arregla de una vez para las ocho piezas,
-; en lugar de bajarle el volumen a cada una por separado.
 buses/default_bus_layout="res://audio_bus_layout.tres"
 
 [display]

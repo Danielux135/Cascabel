@@ -98,6 +98,23 @@ oído.** La columna que decide, `costura`, dice cuál de las dos CIERRA mejor el
 bucle — no cuál suena mejor. La tabla entera está en
 `assets/INVENTARIO_HOJAS.md`, tanda 0m.
 
+**Y LOS BUCLES SE ALARGARON, después de oírlos** (21-ago, Daniel: *"me parecen
+muy cortos"*). El techo de §2 pasa de 40 a 90 s, y **no sube igual en todas**:
+`recuperado` va de 28 a 68 s **y cambia de toma** —con sitio para una frase
+entera, la toma a sube de 0,182 a 0,740 de costura y adelanta a la b, que había
+entrado a la fuerza—, `jefe` de 35 a 62 ganando costura, `escritorio` de 32 a
+48. `mapa` se queda en 23 s porque alargarla la rompe (0,905 contra 0,647), y
+`caza` porque su toma solo dura 62 s. El criterio nuevo se lee solo: **el corte
+más largo de entre los que cierran casi tan bien como el mejor**.
+
+**Y ESTABAN ROTOS LOS `_x3` DE REVISIÓN, no las piezas.** Se concatenaban con
+`-c copy`, que en Ogg no fusiona nada: deja tres bitstreams encadenados con los
+tiempos reiniciando, así que sonaba un ciclo y se quedaba pillado — y el fallo
+se disfrazaba de "el bucle no cierra", que es justo lo que el mosaico existe
+para juzgar. Lo cazó Daniel oyéndolos. Las ocho piezas del juego estaban bien
+(cabecera y contenido decodificado coinciden), y ahora hay una prueba que fija
+la duración de cada una contra la tabla.
+
 **Lo que se aprendió, y va entero en `CLAUDE.md`:**
 
 - **El BPM del prompt es una hipótesis.** Cinco de siete piezas salieron a un
@@ -1914,18 +1931,25 @@ elegidas midiendo cuál CIERRA mejor el bucle, que no es lo mismo que cuál suen
 mejor, y la diferencia entre las dos tomas de una pieza puede ser enorme. Se
 cambia una letra en `PIEZAS`, dentro de `musica.py`, y se vuelve a cortar.
 
-**U2.** **`recuperado` es la que más falta hace oír, y la que peor mide.** Es la
+**U2.** **`recuperado`, que era la que peor medía y ha dado la vuelta.** Es la
 pieza importante del documento —la melodía que se corta a la mitad, lo único
-bonito del juego, y suena justo después de perder un run— y ninguna de sus dos
-tomas da un bucle decente: la costura sale 0,182 y 0,341 sobre un máximo de 1.
-La causa es su propio prompt, que pide silencios largos y una frase que no
-resuelve, o sea lo contrario de algo que se repita. **Entró la toma b porque se
-repite tres veces más que la a**, no porque suene mejor. Si la a es la bonita,
-gana la bonita y ya buscaremos dónde cortarla.
+bonito del juego, y suena justo después de perder un run—. Con bucles de 20-40 s
+ninguna de sus dos tomas pasaba de 0,341 de costura y entró la b a la fuerza,
+por repetirse más. **Al subir el techo a 90 s, la toma a sube a 0,740 y
+adelanta:** lo que le faltaba no era otra toma, era sitio para una frase entera.
+Ahora dura 68 s. ¿Suena como tiene que sonar?
 
 **U3.** ¿Se oye el corte? A la tercera vuelta de un `_x3`, si algo molesta, es
 el corte y no la música. Los dos mandos están en `musica.py`: `inicio` mueve
 dónde empieza y `compases` cuánto dura.
+
+**U3b.** **¿Siguen pareciendo cortas?** Los bucles pasaron de 23-40 s a 23-69 s
+(`recuperado` 68,6 · `jefe` 62,2 · `escritorio` 48 · `combate` 40 · `caza` 34,5
+· `mapa` 22,9). Las dos que no subieron tienen motivo medido: `mapa` se rompe
+al alargarla y `caza` no tiene material —su toma dura 62 s—. **Y `combate` es
+la que peor sabe**: es la que suena el 80 % de la partida, su toma dura 141 s, y
+aun así no hay ni un corte por encima de 40 s que cierre bien. Si esa se sigue
+haciendo repetitiva, no se arregla cortando: hay que regenerarla.
 
 **U4.** **La mezcla.** La música va 8 dB por debajo de los efectos, y ese número
 está puesto a ojo contra una regla escrita (§3: los efectos ocupan de 150 Hz a

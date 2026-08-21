@@ -5739,6 +5739,28 @@ func _prueba_musica() -> void:
 		sueltas.is_empty(),
 		"%s: o se enganchan o salen de assets/musica/" % str(sueltas))
 
+	# CADA PIEZA DURA LO QUE DICE LA TABLA. Un recorte que sale mal no da
+	# error: deja una pieza más corta, o un archivo cuya cabecera miente sobre
+	# lo que lleva dentro, y las dos cosas solo se oyen jugando. Pasó de verdad
+	# con los mosaicos de revisión, que se concatenaban con `-c copy` y
+	# declaraban 102 s con 120 s de audio: el reproductor tocaba el primer
+	# bucle y se plantaba.
+	var descuadran: Array[String] = []
+	for nombre in NodoMusica.PIEZAS:
+		var ruta: String = NodoMusica.RUTA % nombre
+		if not ResourceLoader.exists(ruta):
+			continue
+		var s := load(ruta) as AudioStream
+		if s == null:
+			continue
+		var quiere: float = float(
+			(NodoMusica.PIEZAS[nombre] as Dictionary)["segundos"])
+		if absf(s.get_length() - quiere) > 0.5:
+			descuadran.append("%s dura %.2f y la tabla dice %.2f"
+				% [nombre, s.get_length(), quiere])
+	_comprobar("cada pieza dura lo que dice la tabla", descuadran.is_empty(),
+		str(descuadran))
+
 	# EL BUCLE SE COMPRUEBA CARGADO, no en el .import. Godot sirve la copia de
 	# `.godot/imported/`, así que un flag puesto a mano se pierde en la
 	# siguiente reimportación y la pieza pasa a sonar una vez y callar — con la

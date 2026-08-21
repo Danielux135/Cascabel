@@ -71,23 +71,36 @@ SR = 22050
 # veces para poder juzgarlo con la oreja, que es quien decide.
 # --------------------------------------------------------------------------
 PIEZAS = {
-    # costura 0,891 contra 0,810 de la toma a.
+    # 40 s, y NO se puede alargar más aunque su toma dure 141: por encima de
+    # los 16 compases no hay ni un corte que cierre dentro del margen. Es la
+    # que suena el 80 % de la partida, o sea la que más ganaría, y la música
+    # no da para más.
     "combate":    {"bpm": 96,  "toma": "b", "inicio": 42.92, "compases": 16},
-    # 0,855 contra -0,152: la toma b no cierra por ningún lado.
-    "escritorio": {"bpm": 60,  "toma": "a", "inicio": 32.00, "compases": 8},
-    # LA PIEZA DIFÍCIL, y por su propio prompt: pide una melodía que se corta a
-    # la mitad y silencios largos, o sea lo contrario de algo que se repita.
-    # Medida la autocorrelación a escala de bucle, la toma a se repite a sí
-    # misma 0,23 y la b 0,72 — tres veces más material aprovechable. Es la que
-    # más falta hace oír antes de darla por buena.
-    "recuperado": {"bpm": 56,  "bpm_real": 136.0,
-                   "toma": "b", "inicio": 105.91, "compases": 16},
-    # 0,686 contra 0,354, y encima la toma a sale a medio tempo del pedido.
-    "jefe":       {"bpm": 108, "toma": "b", "inicio": 40.05, "compases": 16},
-    # 0,905, la costura más limpia de las catorce tomas.
+    # 48 s. Pasa de 32 pagando 0,04 de costura, dentro del margen.
+    "escritorio": {"bpm": 60,  "toma": "a", "inicio": 28.00, "compases": 12},
+    # LA PIEZA DIFÍCIL, y la que más ha cambiado al subir el techo: pide por
+    # prompt una melodía que se corta a la mitad y silencios largos, o sea lo
+    # contrario de algo que se repita, y con bucles de 20-40 s ninguna de sus
+    # dos tomas pasaba de 0,341 de costura.
+    #
+    # **Con 68 s la toma a sube a 0,740 y adelanta a la b**, que era la que
+    # había entrado a la fuerza por repetirse más. Lo que le faltaba no era
+    # otra toma, era sitio: una pieza de frases largas necesita un bucle largo,
+    # y a 34 s el corte caía a media frase. De paso vuelve a su BPM real, 56.
+    "recuperado": {"bpm": 56,  "toma": "a", "inicio": 26.41, "compases": 16},
+    # 62 s, y también gana costura al alargar: 0,686 a 35 s, 0,795 a 62.
+    "jefe":       {"bpm": 108, "toma": "b", "inicio": 13.38, "compases": 28},
+    # 23 s, LA MÁS CORTA Y A PROPÓSITO: es la única donde alargar rompe el
+    # bucle de verdad — 0,905 aquí contra 0,647 a 68 s. No hay ningún candidato
+    # largo dentro del margen, así que el barrido se queda corto él solo.
     "mapa":       {"bpm": 84,  "toma": "a", "inicio": 23.44, "compases": 8},
     # NINGUNA DE LAS DOS TOMAS SALIÓ A 120: Suno dio 83,4 y 80,7. Se corta con
     # el real, que es lo único que pone la rejilla donde están los golpes.
+    #
+    # Y se queda en 34 s porque su toma solo dura 62: un bucle de 46 s tendría
+    # que empezar antes del segundo 11 y el primer compás entero pasado el 15 %
+    # cae en el 12. Se pasa por un compás. Esta es la única que no alarga por
+    # falta de material, no por la música.
     "caza":       {"bpm": 120, "bpm_real": 83.4,
                    "toma": "a", "inicio": 20.41, "compases": 12},
     # 0,810 contra 0,598.
@@ -100,16 +113,45 @@ PIEZAS = {
     # su receta se MUEVE" — y es el mismo caso. El corte se hace igual y se
     # guarda al lado de las tomas: el día que haya tienda, se cambia este
     # `False` y se le añade su fila a `NodoMusica.PIEZAS`, en el mismo commit.
-    "tienda":     {"bpm": 70,  "toma": "a", "inicio": 31.09, "compases": 8,
+    "tienda":     {"bpm": 70,  "toma": "a", "inicio": 58.52, "compases": 20,
                    "enganchada": False},
     "arranque":   {"bucle": False},
     "tilt":       {"bucle": False},
 }
 
-# El bucle tiene que durar de 20 a 40 s (§2). Más corto cansa; más largo ocupa
-# y deja de ser un ciclo estable.
+# CUÁNTO DURA UN BUCLE. §2 pedía de 20 a 40 s, y el techo lo subió Daniel
+# oyéndolos: *"había pensado en alargar los audios, me parecen muy cortos"*.
+# Tiene respaldo en la medida, pero solo en algunas piezas — `escritorio` sube
+# de 0,855 a 0,949 de costura con 48 s en vez de 32, y `recuperado` de 0,182 a
+# 0,740 con 68 s — mientras que `mapa` cierra mucho mejor corto (0,905 con 23 s
+# contra 0,647 con 68). O sea que el largo bueno es de cada pieza, no del
+# documento. El suelo se queda donde estaba: por debajo de 20 s el bucle se
+# reconoce y cansa.
 LARGO_MIN = 20.0
-LARGO_MAX = 40.0
+LARGO_MAX = 90.0
+
+# CUÁNTA COSTURA SE PUEDE SACRIFICAR A CAMBIO DE DURACIÓN.
+#
+# Sin esto, alargar sería mover un número: el total premia la costura y en un
+# empate técnico se llevaba el corte corto. Con esto, el barrido primero mira
+# cuál es la mejor costura que se puede conseguir en la pieza, y de todos los
+# cortes que quedan a menos de este margen elige EL MÁS LARGO.
+#
+# Se hace así y no metiendo la duración en el total a propósito: sumar
+# segundos y correlaciones obliga a inventar una escala entre dos cosas que no
+# se parecen, y el resultado sería un número que nadie sabe leer. Esto se lee
+# solo — "el más largo de los que cierran bien" — y el mando dice exactamente
+# cuánto vale "bien".
+MARGEN_COSTURA = 0.06
+
+# Y EL SUELO DE NIVEL, que es la otra mitad de "cierra bien". La primera
+# versión de la regla de arriba filtraba SOLO por costura, y eso eligió para
+# `caza` y `tienda` cortes con nivel 0,000 — doce decibelios o más de salto
+# entre el final y el principio. Un bucle así casa de golpes y da un bajonazo
+# de volumen en cada vuelta, que es más audible que un clic.
+#
+# 0,70 son 3,6 dB de salto: se nota si lo buscas y no salta a la cara.
+NIVEL_MINIMO = 0.70
 
 # Desvanecido de cada punta, en milisegundos. §2 pide de 5 a 10: lo justo para
 # que no chasquee y no tanto como para que se oiga el bajón.
@@ -373,7 +415,22 @@ def mejor_corte(x: np.ndarray, env: np.ndarray, salto: int,
             ini += compas
     if not candidatos:
         return {}
-    return max(candidatos, key=lambda c: c["total"])
+    # EL MÁS LARGO DE LOS QUE CIERRAN BIEN. Se mira primero cuál es la mejor
+    # costura alcanzable en esta pieza, y entre todos los que se le acercan
+    # gana la duración. En las piezas donde alargar rompe el bucle —`mapa`
+    # pierde 0,26 de costura entre 23 s y 68— no hay ningún candidato largo
+    # dentro del margen y el corte corto se queda, sin tener que escribirlo.
+    # El suelo de nivel se aplica ANTES de mirar la costura: si no, el techo
+    # de costura lo puede poner un corte con un bache de 12 dB, y entonces el
+    # margen se mide contra un candidato que no era válido.
+    sanos = [c for c in candidatos if c["nivel"] >= NIVEL_MINIMO]
+    if not sanos:
+        # Ninguno cierra sin bache. Antes que inventarse una excepción, se
+        # devuelve el mejor por total y que lo juzgue la oreja.
+        return max(candidatos, key=lambda c: c["total"])
+    techo: float = max(c["costura"] for c in sanos)
+    buenos = [c for c in sanos if c["costura"] >= techo - MARGEN_COSTURA]
+    return max(buenos, key=lambda c: (c["largo"], c["total"]))
 
 
 def fuentes(nombre: str, cfg: dict):
@@ -548,9 +605,17 @@ def mosaico(carpeta: Path) -> None:
             lista.write_text(
                 "".join(f"file '{suelto.as_posix()}'\n" for _ in range(3)),
                 encoding="utf-8")
+            # SE REENCODIFICA, NO SE COPIA, y esto costó una revisión entera.
+            # Con `-c copy` el concat de Ogg no fusiona nada: deja los tres
+            # bitstreams encadenados, cada uno con su serial y sus tiempos
+            # empezando de cero. El reproductor toca el primero y se planta —
+            # que es justo lo que hay que oír en un mosaico de bucles, así que
+            # el fallo se disfraza de "el bucle no cierra". La cabecera lo
+            # cantaba: `combate_b_x3` declaraba 102 s con 120 s dentro.
             subprocess.run(
                 ["ffmpeg", "-y", "-v", "error", "-f", "concat", "-safe", "0",
-                 "-i", str(lista), "-c", "copy", str(triple)], check=True)
+                 "-i", str(lista), "-c:a", "libvorbis", "-q:a", "5",
+                 str(triple)], check=True)
             lista.unlink()
             print(f"  {marca} {triple.name}  "
                   f"{ini:.2f} s + {compases} compases = {largo:.2f} s")
@@ -580,13 +645,19 @@ def _exportar(origen: Path, ini: float, largo: float, destino: Path,
 
 
 def main() -> int:
+    global LARGO_MIN, LARGO_MAX
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("orden", choices=["analizar", "cortar", "mosaico"])
     ap.add_argument("--aplicar", action="store_true",
                     help="sin esto, `cortar` solo dice lo que haría")
     ap.add_argument("--a", default="", metavar="CARPETA",
                     help="dónde deja `mosaico` los bucles repetidos")
+    ap.add_argument("--largo", default="", metavar="MIN-MAX",
+                    help="rango de duración del bucle en segundos, para "
+                         "explorar (por defecto %g-%g)" % (LARGO_MIN, LARGO_MAX))
     args = ap.parse_args()
+    if args.largo:
+        LARGO_MIN, LARGO_MAX = [float(v) for v in args.largo.split("-")]
     if shutil.which("ffmpeg") is None:
         print("Falta ffmpeg en el PATH.", file=sys.stderr)
         return 1

@@ -1439,6 +1439,57 @@ saca cada bucle repetido tres veces, porque el empalme solo existe cuando el
 archivo vuelve a empezar. Es lo mismo que montar el mosaico 6×6 antes de copiar
 una hoja de nueve trozos al repo.
 
+### Concatenar OGG con `-c copy` no concatena nada (ago-2026)
+
+El mosaico de audio —cada bucle repetido tres veces, para oír el empalme— se
+montaba con `ffmpeg -f concat -c copy`. **Y los catorce salieron rotos:** sonaba
+un ciclo y se quedaba pillado. Lo cazó Daniel oyéndolos.
+
+Ogg no se concatena copiando. Lo que queda son tres bitstreams ENCADENADOS, cada
+uno con su serial y sus tiempos empezando de cero, y el reproductor toca el
+primero y para. La cabecera lo cantaba: `combate_b_x3` declaraba 102 s con 120 s
+dentro. Se arregla reencodificando (`-c:a libvorbis`).
+
+**Lo que lo hace peor que un bug normal: el fallo se disfraza de lo que la
+herramienta iba a medir.** Un mosaico de bucles que se queda pillado se lee como
+"el bucle no cierra", que es exactamente el juicio que se estaba pidiendo. Es de
+la misma familia que el resto de esta lista —algo que no da error y miente sobre
+otra cosa— y por eso ahora se comprueba: **un archivo de audio generado se mide
+decodificándolo entero, no leyendo su cabecera**, porque la cabecera es justo lo
+que sale mal.
+
+### Un bucle no dura lo que dice el documento: dura lo que da la pieza (ago-2026)
+
+`prompts_musica.md` §2 pedía ciclos de 20 a 40 s, y las ocho piezas se cortaron
+así. Daniel las oyó: *"me parecen muy cortos"*. Subido el techo a 90 s, **la
+medida le da la razón en unas y se la quita en otras**, que es lo que hace que
+esto valga la pena escribirlo:
+
+| pieza | 20-40 s | hasta 90 s |
+|---|---|---|
+| `recuperado` | 0,182 | **0,740** a 68 s — y CAMBIA DE TOMA |
+| `jefe` | 0,686 | **0,795** a 62 s |
+| `mapa` | **0,905** | 0,647 a 68 s |
+| `combate` | **0,891** | nada mejor, y su toma dura 141 s |
+
+O sea que **el largo bueno es una propiedad de la música, no un número del
+documento**. `recuperado` es el caso que lo explica: su prompt pide frases
+largas que no resuelven, así que a 34 s el corte caía a media frase y ninguna de
+sus dos tomas cerraba; con sitio para una frase entera, la toma que se había
+descartado por "no repetirse" pasa a ser la buena.
+
+**Y el criterio que salió de ahí, que es lo reutilizable:** no se mete la
+duración en la puntuación —sumar segundos y correlaciones obliga a inventarse
+una escala entre cosas que no se parecen— sino que se elige **el corte más largo
+de entre los que cierran casi tan bien como el mejor**. Las piezas que no dan
+más de sí se quedan cortas ellas solas, sin escribirlo en ningún sitio.
+
+**Ojo con filtrar por un solo criterio:** la primera versión de esa regla miraba
+solo la costura y eligió para `caza` y `tienda` cortes con **12 dB de salto de
+volumen** en el empalme. Un bucle que casa de golpes y da un bajonazo en cada
+vuelta es peor que un clic. Cuando un criterio compuesto se sustituye por uno
+simple, hay que volver a mirar qué se quedó fuera.
+
 ### Una regla sacada de UNA rampa no vale para las nueve (ago-2026)
 
 La tanda 0j dejó en la batería la comprobación de que la cuesta está calibrada:

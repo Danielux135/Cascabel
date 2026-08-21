@@ -18,7 +18,14 @@ const BUS := "Musica"
 
 ## Ajuste por pieza. `db` es el volumen relativo dentro del bus de música —el
 ## nivel general ya lo pone el bus, así que esto solo sirve para que unas no
-## tapen a otras— y `bucle` dice si la pieza se repite o suena una vez y calla.
+## tapen a otras—, `bucle` dice si la pieza se repite o suena una vez y calla,
+## y `segundos` es lo que tiene que durar el archivo.
+##
+## `segundos` no lo usa nadie para reproducir: está para que la batería pueda
+## comprobar que el OGG del repo es el que dice `musica.py`. Un recorte que
+## sale mal no da error —deja una pieza más corta, o un archivo cuya cabecera
+## miente sobre lo que lleva dentro— y eso solo se oye jugando. Ya pasó con los
+## mosaicos de revisión, que declaraban 102 s con 120 s dentro.
 ##
 ## ES UN CANDADO, no una comodidad: la batería comprueba que no hay ni un OGG
 ## en `assets/musica/` fuera de esta tabla ni una fila sin archivo. Es la misma
@@ -28,19 +35,19 @@ const BUS := "Musica"
 const PIEZAS := {
 	# El 80 % de la partida. Va la más baja de todas porque es la única que
 	# suena CON la bola encima: las demás suenan con la mesa parada.
-	"combate":    {"db": -3.0, "bucle": true},
+	"combate":    {"db": -3.0, "bucle": true, "segundos": 40.00},
 	# Casi silencio a propósito (§4.2). Sube porque no tiene con qué pelearse.
-	"escritorio": {"db":  0.0, "bucle": true},
+	"escritorio": {"db":  0.0, "bucle": true, "segundos": 48.00},
 	# La pieza bonita, y la única. Suena entera y sin nada delante.
-	"recuperado": {"db":  0.0, "bucle": true},
-	"jefe":       {"db": -2.0, "bucle": true},
-	"mapa":       {"db": -1.0, "bucle": true},
+	"recuperado": {"db":  0.0, "bucle": true, "segundos": 68.57},
+	"jefe":       {"db": -2.0, "bucle": true, "segundos": 62.22},
+	"mapa":       {"db": -1.0, "bucle": true, "segundos": 22.86},
 	# La caza es prisa, no volumen (§4.6). Al nivel del combate.
-	"caza":       {"db": -3.0, "bucle": true},
+	"caza":       {"db": -3.0, "bucle": true, "segundos": 34.53},
 	# Las dos que terminan. `tilt` es lo último que se oye de un run y detrás
 	# va silencio, así que no puede quedar por debajo de nada.
-	"arranque":   {"db":  0.0, "bucle": false},
-	"tilt":       {"db":  1.0, "bucle": false},
+	"arranque":   {"db":  0.0, "bucle": false, "segundos": 7.84},
+	"tilt":       {"db":  1.0, "bucle": false, "segundos": 7.14},
 }
 
 ## Cuánto tarda un cambio de pieza, en segundos. Corto para que el estado nuevo
