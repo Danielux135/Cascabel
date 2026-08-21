@@ -1,61 +1,53 @@
 # Codebase Memory Index
 
-Este directorio contiene el índice de memoria del proyecto Cascabel (tilt-os) para optimizar las búsquedas de código con Claude.
+Índice de memoria del proyecto Cascabel (tilt-os), para que Claude pueda buscar
+por el grafo del codebase en vez de leer archivo por archivo.
 
-## Archivos
+## ESTE DIRECTORIO ESTÁ VACÍO A PROPÓSITO
 
-- **graph.db.zst**: Base de datos comprimida del índice del codebase
-  - Generado automáticamente por `codebase-memory-mcp`
-  - Contiene 1,744 nodos (funciones, clases, etc.) y 7,173 relaciones
+Antes decía que aquí vivía un `graph.db.zst` con el grafo comprimido, y daba
+instrucciones para commitearlo y compartirlo entre máquinas. **Ese fichero no
+existe y la versión actual del CLI no lo genera**: sus quince herramientas son
+`index_repository`, `search_graph`, `query_graph`, `trace_path`,
+`get_code_snippet`, `get_graph_schema`, `get_architecture`, `search_code`,
+`list_projects`, `delete_project`, `index_status`, `check_index_coverage`,
+`detect_changes`, `manage_adr` e `ingest_traces`, y ninguna exporta un
+artefacto. El propio indexado lo dice en su salida: `"artifact_present": false`.
 
-## Uso en múltiples PCs
+El grafo vive en el almacén local del daemon, fuera del repo. **O sea que el
+índice no viaja con el repositorio**: en una máquina nueva hay que generarlo,
+y cuesta cuatro segundos.
 
-### Primera vez:
-```bash
-# PC 1: Crear el índice
-codebase-memory-mcp cli index_repository --repo-path .
+El directorio se queda con su `.gitkeep` por si una versión posterior vuelve a
+exportar el artefacto aquí.
 
-# Commit y push al repositorio
-git add .codebase-memory/
-git commit -m "Initialize codebase memory index"
-git push
+## Generar o actualizar el índice
+
+```
+codebase-memory-mcp cli index_repository --repo-path C:\dev\tilt-os
 ```
 
-### Máquinas posteriores:
-```bash
-# PC 2: Clonar el repositorio
-git clone <repo-url>
-cd tilt-os
+Detecta cambios incrementales él solo. **Y ya está: no hay que commitear nada.**
 
-# El índice se importa automáticamente
-codebase-memory-mcp cli index_repository --repo-path .
-# Detectará graph.db.zst y lo importará, luego indexará cambios incrementales
+Hay que lanzarlo **con Claude Code cerrado**, o el daemon rechaza al cliente
+(`CBM daemon is active or starting but could not accept this client within
+30000 ms`) porque el servidor MCP de la sesión lo tiene tomado. Si se atasca:
+
+```
+taskkill /F /IM codebase-memory-mcp.exe
 ```
 
-## Actualizar el índice
+## Cuándo hace falta
 
-Después de cambios importantes en el código:
+Lo largo está en `CLAUDE.md`, apartado "Codebase Memory MCP — cuándo y cómo".
+En corto: para buscar dónde se usa algo en todo el proyecto, trazar cadenas de
+llamadas, medir el impacto de un cambio o auditar código muerto. Para un
+bugfix dentro de un archivo que ya tienes abierto, no.
 
-```bash
-# Reindexar
-codebase-memory-mcp cli index_repository --repo-path .
+## Ver el grafo en 3D
 
-# El .gitattributes usa merge=ours para evitar conflictos
-# en ediciones concurrentes del artefacto
-git add .codebase-memory/graph.db.zst
-git commit -m "Update codebase memory index"
-git push
+```
+codebase-memory-mcp daemon start
 ```
 
-## Integración con Claude Code
-
-El MCP ha sido instalado automáticamente en:
-- `C:\Users\daniel\.claude\agents/codebase-memory.md`
-- `C:\Users\daniel\.claude\agents/codebase-memory-scout.md`
-- `C:\Users\daniel\.claude\agents/codebase-memory-auditor.md`
-
-Usa `codebase-memory` skill en Claude Code para:
-- Explorar la estructura del proyecto
-- Encontrar dónde se definen funciones/clases
-- Trazar relaciones entre componentes
-- Auditar la calidad del código
+Y luego <http://localhost:9749>.
