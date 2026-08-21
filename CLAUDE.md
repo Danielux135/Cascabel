@@ -1439,6 +1439,47 @@ saca cada bucle repetido tres veces, porque el empalme solo existe cuando el
 archivo vuelve a empezar. Es lo mismo que montar el mosaico 6×6 antes de copiar
 una hoja de nueve trozos al repo.
 
+### PEDIR "REPETITIVO" NO PIDE QUE LA SECCIÓN VUELVA (ago-2026)
+
+*La causa de que ninguno de los ocho bucles acabe de convencer, y estuvo
+escondida detrás de cuatro métricas en verde.*
+
+`prompts_musica.md` §2 pega a todos los prompts un bloque L con `minimal
+variation, repetitive ostinato, no build, no climax`. Suno lo obedeció — y aun
+así **ninguna de las catorce tomas contiene un bucle**. Medida la
+autocorrelación a distancia de bucle, o sea 20, 40, 60 y 80 segundos:
+
+| toma | 20 s | 40 s | 60 s | 80 s |
+|---|---|---|---|---|
+| `combate_b` | −0,00 | +0,05 | −0,02 | −0,02 |
+| `caza_a` | −0,18 | −0,07 | −0,00 | — |
+| `mapa_a` | +0,04 | +0,01 | −0,03 | +0,01 |
+
+Cero en todas. Y sin embargo **a escala de COMPÁS la repetición es altísima**:
+el groove de `caza` se parece a sí mismo 0,80 cada 2,88 s. O sea que el bloque L
+se cumple perfectamente con **un groove constante encima de música que avanza y
+no vuelve nunca**. "Repetitivo" describe la textura; no dice nada de la forma.
+
+De ahí sale la avería entera: **un corte largo empalma dos sitios distintos de
+una pieza que avanza**. Por eso `caza` suena mal cortada teniendo sus cuatro
+criterios en verde —costura 0,844, nivel 0,976, plana a 1,7 dB, armonía
+0,991—: los cuatro miran ventanas de cuatro segundos, y a cuatro segundos el
+groove SÍ es el mismo. Lo que no casa es la música, que a los treinta segundos
+ya está en otro sitio.
+
+**La regla: para que haya bucle hay que pedir la REPETICIÓN DE LA SECCIÓN, en
+compases y con número.** El bloque R de §11 lo dice así — *"the exact same
+8-bar phrase repeated identically at least eight times"*, más `no fills, no
+turnarounds` (el relleno de batería al cerrar frase es la forma estándar de que
+dos repeticiones no sean idénticas) y `the arrangement is frozen` (Suno mete y
+saca capas por su cuenta).
+
+**Y el corolario que vale para toda esta lista: una medida de empalme no puede
+certificar un corte si el material no se repite.** Sirve para descartar los
+malos y nada más. Cuando las cuatro métricas dicen que sí y la oreja dice que
+no, lo que hay que poner en duda es si están midiendo la escala correcta —
+aquí, cuatro segundos contra treinta.
+
 ### Concatenar OGG con `-c copy` no concatena nada (ago-2026)
 
 El mosaico de audio —cada bucle repetido tres veces, para oír el empalme— se

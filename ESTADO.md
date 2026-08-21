@@ -73,6 +73,49 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
+## POR QUÉ NINGÚN BUCLE ACABA DE CONVENCER (21-ago)
+
+**Lo abrió Daniel oyendo la primera:** *"solo escuchando la primera de caza, ya
+está mal cortada"*. Y `caza` tenía sus cuatro criterios en verde — costura
+0,844, nivel 0,976, plana a 1,7 dB, y la armonía del empalme a 0,991.
+
+**La causa: ninguna de las catorce tomas contiene un bucle.** Medida la
+autocorrelación a distancia de bucle —20, 40, 60, 80 s— sale entre −0,23 y
++0,05 en todas menos `escritorio_a`. A escala de COMPÁS, en cambio, la
+repetición es altísima (0,80 cada 2,88 s en `caza`). O sea que el bloque L
+—`minimal variation, repetitive ostinato`— se cumple con **un groove constante
+encima de música que avanza y no vuelve nunca**.
+
+Por eso las métricas decían que sí: las cuatro miran ventanas de cuatro
+segundos, y a cuatro segundos el groove ES el mismo. Lo que no casa es la
+música, que a los treinta segundos ya está en otro sitio. **Una medida de
+empalme no puede certificar un corte si el material no se repite** — sirve para
+descartar los malos y nada más. Está en `CLAUDE.md`.
+
+**LO QUE HAY ESCRITO Y LISTO PARA PROBAR: `assets/prompts_musica.md` §11-13.**
+
+- **§11, el bloque R**, que es lo que le faltaba al bloque L: pide la repetición
+  de la SECCIÓN, en compases y con número. Se pega junto al L en todo prompt de
+  música que se genere a partir de ahora.
+- **§12, siete prompts de regeneración ENTEROS**, listos para pegar en Suno sin
+  componer nada. Por orden: `combate` (suena el 80 % de la partida y no da más
+  de 40 s), `caza` (la que canta) y `mapa` (22,9 s, la más corta).
+- **§13, los puentes.** Con la decisión de diseño delante: **un puente que casa
+  tonalmente no se le puede encargar a Suno, y uno que TAPA el cambio sí** —y
+  hace el mismo trabajo, porque lo que necesita el oído no es continuidad, es
+  permiso. La ficción lo regala: esto es un sistema operativo, y cambiar de
+  música es cambiar de programa. Cuatro puentes, no nueve, porque un puente no
+  cuenta de dónde vienes sino qué acaba de pasar.
+
+**Y §13.5, que es por donde hay que empezar y no cuesta ninguna generación:**
+un puente dura dos segundos y hay 46 MB de tomas guardadas. La cola de
+cualquiera —el trozo que se tira— ya es material de puente con el timbre
+garantizado. Contesta la pregunta que importa (¿tapar el cambio arregla lo que
+se oye?) antes de gastar una tanda en generar puentes buenos.
+
+**Lo que NO se ha hecho todavía:** el tercer reproductor de `NodoMusica` para
+los puentes. Va cuando haya un puente que probar, no antes.
+
 ## EL JUEGO YA TIENE MÚSICA (tanda 0m · 20-ago)
 
 Las diez piezas de `prompts_musica.md` estaban generadas y bajadas desde el
@@ -1930,6 +1973,11 @@ vuelven a sacar con `python musica.py mosaico --a <carpeta>`.
 elegidas midiendo cuál CIERRA mejor el bucle, que no es lo mismo que cuál suena
 mejor, y la diferencia entre las dos tomas de una pieza puede ser enorme. Se
 cambia una letra en `PIEZAS`, dentro de `musica.py`, y se vuelve a cortar.
+
+⚠ **Y ojo: puede que ninguna sea la buena.** Está medido que ninguna de las
+catorce tomas contiene un bucle de verdad (ver arriba), así que la respuesta
+honesta a varias de estas preguntas puede ser "hay que regenerar", no "hay que
+cortar en otro sitio". Los prompts para eso están escritos: §11-13.
 
 **U2.** **`recuperado`, que era la que peor medía y ha dado la vuelta.** Es la
 pieza importante del documento —la melodía que se corta a la mitad, lo único

@@ -407,3 +407,219 @@ son bonitas y una última que no encaja: el juego entero, antes del menú.
 Mete `combate` en el juego y juega tres combates con ella antes de generar la
 segunda: la mitad de las decisiones de este documento solo se pueden juzgar con
 una bola en pantalla.
+
+---
+
+## 11. EL BLOQUE R — lo que le faltaba al bloque L (21-ago)
+
+> *Empieza en 11 porque las diez piezas de §4 se citan por su número —§6b, §8,
+> §9, §10— desde `ESTADO.md` y desde `CLAUDE.md`, así que del 6 al 10 están
+> tomados.*
+
+**El bloque L no pide lo único que hace falta para que haya bucle**, y eso no
+es una sospecha: está medido sobre las catorce tomas.
+
+Midiendo cuánto se parece cada pieza a sí misma **a distancia de bucle** —20,
+40, 60 y 80 segundos— sale esto:
+
+| toma | dura | 20 s | 40 s | 60 s | 80 s |
+|---|---|---|---|---|---|
+| `combate_b` | 141 s | −0,00 | +0,05 | −0,02 | −0,02 |
+| `caza_a` | 62 s | −0,18 | −0,07 | −0,00 | — |
+| `mapa_a` | 147 s | +0,04 | +0,01 | −0,03 | +0,01 |
+| `recuperado_a` | 129 s | −0,05 | −0,04 | −0,02 | +0,01 |
+| `escritorio_a` | 83 s | **+0,44** | +0,26 | +0,09 | 0,00 |
+
+**Ninguna toma contiene un bucle.** Y no es que Suno ignorara el bloque L: a
+escala de COMPÁS obedeció perfectamente —el groove de `caza` se repite a sí
+mismo 0,80 cada 2,88 s— pero **la sección no vuelve nunca**. La pieza avanza
+para siempre sin repetirse.
+
+De ahí sale todo lo que ha ido mal:
+
+- **Un corte largo empalma dos sitios distintos de una pieza que avanza.** Por
+  eso `caza` suena mal cortada aunque mida bien: sus cuatro criterios están en
+  verde —costura 0,844, nivel 0,976, plana a 1,7 dB, armonía 0,991— porque los
+  cuatro miran ventanas de cuatro segundos, y a cuatro segundos el groove sí es
+  el mismo. Lo que no casa es la MÚSICA, que a los treinta segundos ya está en
+  otro sitio.
+- **Y por eso la herramienta no puede certificar un corte, solo descartarlo.**
+  Con material que no se repite, ninguna medida de empalme dice la verdad.
+
+> **El bloque R se pega junto al L, y es el que de verdad decide si habrá
+> bucle.** El L pide que no haya clímax; el R pide que la sección VUELVA.
+
+> the exact same 8-bar phrase repeated identically at least eight times,
+> every repetition must be identical to the previous one, no variation between
+> repetitions, no fills, no drum fills, no turnarounds, no transitions,
+> no new instrument enters after the first bar, nothing is added and nothing
+> is taken away, the arrangement is frozen, the same loop for the entire
+> duration, at least 3 minutes long
+
+Las tres que más trabajan:
+
+- **`the exact same 8-bar phrase repeated identically`** — es lo único que pide
+  repetición a escala de sección. Sin esta línea, "repetitive ostinato" del
+  bloque L se cumple con un groove constante encima de música que cambia.
+- **`no fills, no turnarounds`** — el relleno de batería al cerrar cada frase
+  es la manera estándar de que dos repeticiones NO sean idénticas, y es
+  exactamente lo que rompe un empalme.
+- **`the arrangement is frozen`** — Suno entra y saca instrumentos por su
+  cuenta. Una capa que aparece a la mitad convierte la segunda mitad en otra
+  pieza.
+
+**Y hay que generar VARIAS TOMAS DE GOLPE con el mismo prompt, no ir ajustando
+entre tirada y tirada.** Es la lección de `CLAUDE.md` sobre las hojas de
+animación, y vale igual aquí: cada generación es una tirada nueva, no una
+edición de la anterior, así que un tirón de cuatro tomas iguales bate a cuatro
+tomas distintas encadenadas.
+
+---
+
+## 12. Los prompts de regeneración, ENTEROS
+
+Copiar y pegar tal cual. Llevan el bloque T, el cuerpo, el bloque R y el
+bloque L ya montados: no hay que componer nada.
+
+**Orden de importancia**, que no es el de aparición: `combate` suena el 80 % de
+la partida y hoy no da más de 40 s; `caza` es la que canta al oído; `mapa` es
+la más corta que hay (22,9 s).
+
+### 12.1 `combate` — 96 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, driving dungeon crawler groove, low FM bass ostinato repeating every two bars, tight dry tracker drums, dark minor mode, one sustained low drone underneath, no lead melody at all, melodic movement only in the deep bass and in occasional high metallic bells, relentless, mechanical, hypnotic, the same two bars forever, patient menace, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 96 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+### 12.2 `caza` — 120 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, nervous fast ostinato, high plucked FM, an audible ticking clock underneath getting slightly ahead of the beat, thin and exposed arrangement, greedy, unsafe, the feeling of stealing time, it should have stopped by now, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 120 BPM, fast and urgent tempo, minimal variation, repetitive ostinato, instrumental, no vocals
+
+**Ojo con el tempo en esta.** Las dos tomas anteriores pidieron 120 y salieron a
+83,4 y 80,7 — la única pieza donde Suno se fue tan lejos, y encima es la que
+tiene que dar prisa. Por eso lleva `fast and urgent tempo` además del número.
+**Se mide antes de cortar** (`python musica.py analizar`): si vuelve a salir por
+debajo de 100, la toma no sirve aunque suene bien.
+
+### 12.3 `mapa` — 84 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, cold minimal arpeggio on a hollow FM patch, mechanical ticking pulse, one low cheap MIDI string pad, no melody, calculating, waiting, faint dread, nothing threatening yet, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 84 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+### 12.4 `jefe` — 108 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, boss theme, heavy detuned FM brass stabs, tritone interval, relentless sixteenth note bass, dry mechanical drums, one distant choir pad far back in the mix, oppressive and inevitable, no heroism, no triumph, nothing to win, the feeling of a process that cannot be killed, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no drum fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 108 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+### 12.5 `escritorio` — 60 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, sparse dark ambient, almost silent, a single slow detuned FM bell every four bars, deep sub drone, distant hard drive seek noise and fan hum used as percussion, one unresolved minor second held too long, vast empty room, patient, waiting, nothing is happening and that is wrong, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 60 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+### 12.6 `recuperado` — 56 BPM
+
+**La que menos falta hace regenerar**, porque su toma actual ya funciona a 68 s
+y es la única que mejoró al alargarla. Está aquí por si se quiere una tirada
+mejor, pero **la que hay no se tira hasta que algo la supere de verdad**, que
+es la regla de `CLAUDE.md`: si una tanda no supera a lo que ya está, no entra.
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, fragile and beautiful, a single unfinished melody on a detuned music box, one distant detuned choir pad, long silences between phrases, the melody stops mid-phrase and starts over from the beginning, never reaching its final note, melancholy, tender, something was here and is not here now, the exact same 16-bar phrase repeated identically at least six times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 56 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+**Lleva 16 compases en vez de 8**, y es el único caso: su frase melódica no cabe
+en ocho, que es literalmente por lo que a 34 s no cerraba y a 68 sí.
+
+### 12.7 `tienda` — 70 BPM
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, MOD and XM demoscene, cheap General MIDI orchestral patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, mysterious, unresolved, warm but wrong, slow detuned music box, one cheap MIDI harp, major key that keeps sliding flat, comforting and not quite right, very sparse, too much reverb for such a small room, safe for now, the exact same 8-bar phrase repeated identically at least eight times, every repetition must be identical to the previous one, no variation between repetitions, no fills, no turnarounds, no transitions, no new instrument enters after the first bar, nothing is added and nothing is taken away, the arrangement is frozen, the same loop for the entire duration, at least 3 minutes long, loopable, seamless loop, no intro, no outro, no fade in, no fade out, consistent energy throughout, no build, no climax, no drop, no breakdown, single key, no key change, no modulation, steady rhythm, exactly 70 BPM, minimal variation, repetitive ostinato, instrumental, no vocals
+
+---
+
+## 13. LOS PUENTES — y por qué no son lo que parecen
+
+Idea de Daniel (21-ago): *"podríamos ingeniarnos transiciones como archivos de
+música enteros"*. Es buena, y la parte de diseño que hay que decidir antes de
+generar nada es **qué tiene que hacer un puente**, porque hay dos respuestas y
+solo una se puede encargar.
+
+### 13.1 Un puente que CASA es imposible de encargar; uno que TAPA es trivial
+
+La versión que suena bien sobre el papel es un puente que sale del tono y el
+tempo de la pieza que se va y entra en los de la que llega. **Eso no se le
+puede pedir a Suno**: no sabe en qué tono está `mapa` ni en cuál `combate`, y
+aunque se le dijera, ya sabemos que cinco de siete piezas ignoraron el BPM. Un
+puente que casa habría que componerlo, no generarlo.
+
+Pero un puente no necesita casar. **Necesita dar permiso al oído para que la
+música cambie.** Si algo pasa por delante en el momento del cambio, deja de
+oírse como un corte y pasa a oírse como un evento. Y eso no tiene tono ni
+tempo, así que sí se puede encargar.
+
+**Y la ficción ya lo tiene resuelto:** esto es un sistema operativo. Cambiar de
+música es cambiar de programa. Un disco duro buscando, un lector arrancando,
+un pitido de placa base. §1 de este documento ya metía "ruido de disco duro y
+zumbido de ventilador" en la paleta de sonido; el puente es esa misma idea
+puesta a trabajar.
+
+### 13.2 Cómo suena, en el motor
+
+**El puente NO sustituye al cruce: suena ENCIMA.** `NodoMusica` cruza las dos
+piezas como ya hace, y a la vez dispara el puente. Así el puente no tiene que
+casar con nada ni durar lo que dure la transición, y si algún día falta un
+puente, el cambio sigue funcionando como hoy.
+
+Hace falta un tercer reproductor en `NodoMusica`, fuera de la pareja del cruce
+—por lo mismo que `NodoSonido.PROPIOS`: un sonido que informa no puede
+comérselo la rueda—.
+
+### 13.3 Cuáles hacen falta: cuatro, no nueve
+
+La tentación es uno por cada par de estados, y son nueve. **Un puente no
+describe de dónde vienes: describe qué acaba de pasar**, y de eso solo hay
+cuatro clases.
+
+| puente | cuándo | qué cuenta |
+|---|---|---|
+| `puente_entrar` | mapa → mesa | un programa que se abre y toma el control |
+| `puente_salir` | mesa → mapa | ese programa que se cierra |
+| `puente_caza` | mesa → arena de caza | **el único que es un premio**, no un cambio |
+| `puente_ventana` | se abre `RECUPERADO` | una ventana del sistema encima de todo |
+
+`arranque` y `tilt` no necesitan puente: ya SON transiciones enteras.
+
+### 13.4 Los prompts, enteros
+
+**Aquí el bloque L NO se pega** —estas terminan— y el bloque R tampoco, que es
+lo contrario de lo que piden. El bloque T sí, porque tienen que sonar a la
+misma máquina.
+
+#### `puente_entrar` · 2 s
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system launching a program, a hard drive spinning up and seeking, one low FM tone rising and cutting off dead, mechanical relay click at the end, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+
+#### `puente_salir` · 2 s
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, tracker module music, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, dark, cold, a short 2 second transition sting for an old operating system closing a program, a hard drive spinning down, one low FM tone descending and losing pitch as if the power is dropping, a soft mechanical click, no melody, no rhythm, no tempo, no key, 2 seconds, ends in silence, instrumental, no vocals
+
+#### `puente_caza` · 3 s
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned and out of tune, hollow metallic tones, lo-fi 22 kHz sample rate, a short 3 second transition sting for a hidden bonus area opening, air pressure rising, one detuned FM bell struck once and left ringing, a distant choir pad swelling underneath and cut off before it resolves, wonder and unease at once, something you were not supposed to reach, no melody, no rhythm, no tempo, 3 seconds, ends unresolved, instrumental, no vocals
+
+**Es el único de los cuatro que puede ser bonito**, y `assets/prompts_musica.md`
+§1 dice que el coro arcano va con cuentagotas: si suena aquí, ya solo puede
+sonar en `recuperado`. Es una decisión, no un adorno — el sitio donde suena lo
+único bonito de la banda sonora es lo que el jugador aprende a querer.
+
+#### `puente_ventana` · 1,5 s
+
+1990s PC dungeon crawler soundtrack, OPL3 FM synthesis, Adlib and Sound Blaster sound card timbres, cheap General MIDI patches, Roland SC-55, slightly detuned, hollow metallic tones, dry and close, lo-fi 22 kHz sample rate, a very short 1.5 second sting for a window opening in an old operating system, one dull wooden knock, a brief burst of tape hiss, one flat detuned bell, no melody, no rhythm, no tempo, no key, 1.5 seconds, ends in silence, instrumental, no vocals
+
+### 13.5 Y la vía que no necesita generar nada
+
+**Hay 46 MB de tomas guardadas en `Desktop/Musica`**, y un puente dura dos
+segundos. La cola de cualquier toma —donde Suno cierra la pieza, que es
+justamente el trozo que se tira— es material de puente ya escrito, con el
+timbre de la banda sonora garantizado porque ES la banda sonora.
+
+Se recorta con lo que ya hay:
+
+    ffmpeg -ss <segundo> -t 2 -i <toma>.ogg -af "afade=t=out:st=1.9:d=0.1" puente.ogg
+
+**Merece probarse ANTES que los prompts de §13.4**, porque cuesta cero
+generaciones y contesta la pregunta que de verdad importa: si un puente tapando
+el cambio arregla lo que se oye. Si la respuesta es que sí, entonces vale la
+pena generar unos buenos.
