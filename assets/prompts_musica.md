@@ -380,7 +380,20 @@ son bonitas y una última que no encaja: el juego entero, antes del menú.
 5. Las cinco restantes, todas desde la Persona.
 5b. **`caza`, y separarla en stems** — de ahí salen el rastro y el regreso (§6b)
    sin generar nada más.
-6. **Recortar, exportar a OGG, y en Godot activar `Loop` con su `Loop Offset`.**
+6. ~~**Recortar, exportar a OGG, y en Godot activar `Loop` con su `Loop
+   Offset`.**~~ **HECHO (tanda 0m), y con dos correcciones a este documento.**
+   Lo hace `musica.py`, que además elige el corte midiendo en vez de a ojo.
+
+   - **El `Loop Offset` de la capa 3 no se usa, y es mejor así.** La idea era
+     dejar la intro en el archivo y que Godot saltara al cuerpo a partir de la
+     segunda vuelta. Pero el offset vive en el `.import`, y Godot sirve la copia
+     de `.godot/imported/`: un flag puesto ahí se pierde en cuanto alguien
+     reimporta, que es justo lo primero que hay que hacer al regenerar audio.
+     El bucle lo pone `NodoMusica` sobre el recurso cargado, la tabla es la
+     única fuente de verdad, y hay una prueba que lo sujeta.
+   - **El BPM de §2 es una hipótesis.** Cinco de las siete piezas salieron a un
+     tempo que no es el que se pidió, así que la rejilla se mide sobre el
+     archivo. Está en `CLAUDE.md`.
 
 **Piloto de una antes de generar diez**, igual que con las hojas de animación.
 Mete `combate` en el juego y juega tres combates con ella antes de generar la

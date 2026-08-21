@@ -26,9 +26,13 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **612/612** con `assets/` en la caja (sin `assets/`, 28 fallos que son
-todos "no existe tal PNG"). **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y
-`rampa_fallada` llevaban desde la 0h sin que nadie las escuchara.
+Batería **622/622** en Windows, con todo el repo delante. **Y desde la tanda 0m
+el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno, cada una
+con su momento, y dos buses con la música por debajo de los efectos. Lo único
+que falta de esa tanda es oírla — ver U1-U10.
+
+**Y desde la tanda 0h2 caerse suena**: `bola_cayo` y `rampa_fallada` llevaban
+desde la 0h sin que nadie las escuchara.
 
 **Y DESDE LA TANDA 7 EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` +
 `Reproductor`: `cr_brasa` y `cr_calavera` llevaban cortadas y limpias **sin que
@@ -68,6 +72,63 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## EL JUEGO YA TIENE MÚSICA (tanda 0m · 20-ago)
+
+Las diez piezas de `prompts_musica.md` estaban generadas y bajadas desde el
+19-ago, sin recortar y sin que las cargara nadie: 46 MB de material bruto
+esperando en `assets/musica/`. **Ahora suenan ocho, y cada una tiene su
+momento.** Es el paso 6 del "Qué hacer, en orden" de ese documento, que era el
+único que quedaba.
+
+**Lo que hay montado:**
+
+- **`musica.py`**, que elige el corte MIDIENDO. Barre inicios en frontera de
+  compás, puntúa cada candidato y saca la tabla de las catorce tomas.
+- **`NodoMusica`**, con dos reproductores que se cruzan en 0,8 s, catálogo con
+  candado y ducking cuando hay más de una bola en juego.
+- **Dos buses de audio**, con la música 8 dB por debajo de los efectos. Es la
+  regla de mezcla de §3, que hasta hoy no tenía dónde aplicarse porque todo iba
+  al `Master`.
+- **`VistaMesa._musica_que_toca()`**, que se PREGUNTA cada fotograma en vez de
+  encenderse al cambiar de pantalla. Ver el invariante nuevo en `CLAUDE.md`.
+
+**Las tomas están elegidas por MEDIDA, y eso es lo primero que hay que cerrar de
+oído.** La columna que decide, `costura`, dice cuál de las dos CIERRA mejor el
+bucle — no cuál suena mejor. La tabla entera está en
+`assets/INVENTARIO_HOJAS.md`, tanda 0m.
+
+**Lo que se aprendió, y va entero en `CLAUDE.md`:**
+
+- **El BPM del prompt es una hipótesis.** Cinco de siete piezas salieron a un
+  tempo que no es el que se pidió; `caza` pedía 120 y sus dos tomas dieron 83,4
+  y 80,7. Como la rejilla de compases sale del BPM, cortar con el pedido es
+  cortar fuera de compás, o sea el clic que §2 existe para evitar.
+- **Un bucle se juzga en el EMPALME, no oyéndolo entero.** La primera métrica
+  comparaba el espectro medio y daba de 0,94 a 0,99 en las catorce tomas: no
+  separaba nada, porque estas piezas son PLANAS a propósito. Medida sobre los
+  onsets, la misma tabla se abre de −0,15 a 0,91.
+- **Y descartado por medida:** repartir el peso según la fuerza del pulso, para
+  las piezas ambientales donde la costura por golpes no mediría. Sale de 0,645 a
+  0,897 en las catorce, así que no separa ambientales de rítmicas: era un mando
+  que no tocaba nada.
+
+**Dos decisiones de dónde vive cada cosa:**
+
+- **Las tomas de Suno salen del repo**, a `Desktop/Musica`, igual que las hojas
+  de IA viven en `Desktop/Sprites`. De 46 MB a 4 MB, y el candado de catálogo
+  deja de tener catorce OGG que nadie pide.
+- **`tienda` no entra todavía.** No hay tienda ni descanso con pantalla, así que
+  no existe el momento en que sonaría, y eso es el invariante del banco de
+  sonidos palabra por palabra. Está cortada y guardada con las tomas; el día que
+  haya tienda se cambia una línea en `musica.py` y se le añade su fila a
+  `NodoMusica.PIEZAS`, en el mismo commit.
+
+**LO QUE NO SE HA PODIDO COMPROBAR AQUÍ, Y POR ESO ESTÁ ENTERO EN LAS PREGUNTAS:
+NADA DE ESTO SE HA OÍDO.** La batería corre con el driver Dummy, y una voz fuera
+de un árbol activo nunca llega a sonar: lo que está probado es el catálogo, los
+buses y la lógica, no que suene bien. Los bucles repetidos tres veces están en
+`Desktop/Musica/_revision` para poder juzgarlos sin abrir el juego.
 
 ## ANIMACIÓN DE IA: DÓNDE ESTÁ EL TECHO (tanda 0k-arte · 20-ago)
 
@@ -1839,6 +1900,62 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+**LO DE ESTA SESIÓN (tanda 0m, la música). NADA DE ESTO SE HA OÍDO, así que la
+lista entera es de oreja y no hay ninguna medida detrás que la respalde.**
+
+**Lo más rápido, y no hace falta abrir el juego:** en
+`Desktop\Musica\_revision` hay catorce ficheros `<pieza>_<toma>_x3.ogg`, que son
+cada bucle repetido tres veces seguidas. El empalme solo existe cuando el
+archivo vuelve a empezar, así que es donde se oye si el corte está bien. Se
+vuelven a sacar con `python musica.py mosaico --a <carpeta>`.
+
+**U1.** **La pregunta de la tanda: ¿la toma elegida es la buena?** Están
+elegidas midiendo cuál CIERRA mejor el bucle, que no es lo mismo que cuál suena
+mejor, y la diferencia entre las dos tomas de una pieza puede ser enorme. Se
+cambia una letra en `PIEZAS`, dentro de `musica.py`, y se vuelve a cortar.
+
+**U2.** **`recuperado` es la que más falta hace oír, y la que peor mide.** Es la
+pieza importante del documento —la melodía que se corta a la mitad, lo único
+bonito del juego, y suena justo después de perder un run— y ninguna de sus dos
+tomas da un bucle decente: la costura sale 0,182 y 0,341 sobre un máximo de 1.
+La causa es su propio prompt, que pide silencios largos y una frase que no
+resuelve, o sea lo contrario de algo que se repita. **Entró la toma b porque se
+repite tres veces más que la a**, no porque suene mejor. Si la a es la bonita,
+gana la bonita y ya buscaremos dónde cortarla.
+
+**U3.** ¿Se oye el corte? A la tercera vuelta de un `_x3`, si algo molesta, es
+el corte y no la música. Los dos mandos están en `musica.py`: `inicio` mueve
+dónde empieza y `compases` cuánto dura.
+
+**U4.** **La mezcla.** La música va 8 dB por debajo de los efectos, y ese número
+está puesto a ojo contra una regla escrita (§3: los efectos ocupan de 150 Hz a
+1 kHz y suenan todo el rato). Con una bola encima, ¿se oye la música, o estorba?
+El mando es el bus `Musica` en `audio_bus_layout.tres`, y los ajustes por pieza
+están en `NodoMusica.PIEZAS`.
+
+**U5.** **El cruce de 0,8 s**, al bajar del mapa a la mesa y al volver. ¿Se
+siente como un cambio de sitio, o como que alguien ha cambiado de emisora? El
+mando es `NodoMusica.CRUCE`.
+
+**U6.** **El arranque.** Suena 7,8 s al abrir el juego y no se deja pisar. ¿Es
+demasiado antes de poder tocar nada? El prompt pedía 4 s y la toma dura el
+doble. Se recorta cambiando el `+ 0.5` de la cola en `musica.py`.
+
+**U7.** **`caza`.** El prompt pedía 120 BPM para dar prisa y Suno dio 83,4.
+¿Sigue dando prisa, o suena a paseo? Esta no se arregla cortando: se regenera.
+
+**U8.** **El ducking del multibola** baja la música 4 dB mientras hay más de una
+bola. ¿Se nota, ayuda, o es un mando que no toca nada? `NodoMusica.AGACHE_DB`.
+
+**U9.** **`tilt` y el silencio de detrás.** El sting dura 7,1 s y la pantalla
+azul se queda muda después, a propósito. ¿El silencio pesa lo que tiene que
+pesar, o parece que el juego se ha colgado?
+
+**U10.** **Y la que no es de oreja: ¿dónde suena `tienda`?** Está cortada y
+fuera del repo porque hoy no hay ningún momento donde ponerla — un nodo de
+descanso se resuelve solo y te devuelve al mapa. O el descanso tiene pantalla,
+o esta pieza espera a que haya tienda. **Es decisión de diseño, no de oído.**
+
 **LO DE ESTA SESIÓN (tanda 7, el reproductor). Esto no se mide, se mira:**
 
 **A1.** Abre *Inicio → Nueva partida* con Brasa o Calavera recuperada y mira el
@@ -2219,6 +2336,24 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 0h2. ~~**QUE CAERSE SUENE**~~ **HECHA Y MEDIDA.** 506/506, dos sonidos nuevos,
    `retardo` en `sonidos.py` y dos candados de batería. Ver arriba. Lo que queda
    de esta tanda es **oírlos** (S1-S3, abajo) y decidir lo de `flipper_golpeado`.
+
+0m. ~~**LA MÚSICA ENTRA EN EL JUEGO**~~ **HECHA.** `musica.py`, `NodoMusica`,
+   dos buses y el decisor. Ver arriba. **Lo que queda de esta tanda es OÍRLA**
+   —U1-U10— y no es un trámite: las tomas están elegidas por medida y la medida
+   solo sabe cuál cierra mejor el bucle.
+
+0m-2. **LO QUE FALTA DE AUDIO, y casi nada es generar** (Sonnet, medio, salvo
+   donde diga otra cosa). En orden de lo barato a lo caro:
+   - **Las tres puntadas de la captura** (`prompts_musica.md` §6b) se RECORTAN
+     de `recuperado.ogg`, no se generan. Y llevan su propio ducking.
+   - **Los stems de `combate` y de `caza`**, que dan cinco estados de música
+     por el precio de cero generaciones: los actos II y III, MODO SEGURO, y el
+     rastro y el regreso de la caza. Suno los exporta; no hay que pedirle nada.
+   - **La capa aguda de la DESCARGA de rampa**, que ya tiene su barra montada
+     desde la tanda 0k y sería lo primero que reaccione a la mesa.
+   - **Las cuatro piezas-archivo de `prompts_canciones.md`**, sin generar:
+     `los_nueve_cascabeles`, `sin_titulo`, `cascabel_sa`, `nana`. Y estas sí
+     necesitan a alguien delante de Suno.
 
 0j. **EL 3 % DE ENTRADA AL UMBRAL** (Daniel y Fátima). Con la planta alta ya
    rehecha, la pregunta vuelve a estar viva y es la primera de `CAZA.md` §7: una

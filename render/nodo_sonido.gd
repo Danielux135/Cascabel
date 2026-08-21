@@ -9,6 +9,10 @@ extends Node
 
 const RUTA := "res://assets/sonido/%s.wav"
 const VOCES := 14
+## Su propio bus, para poder mover la música por debajo sin tocar los catorce
+## ajustes de aquí. `assets/prompts_musica.md` §3: estos sonidos ocupan de
+## 150 Hz a 1 kHz y suenan todo el rato, así que la separación no es de gusto.
+const BUS := "Efectos"
 
 ## Ajuste por sonido. `db` es el volumen final y `tono` cuánto se desafina al
 ## azar cada vez: los que suenan muchas veces seguidas necesitan variación o el
@@ -62,10 +66,12 @@ func _ready() -> void:
 			push_warning("Falta %s. Se genera con: python sonidos.py" % ruta)
 	for _i in VOCES:
 		var v := AudioStreamPlayer.new()
+		v.bus = BUS
 		add_child(v)
 		_voces.append(v)
 	for nombre in PROPIOS:
 		var v := AudioStreamPlayer.new()
+		v.bus = BUS
 		add_child(v)
 		_propias[nombre] = v
 

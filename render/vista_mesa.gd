@@ -223,6 +223,7 @@ var _rng := RandomNumberGenerator.new()
 var _flipper_izq_antes := false
 var _flipper_der_antes := false
 var _sonido: NodoSonido
+var _musica: NodoMusica
 var _nodo_suelo: NodoSuelo
 var _tex_girador: Array[Texture2D] = []
 var _giro: Array[float] = []
@@ -254,6 +255,12 @@ func _ready() -> void:
 	impactos = Impactos.new(impacto)
 	_sonido = NodoSonido.new()
 	add_child(_sonido)
+	_musica = NodoMusica.new()
+	add_child(_musica)
+	# EL ARRANQUE SUENA UNA VEZ Y AQUÍ, que es lo único que pasa antes del
+	# escritorio (`assets/prompts_musica.md` §4.10). En cuanto `_musica_que_toca`
+	# empiece a mandar, la cruzará por la del escritorio ella sola.
+	_musica.poner("arranque")
 	cascara = NodoCascara.new(self, cam, anim)
 	add_child(cascara)
 	_nodo_suelo = NodoSuelo.new(self)
@@ -639,8 +646,59 @@ func _congelar(fuerza: float) -> void:
 func _sacudir(cantidad: float) -> void:
 	_sacudida = minf(maxf(_sacudida, cantidad), anim.sacudida_maxima)
 
+## QUÉ PIEZA TOCA AHORA. Se llama cada fotograma y no dispara nada por su
+## cuenta: mira el estado y lo dice. `NodoMusica.poner` con lo que ya suena no
+## hace nada, así que aquí no hay que acordarse de apagar ni de encender.
+##
+## ESO ES LA DECISIÓN, no un detalle de implementación. La otra forma de
+## escribir esto es que cada sitio que cambia de pantalla ponga su música al
+## pasar, y eso es exactamente la avería de la caza que cruzaba de un combate
+## al siguiente: un estado que se enciende en un sitio y hay que acordarse de
+## apagar en otro acaba puesto donde no toca. Preguntando cada fotograma no hay
+## nada que se quede encendido.
+##
+## El orden de los casos ES la prioridad, y va de lo más raro a lo más común:
+## lo de arriba tapa a lo de abajo.
+func _musica_que_toca() -> void:
+	if _musica == null:
+		return
+	# CON VARIAS BOLAS LA MÚSICA SE AGACHA (`prompts_musica.md` §3). Cuatro
+	# bolas son cuatro veces más golpes por segundo, y ahí la música estorba.
+	_musica.agachar(mesa != null and mesa.bolas.size() > 1)
+
+	if tilt != null and tilt.visible:
+		_musica.poner("tilt")
+		return
+	# La carpeta RECUPERADO manda sobre todo lo demás porque es lo único que se
+	# abre ENCIMA de otra cosa: se llega a ella desde el escritorio o desde el
+	# menú de Inicio, y su pieza es la recompensa de `PROPÓSITO.md` §2.
+	if sistema != null and sistema.abierto == "recuperado":
+		_musica.poner("recuperado")
+		return
+	# Y CUALQUIER OTRA VENTANA DEL SISTEMA TAMBIÉN MANDA, porque congela la
+	# mesa: con la preparación o la papelera delante ya no se está jugando, se
+	# está en la cáscara, y la pieza de la cáscara es `escritorio`. Se pregunta
+	# por `congela_la_mesa` y no por `hay_algo` a propósito — el menú de Inicio
+	# abierto no congela nada, así que no cambia lo que suena.
+	if sistema != null and sistema.congela_la_mesa():
+		_musica.poner("escritorio")
+		return
+	if mesa != null and mesa.en_caza:
+		_musica.poner("caza")
+		return
+	if not _en_mapa and run != null and not run.terminada():
+		var n := run.nodo_actual()
+		var es_jefe: bool = n != null and n.tipo == NodoMapa.Tipo.JEFE
+		_musica.poner("jefe" if es_jefe else "combate")
+		return
+	if _en_mapa and _pantalla_mapa != null and _pantalla_mapa.visible:
+		_musica.poner("mapa")
+		return
+	_musica.poner("escritorio")
+
 func _process(delta: float) -> void:
 	_tiempo += delta
+	_musica_que_toca()
 	# El reloj de la descarga lo lleva la mesa; aquí solo se copia para poder
 	# dibujarla vaciándose entre subpasos. Copiar en vez de restar por nuestra
 	# cuenta es lo que impide que la barra y el daño doblado dejen de cuadrar.

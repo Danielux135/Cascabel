@@ -40,6 +40,7 @@ func _initialize() -> void:
 	_prueba_capas()
 	_prueba_carga()
 	_prueba_sonido()
+	_prueba_musica()
 	_prueba_impactos()
 	_prueba_racimo()
 	_prueba_zona_alta()
@@ -5701,3 +5702,138 @@ func _prueba_paleta() -> void:
 			fuera.append(str(pareja[0]))
 	_comprobar("todos los alias por uso salen de la paleta",
 		fuera.is_empty(), str(fuera))
+
+
+# ------------------------------------------------------------------- musica
+
+## LA MÚSICA, Y SUS CANDADOS.
+##
+## Casi todo lo de aquí es la misma familia de averías que ya han costado dos
+## tandas: un asset que existe y no carga nadie, y un ajuste que se pierde al
+## reimportar. Ninguna de las dos da error — dejan el juego mudo, o sonando lo
+## que no toca, y eso se diagnostica como "la música no funciona".
+func _prueba_musica() -> void:
+	# Que exista lo que el juego pide.
+	var faltan: Array[String] = []
+	for nombre in NodoMusica.PIEZAS:
+		var ruta: String = NodoMusica.RUTA % nombre
+		if not ResourceLoader.exists(ruta):
+			faltan.append(nombre)
+	_comprobar("estan las %d piezas de musica" % NodoMusica.PIEZAS.size(),
+		faltan.is_empty() and NodoMusica.PIEZAS.size() >= 6,
+		"%s: se cortan con `python musica.py cortar --aplicar`" % str(faltan))
+
+	# Y AL REVÉS, que es el candado que de verdad hace falta: que el juego pida
+	# todo lo que hay en disco. Un OGG cortado y sin enganchar es la misma
+	# avería que el wav mudo de la tanda 0h2 y que las dos criaturas de la
+	# tanda 7, que llevaban meses cortadas sin que las cargara nadie.
+	var sueltas: Array[String] = []
+	var dir := DirAccess.open("res://assets/musica")
+	if dir != null:
+		for f in dir.get_files():
+			if not f.ends_with(".ogg"):
+				continue
+			if not NodoMusica.PIEZAS.has(f.get_basename()):
+				sueltas.append(f.get_basename())
+	_comprobar("no hay ninguna pieza cortada que el juego no use",
+		sueltas.is_empty(),
+		"%s: o se enganchan o salen de assets/musica/" % str(sueltas))
+
+	# EL BUCLE SE COMPRUEBA CARGADO, no en el .import. Godot sirve la copia de
+	# `.godot/imported/`, así que un flag puesto a mano se pierde en la
+	# siguiente reimportación y la pieza pasa a sonar una vez y callar — con la
+	# mesa en silencio a partir del segundo 40 y sin un solo error.
+	# Se comprueba DESPUÉS de montar el nodo, porque es él quien pone el flag
+	# al cargar: mirarlo sobre el recurso a pelo mediría el .import, que es
+	# justo lo que no manda.
+	var nm := NodoMusica.new()
+	root.add_child(nm)
+	# `preparar` a mano: meter un nodo en `root` desde un `SceneTree` pelado no
+	# dispara `_ready`, así que sin esto todo lo de abajo mediría un nodo vacío
+	# y pasaría siempre.
+	nm.preparar()
+	var sin_bucle: Array[String] = []
+	var con_bucle_de_mas: Array[String] = []
+	for nombre in NodoMusica.PIEZAS:
+		var ruta: String = NodoMusica.RUTA % nombre
+		if not ResourceLoader.exists(ruta):
+			continue
+		var s := load(ruta) as AudioStreamOggVorbis
+		if s == null:
+			continue
+		var quiere: bool = bool(
+			(NodoMusica.PIEZAS[nombre] as Dictionary)["bucle"])
+		if quiere and not s.loop:
+			sin_bucle.append(nombre)
+		if not quiere and s.loop:
+			con_bucle_de_mas.append(nombre)
+	_comprobar("las piezas con bucle se cargan con loop puesto",
+		sin_bucle.is_empty(), str(sin_bucle))
+	# Y las dos que terminan NO pueden llevarlo: `tilt` en bucle sería la
+	# pantalla azul repitiendo su golpe cada siete segundos para siempre, y el
+	# silencio de detrás es parte del efecto.
+	_comprobar("`arranque` y `tilt` no se repiten",
+		con_bucle_de_mas.is_empty(), str(con_bucle_de_mas))
+
+	# LOS DOS BUSES EXISTEN Y LA MÚSICA VA POR DEBAJO. Es la regla de mezcla de
+	# `prompts_musica.md` §3, y si el layout no se carga, Godot deja un solo
+	# bus `Master`: todo sonaría al mismo nivel y cada bola sería un barrizal.
+	var i_mus := AudioServer.get_bus_index(NodoMusica.BUS)
+	var i_efe := AudioServer.get_bus_index(NodoSonido.BUS)
+	_comprobar("existen los buses de musica y de efectos",
+		i_mus >= 0 and i_efe >= 0, "musica=%d efectos=%d" % [i_mus, i_efe])
+	if i_mus >= 0 and i_efe >= 0:
+		_comprobar("la musica suena por debajo de los efectos",
+			AudioServer.get_bus_volume_db(i_mus)
+				< AudioServer.get_bus_volume_db(i_efe),
+			"musica %.1f dB, efectos %.1f dB" % [
+				AudioServer.get_bus_volume_db(i_mus),
+				AudioServer.get_bus_volume_db(i_efe)])
+
+	# PEDIR LO QUE YA SUENA NO HACE NADA. De esto depende que el decisor pueda
+	# llamarse cada fotograma sin llevar cuenta de nada, que es lo que impide
+	# la avería de un estado que se enciende en un sitio y hay que acordarse de
+	# apagar en otro.
+	nm.poner("mapa")
+	var antes := nm.sonando
+	nm.poner("mapa")
+	_comprobar("poner la pieza que ya suena la deja donde esta",
+		nm.sonando == antes and antes == "mapa", nm.sonando)
+
+	# UNA PIEZA CON BUCLE NO ESTÁ PROTEGIDA, o sea que el estado del juego
+	# siempre puede cambiar la música. La otra mitad de `protegida` —que la voz
+	# siga sonando— NO se puede comprobar aquí: la batería corre sin tarjeta de
+	# sonido, con el driver Dummy, y una voz que no está en un árbol activo
+	# nunca dice `playing`. Que `arranque` no se deje pisar se oye jugando.
+	_comprobar("una pieza con bucle no bloquea el cambio",
+		not nm.protegida(), nm.sonando)
+
+	# LAS QUE TERMINAN SON EXACTAMENTE DOS, y esta es la mitad de `protegida`
+	# que sí se equivoca sola: la que se rompe el día que alguien añada una
+	# pieza nueva y le ponga `bucle` a lo que le suene mejor.
+	var terminan: Array[String] = []
+	for nombre in NodoMusica.PIEZAS:
+		if not bool((NodoMusica.PIEZAS[nombre] as Dictionary)["bucle"]):
+			terminan.append(nombre)
+	terminan.sort()
+	_comprobar("las unicas piezas que terminan son `arranque` y `tilt`",
+		terminan == ["arranque", "tilt"], str(terminan))
+	nm.queue_free()
+
+	# EL DECISOR PIDE PIEZAS QUE EXISTEN. Es la trampa del identificador
+	# escrito a mano: una `poner("tienda")` con la pieza fuera del repo no da
+	# error, deja el momento en silencio. Se lee del fichero para que añadir un
+	# caso nuevo mal escrito ponga esto en rojo solo.
+	var pedidas: Array[String] = []
+	var fv := FileAccess.open("res://render/vista_mesa.gd", FileAccess.READ)
+	if fv != null:
+		var re := RegEx.new()
+		re.compile('_musica\\.poner\\("([a-z_]+)"')
+		for m in re.search_all(fv.get_as_text()):
+			var q := m.get_string(1)
+			if not NodoMusica.PIEZAS.has(q) and not pedidas.has(q):
+				pedidas.append(q)
+		fv.close()
+	_comprobar("el juego no pide ninguna pieza que no exista",
+		pedidas.is_empty(),
+		"%s: falta su fila en NodoMusica.PIEZAS" % str(pedidas))

@@ -334,6 +334,16 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   en `prompts_musica.md`. Si un candidato de Suno sale con voz, muestra vocal
   o algo que se le parezca, se descarta y se regenera: no se recorta la voz
   después.
+- **LA MÚSICA SE PREGUNTA CADA FOTOGRAMA, NO SE ENCIENDE AL CAMBIAR DE
+  PANTALLA.** `VistaMesa._musica_que_toca()` mira el estado y dice qué toca;
+  `NodoMusica.poner` con lo que ya suena no hace nada. La otra forma —que cada
+  sitio que cambia de pantalla ponga su pieza al pasar— es la avería de la caza
+  que cruzaba de un combate al siguiente: **un estado que se enciende en un
+  sitio y hay que acordarse de apagar en otro acaba puesto donde no toca**.
+  Preguntando, no hay nada que se quede encendido, y el orden de los casos ES
+  la prioridad. Las dos únicas que mandan sobre eso son las que TERMINAN,
+  `arranque` y `tilt`: mientras suenan no se dejan pisar, porque si no el
+  escritorio se come al arranque en el primer fotograma.
 - **La cáscara va en PIXELART, con marcos de nueve trozos.** Misma rejilla y
   misma paleta que el resto. Se acabó dibujarla por código con degradados y
   biselados en resolución nativa: era más cara y peleaba con el arte.
@@ -1358,6 +1368,57 @@ sirve para decidir si dos sonidos se confunden.**
   tamaño que quepa**: `_tam_que_cabe` en `nodo_hud.gd`, que prueba por
   múltiplos de la celda. Todo texto de ancho variable que venga de un JSON
   (nombres de enemigo, de reliquia, de misión) tiene que pasar por ahí.
+
+### EL BPM QUE PEDISTE EN EL PROMPT ES UNA HIPÓTESIS (ago-2026)
+
+`prompts_musica.md` §2 pega a todos los prompts un bloque que dice `exactly NN
+BPM`, y explica por qué es lo primero que hay que exigir: **sin tempo fijo no
+hay rejilla de compases, y sin rejilla no hay dónde cortar**. Todo correcto. Lo
+que no dice es que Suno lo obedece a medias.
+
+Medidas las catorce tomas, **cinco de las siete piezas salieron a un tempo que
+no es el que se pidió**. `caza` pedía 120 y las dos tomas dieron 83,4 y 80,7;
+`recuperado` pedía 56 y su toma buena va a 136. Y como el compás sale del BPM,
+cortar con el número del prompt es cortar FUERA de frontera de compás — o sea
+exactamente el clic que el bloque L existía para evitar.
+
+**La regla: el BPM de un prompt es lo que se pidió, no lo que hay.** Se mide
+sobre el archivo antes de cortar nada, y lo medido manda. Es la misma familia
+que "un parámetro de tacto se mide contra lo que la mesa PRODUCE": el número
+escrito es la hipótesis y el material es el dato.
+
+**Y el corolario, que es de dónde salió esto:** el detector confunde el pulso
+con el medio pulso constantemente —`jefe` salió a 52,7 contra 108 pedidos, que
+es la mitad justa— así que el doble y la mitad cuentan como el mismo tempo. Un
+detector que no lo contemple marca como incumplidas piezas que están bien.
+
+### Un bucle no se juzga oyéndolo: se juzga en el EMPALME (ago-2026)
+
+La primera versión de `musica.py` puntuaba el corte comparando el espectro
+medio del final con el del principio, y dio **de 0,94 a 0,99 en las catorce
+tomas**: una medida que no separa nada. La causa está escrita en el propio
+documento que la pedía — §2 pide piezas PLANAS, "cualquier trozo suena como
+cualquier otro"—, así que el timbre medio es el mismo en toda la pieza y no
+dice nada del corte.
+
+Lo que distingue un bucle que cierra de uno que no es **dónde caen los golpes**,
+y eso es tiempo. Midiendo la correlación de la envolvente de onsets entre lo que
+viene DESPUÉS del final y lo que viene DESPUÉS del inicio, la misma tabla se
+abre de **−0,15 a 0,91**. Es la avería de `sonidos.py` otra vez —"una medida de
+timbre que ignora el tiempo no sirve para decidir si dos sonidos se confunden"—
+y esta vez en la costura en vez de en el timbre.
+
+**Y probado y descartado:** repartir el peso según la fuerza del pulso, para las
+piezas ambientales donde la costura por golpes no mediría. La fuerza de pulso
+sale de 0,645 a 0,897 en las catorce, o sea que no separa ambientales de
+rítmicas: era un mando que no tocaba nada. La contradice además el dato que iba
+a proteger — si en `escritorio` no hubiera nada que correlacionar, sus dos tomas
+darían las dos cerca de cero, y dan +0,855 y −0,152.
+
+**Lo que sí hace falta es el mosaico**, que aquí es de oído: `musica.py mosaico`
+saca cada bucle repetido tres veces, porque el empalme solo existe cuando el
+archivo vuelve a empezar. Es lo mismo que montar el mosaico 6×6 antes de copiar
+una hoja de nueve trozos al repo.
 
 ### Una regla sacada de UNA rampa no vale para las nueve (ago-2026)
 

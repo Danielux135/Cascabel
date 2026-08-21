@@ -3,3 +3,6 @@
 /android/
 _to_delete/
 .claude/
+
+# Las herramientas de Python del repo (musica.py, anim.py, ...)
+__pycache__/

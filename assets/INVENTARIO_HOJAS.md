@@ -301,3 +301,53 @@ que le da al generador la escala de alturas del bucle.
 ⚠ **`brasa_spritesheet.png`, en Downloads, NO es la tira del juego** aunque mida
 lo mismo (512×64): es la versión antigua con el arco de piedra, sobre fondo
 negro y con 19 colores. Adjuntarla como referencia es pedir el sprite viejo.
+
+---
+
+## Tanda 0m — 20 de agosto, LA MÚSICA ENTRA EN EL JUEGO
+
+Primera tanda de este inventario que no es de imágenes. Se apunta aquí por lo
+mismo que las hojas: **las tomas de Suno viven fuera del repo** y sin índice
+nadie sabe de cuál salió cada bucle.
+
+**Dónde están las tomas:** `C:\Users\Daniel\Desktop\Musica` (fuera del repo),
+igual que `Desktop\Sprites` para las hojas. Son 46 MB de material bruto —de
+62 a 147 s por toma— que el juego no carga. En `assets/musica/` solo van los
+recortes, que suman 4 MB.
+
+**Los recortes de `_revision/`** son cada bucle repetido tres veces, para poder
+oír la costura. No son assets: se pueden borrar y volver a sacar con
+`python musica.py mosaico --a <carpeta>`.
+
+| pieza | toma | recorte | largo | costura | quién la pide |
+|---|---|---|---|---|---|
+| `combate` | **b** | 42,92 s + 16 cp | 40,00 s | 0,891 | combate normal y élite |
+| `escritorio` | **a** | 32,00 s + 8 cp | 32,00 s | 0,855 | escritorio, Inicio, preparación |
+| `recuperado` | **b** | 105,91 s + 16 cp | 28,24 s | 0,341 | la carpeta `RECUPERADO` abierta |
+| `jefe` | **b** | 40,05 s + 16 cp | 35,56 s | 0,686 | nodo de mapa de tipo JEFE |
+| `mapa` | **a** | 23,44 s + 8 cp | 22,86 s | 0,905 | el explorador de carpetas |
+| `caza` | **a** | 20,41 s + 12 cp | 34,53 s | 0,844 | `mesa.en_caza` |
+| `tienda` | a | 31,09 s + 8 cp | 27,43 s | 0,810 | **NADIE TODAVÍA** — ver abajo |
+| `arranque` | única | cola cortada | 7,84 s | — | una vez, al abrir el juego |
+| `tilt` | única | cola cortada | 7,14 s | — | la pantalla azul |
+
+**Las tomas están elegidas por MEDIDA, no de oído**, y eso es lo primero que
+hay que cerrar: la columna `costura` dice cuál de las dos CIERRA mejor el
+bucle, que no es lo mismo que cuál suena mejor. Los `_x3` están para eso.
+
+**`tienda` no entró al repo** y es a propósito: no hay tienda ni descanso con
+pantalla, así que no existe el momento en que sonaría. Es el invariante del
+banco de sonidos de `CLAUDE.md`, palabra por palabra. Está cortada y guardada
+con las tomas; el día que haya tienda se cambia `enganchada` a `True` en
+`musica.py` y se le añade su fila a `NodoMusica.PIEZAS`, en el mismo commit.
+
+**Lo que se aprendió de Suno, y va en `CLAUDE.md`:** el BPM del prompt es una
+hipótesis. De siete piezas, cinco salieron con un tempo que no es el pedido —
+`caza` pedía 120 y las dos tomas dieron 83,4 y 80,7— y como la rejilla de
+compases sale del BPM, cortar con el pedido es cortar fuera de compás, que es
+justo lo que produce el clic que §2 quiere evitar.
+
+**Sin generar todavía** (`prompts_canciones.md`, las cuatro piezas-archivo):
+`los_nueve_cascabeles`, `sin_titulo`, `cascabel_sa`, `nana`. Y de
+`prompts_musica.md`: las tres puntadas de captura de §6b —que se recortan de
+`recuperado`, no se generan— y los stems de `combate` y `caza`.
