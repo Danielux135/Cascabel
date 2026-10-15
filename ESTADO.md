@@ -81,7 +81,7 @@ son las fases de la captura (§2) y las nueve criaturas.
 
 Con 14 misiones y tres por combate se veían casi todas en un run. Ahora son
 **28: 10 comunes, 10 raras y 8 arcanas**, solo con tiros que ya existen y
-ninguna de la planta alta. **Es una lista para revisar** (pregunta M1). Las
+ninguna de la planta alta. **Es una lista para revisar** (pregunta MI1). Las
 nuevas:
 
 | Rareza | Misiones |
@@ -193,7 +193,7 @@ rehace en cada `iniciar` y **neutro exacto con la lista vacía**. No gasta azar.
 El panel del enemigo los escribe a la izquierda del retrato, y se enciende el que
 está actuando. Uno por commit.
 
-**QUIÉN LLEVA CADA UNO ES UNA PROPUESTA** (pregunta F1). El acto I va sin
+**QUIÉN LLEVA CADA UNO ES UNA PROPUESTA** (pregunta E1). El acto I va sin
 ninguno, a propósito: es donde se aprende la mesa. `DISEÑO.md` §12 pone los
 enemigos que responden desde el acto II.
 
@@ -241,7 +241,7 @@ enemigos que responden desde el acto II.
   que alimenta el combo, pega a un cuarto: contra ella hay que buscar el cañón o
   subir el multiplicador para que un retorno llegue. **El veneno lo atraviesa**,
   porque no es un golpe, y eso la deja como el enemigo contra el que el veneno
-  brilla (pregunta F6).
+  brilla (pregunta E6).
 - **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y va en el
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
@@ -2195,7 +2195,7 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
 
 **LO DE LAS MISIONES NUEVAS.**
 
-**M1.** **¿Valen las catorce nuevas?** Están en la tabla de arriba y en
+**MI1.** **¿Valen las catorce nuevas?** Están en la tabla de arriba y en
 `data/misiones.json`, al final. Las que más pueden fallar: **Todo o nada** pide
 retorno, cañón y platillo en una sola bola, y si se hace imposible es la
 primera que sobra; y **Ronda** usa la órbita, que el lanzamiento a tope regala,
@@ -2203,14 +2203,14 @@ así que depende de la decisión abierta del tramo gratis. **Remate y Lanzadera
 acababan en órbita y se cambiaron** por eso mismo: una misión en orden que
 termina en el tiro que regala el lanzamiento se cierra sirviendo la bola. Ahora
 Remate es banco y retorno, y Lanzadera retorno, cañón y retorno.
-**M3.** **La planta alta cuenta para las misiones**, y es una decisión que nadie
+**MI3.** **La planta alta cuenta para las misiones**, y es una decisión que nadie
 ha tomado: la subida a la isla paga como el cañón, la órbita alta como la
 órbita y los túneles como retornos, así que cuentan como esos tiros. Y como
 arriba hay salvabolas, **"sin drenar" no corre ningún riesgo mientras dura la
 caza**. ¿Está bien así —la caza como sitio para avanzar misiones— o los tiros de
 arriba no deberían contar? Lo que sí se quitó es el regreso: lo hace la mesa
 sola al acabarse el tiempo y contaba un retorno gratis en cada caza.
-**M2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
+**MI2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
 queda así, o se le busca un nombre de catorce letras?
 
 **LO DE CAOS (la tabla de la tarea 3).**
@@ -2226,39 +2226,39 @@ juego más fácil"—, y esa decisión es vuestra.
 **LO DE LA FASE 6 (comportamientos de enemigo).** Para ver uno sin esperar al
 acto que le toca: la tabla del apartado de arriba dice qué enemigo lo lleva.
 
-**F1.** **¿Quién lleva cada uno?** La tabla es una propuesta razonada, no una
+**E1.** **¿Quién lleva cada uno?** La tabla es una propuesta razonada, no una
 decisión. Las dos preguntas de fondo: ¿el acto I sin ninguno está bien, o se
 hace largo aprender la mesa contra sacos? ¿Y los jefes —que son uno de los tres
 del acto al azar, con ×1,5 de vida— deberían llevar DOS comportamientos?
-**F2.** **La Gárgola acelera su reloj ×1,6 mientras cazas.** ¿Se nota? ¿Te hace
+**E2.** **La Gárgola acelera su reloj ×1,6 mientras cazas.** ¿Se nota? ¿Te hace
 pensártelo antes de subir, que es para lo que está, o la caza sigue siendo un
 regalo? El dial es `caza_factor_reloj`, y una fila del JSON puede traer el suyo.
-**F3.** Los comportamientos salen escritos a la izquierda del retrato del
+**E3.** Los comportamientos salen escritos a la izquierda del retrato del
 enemigo, y el que está actuando se pone en rojo. ¿Se lee de reojo?
-**F4.** **El Cultista se cura** el 1 % por segundo a los 6 s sin tocarle, y su
+**E4.** **El Cultista se cura** el 1 % por segundo a los 6 s sin tocarle, y su
 barra se pone verde. ¿Se nota la presión de "no puedo esperar en la cuna"? ¿Y el
 veneno debería contar como tocarle? Hoy NO (`cura_tocan_los_estados`): si
 contara, la build de veneno anularía el comportamiento sin jugar la mesa.
-**F5.** **El Goblin bruto te roba un tramo** si su reloj pega con el combo en x3
+**E5.** **El Goblin bruto te roba un tramo** si su reloj pega con el combo en x3
 o más. ¿Se entiende por qué ha pasado, con el "de x4 a x3" y el rótulo
 encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales:
 `castigo_desde`, `castigo_factor_por_tramo`, `castigo_tramos_robados`.
-**F6.** **La Armadura vacía lleva blindaje.** ¿Se entiende que el racimo le hace
+**E6.** **La Armadura vacía lleva blindaje.** ¿Se entiende que el racimo le hace
 cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas?
 ¿Y está bien que el veneno lo atraviese entero? Diales: `blindaje_capas`,
 `blindaje_umbral` (fracción del cañón), `blindaje_factor`, `blindaje_regenera`.
-**F8.** **La Calavera cierra el cañón** hasta que le das por otro sitio. ¿Se
+**E8.** **La Calavera cierra el cañón** hasta que le das por otro sitio. ¿Se
 entiende con el "BLOQUEADO" y el "CAÑÓN ABIERTO"? ¿Es el cañón el que tiene que
 cerrar, o otro recorrido? Una fila del JSON lo cambia (`"tiro"`); los diales son
 `bloqueo_tiro` y `bloqueo_rearme`.
-**F9.** **En la planta alta ni se bloquea ni se refleja nada**: los túneles y la
+**E9.** **En la planta alta ni se bloquea ni se refleja nada**: los túneles y la
 subida no son tiros que se apunten igual que abajo (un túnel se repite solo
 rebotando en su bumper) y la caza es un bonus. La que castiga cazar es la
 Gárgola. ¿Bien así, o la Calavera y el Esqueleto también deberían mirar arriba?
 Por lo mismo, **el rearme del bloqueo no corre mientras cazas**: el umbral abre el
 cañón y lo encuentras abierto al bajar.
-Y la F8 tiene un matiz: el cañón cerrado sigue cargando la barra de descarga.
-**F7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
+Y la E8 tiene un matiz: el cañón cerrado sigue cargando la barra de descarga.
+**E7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
 solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
 lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.
 
@@ -2786,7 +2786,7 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 
 1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto) — **EN
    CURSO**, ver el apartado de arriba: uno por commit. Lo que queda de esta
-   tanda es jugarla y contestar F1-F3.
+   tanda es jugarla y contestar E1-E3.
 1a. ~~**PONER LA BATERÍA EN VERDE**~~ **HECHA. 321/321.** Ver el detalle en
    "Abierto". Falta el commit.
 1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes,
@@ -3136,7 +3136,7 @@ de geometría fina y se hace jugando, no midiendo.
   (bloquear un recorrido, curarse, reflejar, blindaje, castigar el combo,
   acelerar el reloj), y **desde el 15-oct están construidos** y repartidos por
   los actos II y III, sin jugar. El acto I sigue siendo de sacos a propósito
-  (pregunta F1).
+  (pregunta E1).
 - **La tele se come sitio en el hueco entre palas.** No es física, pero sí es
   arte: 184×124 px justo encima de los flippers, por donde pasa la bola
   constantemente. Si estorba visualmente, se encoge o se sube, pero tiene que

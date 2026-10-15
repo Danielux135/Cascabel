@@ -194,7 +194,7 @@ var cura_periodo: float = 1.0
 var cura_fraccion: float = 0.01
 ## Si el daño de los estados (veneno, brasa) cuenta como tocarle. Por defecto NO:
 ## si contara, una build de veneno anularía este comportamiento entero sin jugar
-## la mesa, y lo que prohíbe es justo eso, jugar seguro. Es diseño: pregunta F4.
+## la mesa, y lo que prohíbe es justo eso, jugar seguro. Es diseño: pregunta E4.
 var cura_tocan_los_estados: bool = false
 ## (5) CASTIGA EL MULTIPLICADOR ALTO: cuando su reloj pega con el combo en
 ## `castigo_desde` o más, el golpe sube `castigo_factor_por_tramo` por cada
