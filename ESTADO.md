@@ -140,12 +140,48 @@ repetible), y `SOLO=caos` mide doce builds forzadas desde el principio del run,
 con un combate SECO contra un saco al lado para separar la build de lo que le
 hace a la ruleta.
 
-**Primeros números, PRELIMINARES** (la tabla entera se está midiendo y entra en
-«Mediciones» en el commit siguiente): con las extras jugadas, **Bomba de
-procesos sube el daño por bola de 818 a 2670 y acorta el combate de 129 s a
-51 s**; con Condición de carrera encima, 3377 y 38 s. Con `fisica` la misma
-Bomba se quedaba en 1105 y 94 s. O sea que el eje de Caos, jugado aunque sea por
-un maniquí, es lo más fuerte del juego, y el modelo de antes lo tapaba.
+**LA TABLA DE CAOS**, medida con el juego de ANTES de la Fase 6 y las 14 misiones
+de entonces (`SOLO=caos`, 5 semillas; "seco" son 20 bolas contra un saco con solo
+la build). Daño por bola · segundos por combate · vida al acabar · runs acabados:
+
+| Build | `fisica` | `jugada` | Seco (f → j) | Multi (j) |
+|---|---|---|---|---|
+| ninguna | 818 · 129 s · 95 % · 4/5 | igual | 439 | 0 % |
+| **Bomba de procesos** | 1105 · 94 s · 97 % · 4/5 | **2642 · 50 s · 99 % · 5/5** | 652 → 1658 | 66 % |
+| Bifurcación | 901 · 119 s · 98 % · 4/5 | 1242 · 103 s · 74 % · 4/5 | 557 → 805 | 14 % |
+| Proceso hijo | 832 · 128 s · 96 % · 4/5 | 811 · 129 s · 97 % · 4/5 | 477 → 431 | 0 % |
+| Condición de carrera | 846 · 125 s · 97 % · 4/5 | 851 · 123 s · 97 % · 4/5 | 460 → 458 | 0 % |
+| Hilo único | 819 · 125 s · 80 % · 3/5 | 846 · 123 s · 82 % · 3/5 | 532 → 495 | 0 % |
+| **Bomba + carrera** | 1247 · 83 s · 98 % · 4/5 | **3139 · 41 s · 100 % · 5/5** | 738 → 2652 | 61 % |
+| Bifurcación + carrera | 961 · 112 s · 98 % · 4/5 | 1406 · 88 s · 99 % · 4/5 | 643 → 1525 | 13 % |
+| Bomba + hilo | 1146 · 92 s · 89 % · 3/5 | 2541 · 50 s · 84 % · 5/5 | 725 → 1894 | 67 % |
+| **Las cinco** | 1436 · 73 s · 71 % · 5/5 | **3858 · 34 s · 98 % · 5/5** | 1071 → 5207 | 73 % |
+| ninguna, perfil puntero | 1586 · 66 s · 89 % · 5/5 | 1675 · 66 s · 89 % · 5/5 | 667 → 751 | 3 % |
+| Proceso hijo, puntero | 1797 · 58 s · 95 % · 5/5 | 2225 · 56 s · 98 % · 5/5 | 810 → 812 | 16 % |
+
+Lo que dice, sin tocar un número:
+
+- **El eje de Caos jugado es lo más fuerte del juego, y el modelo de antes lo
+  tapaba.** Bomba de procesos sola triplica el daño por bola y deja el combate en
+  el 39 % de lo que dura; con las cinco, casi ×5 y combates de 34 s. Y como un
+  combate corto come menos relojes, **acaba con MÁS vida que sin build** — es la
+  trampa de "más daño hace el juego más fácil" con números.
+- **Lo que separa `fisica` de `jugada` es jugar la extra**, no soltarla: con las
+  palas quietas, la extra de la Bomba cobra 652 en seco; jugada, 1658. Las tablas
+  viejas con multibola (todas en `fisica`) se quedaban cortas por ahí.
+- **Proceso hijo y Condición de carrera solas no hacen nada con el perfil de
+  Daniel**: él no cierra bancos, que es lo que dispara Proceso hijo, y Carrera
+  necesita dos bolas. Con el perfil `puntero` (un banco por bola) Proceso hijo sí
+  sube, +33 % jugada.
+- **Hilo único cuesta vida y no da nada a cambio** en este modelo (80 % y 3/5 en
+  los dos modos).
+- **Bifurcación jugada acaba con el 74 % de vida** contra el 98 % en `fisica`, con
+  el mismo 4/5. No sé por qué y no lo he perseguido: el maniquí que juega la
+  extra no es Daniel, y una sola semilla que se tuerza mueve esa columna.
+
+**El maniquí no es Daniel** (ver arriba): lo que mide `jugada` es lo que da la
+mesa cuando alguien aporrea las palas con la extra, no lo que haría él. Es la
+otra punta de la horquilla, y la verdad está entre las dos columnas (pregunta K1).
 
 ## FASE 6: LOS ENEMIGOS HACEN COSAS (15-oct, en curso)
 
@@ -2165,13 +2201,23 @@ sola al acabarse el tiempo y contaba un retorno gratis en cada caza.
 **M2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
 queda así, o se le busca un nombre de catorce letras?
 
+**LO DE CAOS (la tabla de la tarea 3).**
+
+**K1.** **¿Bomba de procesos se siente tan fuerte como mide?** Con las extras
+jugadas por el maniquí triplica el daño y acaba los combates en 50 s; con las
+cinco de Caos, 34 s y con más vida que sin nada. No he tocado ningún número: lo
+que hace falta saber es si jugándola tú se acerca a la columna `jugada` o a la
+`fisica`. Si se acerca a `jugada`, el eje de Caos necesita un precio en RELOJ
+—no en drenaje ni en vida, que es lo que dice la trampa de "más daño hace el
+juego más fácil"—, y esa decisión es vuestra.
+
 **LO DE LA FASE 6 (comportamientos de enemigo).** Para ver uno sin esperar al
 acto que le toca: la tabla del apartado de arriba dice qué enemigo lo lleva.
 
 **F1.** **¿Quién lleva cada uno?** La tabla es una propuesta razonada, no una
 decisión. Las dos preguntas de fondo: ¿el acto I sin ninguno está bien, o se
-hace largo aprender la mesa contra sacos? ¿Y los jefes —que hoy son el enemigo
-más duro del acto con más vida— deberían llevar DOS comportamientos?
+hace largo aprender la mesa contra sacos? ¿Y los jefes —que son uno de los tres
+del acto al azar, con ×1,5 de vida— deberían llevar DOS comportamientos?
 **F2.** **La Gárgola acelera su reloj ×1,6 mientras cazas.** ¿Se nota? ¿Te hace
 pensártelo antes de subir, que es para lo que está, o la caza sigue siendo un
 regalo? El dial es `caza_factor_reloj`, y una fila del JSON puede traer el suyo.
@@ -2803,7 +2849,8 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 | Run real de Daniel (antes del rebalance) | 98 % de vida · 797 d/bola · 45 s · 43 bolas |
 | Motor de multibola, una bola: antes → después | 71 % / 3-5 runs → **idéntico** |
 | Con las 5 reliquias de Caos dentro (modelo, no veredicto) | 97 % de vida, 835 d/bola, 128 s |
-| **Bomba de procesos, extras jugadas** (`EXTRA=jugada`, preliminar) | **2670 d/bola · 51 s**, contra 818 · 129 s sin build |
+| **Bomba de procesos, extras jugadas** (`EXTRA=jugada`) | **2642 d/bola · 50 s**, contra 818 · 129 s sin build (1105 · 94 s en `fisica`) |
+| **Las cinco de Caos, extras jugadas** | **3858 d/bola · 34 s · 98 % de vida**: casi ×5, y acaba con más vida |
 | Tope de bolas a la vez | 4 (`bolas_maximas`, elegido a ojo) |
 | **Racimo: golpes por entrada, de espaldas → girado** | **1,0 → 3,9** |
 | Tiro desde la cuna: sube a | y=893 de media, y=751 el mejor de 42 |
