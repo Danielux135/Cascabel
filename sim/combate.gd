@@ -34,6 +34,9 @@ signal golpe_critico(punto: Vector2, dano: int)
 ## Te han curado. Existe para poder enseñar el "+N": una curación que no sale en
 ## pantalla es exactamente la avería del platillo.
 signal curado(cantidad: int, punto: Vector2)
+## EL ENEMIGO se ha curado (comportamiento `cura`, `DISEÑO.md` §11). Va aparte de
+## `curado`, que es el jugador: son dos barras distintas y dos colores.
+signal enemigo_curado(cantidad: int)
 ## La red de seguridad ha comido un drenaje. Igual: si no se anuncia, parece que
 ## el juego se ha olvidado de castigarte.
 signal drenaje_perdonado()
@@ -288,6 +291,8 @@ func _dano_de_estados(dano: int, punto: Vector2) -> void:
 	if dano <= 0 or enemigo == null or not enemigo.vivo():
 		return
 	var aplicado := enemigo.recibir(dano)
+	if aplicado > 0 and p.cura_tocan_los_estados:
+		conducta.tocado()
 	dano_de_la_bola += aplicado
 	dano_total += aplicado
 	dano_infligido.emit(aplicado, 0, punto)
@@ -401,11 +406,24 @@ func avanzar(dt: float) -> void:
 		for id_estallado in paso["estallidos"]:
 			estallido_de_estado.emit(str(id_estallado))
 		_dano_de_estados(int(paso["dano"]), mesa.bola_en_peligro().pos)
+		_avanzar_cura(dt)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
 			_temporizador = 0.0
 			_siguiente_fase()
+
+## La cura del enemigo, si la lleva. Va dentro de `if _en_juego()`, con el
+## reloj: cuentan los mismos segundos que cuenta él.
+func _avanzar_cura(dt: float) -> void:
+	if enemigo == null or not enemigo.vivo():
+		return
+	var cura := conducta.avanzar_cura(dt, enemigo.vida_maxima)
+	if cura <= 0:
+		return
+	var real := enemigo.curar(cura)
+	if real > 0:
+		enemigo_curado.emit(real)
 
 # ------------------------------------------------------------- el reloj
 
@@ -485,6 +503,7 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true,
 	# o el jugador vería impactos que no hacen daño y lo leería como un fallo.
 	var dano := maxi(int(round(dano_f)), 1)
 	var aplicado := enemigo.recibir(dano)
+	conducta.tocado()
 	dano_de_la_bola += aplicado
 	dano_total += aplicado
 	dano_infligido.emit(dano, multiplicador(), punto)

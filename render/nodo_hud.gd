@@ -123,6 +123,9 @@ func _panel_enemigo(combate: Combate) -> void:
 	_texto(Vector2(d.position.x, y), e.nombre, 8, C_TEXTO,
 		HORIZONTAL_ALIGNMENT_CENTER, d.size.x)
 	var col_enemigo := C_GOMA_LUZ if vista.flash_enemigo <= 0.0 else C_ORO_CLARO
+	# Y en verde mientras se cura: el comportamiento `cura` se ve donde se mide.
+	if vista.flash_cura_enemigo > 0.0:
+		col_enemigo = C_VERDE
 	_barra(Rect2(d.position.x + 8.0, y + 8.0, d.size.x - 16.0, 8.0),
 		float(e.vida) / float(maxi(e.vida_maxima, 1)), col_enemigo)
 	_texto(Vector2(d.position.x, y + 30.0), "%d/%d" % [e.vida, e.vida_maxima],

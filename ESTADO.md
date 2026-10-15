@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **646/646** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **653/653** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -93,8 +93,15 @@ enemigos que responden desde el acto II.
 
 | Enemigo | Acto | Comportamiento | Estado |
 |---|---|---|---|
+| Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
 | Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
 
+- **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
+  el 1 % de su vida cada segundo hasta que le vuelvas a dar. Es el jefe del acto
+  II, que es donde un run empieza a jugarse "seguro" aguantando la bola en la
+  cuna, y es lo que este comportamiento prohíbe. Solo cuenta con la bola en
+  juego, nunca en las pausas. **El modelo tampoco lo ve**: reparte los golpes
+  cada 0,86 s, así que nunca pasan seis sin tocarle.
 - **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y es el jefe del
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
@@ -2042,6 +2049,10 @@ pensártelo antes de subir, que es para lo que está, o la caza sigue siendo un
 regalo? El dial es `caza_factor_reloj`, y una fila del JSON puede traer el suyo.
 **F3.** Los comportamientos salen escritos a la izquierda del retrato del
 enemigo, y el que está actuando se pone en rojo. ¿Se lee de reojo?
+**F4.** **El Cultista se cura** el 1 % por segundo a los 6 s sin tocarle, y su
+barra se pone verde. ¿Se nota la presión de "no puedo esperar en la cuna"? ¿Y el
+veneno debería contar como tocarle? Hoy NO (`cura_tocan_los_estados`): si
+contara, la build de veneno anularía el comportamiento sin jugar la mesa.
 
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.

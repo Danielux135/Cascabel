@@ -184,3 +184,15 @@ var platillo_atrasa_reloj: float = 0.35
 ## (6) ACELERA AL CAZAR: por cuánto se multiplica lo rápido que carga su reloj
 ## mientras estás en la planta alta. 1,6 son unos 20 s de caza cobrados como 32.
 var caza_factor_reloj: float = 1.6
+## (2) SE CURA SI NO LE TOCAS: los segundos sin pegarle que aguanta antes de
+## empezar, cada cuánto cura desde entonces, y cuánto, en fracción de SU vida
+## máxima —así escala sola con el élite y el jefe—. Con 6 s, 1 s y el 1 %, un
+## enemigo de 6000 se cura 60 por segundo en cuanto le dejas respirar, que es lo
+## que hace un bumper a x2 cada segundo: lo que pide es no jugar a esperar.
+var cura_espera: float = 6.0
+var cura_periodo: float = 1.0
+var cura_fraccion: float = 0.01
+## Si el daño de los estados (veneno, brasa) cuenta como tocarle. Por defecto NO:
+## si contara, una build de veneno anularía este comportamiento entero sin jugar
+## la mesa, y lo que prohíbe es justo eso, jugar seguro. Es diseño: pregunta F4.
+var cura_tocan_los_estados: bool = false

@@ -32,11 +32,12 @@ extends RefCounted
 
 ## Los que existen. Lista CERRADA: un id mal escrito en el JSON no da error, deja
 ## un enemigo que no hace nada, y eso se diagnostica como balance. Hay prueba.
-const IDS := ["caza_acelera"]
+const IDS := ["cura", "caza_acelera"]
 
 ## Las claves que cada uno sabe leer del JSON, además de `id`. Misma razón: una
 ## clave mal escrita no pisa nada y nadie se entera. Hay prueba.
 const CLAVES := {
+	"cura": ["espera", "periodo", "fraccion"],
 	"caza_acelera": ["factor"],
 }
 
@@ -45,12 +46,16 @@ var p: ParametrosCombate
 ## el parámetro con nombre).
 var activos: Dictionary = {}
 
+## (2) Segundos de juego sin que le toquen. Solo corre con la bola en juego.
+var sin_tocar: float = 0.0
+
 ## Prepara los comportamientos de un enemigo y deja el estado a cero. `lista` es
 ## lo que trae `Enemigo.comportamientos`; los ids que no existen se ignoran (la
 ## batería es la que los caza, no la partida: una fila rota no puede tumbarla).
 func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 	p = parametros if parametros != null else ParametrosCombate.new()
 	activos.clear()
+	sin_tocar = 0.0
 	for fila in lista:
 		if typeof(fila) != TYPE_DICTIONARY:
 			continue
@@ -72,9 +77,54 @@ func vacio() -> bool:
 func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 	var r := {}
 	match el_id:
+		"cura":
+			r["espera"] = maxf(float(fila.get("espera", p.cura_espera)), 0.0)
+			r["periodo"] = maxf(float(fila.get("periodo", p.cura_periodo)), 0.05)
+			r["fraccion"] = maxf(float(fila.get("fraccion", p.cura_fraccion)), 0.0)
 		"caza_acelera":
 			r["factor"] = float(fila.get("factor", p.caza_factor_reloj))
 	return r
+
+# ------------------------------------------------------------------- la cura
+
+## (2) SE CURA SI NO LE TOCAS EN N SEGUNDOS: *"prohíbe jugar seguro"*. Un
+## combate de dos minutos se puede jugar aguantando la bola en la cuna hasta que
+## el reloj te obligue, y contra este enemigo esperar cuesta vida suya.
+##
+## Lo llama `Combate._golpear` cada vez que le aplica daño de verdad.
+func tocado() -> void:
+	sin_tocar = 0.0
+
+## Avanza el reloj de la cura y devuelve cuánto se cura en este paso. SOLO lo
+## llama `Combate.avanzar` con la bola en juego: en las pausas de drenaje y de
+## ataque el jugador no tiene la bola, y cobrarle ahí sería cobrarle por esperar.
+##
+## Los instantes de cura caen en `espera`, `espera + periodo`, ... desde el
+## último toque, y se cuentan los que caen dentro del paso: así sale lo mismo con
+## pasos de 1/120 que de 1/30, que es lo que hace que la medida no dependa de los
+## fotogramas (la misma regla que los ticks de `Estados`).
+func avanzar_cura(dt: float, vida_maxima: int) -> int:
+	if not activos.has("cura") or dt <= 0.0:
+		return 0
+	var c: Dictionary = activos["cura"]
+	var espera := float(c["espera"])
+	var periodo := float(c["periodo"])
+	var antes := sin_tocar
+	sin_tocar += dt
+	if sin_tocar < espera:
+		return 0
+	var ya := -1 if antes < espera else int(floorf((antes - espera) / periodo))
+	var ahora := int(floorf((sin_tocar - espera) / periodo))
+	var veces := ahora - ya
+	if veces <= 0:
+		return 0
+	return veces * maxi(int(round(float(vida_maxima) * float(c["fraccion"]))), 1)
+
+## Lo que le falta para empezar a curarse, para enseñarlo. Cero si ya se cura.
+func cura_en() -> float:
+	if not activos.has("cura"):
+		return 0.0
+	return maxf(float(activos["cura"]["espera"]) - sin_tocar, 0.0)
 
 # ------------------------------------------------------- acelera al cazar
 
@@ -107,6 +157,11 @@ func rotulos(en_caza: bool) -> Array:
 		if not activos.has(el_id):
 			continue
 		match el_id:
+			"cura":
+				var falta := cura_en()
+				salida.append({"rotulo": "SE CURA",
+					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
+					"activo": falta <= 0.0})
 			"caza_acelera":
 				salida.append({"rotulo": "ACELERA", "detalle": "en la caza",
 					"activo": en_caza})

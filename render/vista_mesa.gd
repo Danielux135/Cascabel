@@ -213,6 +213,9 @@ var _tiempo: float = 0.0
 ## Cuánto está apagada la planta de abajo, de 0 a 1. Sube mientras dura la caza.
 var _dormida: float = 0.0
 var flash_enemigo: float = 0.0
+## El enemigo se acaba de curar: su barra se pone verde un momento. Es lo que
+## hace visible el comportamiento `cura` donde se mide, que es su barra de vida.
+var flash_cura_enemigo: float = 0.0
 var flash_jugador: float = 0.0
 ## El platillo acaba de devolver tiempo. Enciende la BARRA DEL RELOJ, que está
 ## arriba, mientras el número sale abajo en el platillo: sin esto el "+6 s"
@@ -383,6 +386,8 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	combate.mision_reiniciada.connect(_al_reiniciar_mision)
 	combate.golpe_critico.connect(_al_criticar)
 	combate.curado.connect(_al_curar)
+	combate.enemigo_curado.connect(func(_cantidad: int) -> void:
+		flash_cura_enemigo = 0.7)
 	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
@@ -710,6 +715,7 @@ func _process(delta: float) -> void:
 	_dormida = move_toward(_dormida, 1.0 if mesa.en_caza else 0.0, delta * 2.0)
 	_sacudida = maxf(_sacudida - delta * anim.sacudida_frenado, 0.0)
 	flash_enemigo = maxf(flash_enemigo - delta * 2.2, 0.0)
+	flash_cura_enemigo = maxf(flash_cura_enemigo - delta * 2.2, 0.0)
 	flash_jugador = maxf(flash_jugador - delta * 2.2, 0.0)
 	# Más lento que los otros dos a propósito: este no es un golpe, es una
 	# lectura, y hay que darle tiempo al ojo a subir del platillo a la barra.

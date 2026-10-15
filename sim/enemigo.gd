@@ -50,3 +50,12 @@ func recibir(dano: int) -> int:
 	var real := clampi(dano, 0, vida)
 	vida -= real
 	return real
+
+## Lo contrario: devuelve lo que se ha curado de verdad, nunca por encima de la
+## vida máxima. Un muerto no se cura —el combate ya lo ha dado por ganado—.
+func curar(cantidad: int) -> int:
+	if not vivo():
+		return 0
+	var real := clampi(cantidad, 0, vida_maxima - vida)
+	vida += real
+	return real

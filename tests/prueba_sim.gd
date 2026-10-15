@@ -1313,6 +1313,96 @@ func _prueba_comportamientos() -> void:
 	_comprobar("y al cortarse la caza vuelve a su ritmo, sin nadie que lo apague",
 		not c6.mesa.en_caza and c6.ritmo_reloj() == 1.0, "%.3f" % c6.ritmo_reloj())
 
+	_prueba_comportamiento_cura()
+
+## (2) SE CURA SI NO LE TOCAS. Contra los parámetros, nunca contra números.
+func _prueba_comportamiento_cura() -> void:
+	var pc := ParametrosCombate.new()
+	var datos := {"nombre": "Cultista", "vida": 6000, "ataque": 1, "reloj": 1000.0,
+		"comportamientos": [{"id": "cura"}]}
+	var por_vez := maxi(int(round(6000.0 * pc.cura_fraccion)), 1)
+	# Lo que cura en `espera + 2,5 periodos` sin tocarle son TRES curas (en
+	# espera, espera+1 y espera+2), y tiene que salir lo mismo con pasos finos y
+	# gruesos: si dependiera del paso, dependería de los fotogramas.
+	var curas: Array[int] = []
+	for paso in [1.0 / 120.0, 1.0 / 30.0]:
+		var c := Combate.new(pc)
+		c.iniciar(Enemigo.new(datos))
+		c.enemigo.vida = 3000
+		_en_juego(c)
+		var t := 0.0
+		while t < pc.cura_espera + pc.cura_periodo * 2.5 - DT:
+			c.avanzar(paso)
+			t += paso
+		curas.append(c.enemigo.vida - 3000)
+	_comprobar("se cura tres veces en espera + 2,5 periodos, igual con cualquier paso",
+		curas[0] == 3 * por_vez and curas[1] == 3 * por_vez,
+		"curó %s y tocaba %d" % [str(curas), 3 * por_vez])
+
+	# Pegarle reinicia la espera.
+	var c2 := Combate.new(pc)
+	c2.iniciar(Enemigo.new(datos))
+	c2.enemigo.vida = 3000
+	_en_juego(c2)
+	_avanzar_combate(c2, pc.cura_espera - 1.0)
+	c2.mesa.bumper_golpeado.emit(Vector2(200, 800), 300.0)
+	var tras_golpe := c2.enemigo.vida
+	_avanzar_combate(c2, pc.cura_espera - 0.5)
+	_comprobar("pegarle reinicia la espera: no se cura antes de tiempo",
+		c2.enemigo.vida == tras_golpe, "%d -> %d" % [tras_golpe, c2.enemigo.vida])
+	var curas_c2 := [0]
+	c2.enemigo_curado.connect(func(n: int) -> void: curas_c2[0] += n)
+	_avanzar_combate(c2, 1.0)
+	_comprobar("y se cura cuando la cumple, y lo AVISA",
+		c2.enemigo.vida > tras_golpe and curas_c2[0] == c2.enemigo.vida - tras_golpe,
+		"%d -> %d, avisó %d" % [tras_golpe, c2.enemigo.vida, curas_c2[0]])
+
+	# Nunca por encima del máximo.
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new(datos))
+	c3.enemigo.vida = c3.enemigo.vida_maxima - 1
+	_en_juego(c3)
+	_avanzar_combate(c3, pc.cura_espera + pc.cura_periodo * 5.0)
+	_comprobar("no se cura por encima de su vida maxima",
+		c3.enemigo.vida == c3.enemigo.vida_maxima, "%d" % c3.enemigo.vida)
+
+	# Y NO en las pausas: ahí el jugador no tiene la bola.
+	var c4 := Combate.new(pc)
+	c4.iniciar(Enemigo.new(datos))
+	c4.enemigo.vida = 3000
+	_en_juego(c4)
+	_avanzar_combate(c4, pc.cura_espera - 0.2)
+	c4.mesa.retirar_bolas()
+	c4.mesa.bola_drenada.emit()
+	var en_pausa := c4.enemigo.vida
+	var t4 := 0.0
+	while c4.fase != Combate.Fase.LANZANDO and t4 < 5.0:
+		c4.avanzar(DT)
+		t4 += DT
+	_comprobar("no se cura en las pausas de drenaje y de ataque",
+		c4.enemigo.vida == en_pausa and t4 > 0.5,
+		"%d -> %d en %.1f s de pausa" % [en_pausa, c4.enemigo.vida, t4])
+
+	# El veneno no cuenta como tocarle (`cura_tocan_los_estados` en false).
+	var c5 := Combate.new(pc)
+	c5.iniciar(Enemigo.new(datos))
+	c5.enemigo.vida = 3000
+	_en_juego(c5)
+	c5.estados.aplicar("veneno", 10)
+	_avanzar_combate(c5, pc.cura_espera + 0.5)
+	_comprobar("el veneno no le impide curarse",
+		not pc.cura_tocan_los_estados and c5.conducta.cura_en() == 0.0,
+		"le faltan %.1f s" % c5.conducta.cura_en())
+
+	# Y un enemigo sin el comportamiento no se cura nunca.
+	var c6 := Combate.new(pc)
+	c6.iniciar(Enemigo.new({"nombre": "Saco", "vida": 6000, "ataque": 1, "reloj": 1000.0}))
+	c6.enemigo.vida = 3000
+	_en_juego(c6)
+	_avanzar_combate(c6, pc.cura_espera * 3.0)
+	_comprobar("sin el comportamiento no se cura nunca",
+		c6.enemigo.vida == 3000, "%d" % c6.enemigo.vida)
+
 ## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
 ## qué planta hablas es de donde salen las pruebas que miden otra cosa.
 func _cuantos_arriba(m: Mesa, tipo: int) -> int:
