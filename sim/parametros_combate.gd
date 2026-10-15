@@ -217,3 +217,11 @@ var blindaje_capas: int = 3
 var blindaje_umbral: float = 1.0
 var blindaje_factor: float = 0.25
 var blindaje_regenera: float = 10.0
+## (3) REFLEJA SI REPITES TIRO: a partir de la `reflejo_repeticiones`-ésima vez
+## seguida que metes el MISMO recorrido (órbita, retorno, cañón o platillo), ese
+## tiro no le hace nada y te devuelve `reflejo_factor_ataque` veces su ataque.
+## Con 2, repetir una vez ya refleja, y sigue reflejando mientras no cambies. Los
+## targets y el racimo no cuentan: un banco pide tres targets seguidos, y el
+## racimo no se apunta.
+var reflejo_repeticiones: int = 2
+var reflejo_factor_ataque: float = 1.0

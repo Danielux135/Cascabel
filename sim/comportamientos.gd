@@ -32,12 +32,13 @@ extends RefCounted
 
 ## Los que existen. Lista CERRADA: un id mal escrito en el JSON no da error, deja
 ## un enemigo que no hace nada, y eso se diagnostica como balance. Hay prueba.
-const IDS := ["cura", "blindaje", "castiga_combo", "caza_acelera"]
+const IDS := ["cura", "refleja", "blindaje", "castiga_combo", "caza_acelera"]
 
 ## Las claves que cada uno sabe leer del JSON, además de `id`. Misma razón: una
 ## clave mal escrita no pisa nada y nadie se entera. Hay prueba.
 const CLAVES := {
 	"cura": ["espera", "periodo", "fraccion"],
+	"refleja": ["repeticiones", "factor_ataque"],
 	"blindaje": ["capas", "umbral", "factor", "regenera"],
 	"castiga_combo": ["desde", "factor_por_tramo", "tramos_robados"],
 	"caza_acelera": ["factor"],
@@ -48,8 +49,16 @@ var p: ParametrosCombate
 ## el parámetro con nombre).
 var activos: Dictionary = {}
 
+## Los tiros que vigila el reflejo: los recorridos que se APUNTAN. Ni el racimo
+## ni los targets (un banco pide tres targets seguidos, y reflejar el segundo
+## haría imposible cerrarlo).
+const TIROS_REFLEJABLES := ["orbita", "retorno", "canon", "platillo"]
+
 ## (2) Segundos de juego sin que le toquen. Solo corre con la bola en juego.
 var sin_tocar: float = 0.0
+## (3) El último recorrido vigilado y cuántas veces seguidas va.
+var ultimo_tiro: String = ""
+var seguidas: int = 0
 ## (4) Capas de blindaje que le quedan, y lo que lleva regenerando la siguiente.
 var capas: int = 0
 var _hasta_capa: float = 0.0
@@ -61,6 +70,8 @@ func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 	p = parametros if parametros != null else ParametrosCombate.new()
 	activos.clear()
 	sin_tocar = 0.0
+	ultimo_tiro = ""
+	seguidas = 0
 	capas = 0
 	_hasta_capa = 0.0
 	for fila in lista:
@@ -90,6 +101,11 @@ func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 			r["espera"] = maxf(float(fila.get("espera", p.cura_espera)), 0.0)
 			r["periodo"] = maxf(float(fila.get("periodo", p.cura_periodo)), 0.05)
 			r["fraccion"] = maxf(float(fila.get("fraccion", p.cura_fraccion)), 0.0)
+		"refleja":
+			r["repeticiones"] = maxi(int(fila.get("repeticiones",
+				p.reflejo_repeticiones)), 2)
+			r["factor_ataque"] = maxf(float(fila.get("factor_ataque",
+				p.reflejo_factor_ataque)), 0.0)
 		"blindaje":
 			r["capas"] = maxi(int(fila.get("capas", p.blindaje_capas)), 1)
 			r["umbral"] = maxf(float(fila.get("umbral", p.blindaje_umbral)), 0.0)
@@ -166,6 +182,37 @@ func cura_en() -> float:
 		return 0.0
 	return maxf(float(activos["cura"]["espera"]) - sin_tocar, 0.0)
 
+# ------------------------------------------------------------- el reflejo
+
+## (3) REFLEJA SI REPITES TIRO: *"obliga a variar"*. Lo pregunta
+## `Combate._filtrar_tiro` con cada recorrido completado. Lleva la cuenta de los
+## seguidos y dice si ESTE se refleja: a partir de `repeticiones` seguidas, y
+## mientras no cambies. Los tiros que no vigila no tocan la cuenta.
+func reflejar(tiro: String) -> bool:
+	if not activos.has("refleja") or not TIROS_REFLEJABLES.has(tiro):
+		return false
+	if tiro == ultimo_tiro:
+		seguidas += 1
+	else:
+		ultimo_tiro = tiro
+		seguidas = 1
+	return seguidas >= int(activos["refleja"]["repeticiones"])
+
+## Lo que te devuelve un tiro reflejado.
+func ataque_reflejo(ataque: int) -> int:
+	if not activos.has("refleja"):
+		return 0
+	return maxi(int(round(float(ataque) * float(activos["refleja"]["factor_ataque"]))), 0)
+
+## El tiro que reflejaría si lo metieras ahora, o "" si ninguno. Es lo que dice
+## el panel: no "refleja si repites", sino "REFLEJA: CAÑÓN".
+func tiro_vigilado() -> String:
+	if not activos.has("refleja") or ultimo_tiro == "":
+		return ""
+	if seguidas + 1 >= int(activos["refleja"]["repeticiones"]):
+		return ultimo_tiro
+	return ""
+
 # ------------------------------------------------------------- el blindaje
 
 ## (4) BLINDAJE QUE SOLO ROMPE EL DAÑO CONCENTRADO: *"mata al build de combo"*.
@@ -237,6 +284,12 @@ func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
 				salida.append({"rotulo": "SE CURA",
 					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
 					"activo": falta <= 0.0})
+			"refleja":
+				var vigilado := tiro_vigilado()
+				salida.append({"rotulo": "REFLEJA",
+					"detalle": "si repites" if vigilado == ""
+						else str(Mision.ROTULO_TIRO.get(vigilado, vigilado)).to_upper(),
+					"activo": vigilado != ""})
 			"blindaje":
 				salida.append({"rotulo": "BLINDAJE",
 					"detalle": "roto" if capas <= 0 else ("1 capa" if capas == 1

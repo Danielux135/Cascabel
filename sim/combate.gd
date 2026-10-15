@@ -43,6 +43,9 @@ signal combo_castigado(antes: int, ahora: int)
 ## Un golpe concentrado le ha roto una capa de blindaje (comportamiento
 ## `blindaje`). `capas` son las que le quedan.
 signal blindaje_roto(capas: int, punto: Vector2)
+## Has repetido tiro contra un enemigo que refleja (`refleja`): el tiro no le ha
+## hecho nada y te devuelve `dano`.
+signal golpe_reflejado(punto: Vector2, dano: int)
 ## La red de seguridad ha comido un drenaje. Igual: si no se anuncia, parece que
 ## el juego se ha olvidado de castigarte.
 signal drenaje_perdonado()
@@ -645,9 +648,44 @@ func _sumar_golpes(cuantos: int) -> void:
 	if ahora != antes:
 		combo_cambiado.emit(ahora, golpes)
 
+## EL TIRO QUE ES UNA RAMPA, por su premio: es lo que deciden las misiones y los
+## estados, y lo que miran los comportamientos que filtran tiros. Va aparte del
+## `match` de abajo para poder preguntarlo ANTES de cobrar nada.
+func _tiro_de_rampa(r: Rampa) -> String:
+	match r.premio:
+		Rampa.Premio.CAZA: return "umbral"
+		Rampa.Premio.MULTIPLICADOR: return "orbita"
+		Rampa.Premio.DANO_FUERTE: return "canon"
+	return "retorno"
+
+## LOS COMPORTAMIENTOS QUE ANULAN UN TIRO (`DISEÑO.md` §11), en un solo sitio y
+## al PRINCIPIO de cada gancho de recorrido, antes del premio: un tiro anulado no
+## paga daño, ni misión, ni estados, ni el premio de recorrido —ni bola extra ni
+## cura—. La bola completa la rampa igual, que es física; lo que no hay es cobro.
+##
+## Devuelve si el tiro sigue. El regreso de la caza no se filtra nunca: lo hace
+## la mesa sola al acabarse el tiempo, no es un tiro tuyo, y reflejarlo te
+## pegaría por haber cazado.
+func _filtrar_tiro(tiro: String, punto: Vector2, nombre_rampa: String = "") -> bool:
+	if not _en_juego() or nombre_rampa == "regreso" or enemigo == null:
+		return true
+	# (3) EL REFLEJO: el tiro repetido no hace nada y te devuelve su ataque. Por
+	# `_atacar`, que es por donde pasa todo golpe suyo —armadura de reliquias y
+	# derrota incluidas—, y sin marcarlo como de reloj: no lo castiga el combo.
+	if conducta.reflejar(tiro):
+		var dano := conducta.ataque_reflejo(enemigo.ataque)
+		golpe_reflejado.emit(punto, dano)
+		if dano > 0:
+			_atacar(dano, false)
+		return false
+	return true
+
 ## Las rampas pagan al SALIR, no al entrar: el premio es completarlas. Y cada
 ## una paga una cosa distinta, que es lo que las hace tres tiros de verdad.
 func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
+	var r := mesa.rampas[indice] as Rampa
+	if not _filtrar_tiro(_tiro_de_rampa(r), punto, r.nombre):
+		return
 	_premio_de_recorrido()
 	var comun := bolsa.factor("factor_dano_recorrido")
 	match (mesa.rampas[indice] as Rampa).premio:
@@ -690,6 +728,8 @@ func _subir_tramo(punto: Vector2, factor_local: float = 1.0) -> void:
 ## no solo números.
 func _al_salir_del_platillo(punto: Vector2, _indice: int) -> void:
 	if not _en_juego():
+		return
+	if not _filtrar_tiro("platillo", punto):
 		return
 	_apuntar("platillo")
 	_premio_de_recorrido()

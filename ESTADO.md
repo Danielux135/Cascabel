@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **666/666** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **673/673** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -93,11 +93,19 @@ enemigos que responden desde el acto II.
 
 | Enemigo | Acto | Comportamiento | Estado |
 |---|---|---|---|
+| Esqueleto | II | **refleja si repites recorrido** (te devuelve su ataque) | hecho |
 | Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
 | Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
 | Armadura vacía | III | **blindaje** (3 capas; lo flojo entra a ¼; el cañón rompe) | hecho |
 | Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
 
+- **Esqueleto, refleja.** Si metes el mismo recorrido (órbita, retorno, cañón o
+  platillo) dos veces seguidas, el segundo no le hace nada —ni daño, ni misión,
+  ni premio de recorrido— y te devuelve su ataque, y sigue así mientras no
+  cambies. El panel dice CUÁL no repetir ("REFLEJA / RETORNO", en rojo), y al
+  reflejar sale "REFLEJADO". Ni el racimo ni los targets cuentan, y el regreso
+  de la caza nunca, que no es un tiro tuyo. Los tiros anulados pasan todos por
+  un filtro común al principio de cada gancho, `Combate._filtrar_tiro`.
 - **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
   el 1 % de su vida cada segundo hasta que le vuelvas a dar. Es el jefe del acto
   II, que es donde un run empieza a jugarse "seguro" aguantando la bola en la
@@ -2077,6 +2085,9 @@ encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales
 cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas?
 ¿Y está bien que el veneno lo atraviese entero? Diales: `blindaje_capas`,
 `blindaje_umbral` (fracción del cañón), `blindaje_factor`, `blindaje_regenera`.
+**F7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
+solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
+lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.
 
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.

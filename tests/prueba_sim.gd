@@ -1316,6 +1316,80 @@ func _prueba_comportamientos() -> void:
 	_prueba_comportamiento_cura()
 	_prueba_comportamiento_castigo()
 	_prueba_comportamiento_blindaje()
+	_prueba_comportamiento_reflejo()
+
+## (3) REFLEJA SI REPITES TIRO. Lo que se sujeta es la racha: cuándo empieza a
+## reflejar, que siga mientras repites y que cambiar de tiro la rompa. Y dos
+## cosas que no son tiros tuyos y no pueden reflejarse: el regreso de la caza y
+## los targets de un banco.
+func _prueba_comportamiento_reflejo() -> void:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var datos := {"nombre": "Esqueleto", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0, "comportamientos": [{"id": "refleja"}]}
+	var c := Combate.new(pc)
+	c.iniciar(Enemigo.new(datos))
+	_en_juego(c)
+	var reflejos := [0]
+	c.golpe_reflejado.connect(func(_p: Vector2, _d: int) -> void: reflejos[0] += 1)
+	var vida_e := c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO)
+	var primero := vida_e - c.enemigo.vida
+	vida_e = c.enemigo.vida
+	var vida_j := c.vida_jugador
+	_recorrido(c, Rampa.Premio.DANO)
+	var devuelto := int(round(10.0 * pc.reflejo_factor_ataque))
+	_comprobar("el primer retorno pega, y el segundo seguido se refleja y lo avisa",
+		primero > 0 and c.enemigo.vida == vida_e
+			and vida_j - c.vida_jugador == devuelto and reflejos[0] == 1,
+		"1º %d, 2º %d al enemigo y %d a ti (tocaba %d), %d avisos" % [primero,
+			vida_e - c.enemigo.vida, vida_j - c.vida_jugador, devuelto, reflejos[0]])
+	_recorrido(c, Rampa.Premio.DANO)
+	_comprobar("y sigue reflejando mientras repites",
+		c.enemigo.vida == vida_e and reflejos[0] == 2)
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	var tras_canon := c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO)
+	_comprobar("cambiar de tiro rompe la racha: el cañón y el retorno de despues pegan",
+		tras_canon < vida_e and c.enemigo.vida < tras_canon and reflejos[0] == 2,
+		"%d avisos" % reflejos[0])
+	# El platillo reflejado no roba reloj: no cobra nada.
+	c.mesa.platillo_expulsado.emit(Vector2(200, 800), 0)
+	c.carga_reloj = 0.5
+	c.mesa.platillo_expulsado.emit(Vector2(200, 800), 0)
+	_comprobar("el platillo reflejado no roba reloj",
+		is_equal_approx(c.carga_reloj, 0.5) and reflejos[0] == 3,
+		"carga %.2f, %d avisos" % [c.carga_reloj, reflejos[0]])
+	# Los targets no cuentan: un banco pide tres seguidos.
+	var antes_t := c.enemigo.vida
+	for _i in 3:
+		c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("los targets seguidos no se reflejan",
+		antes_t > c.enemigo.vida and reflejos[0] == 3,
+		"pegaron %d, %d avisos" % [antes_t - c.enemigo.vida, reflejos[0]])
+	# El regreso de la caza lo hace la mesa sola: nunca se refleja.
+	var c2 := Combate.new(pc)
+	c2.iniciar(Enemigo.new(datos))
+	_en_juego(c2)
+	var reflejos2 := [0]
+	c2.golpe_reflejado.connect(func(_p: Vector2, _d: int) -> void: reflejos2[0] += 1)
+	var vida2 := c2.enemigo.vida
+	for _i in 3:
+		c2.mesa.rampa_salida.emit(Vector2(200, 800), c2.mesa.regreso)
+	_comprobar("el regreso de la caza no se refleja aunque se repita",
+		c2.mesa.regreso >= 0 and reflejos2[0] == 0 and c2.enemigo.vida < vida2,
+		"%d reflejos" % reflejos2[0])
+	# Sin el comportamiento, dos retornos seguidos pegan los dos.
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0}))
+	_en_juego(c3)
+	var v3 := c3.enemigo.vida
+	_recorrido(c3, Rampa.Premio.DANO)
+	var uno := v3 - c3.enemigo.vida
+	_recorrido(c3, Rampa.Premio.DANO)
+	_comprobar("sin el comportamiento repetir tiro pega igual",
+		uno > 0 and v3 - c3.enemigo.vida > uno)
 
 ## (4) BLINDAJE QUE SOLO ROMPE EL DAÑO CONCENTRADO. Contra los parámetros: el
 ## umbral es una fracción del cañón, así que el cañón a x1 rompe y un target no.
@@ -6042,7 +6116,13 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	var col_c := NodoHud.ancho_columna_conducta(
 		cascara.interior_panel(cascara.panel_enemigo()))
 	var no_caben: Array[String] = []
-	for fila in conducta.rotulos(true, 4):
+	var filas_c: Array = conducta.rotulos(true, 4)
+	# Y los detalles que solo salen con el reflejo armado, uno por tiro.
+	for tiro in Comportamientos.TIROS_REFLEJABLES:
+		conducta.ultimo_tiro = tiro
+		conducta.seguidas = 1
+		filas_c.append_array(conducta.rotulos(true, 4))
+	for fila in filas_c:
 		for k in ["rotulo", "detalle"]:
 			var txt := str((fila as Dictionary)[k])
 			if FuenteUI.obtener().get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT,

@@ -390,6 +390,7 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 		flash_cura_enemigo = 0.7)
 	combate.combo_castigado.connect(_al_castigar_combo)
 	combate.blindaje_roto.connect(_al_romper_blindaje)
+	combate.golpe_reflejado.connect(_al_reflejar_golpe)
 	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
@@ -1160,6 +1161,13 @@ func _al_romper_blindaje(capas: int, punto: Vector2) -> void:
 		"col": C_ORO_CLARO, "tam": 8.0, "subida": 26.0})
 	impactos.onda(punto, C_ORO_CLARO, 1.3)
 	impactos.chispas(punto, Vector2.UP, C_PIEDRA, 1.2)
+
+## HAS REPETIDO TIRO Y TE LO HA DEVUELTO. Se dice donde ha pasado, en el color
+## de lo que pega el enemigo; el "-N" de su golpe sale solo, por `enemigo_ataca`.
+func _al_reflejar_golpe(punto: Vector2, _dano: int) -> void:
+	_numeros.append({"pos": punto + Vector2(0, -20), "t": 1.0, "texto": "REFLEJADO",
+		"col": C_GOMA_LUZ, "tam": 8.0, "subida": 26.0})
+	impactos.onda(punto, C_GOMA_LUZ, 1.2)
 
 ## Curarse también lleva número. Sale en verde y donde estaba la bola, que es
 ## donde ha pasado.
