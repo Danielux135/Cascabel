@@ -371,14 +371,14 @@
       "id": "remate",
       "nombre": "Remate",
       "rareza": "rara",
-      "texto": "Banco y luego órbita. En orden y sin perder la bola.",
+      "texto": "Banco y luego un carril de retorno. En orden y sin perder la bola.",
       "tiros": [
         {
           "tiro": "banco",
           "veces": 1
         },
         {
-          "tiro": "orbita",
+          "tiro": "retorno",
           "veces": 1
         }
       ],
@@ -445,14 +445,18 @@
       "id": "lanzadera",
       "nombre": "Lanzadera",
       "rareza": "arcana",
-      "texto": "Cañón y luego órbita. En orden y sin perder la bola.",
+      "texto": "Retorno, cañón y otro retorno. En orden y sin perder la bola.",
       "tiros": [
+        {
+          "tiro": "retorno",
+          "veces": 1
+        },
         {
           "tiro": "canon",
           "veces": 1
         },
         {
-          "tiro": "orbita",
+          "tiro": "retorno",
           "veces": 1
         }
       ],

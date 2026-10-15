@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **694/694** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **699/699** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -107,6 +107,14 @@ Gran vuelta perdía su tercera línea (ahora caben tres).
 **Ojo, que esto mueve el modelo:** `medir_daniel.gd` carga el catálogo de
 misiones, y con 28 el perfil de Daniel completa otras y gana otras reliquias.
 Las medidas de la Fase 6 de esta sesión están sacadas con las 14 de antes.
+
+**La revisión cazó tres regalos, y dos eran de antes de las misiones nuevas:**
+el regreso de la caza contaba como retorno (es la mesa, no tú); el banco que
+sale del mismo golpe que el target que cierra una misión contaba ya para la
+siguiente; y la racha del Esqueleto cruzaba de una bola a otra, así que te
+reflejaba la órbita del lanzamiento. Arreglados los tres, con prueba, y con
+otras dos que miran `orden` y `sin_drenar` por el otro lado: sin la condición,
+el paso cuenta y drenar no borra.
 
 ## `medir_daniel.gd` SABE JUGAR CON VARIAS BOLAS (tarea 3 · 15-oct)
 
@@ -2142,8 +2150,18 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
 **M1.** **¿Valen las catorce nuevas?** Están en la tabla de arriba y en
 `data/misiones.json`, al final. Las que más pueden fallar: **Todo o nada** pide
 retorno, cañón y platillo en una sola bola, y si se hace imposible es la
-primera que sobra; y **Ronda** y **Remate** usan la órbita, que el lanzamiento a
-tope regala, así que dependen de la decisión abierta del tramo gratis.
+primera que sobra; y **Ronda** usa la órbita, que el lanzamiento a tope regala,
+así que depende de la decisión abierta del tramo gratis. **Remate y Lanzadera
+acababan en órbita y se cambiaron** por eso mismo: una misión en orden que
+termina en el tiro que regala el lanzamiento se cierra sirviendo la bola. Ahora
+Remate es banco y retorno, y Lanzadera retorno, cañón y retorno.
+**M3.** **La planta alta cuenta para las misiones**, y es una decisión que nadie
+ha tomado: la subida a la isla paga como el cañón, la órbita alta como la
+órbita y los túneles como retornos, así que cuentan como esos tiros. Y como
+arriba hay salvabolas, **"sin drenar" no corre ningún riesgo mientras dura la
+caza**. ¿Está bien así —la caza como sitio para avanzar misiones— o los tiros de
+arriba no deberían contar? Lo que sí se quitó es el regreso: lo hace la mesa
+sola al acabarse el tiempo y contaba un retorno gratis en cada caza.
 **M2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
 queda así, o se le busca un nombre de catorce letras?
 

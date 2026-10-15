@@ -1502,6 +1502,24 @@ func _prueba_comportamiento_reflejo() -> void:
 	c4.mesa.target_abatido.emit(Vector2(200, 800), 0)
 	_comprobar("y el panel nunca dice que vigila un target",
 		c4.conducta.tiro_vigilado() == "", c4.conducta.tiro_vigilado())
+	# LA RACHA NO CRUZA DE UNA BOLA A OTRA: el retorno con el que acabas una bola
+	# y el primero de la siguiente no son repetir. Sin esto, el Esqueleto te
+	# devolvía el golpe por la órbita del lanzamiento.
+	var c5 := Combate.new(pc)
+	c5.iniciar(Enemigo.new(datos))
+	_en_juego(c5)
+	var reflejos5 := [0]
+	c5.golpe_reflejado.connect(func(_p: Vector2, _d: int) -> void: reflejos5[0] += 1)
+	_recorrido(c5, Rampa.Premio.DANO)
+	_drenar(c5)
+	_avanzar_combate(c5, c5.p.pausa_drenaje + c5.p.pausa_ataque + DT * 4.0)
+	var servida := c5.fase == Combate.Fase.LANZANDO
+	_en_juego(c5)
+	var vida5 := c5.enemigo.vida
+	_recorrido(c5, Rampa.Premio.DANO)
+	_comprobar("la racha del reflejo empieza de cero con cada bola",
+		servida and reflejos5[0] == 0 and c5.enemigo.vida < vida5,
+		"servida %s, %d reflejos" % [servida, reflejos5[0]])
 
 	# El regreso de la caza lo hace la mesa sola: nunca se refleja.
 	var c2 := Combate.new(pc)
@@ -5899,6 +5917,82 @@ func _prueba_misiones_una_a_una(catalogo: Array[Mision]) -> void:
 		mal_orden.is_empty(), str(mal_orden))
 	_comprobar("y en las de sin drenar, drenar deja el progreso a cero",
 		mal_drenaje.is_empty(), str(mal_drenaje))
+
+	# Y EL OTRO SENTIDO DE LAS DOS: sin `orden`, un paso que no es el primero
+	# cuenta igual, y sin `sin_drenar`, drenar no borra nada. Las dos de arriba
+	# pasarían también con una condición que se aplicara a todas las misiones.
+	var orden_de_mas: Array[String] = []
+	var drenaje_de_mas: Array[String] = []
+	for m in catalogo:
+		var casillas := 0
+		for i in m.tiros.size():
+			casillas += m.veces(i)
+		var ultimo := m.tiros.size() - 1
+		if not m.orden and ultimo > 0 and m.tiro(ultimo) != m.tiro(0):
+			var c3 := _combate_de_mision(m, [])
+			_tiro_de_mision(c3, m.tiro(ultimo))
+			var suma := 0
+			for i in m.tiros.size():
+				suma += c3.llevas(i)
+			if suma != 1:
+				orden_de_mas.append(m.id)
+		if not m.sin_drenar and casillas > 1:
+			var c4 := _combate_de_mision(m, [])
+			_tiro_de_mision(c4, m.tiro(0))
+			_drenar(c4)
+			if c4.llevas(0) != 1:
+				drenaje_de_mas.append(m.id)
+	_comprobar("sin orden, el ultimo paso cuenta aunque vaya primero",
+		orden_de_mas.is_empty(), str(orden_de_mas))
+	_comprobar("y sin la condicion de no drenar, drenar no borra el progreso",
+		drenaje_de_mas.is_empty(), str(drenaje_de_mas))
+
+	_prueba_misiones_y_la_mesa()
+
+## LO QUE LA MESA HACE SOLA NO ES UN TIRO TUYO, y lo que ya cobró una misión no
+## cobra la siguiente. Dos regalos que cazó la revisión de las misiones nuevas.
+func _prueba_misiones_y_la_mesa() -> void:
+	# (1) EL REGRESO DE LA CAZA no cuenta como retorno. Lo hace la mesa sola al
+	# acabarse el tiempo, así que contaba un paso gratis en cada caza.
+	var de_retorno := Mision.new({"id": "prueba_retorno", "nombre": "Prueba",
+		"texto": "x", "tiros": [{"tiro": "retorno", "veces": 2}]})
+	var c := _combate_de_mision(de_retorno, [])
+	var vida := c.enemigo.vida
+	c.mesa.rampa_salida.emit(Vector2(200, 800), c.mesa.regreso)
+	var tras_regreso := c.llevas(0)
+	var pego := vida - c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO)
+	_comprobar("el regreso de la caza no cuenta para la mision, y sigue pegando",
+		c.mesa.regreso >= 0 and tras_regreso == 0 and pego > 0 and c.llevas(0) == 1,
+		"tras el regreso %d, pego %d, tras un retorno %d" % [tras_regreso, pego,
+			c.llevas(0)])
+
+	# (2) EL BANCO DEL MISMO GOLPE no cuenta para la misión que acaba de abrirse.
+	# La mesa emite el último target y su banco uno detrás de otro, en el mismo
+	# paso: si el target cierra una misión, la siguiente no puede empezar ya con
+	# su banco hecho.
+	var de_target := Mision.new({"id": "prueba_target", "nombre": "Prueba",
+		"texto": "x", "tiros": [{"tiro": "target", "veces": 1}]})
+	var de_banco := Mision.new({"id": "prueba_banco", "nombre": "Prueba",
+		"texto": "x", "tiros": [{"tiro": "banco", "veces": 1},
+			{"tiro": "bumper", "veces": 1}]})
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var c2 := Combate.new(pc)
+	var esc: Array[Mision] = [de_target, de_banco]
+	c2.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1,
+		"reloj": 100000.0}), -1, esc)
+	_en_juego(c2)
+	c2.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	c2.mesa.banco_completado.emit(Vector2(200, 800), 0)
+	var mismo_golpe := c2.llevas(0)
+	var subio := c2.mision() == de_banco
+	c2.avanzar(DT)
+	c2.mesa.banco_completado.emit(Vector2(200, 800), 0)
+	_comprobar("el banco del golpe que cierra una mision no cuenta para la siguiente",
+		subio and mismo_golpe == 0 and c2.llevas(0) == 1,
+		"subio %s, del mismo golpe %d, del siguiente %d" % [subio, mismo_golpe,
+			c2.llevas(0)])
 
 ## Un combate contra un saco con UNA misión puesta, ya en juego.
 func _combate_de_mision(m: Mision, conducta: Array) -> Combate:

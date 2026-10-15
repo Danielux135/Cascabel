@@ -153,8 +153,14 @@ func tocado() -> void:
 ## segundos que llevaba la bola anterior pasaban a la nueva y el enemigo podía
 ## curarse con la bola todavía en el lanzador, sin que hubieras tenido ocasión
 ## de tocarle. Lo cazó la revisión de la Fase 6.
+##
+## Y LA RACHA DEL REFLEJO TAMBIÉN: sin esto, la órbita del lanzamiento de una bola
+## y la de la siguiente contaban como repetir, y el Esqueleto te devolvía el
+## golpe por lanzar. También la cazó una revisión.
 func nueva_bola() -> void:
 	sin_tocar = 0.0
+	ultimo_tiro = ""
+	seguidas = 0
 
 ## Avanza el reloj de la cura y devuelve cuánto se cura en este paso. SOLO lo
 ## llama `Combate.avanzar` con la bola en juego: en las pausas de drenaje y de

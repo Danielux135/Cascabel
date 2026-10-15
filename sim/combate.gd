@@ -112,6 +112,11 @@ var _primer_golpe := true
 var _red_gastada := false
 ## Drenajes de este combate. Es lo que mira la condición `sin_drenar`.
 var drenajes: int = 0
+## El target que acaba de caer ha cerrado una misión. El banco que salga del
+## MISMO golpe no cuenta para la siguiente: la mesa emite el último target y el
+## banco uno detrás de otro, y si no, una misión que empieza por banco se abría
+## con su primer paso ya hecho. Se apaga al principio de cada paso del combate.
+var _banco_del_mismo_golpe := false
 
 # --------------------------------------------------------------- la medida
 #
@@ -288,6 +293,13 @@ func _apuntar(tiro: String) -> void:
 	else:
 		mision_cambiada.emit(m)
 
+## Los estados de un tiro SIN contarlo para la misión: para lo que pasa en la
+## mesa sin ser un tiro del jugador —el regreso de la caza— o que ya ha cobrado
+## otra misión en el mismo golpe.
+func _solo_estados(tiro: String) -> void:
+	if _en_juego():
+		_aplicar_estados(tiro)
+
 ## Aplica los estados que toque este tiro. `tiro` son los ocho de la mesa más
 ## dos que no son tiros: `critico`, que salta al criticar, y `matar`.
 func _aplicar_estados(tiro: String) -> void:
@@ -405,6 +417,7 @@ func reloj_carga() -> float:
 	return p.reloj_carga
 
 func avanzar(dt: float) -> void:
+	_banco_del_mismo_golpe = false
 	mesa.avanzar(dt)
 	if fase == Fase.LANZANDO and mesa.hay_bola_en_juego():
 		fase = Fase.BOLA_VIVA
@@ -559,13 +572,20 @@ func _al_abatir_target(punto: Vector2, _banco: int) -> void:
 	# Un target no se bloquea ni se refleja nunca; pasa por el filtro porque es
 	# "otro sitio" y abre un recorrido cerrado.
 	_filtrar_tiro("target", punto)
+	var nivel_antes := nivel_mision
 	_apuntar("target")
+	_banco_del_mismo_golpe = nivel_mision != nivel_antes
 	_robar_reloj(bolsa.suma("suma_robo_reloj_target"))
 	_golpear(p.dano_target + int(round(bolsa.suma("suma_dano_target"))), punto, true)
 
 func _al_completar_banco(punto: Vector2, _banco: int) -> void:
 	_filtrar_tiro("banco", punto)
-	_apuntar("banco")
+	if _banco_del_mismo_golpe:
+		# Del mismo golpe que cerró la misión anterior: estados sí, misión no.
+		_banco_del_mismo_golpe = false
+		_solo_estados("banco")
+	else:
+		_apuntar("banco")
 	_robar_reloj(bolsa.suma("suma_robo_reloj_banco"))
 	_tirar_por_bola_extra("azar_bola_extra_banco")
 	_sumar_golpes(int(round(bolsa.suma("suma_golpes_banco"))))
@@ -728,7 +748,13 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 			_golpear(p.dano_rampa_fuerte, punto, true, true,
 				comun * bolsa.factor("factor_dano_canon"))
 		_:
-			_apuntar("retorno")
+			# EL REGRESO NO CUENTA PARA LA MISIÓN. Lo hace la mesa sola al
+			# acabarse la caza, no es un tiro tuyo, y contando como retorno
+			# regalaba ese paso en cada caza. Sigue pagando su daño, como antes.
+			if r.nombre == "regreso":
+				_solo_estados("retorno")
+			else:
+				_apuntar("retorno")
 			_golpear(p.dano_rampa, punto, true,
 				true, comun * bolsa.factor("factor_dano_retorno"))
 
