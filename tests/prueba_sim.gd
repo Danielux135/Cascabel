@@ -1260,6 +1260,28 @@ func _prueba_comportamientos() -> void:
 		todos.append({"id": el_id})
 	var completo := Comportamientos.new()
 	completo.preparar(todos, ParametrosCombate.new())
+	# Y CADA CLAVE DE `CLAVES` SE LEE DE VERDAD: `CLAVES` es una lista escrita a
+	# mano, y una clave que esté en ella sin que `_resolver` la lea pasaría la
+	# comprobación de arriba y no cambiaría nada. Se pone cada una a un valor
+	# distinto del de por defecto y se mira que llegue.
+	var no_leidas: Array[String] = []
+	for el_id in Comportamientos.IDS:
+		for clave in Comportamientos.CLAVES[el_id]:
+			var valor: Variant = 7
+			if clave == "tiro":
+				valor = "platillo"
+			elif el_id == "blindaje" and clave == "factor":
+				valor = 0.5
+			var una := Comportamientos.new()
+			una.preparar([{"id": el_id, clave: valor}], ParametrosCombate.new())
+			var leido = (una.activos[el_id] as Dictionary).get(clave)
+			if typeof(valor) == TYPE_STRING:
+				if str(leido) != str(valor):
+					no_leidas.append("%s.%s" % [el_id, clave])
+			elif leido == null or not is_equal_approx(float(leido), float(valor)):
+				no_leidas.append("%s.%s (%s)" % [el_id, clave, str(leido)])
+	_comprobar("cada clave que se admite en el JSON se lee de verdad",
+		no_leidas.is_empty(), str(no_leidas))
 	_comprobar("cada comportamiento sale en el panel con su rotulo",
 		completo.rotulos(false, 1).size() == Comportamientos.IDS.size()
 			and completo.activos.size() == Comportamientos.IDS.size(),
@@ -2755,6 +2777,40 @@ func _prueba_sonido() -> void:
 	_comprobar("la vista atiende todas las senales de la mesa",
 		sin_atender.is_empty(),
 		"%s: una senal que nadie escucha es un evento mudo" % str(sin_atender))
+
+	# Y LAS DEL COMBATE, que hasta la Fase 6 no vigilaba nadie. La Fase 6 añadió
+	# seis —curarse, castigar el combo, romper el blindaje, reflejar, bloquear y
+	# abrir— y cada una es lo único que hace VISIBLE un comportamiento: una que se
+	# quedara sin oyente dejaría al enemigo haciendo algo que no se ve, que es la
+	# avería del platillo de `CLAUDE.md`. Las tres que ya estaban mudas van con su
+	# motivo:
+	#
+	#  - `bola_extra_soltada`: la bola extra la dice la mesa (`mesa.bola_extra`),
+	#    que sabe dónde sale. Esta la escucha el medidor.
+	#  - `bola_servida`: servir no tiene gesto propio; lo cuenta la tele.
+	#  - `estallido_de_estado`: la brasa estalla sin efecto propio. Es un hueco
+	#    de verdad, de la tanda de estados, y está aquí para que se vea.
+	var del_combate := {}
+	var fc := FileAccess.open("res://sim/combate.gd", FileAccess.READ)
+	if fc != null:
+		var re_c := RegEx.new()
+		re_c.compile("^signal ([a-z_]+)")
+		for linea in fc.get_as_text().split("\n"):
+			var mc := re_c.search(linea)
+			if mc != null:
+				del_combate[mc.get_string(1)] = true
+		fc.close()
+	const COMBATE_SIN_ATENDER := ["bola_extra_soltada", "bola_servida",
+		"estallido_de_estado"]
+	var mudas: Array[String] = []
+	for senal in del_combate:
+		if COMBATE_SIN_ATENDER.has(senal):
+			continue
+		if not texto_vista.contains("combate.%s.connect" % senal):
+			mudas.append(str(senal))
+	_comprobar("la vista atiende todas las senales del combate",
+		del_combate.size() > 15 and mudas.is_empty(),
+		"%d señales, mudas: %s" % [del_combate.size(), str(mudas)])
 
 	# Caerse y fallar la rampa son los DOS ÚNICOS sonidos del juego cuya energía
 	# no llega en el primer instante, y ahí está toda su identidad: la mesa ya
