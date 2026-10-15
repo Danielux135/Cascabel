@@ -329,6 +329,16 @@ ventanas abiertas):
 
 Cero píxeles de campo, y explica el modo sin un solo tutorial.
 
+**CONSTRUIDA (tanda 0o, 15-oct), sin jugar.** `NodoSistema` la dibuja en su capa
+(30) mientras `mesa.en_caza` diga que sí, preguntando cada fotograma: no tiene
+estado propio que haya que acordarse de cerrar, así que sigue abierta con el
+salvabolas y se va sola al acabarse el tiempo o al servirse bola nueva. No
+congela la mesa. Va encima de `ayuda.hlp`, que es lo único de la pantalla que se
+puede tapar veinte segundos sin quitarle nada al jugador, y su barra es el
+**tiempo de caza consumido**. Lleva además "defectuosos: N", que son las
+salvadas. **Lo que falta: "el fichero recuperado aparece en `RECUPERADO/`"**,
+que depende de la captura (§2) y no se ha tocado.
+
 ---
 
 ## 4. Qué NO se toca

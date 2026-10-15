@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **628/628** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **636/636** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -76,6 +76,20 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## LA VENTANA DE RECUPERACIÓN DE DISCO DURANTE LA CAZA (tanda 0o · 15-oct)
+
+`CAZA.md` §3.7, decidido por Fátima. Al subir a cazar se abre encima de
+`ayuda.hlp`, ocupando justo su sitio, una ventana "recuperación de disco" con el
+icono del disco, "N % completado" (y "defectuosos: N", que son las salvadas) y
+una barra que es el **tiempo de caza consumido**. No congela la mesa y **no tiene estado propio**:
+`NodoSistema` pregunta a `mesa.en_caza` cada fotograma, así que sigue abierta
+con el salvabolas y se cierra sola al acabar la caza o al servirse bola nueva.
+Ocho pruebas nuevas, con una mesa de verdad recorriendo las tres puertas.
+Mirada en captura con F1+F3. Una revisión adversarial cazó que se comía el canto
+del cuadro de error del cañón, que sí puede salir en la caza (una bola extra de
+abajo); ahora no sube al hueco de encima de `ayuda.hlp`, y hay prueba. **Falta** que el fichero recuperado aparezca en
+`RECUPERADO/`, que depende de la captura (0k). Preguntas W1-W4.
 
 ## LA CÁSCARA REACCIONA A LA MESA (tanda 0n · 21-ago, mirada el 15-oct)
 
@@ -1994,6 +2008,20 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+**LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
+en un combate, o subiendo por el umbral de verdad.
+
+**W1.** ¿Se lee la caza como "el sistema está recuperando algo" sin que nadie lo
+explique? Es la apuesta entera de `CAZA.md` §3.7.
+**W2.** La barra es el tiempo de caza que se va consumiendo, y "N % completado"
+lo mismo en número. ¿Se entiende que cuando se llena se acaba el bonus, o se
+lee como una barra de adorno?
+**W3.** "defectuosos: N" cuenta las veces que la mesa te ha salvado la bola ahí
+arriba. ¿Dice algo, o sobra? Sin tocar las palas salen unas quince por
+caza.
+**W4.** Tapa `ayuda.hlp` veinte segundos, a propósito. ¿Molesta, o está bien
+ahí? La otra opción era la banda izquierda, que son tus reliquias.
+
 **LO DE LA TANDA 0n (la cáscara reacciona a la mesa).** Mirado en captura, sin
 jugar. Para verlo sin esperar a la suerte: un cañón (la boca de la derecha), una
 descarga (llenar la barra de carga y completar otra rampa) y un drenaje.
@@ -2442,8 +2470,8 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    **P4.** La isla: ¿se entiende que está ALTA y que hay que subir a ella?
    **P5.** ¿Los túneles se leen como agujeros por debajo, o como rampas oscuras?
    **P6.** La planta de abajo se atenúa mientras cazas. ¿Ayuda o distrae?
-   Y falta por construir de `CAZA.md` §3.7: la **ventana de recuperación de
-   disco** que la cáscara tenía que abrir encima durante la caza.
+   La **ventana de recuperación de disco** de `CAZA.md` §3.7 ya está (tanda
+   0o); de ella falta solo el fichero en `RECUPERADO/`, que va con la captura.
 
 0i-C. ~~**EL CUELGUE ENTRE PLANTAS, LA CÁMARA FIJA Y EL SONIDO DE SALVAGUARDA**~~
    **HECHAS Y MEDIDAS** (18-ago). Ver arriba. Lo que queda de esta tanda es
@@ -2671,9 +2699,9 @@ de geometría fina y se hace jugando, no midiendo.
   no lo que da la habilidad. Un maniquí no mide una mesa —es la misma trampa que
   la tabla de balance calibrada contra un jugador inventado—, y por eso la puerta
   B la juzgáis vosotros.
-- **La planta de abajo se atenúa durante la caza, pero la cáscara no reacciona.**
-  `CAZA.md` §3.7 pedía además una **ventana de recuperación de disco** encima
-  mientras cazas, y eso no está: es trabajo de `NodoSistema`, no de la mesa.
+- **La ventana de recuperación de disco de la caza no deja nada en
+  `RECUPERADO/`.** `CAZA.md` §3.7 dice que el fichero recuperado aparece ahí, y
+  hoy la caza no recupera nada: eso es la captura (0k), no la ventana.
 
 - **NO HAY BOLA-BOLA DENTRO DE LAS RAMPAS NI EN EL PLATILLO, y es a propósito.**
   Una bola enganchada a una curva está en otro plano —las rampas son elevadas—,

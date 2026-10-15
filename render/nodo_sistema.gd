@@ -484,6 +484,11 @@ func _avanzar_retrato(delta: float) -> void:
 	_repro.avanzar(delta)
 
 func _dibujar() -> void:
+	# La de la caza va PRIMERO: si el jugador abre otra ventana encima, esa es
+	# la que está delante. No congela la mesa —la caza se está jugando—, así
+	# que no pasa por `abierto` ni por `congela_la_mesa`.
+	if disponible() and ventana_caza_abierta(vista.mesa):
+		_dibujar_recuperacion()
 	if aviso_tiempo > 0.0:
 		_dibujar_aviso()
 	if abierto == "":
@@ -876,6 +881,81 @@ func _boton(caja: Rect2, texto: String, marcado: bool) -> void:
 	_lienzo.draw_string(_fuente,
 		Vector2(caja.position.x, caja.position.y + caja.size.y * 0.5 + 4.0), texto,
 		HORIZONTAL_ALIGNMENT_CENTER, caja.size.x, 8, C_VACIO)
+
+## LA VENTANA DE RECUPERACIÓN DE DISCO DURANTE LA CAZA (`CAZA.md` §3.7, decidido
+## por Fátima): *"la caza abre una ventana encima, con pinta de diálogo de
+## recuperación de disco. Se cierra sola al acabar la caza"*. Cero píxeles de
+## campo, y explica el modo sin un solo tutorial.
+##
+## NO TIENE ESTADO PROPIO: se le pregunta a la mesa cada fotograma, como la
+## música. La otra forma —abrirla con `caza_empezada` y cerrarla con
+## `caza_terminada`— es la avería de siempre: la caza se acaba por tiempo, se
+## corta al servir bola nueva, y el salvabolas la deja abierta sin emitir nada
+## de las dos, y cada una de esas puertas sería un sitio donde acordarse de
+## cerrarla. Mientras `mesa.en_caza` diga que sí, está; cuando diga que no, no.
+##
+## Y es estática y recibe la mesa para que la batería la pruebe con una `Mesa`
+## de verdad, sin montar una `VistaMesa` entera.
+static func ventana_caza_abierta(mesa: Mesa) -> bool:
+	return mesa != null and mesa.en_caza
+
+## Lo recuperado, de 0 a 1: es el TIEMPO DE CAZA consumido, así que la barra
+## dice cuánto le queda al bonus sin escribir un número encima de la mesa. Cada
+## salvada se come `caza_coste_salvada` y la barra salta con ella.
+static func progreso_caza(mesa: Mesa) -> float:
+	if not ventana_caza_abierta(mesa) or mesa.p.caza_tiempo <= 0.0:
+		return 0.0
+	return clampf(1.0 - mesa.caza_restante / mesa.p.caza_tiempo, 0.0, 1.0)
+
+const TITULO_RECUPERACION := "recuperación de disco"
+const LINEA_RECUPERACION := "Recuperando sectores..."
+
+## DÓNDE VA: EXACTAMENTE ENCIMA DE `ayuda.hlp`, ni un píxel más. Es lo único de
+## la pantalla que se puede tapar veinte segundos sin quitarle nada al jugador
+## —las teclas no cambian a mitad de combate—, mientras que la banda izquierda
+## son tus reliquias, que se encienden y se apagan, y los otros dos paneles son
+## la vida del enemigo y la tuya.
+##
+## Y NO SUBE AL HUECO DE ENCIMA, que es del cuadro de error del cañón. Se
+## escribió más alta, con 16 px dentro del hueco y un comentario que decía que
+## los dos no coincidían nunca porque en la caza no hay bola abajo: la revisión
+## destapó que sí la puede haber —una reliquia de Caos suelta una bola extra al
+## completar un recorrido de arriba, y esa bola entra por el carril de abajo—,
+## y entonces la ventana le comía el canto al cuadro de error.
+static func caja_recuperacion_en(cascara: NodoCascara) -> Rect2:
+	return cascara.panel_ayuda()
+
+## Las líneas de texto que lleva, para medirlas: la batería comprueba que caben
+## con el número más largo posible, no con el de ahora. Son DOS para que quepan
+## con la barra en el alto de `ayuda.hlp`.
+static func lineas_recuperacion(progreso: float, salvadas: int) -> Array[String]:
+	var segunda := "%d %% completado" % int(floorf(progreso * 100.0))
+	if salvadas > 0:
+		segunda = "%d %%  ·  defectuosos: %d" % [int(floorf(progreso * 100.0)), salvadas]
+	return [LINEA_RECUPERACION, segunda]
+
+func _dibujar_recuperacion() -> void:
+	if vista.cascara == null:
+		return
+	var caja := caja_recuperacion_en(vista.cascara)
+	vista.cascara.dibujar_panel(_lienzo, caja, TITULO_RECUPERACION)
+	var d := _interior(caja).grow(-4.0)
+	var tex := _icono("disco")
+	var x_texto := d.position.x
+	if tex != null:
+		_lienzo.draw_texture_rect(tex, Rect2(d.position, Vector2(32, 32)), false)
+		x_texto += 40.0
+	var progreso := progreso_caza(vista.mesa)
+	var lineas := lineas_recuperacion(progreso, vista.mesa.caza_salvadas)
+	for i in lineas.size():
+		_lienzo.draw_string(_fuente,
+			Vector2(x_texto, d.position.y + 8.0 + float(i) * 12.0), lineas[i],
+			HORIZONTAL_ALIGNMENT_LEFT, d.end.x - x_texto, 8,
+			C_TEXTO if i == 0 else C_TEXTO_TENUE)
+	# La barra, abajo y a la derecha del icono: es la pieza que más se lee de
+	# reojo, y en el alto de `ayuda.hlp` no cabe debajo de él.
+	var barra := Rect2(x_texto, d.end.y - 10.0, d.end.x - x_texto, 10.0)
+	vista.cascara.dibujar_progreso(_lienzo, barra, progreso, false)
 
 ## EL AVISO DE QUE HAS RECUPERADO ALGO. Es lo único de todo este nodo que sale
 ## sin que lo pidas, y por eso es pequeño y se apaga solo: sale abajo a la

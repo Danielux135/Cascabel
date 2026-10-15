@@ -44,6 +44,7 @@ func _initialize() -> void:
 	_prueba_impactos()
 	_prueba_racimo()
 	_prueba_zona_alta()
+	_prueba_ventana_de_la_caza()
 	_prueba_sin_rebote_encerrado()
 	_prueba_slingshot_tiene_espalda()
 	_prueba_outlanes()
@@ -1147,6 +1148,72 @@ func _prueba_zona_alta() -> void:
 	_comprobar("y no avisa dos veces si la caza ya estaba cerrada",
 		cerrada8[0] == avisos_antes + 1,
 		"%d avisos" % (cerrada8[0] - avisos_antes))
+
+## LA VENTANA DE RECUPERACIÓN DE DISCO (`CAZA.md` §3.7). Se abre al entrar en la
+## caza, SIGUE ABIERTA cuando el salvabolas devuelve la bola arriba —que es el
+## caso que se olvida, porque la caza no se cierra y no emite nada de
+## principio ni de fin— y se cierra al acabarse. Se prueba con una mesa de
+## verdad y sin tocar las palas, que es el jugador que más salvadas provoca.
+func _prueba_ventana_de_la_caza() -> void:
+	var m := _nueva_mesa()
+	m.nueva_bola()
+	m.bola.en_carril = false
+	m.bola.pos = m.p.umbral_boca
+	m.bola.vel = Vector2(0, -(m.p.umbral_velocidad_minima + 200.0))
+	_comprobar("la ventana de la caza no esta abierta antes de subir",
+		not NodoSistema.ventana_caza_abierta(m))
+	var al_abrir := [false]
+	var progreso_al_abrir := [-1.0]
+	var al_salvar: Array[bool] = []
+	var al_cerrar := [true]
+	m.caza_empezada.connect(func(_p: Vector2) -> void:
+		al_abrir[0] = NodoSistema.ventana_caza_abierta(m)
+		progreso_al_abrir[0] = NodoSistema.progreso_caza(m))
+	m.bola_salvada.connect(func(_p: Vector2, _n: int) -> void:
+		al_salvar.append(NodoSistema.ventana_caza_abierta(m)))
+	m.caza_terminada.connect(func(_p: Vector2) -> void:
+		al_cerrar[0] = NodoSistema.ventana_caza_abierta(m))
+	var progreso_antes := -1.0
+	var retrocede := false
+	var t := 0.0
+	while t < m.p.caza_tiempo + 8.0 and m.bola.viva:
+		m.avanzar(DT)
+		t += DT
+		if m.en_caza:
+			var pr := NodoSistema.progreso_caza(m)
+			if pr < progreso_antes - 0.0001:
+				retrocede = true
+			progreso_antes = pr
+	_comprobar("se abre al entrar en la caza", al_abrir[0])
+	_comprobar("sigue abierta cada vez que el salvabolas devuelve la bola arriba",
+		not al_salvar.is_empty() and not al_salvar.has(false),
+		"%d salvadas, abierta en %s" % [al_salvar.size(), str(al_salvar)])
+	_comprobar("y se cierra al acabarse la caza", not al_cerrar[0]
+		and not NodoSistema.ventana_caza_abierta(m))
+	# La barra es el tiempo de caza consumido: si retrocediera, diría que el
+	# bonus se alarga, y eso no pasa nunca.
+	# Y EMPIEZA VACÍA: sin esto, una barra llena desde el primer fotograma
+	# pasaría las dos comprobaciones de arriba.
+	_comprobar("su barra empieza vacia, solo avanza y llega casi al final",
+		progreso_al_abrir[0] >= 0.0 and progreso_al_abrir[0] < 0.01
+			and not retrocede and progreso_antes > 0.95,
+		"empezó en %.2f y acabó en %.2f" % [progreso_al_abrir[0], progreso_antes])
+
+	# Y la otra puerta de salida: servir bola nueva corta la caza sin jugarla
+	# (`cortar_caza`), y la ventana tiene que irse con ella.
+	var m2 := _nueva_mesa()
+	m2.nueva_bola()
+	m2.bola.en_carril = false
+	var t2 := 0.0
+	while t2 < 6.0 and not m2.en_caza:
+		if not m2.abrir_caza_a_mano() and m2.bola.pos.y > m2.p.y_drenaje - 200.0:
+			break
+		m2.avanzar(DT)
+		t2 += DT
+	var abierta_antes := NodoSistema.ventana_caza_abierta(m2)
+	m2.nueva_bola()
+	_comprobar("y se cierra si se sirve bola nueva a mitad de caza",
+		abierta_antes and not NodoSistema.ventana_caza_abierta(m2))
 
 ## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
 ## qué planta hablas es de donde salen las pruebas que miden otra cosa.
@@ -5635,6 +5702,38 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	_comprobar("y su mensaje cabe entero, sin que el width lo recorte",
 		cascara.cabe_error(VistaMesa.ERROR_CANON),
 		"hueco %s" % str(cascara.hueco_texto_error()))
+
+	# LA VENTANA DE RECUPERACIÓN DE LA CAZA (`CAZA.md` §3.7) tapa `ayuda.hlp` a
+	# propósito —es lo único que se puede tapar veinte segundos—, pero nada más:
+	# ni la mesa, ni la vida del enemigo, ni la tuya. Y su texto tiene que caber
+	# con el número más largo que pueda llegar a escribir.
+	var rec := NodoSistema.caja_recuperacion_en(cascara)
+	var tapa: Array[String] = []
+	for nombre in ["enemigo", "jugador"]:
+		if rec.intersects(paneles[nombre]):
+			tapa.append(str(nombre))
+	if rec.intersects(ventana) or not der.encloses(rec):
+		tapa.append("fuera de la banda")
+	# Y tampoco el cuadro de error del cañón, que puede salir en plena caza si
+	# una bola extra de abajo entra por el cañón.
+	if rec.intersects(cascara.caja_error()):
+		tapa.append("cuadro de error")
+	_comprobar("la ventana de la caza solo tapa ayuda.hlp",
+		tapa.is_empty() and rec.encloses(paneles["ayuda"]),
+		"%s — %s" % [str(rec), str(tapa)])
+	var fuente := FuenteUI.obtener()
+	var dentro_rec := cascara.interior_panel(rec).grow(-4.0)
+	var ancho_max := 0.0
+	for linea in NodoSistema.lineas_recuperacion(1.0, 99):
+		ancho_max = maxf(ancho_max, fuente.get_string_size(
+			linea, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x)
+	var titulo_rec := fuente.get_string_size(NodoSistema.TITULO_RECUPERACION,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, 8).x
+	_comprobar("y su texto cabe al lado del icono, con la barra debajo",
+		ancho_max + 40.0 <= dentro_rec.size.x
+			and titulo_rec <= rec.size.x - NodoCascara.GROSOR_VENTANA * 2.0 - 12.0
+			and dentro_rec.size.y >= 2.0 * 12.0 + 10.0,
+		"texto %.0f + icono, hueco %s" % [ancho_max, str(dentro_rec)])
 
 	# Y el enemigo tiene que caber ENTERO dentro del suyo. Un sprite de 96 px que
 	# se sale por abajo se come el nombre y la barra de vida, y eso no da error:
