@@ -32,12 +32,13 @@ extends RefCounted
 
 ## Los que existen. Lista CERRADA: un id mal escrito en el JSON no da error, deja
 ## un enemigo que no hace nada, y eso se diagnostica como balance. Hay prueba.
-const IDS := ["cura", "castiga_combo", "caza_acelera"]
+const IDS := ["cura", "blindaje", "castiga_combo", "caza_acelera"]
 
 ## Las claves que cada uno sabe leer del JSON, además de `id`. Misma razón: una
 ## clave mal escrita no pisa nada y nadie se entera. Hay prueba.
 const CLAVES := {
 	"cura": ["espera", "periodo", "fraccion"],
+	"blindaje": ["capas", "umbral", "factor", "regenera"],
 	"castiga_combo": ["desde", "factor_por_tramo", "tramos_robados"],
 	"caza_acelera": ["factor"],
 }
@@ -49,6 +50,9 @@ var activos: Dictionary = {}
 
 ## (2) Segundos de juego sin que le toquen. Solo corre con la bola en juego.
 var sin_tocar: float = 0.0
+## (4) Capas de blindaje que le quedan, y lo que lleva regenerando la siguiente.
+var capas: int = 0
+var _hasta_capa: float = 0.0
 
 ## Prepara los comportamientos de un enemigo y deja el estado a cero. `lista` es
 ## lo que trae `Enemigo.comportamientos`; los ids que no existen se ignoran (la
@@ -57,6 +61,8 @@ func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 	p = parametros if parametros != null else ParametrosCombate.new()
 	activos.clear()
 	sin_tocar = 0.0
+	capas = 0
+	_hasta_capa = 0.0
 	for fila in lista:
 		if typeof(fila) != TYPE_DICTIONARY:
 			continue
@@ -65,6 +71,8 @@ func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 		if not IDS.has(el_id):
 			continue
 		activos[el_id] = _resolver(el_id, d)
+	if activos.has("blindaje"):
+		capas = int(activos["blindaje"]["capas"])
 
 func tiene(el_id: String) -> bool:
 	return activos.has(el_id)
@@ -82,6 +90,11 @@ func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 			r["espera"] = maxf(float(fila.get("espera", p.cura_espera)), 0.0)
 			r["periodo"] = maxf(float(fila.get("periodo", p.cura_periodo)), 0.05)
 			r["fraccion"] = maxf(float(fila.get("fraccion", p.cura_fraccion)), 0.0)
+		"blindaje":
+			r["capas"] = maxi(int(fila.get("capas", p.blindaje_capas)), 1)
+			r["umbral"] = maxf(float(fila.get("umbral", p.blindaje_umbral)), 0.0)
+			r["factor"] = clampf(float(fila.get("factor", p.blindaje_factor)), 0.0, 1.0)
+			r["regenera"] = maxf(float(fila.get("regenera", p.blindaje_regenera)), 0.1)
 		"castiga_combo":
 			r["desde"] = maxi(int(fila.get("desde", p.castigo_desde)), 2)
 			r["factor_por_tramo"] = maxf(float(fila.get("factor_por_tramo",
@@ -153,6 +166,41 @@ func cura_en() -> float:
 		return 0.0
 	return maxf(float(activos["cura"]["espera"]) - sin_tocar, 0.0)
 
+# ------------------------------------------------------------- el blindaje
+
+## (4) BLINDAJE QUE SOLO ROMPE EL DAÑO CONCENTRADO: *"mata al build de combo"*.
+## Lo llama `Combate._golpear` con el daño del golpe ya entero —multiplicador,
+## reliquias, descarga y crítico— y el daño del cañón, que es la vara del
+## umbral. Devuelve el daño que entra; si rompe una capa, la quita.
+##
+## NO lo pasan los estados: un tic de veneno no es un golpe, y aplicarle un
+## umbral dependería de cuántos tics caen en el fotograma. Que el veneno
+## atraviese el blindaje es la respuesta a este enemigo, y es diseño: pregunta.
+func filtrar_golpe(dano: float, dano_canon: float) -> float:
+	if not activos.has("blindaje") or capas <= 0:
+		return dano
+	var b: Dictionary = activos["blindaje"]
+	if dano >= float(b["umbral"]) * dano_canon:
+		capas -= 1
+		return dano
+	return dano * float(b["factor"])
+
+## Regenera capas con la bola en juego. Lo llama `Combate.avanzar` dentro de
+## `if _en_juego()`, como la cura: en las pausas no se arregla nada.
+func avanzar_blindaje(dt: float) -> void:
+	if not activos.has("blindaje"):
+		return
+	var b: Dictionary = activos["blindaje"]
+	var maximo := int(b["capas"])
+	if capas >= maximo:
+		_hasta_capa = 0.0
+		return
+	_hasta_capa += dt
+	var cada := float(b["regenera"])
+	while _hasta_capa >= cada and capas < maximo:
+		_hasta_capa -= cada
+		capas += 1
+
 # ------------------------------------------------------- acelera al cazar
 
 ## (6) ACELERA SU RELOJ CUANDO SUBES A CAZAR: *"castiga farmear"*. Subir ya
@@ -189,6 +237,11 @@ func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
 				salida.append({"rotulo": "SE CURA",
 					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
 					"activo": falta <= 0.0})
+			"blindaje":
+				salida.append({"rotulo": "BLINDAJE",
+					"detalle": "roto" if capas <= 0 else ("1 capa" if capas == 1
+						else "%d capas" % capas),
+					"activo": capas > 0})
 			"castiga_combo":
 				# Se enciende en cuanto estás en el umbral, que es justo cuando hay
 				# que gastar el combo antes de que llegue el reloj.

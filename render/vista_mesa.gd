@@ -389,6 +389,7 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	combate.enemigo_curado.connect(func(_cantidad: int) -> void:
 		flash_cura_enemigo = 0.7)
 	combate.combo_castigado.connect(_al_castigar_combo)
+	combate.blindaje_roto.connect(_al_romper_blindaje)
 	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
@@ -1149,6 +1150,16 @@ func _al_castigar_combo(antes: int, ahora: int) -> void:
 	_numeros.append({"pos": donde, "t": 1.2, "texto": "de x%d a x%d" % [antes, ahora],
 		"col": C_FUEGO, "tam": 16.0, "subida": 20.0})
 	impactos.onda(donde, C_FUEGO, 1.2)
+
+## UN GOLPE CONCENTRADO HA ROTO UNA CAPA DEL BLINDAJE. Se dice donde ha pasado,
+## que es donde estaba la bola: es lo que enseña QUÉ tiro rompe, que es la
+## pregunta que este enemigo te hace.
+func _al_romper_blindaje(capas: int, punto: Vector2) -> void:
+	_numeros.append({"pos": punto + Vector2(0, -24), "t": 1.0,
+		"texto": "BLINDAJE ROTO" if capas <= 0 else "CAPA ROTA",
+		"col": C_ORO_CLARO, "tam": 8.0, "subida": 26.0})
+	impactos.onda(punto, C_ORO_CLARO, 1.3)
+	impactos.chispas(punto, Vector2.UP, C_PIEDRA, 1.2)
 
 ## Curarse también lleva número. Sale en verde y donde estaba la bola, que es
 ## donde ha pasado.

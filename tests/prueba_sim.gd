@@ -1315,6 +1315,78 @@ func _prueba_comportamientos() -> void:
 
 	_prueba_comportamiento_cura()
 	_prueba_comportamiento_castigo()
+	_prueba_comportamiento_blindaje()
+
+## (4) BLINDAJE QUE SOLO ROMPE EL DAÑO CONCENTRADO. Contra los parámetros: el
+## umbral es una fracción del cañón, así que el cañón a x1 rompe y un target no.
+func _prueba_comportamiento_blindaje() -> void:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var datos := {"nombre": "Armadura vacía", "vida": 1000000, "ataque": 1,
+		"reloj": 1000.0, "comportamientos": [{"id": "blindaje"}]}
+	var c := Combate.new(pc)
+	c.iniciar(Enemigo.new(datos))
+	_en_juego(c)
+	_comprobar("el blindaje empieza con todas sus capas",
+		c.conducta.capas == pc.blindaje_capas, "%d" % c.conducta.capas)
+	# Un target a x1 está por debajo del umbral: entra reducido.
+	var vida := c.enemigo.vida
+	c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	var esperado := maxi(int(round(float(pc.dano_target) * pc.blindaje_factor)), 1)
+	_comprobar("un golpe flojo entra reducido y no rompe nada",
+		vida - c.enemigo.vida == esperado and c.conducta.capas == pc.blindaje_capas,
+		"entró %d (tocaba %d), %d capas" % [vida - c.enemigo.vida, esperado, c.conducta.capas])
+	# El cañón llega al umbral: rompe una capa y entra entero.
+	var rotas := [0]
+	c.blindaje_roto.connect(func(_n: int, _p: Vector2) -> void: rotas[0] += 1)
+	c.golpes = 0
+	vida = c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	var canon := int(round(float(pc.dano_rampa_fuerte) * float(c.multiplicador())))
+	_comprobar("un golpe concentrado rompe una capa, entra entero y lo avisa",
+		vida - c.enemigo.vida == canon and c.conducta.capas == pc.blindaje_capas - 1
+			and rotas[0] == 1,
+		"entró %d (tocaba %d), %d capas, %d avisos" % [vida - c.enemigo.vida, canon,
+			c.conducta.capas, rotas[0]])
+	# Sin capas, ya no reduce.
+	for _i in pc.blindaje_capas:
+		_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	vida = c.enemigo.vida
+	c.golpes = 0
+	c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("con el blindaje roto los golpes flojos entran enteros",
+		c.conducta.capas == 0 and vida - c.enemigo.vida == pc.dano_target,
+		"%d capas, entró %d" % [c.conducta.capas, vida - c.enemigo.vida])
+	# Regenera con la bola en juego, una capa cada `blindaje_regenera`.
+	_avanzar_combate(c, pc.blindaje_regenera + 0.1)
+	_comprobar("regenera una capa con la bola en juego",
+		c.conducta.capas == 1, "%d capas" % c.conducta.capas)
+	# Y no en las pausas.
+	c.mesa.retirar_bolas()
+	c.mesa.bola_drenada.emit()
+	var capas_pausa := c.conducta.capas
+	var t := 0.0
+	while c.fase != Combate.Fase.LANZANDO and t < 5.0:
+		c.avanzar(DT)
+		t += DT
+	_comprobar("y no regenera en las pausas", c.conducta.capas == capas_pausa)
+	# El veneno lo atraviesa: no es un golpe.
+	var c2 := Combate.new(pc)
+	c2.iniciar(Enemigo.new(datos))
+	_en_juego(c2)
+	vida = c2.enemigo.vida
+	c2._dano_de_estados(12, Vector2(200, 800))
+	_comprobar("el dano de los estados atraviesa el blindaje",
+		vida - c2.enemigo.vida == 12 and c2.conducta.capas == pc.blindaje_capas)
+	# Y sin el comportamiento, neutro exacto.
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000000, "ataque": 1,
+		"reloj": 1000.0}))
+	_en_juego(c3)
+	vida = c3.enemigo.vida
+	c3.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("sin el comportamiento un target pega su dano entero",
+		vida - c3.enemigo.vida == pc.dano_target)
 
 ## (5) CASTIGA EL MULTIPLICADOR ALTO. El golpe del reloj pega más y roba tramos
 ## si el combo está en el umbral; por debajo, y en el golpe del drenaje, nada.

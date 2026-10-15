@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **658/658** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **666/666** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -95,6 +95,7 @@ enemigos que responden desde el acto II.
 |---|---|---|---|
 | Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
 | Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
+| Armadura vacía | III | **blindaje** (3 capas; lo flojo entra a ¼; el cañón rompe) | hecho |
 | Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
 
 - **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
@@ -109,6 +110,14 @@ enemigos que responden desde el acto II.
   gastarlo antes del 3-2-1. Sale escrito "de x4 a x3" encima de la tele, y el
   rótulo se enciende en cuanto estás en el umbral. Los tramos que se roban son
   los de verdad, con las reliquias que los mueven.
+- **Armadura vacía, blindaje.** Es la evidente. Tres capas: mientras le quede
+  una, lo que pegue por debajo del cañón (el umbral es una fracción de
+  `dano_rampa_fuerte`, no un número) entra a un cuarto, y lo que llegue rompe
+  una capa y entra entero. Regenera una cada 10 s de juego. El racimo, que es lo
+  que alimenta el combo, pega a un cuarto: contra ella hay que buscar el cañón o
+  subir el multiplicador para que un retorno llegue. **El veneno lo atraviesa**,
+  porque no es un golpe, y eso la deja como el enemigo contra el que el veneno
+  brilla (pregunta F6).
 - **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y es el jefe del
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
@@ -2064,6 +2073,10 @@ contara, la build de veneno anularía el comportamiento sin jugar la mesa.
 o más. ¿Se entiende por qué ha pasado, con el "de x4 a x3" y el rótulo
 encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales:
 `castigo_desde`, `castigo_factor_por_tramo`, `castigo_tramos_robados`.
+**F6.** **La Armadura vacía lleva blindaje.** ¿Se entiende que el racimo le hace
+cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas?
+¿Y está bien que el veneno lo atraviese entero? Diales: `blindaje_capas`,
+`blindaje_umbral` (fracción del cañón), `blindaje_factor`, `blindaje_regenera`.
 
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.

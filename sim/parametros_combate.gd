@@ -205,3 +205,15 @@ var cura_tocan_los_estados: bool = false
 var castigo_desde: int = 3
 var castigo_factor_por_tramo: float = 0.5
 var castigo_tramos_robados: int = 1
+## (4) BLINDAJE QUE SOLO ROMPE EL DAÑO CONCENTRADO: mientras le queden capas,
+## un golpe por debajo del umbral entra multiplicado por `blindaje_factor`, y uno
+## que llegue al umbral rompe una capa y entra entero. El umbral va en fracción
+## del CAÑÓN (`dano_rampa_fuerte`), no en puntos: la escala de daño ya se ha
+## multiplicado dos veces, y un número escrito a mano mediría la escala. Con 1,0,
+## el cañón a x1 rompe, un retorno necesita x3 y un bumper no rompe nunca: el
+## racimo, que es lo que alimenta el combo, pega a un cuarto. Regenera una capa
+## cada `blindaje_regenera` segundos de juego mientras le falte alguna.
+var blindaje_capas: int = 3
+var blindaje_umbral: float = 1.0
+var blindaje_factor: float = 0.25
+var blindaje_regenera: float = 10.0

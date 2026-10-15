@@ -23,7 +23,8 @@
 
     { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 7800, "ataque": 9,  "reloj": 9.0,  "sprite": "res://assets/enemigos/goblin_bruto.png" ,
       "comportamientos": [{ "id": "castiga_combo" }] },
-    { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 8730, "ataque": 10, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" },
+    { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 8730, "ataque": 10, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" ,
+      "comportamientos": [{ "id": "blindaje" }] },
     { "id": "gargola",             "nombre": "Gárgola",            "vida": 9660, "ataque": 11, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png",
       "comportamientos": [{ "id": "caza_acelera" }] }
   ]

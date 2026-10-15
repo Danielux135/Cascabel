@@ -40,6 +40,9 @@ signal enemigo_curado(cantidad: int)
 ## Su reloj te ha pegado con el combo alto y te ha robado tramos (comportamiento
 ## `castiga_combo`). `antes` y `ahora` son multiplicadores.
 signal combo_castigado(antes: int, ahora: int)
+## Un golpe concentrado le ha roto una capa de blindaje (comportamiento
+## `blindaje`). `capas` son las que le quedan.
+signal blindaje_roto(capas: int, punto: Vector2)
 ## La red de seguridad ha comido un drenaje. Igual: si no se anuncia, parece que
 ## el juego se ha olvidado de castigarte.
 signal drenaje_perdonado()
@@ -410,6 +413,7 @@ func avanzar(dt: float) -> void:
 			estallido_de_estado.emit(str(id_estallado))
 		_dano_de_estados(int(paso["dano"]), mesa.bola_en_peligro().pos)
 		_avanzar_cura(dt)
+		conducta.avanzar_blindaje(dt)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
@@ -502,6 +506,12 @@ func _golpear(base: int, punto: Vector2, suma_golpe: bool, escala: bool = true,
 			p.prob_critico + estados.suma_critico())
 	if critico:
 		dano_f *= factor_critico()
+	# EL BLINDAJE DEL ENEMIGO (`blindaje`), con el golpe ya entero: lo que decide
+	# si rompe es cuánto pega DE VERDAD, crítico y descarga incluidos.
+	var capas_antes := conducta.capas
+	dano_f = conducta.filtrar_golpe(dano_f, float(p.dano_rampa_fuerte))
+	if conducta.capas < capas_antes:
+		blindaje_roto.emit(conducta.capas, punto)
 	# Suelo de 1: un factor por debajo de 1 no puede convertir un golpe en nada,
 	# o el jugador vería impactos que no hacen daño y lo leería como un fallo.
 	var dano := maxi(int(round(dano_f)), 1)
