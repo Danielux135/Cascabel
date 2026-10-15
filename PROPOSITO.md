@@ -452,7 +452,7 @@ comportamientos de enemigo no hay tabla que valga.
 | 5 | **Rampas fallables + barra de CARGA** | Opus, alto | `sim/` puro, y la descarga puede cargarse la tabla de balance. Medir antes de escribir |
 | 6 | **Selector de dificultad** | Opus, alto | Necesita la Fase 6 dentro para que los niveles altos añadan reglas |
 | 7 | **Tapar agujeros**: kickback y recuperación de sector | Opus, alto | Cambia el drenaje, que es el corazón del balance |
-| 8 | **Fase 6: comportamientos de enemigo** + rebalance | Opus, alto | Sigue siendo lo que arregla la banda de dificultad |
+| 8 | ~~**Fase 6: comportamientos de enemigo**~~ + rebalance | Opus, alto | **Los seis comportamientos, HECHOS (15-oct) y sin jugar**, con una propuesta de quién lleva cada uno. **El rebalance sigue pendiente**, y ya tiene lo que le faltaba: `medir_daniel.gd` sabe jugar con varias bolas. Ver `ESTADO.md` |
 | 9 | **Desbloqueo de verdad** (reabrir §13) | Opus + Fátima | Solo cuando 2 y 5 se hayan jugado y se sepa qué merece la pena |
 
 **El criterio de salida de todo esto, y no se lee, se juega:** alguien pierde un

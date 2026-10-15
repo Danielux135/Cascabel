@@ -849,6 +849,28 @@ todas comparten arco.
   `flipper_velocidad_giro`: subirlo NO acelera el juego —está medido que la
   ventana de reacción y la duración de bola no se mueven, porque las fija la
   gravedad al caer— solo alarga lo que tú tiras.
+### Lo que la mesa hace sola no es un tiro tuyo (oct-2026)
+
+Salió tres veces en la misma sesión, y ninguna daba error:
+
+1. **El regreso de la caza contaba como retorno** para las misiones: la mesa mete
+   la bola en él al acabarse el tiempo, así que regalaba un paso en cada caza.
+2. **La órbita del lanzamiento contaba para el reflejo del Esqueleto** y abría el
+   cañón de la Calavera. Un lanzamiento a tope la engancha SIEMPRE, también el de
+   cada bola extra: con la Bomba de procesos, la extra daba su órbita sola y la
+   tuya del lanzamiento salía reflejada en cada bola.
+3. **Los túneles de la planta alta se repetían solos** rebotando en el bumper
+   pegado a su boca, y el reflejo te quitaba vida en el bonus.
+
+**La regla: todo lo que cuente QUÉ TIRO has metido —misiones, comportamientos,
+reliquias "por recorrido"— tiene que preguntarse si la mesa puede producir ese
+evento sin el jugador.** El regreso, el lanzamiento y un bumper pegado a una boca
+son los tres que hay hoy. Las herramientas: `Bola.de_lanzamiento`,
+`Mesa.salida_de_lanzamiento` (solo vale durante la emisión de `rampa_salida`),
+`Mesa.rampas_altas` y `Combate._rampa_exenta`. **Ojo con lo que NO se ha
+decidido:** la órbita del lanzamiento sigue pagando su tramo y contando para las
+misiones, porque eso es la decisión abierta del tramo gratis.
+
 ### Una señal que nadie escucha es un evento mudo, y no da error (ago-2026)
 
 `bola_cayo` y `rampa_fallada` se construyeron con el sistema de capas, se
