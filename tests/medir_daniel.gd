@@ -18,8 +18,62 @@ extends SceneTree
 ## la partida. Y la vida del jugador es la del run, no infinita, para que las
 ## reliquias condicionales ("cuando estés por debajo de la mitad") se enciendan
 ## cuando les toca en vez de no encenderse nunca.
+##
+## LAS BOLAS EXTRA, y por qué hay dos modos (`EXTRA=fisica` o `EXTRA=jugada`).
+##
+## El perfil describe lo que produce UNA bola y no tiene física dentro, pero el
+## combate sí: lleva su `Mesa` de verdad, y una reliquia de Caos que suelta una
+## bola la suelta en esa mesa. Lo que se hace con ella es lo que cambia:
+##
+##   - `fisica` (por defecto): lo de siempre. La extra sale por el lanzador y
+##     vuela con física real, pero nadie toca las palas, así que cobra lo que
+##     golpee por el camino y se cae; y la que siga viva al acabar el perfil la
+##     retira `_drenar`. Es el modo con el que están medidas todas las tablas de
+##     `ESTADO.md`, y por eso es el de defecto: cambiarlo movería números viejos.
+##   - `jugada`: la extra la juega el MANIQUÍ de `medir_capas.gd` —pulsa la pala
+##     de su lado 0,14 s cuando la bola baja de y=1150— con la física de la mesa,
+##     y SOBREVIVE a la principal: cuando el perfil se acaba, la principal se cae
+##     por `bola_perdida` y el turno sigue hasta que la mesa emite `bola_drenada`
+##     con la última, que es el invariante de la multibola. Mientras hay extras,
+##     la principal se aparca en el platillo: si no, la extra nace encima de ella
+##     en el carril y la puede lanzar al campo (dos bolas jugando el mismo perfil).
+##
+## Con UNA bola los dos modos son el mismo camino, línea a línea: el maniquí no
+## tiene a quién pulsarle y la cola no existe. Lo comprueba `SIN_BOLAS_EXTRA=1`,
+## que quita del catálogo las tres reliquias que sueltan bolas.
+##
+## OJO con lo que `jugada` NO es: el maniquí no es Daniel. El perfil de la bola
+## principal está calibrado contra él; las extras las juega un reflejo que
+## aporrea. Es la mesa la que decide lo que da cada extra —golpes reales,
+## cuestas reales, drenajes reales—, no un número escrito aquí, pero el que
+## juega es otro.
 
 const DT := 1.0 / 60.0
+## Ver la cabecera. Se lee de `EXTRA` en `_initialize`.
+var _modo_extra := "fisica"
+## Las tres reliquias que sueltan bolas. Con `SIN_BOLAS_EXTRA=1` salen del
+## catálogo y el modelo no puede tener nunca más de una bola: es la forma de
+## comprobar que el código de multibola no toca el camino de una sola.
+const SUELTAN_BOLAS := ["bifurcacion", "proceso_hijo", "bomba_de_procesos"]
+## La bola que juega el perfil en el turno que corre. Con multibola no es
+## siempre `mesa.bolas[0]`: tras una cola, la superviviente pasa a ser la [0].
+var _principal: Bola = null
+## Se está jugando la cola de una multibola: la principal ya se cayó y quedan
+## extras. Una extra que salga ahora no aparca a nadie.
+var _en_cola := false
+var _pulso_izq := 0.0
+var _pulso_der := 0.0
+## El platillo donde se aparca la principal. Es el único de la planta baja.
+const PARQUE := 0
+## Tope de una cola de multibola. Con una caza de por medio y su salvabolas una
+## extra puede vivir mucho; esto es la red, no una regla de juego.
+const COLA_MAXIMA := 60.0
+## Contadores de diagnóstico de la sección de Caos. No tocan nada de lo que se
+## ejecuta: solo cuentan.
+var _extras_soltadas := 0
+var _bolas_servidas := 0
+var _ticks_multibola := 0
+var _ticks_total := 0
 ## Semilla fija: el modelo tiene que dar el mismo número dos veces seguidas o no
 ## se puede comparar un cambio de balance contra el de ayer.
 var _rng := RandomNumberGenerator.new()
@@ -54,11 +108,24 @@ func _initialize() -> void:
 	var enemigos := CatalogoEnemigos.cargar()
 	var reliquias := CatalogoReliquias.cargar()
 	var misiones := CatalogoMisiones.cargar()
+	var modo := OS.get_environment("EXTRA")
+	if modo == "jugada":
+		_modo_extra = "jugada"
+	elif modo != "" and modo != "fisica":
+		push_error("EXTRA=%s no existe: vale 'fisica' o 'jugada'" % modo)
+		quit(1)
+		return
+	if OS.get_environment("SIN_BOLAS_EXTRA") == "1":
+		var sin: Array[Reliquia] = []
+		for r in reliquias:
+			if not SUELTAN_BOLAS.has(r.id):
+				sin.append(r)
+		reliquias = sin
 	print("")
 	print("MEDIDA CONTRA DANIEL  ·  objetivo %.0f de daño por bola, %.0f s por combate"
 		% [DANIEL_DANO_BOLA, DANIEL_SEG_COMBATE])
-	print("  catálogo: %d enemigos · %d reliquias · %d misiones"
-		% [enemigos.size(), reliquias.size(), misiones.size()])
+	print("  catálogo: %d enemigos · %d reliquias · %d misiones  ·  bolas extra: %s"
+		% [enemigos.size(), reliquias.size(), misiones.size(), _modo_extra])
 	print("")
 	# QUÉ SE MIDE. El barrido entero tarda trece minutos, y tocar balance es
 	# darle vueltas al mismo mando: medir las tres secciones cada vez convierte
@@ -75,6 +142,8 @@ func _initialize() -> void:
 		_barrido_cascabeles(enemigos, reliquias, misiones)
 	if solo == "tiros":
 		_cruce_de_tiros(enemigos, reliquias, misiones)
+	if solo == "caos":
+		_barrido_caos(enemigos, reliquias, misiones)
 	quit(0)
 
 ## El barrido de verdad: vida y ataque a la vez, CON reliquias puestas. Es lo
@@ -183,6 +252,7 @@ func _dano_por_bola(perfil: Dictionary, base: ParametrosCombate) -> int:
 	var p := _copiar(base)
 	p.vida_jugador = 100000000
 	var c := Combate.new(p)
+	c.mesa.rng.seed = 20260812
 	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1}))
 	_jugar_una_bola(c, perfil)
 	return c.dano_de_la_bola
@@ -194,7 +264,7 @@ func _dano_por_bola(perfil: Dictionary, base: ParametrosCombate) -> int:
 func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 		misiones: Array[Mision], semillas: Array,
 		escala_vida: float, escala_ataque: float,
-		cascabel: String = "") -> Dictionary:
+		cascabel: String = "", forzadas: Array[Reliquia] = []) -> Dictionary:
 	var catalogo := _escalar(enemigos, escala_vida, escala_ataque)
 	var acabados := 0
 	var nodos := 0
@@ -218,6 +288,12 @@ func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 			var casc := pre.como_reliquia()
 			if casc != null:
 				r.bolsa.base = [casc]
+		# LAS RELIQUIAS FORZADAS, para medir una build concreta. Van con
+		# `anadir` y no en `base`: `tiene()` solo mira `reliquias`, así que
+		# desde `base` la ruleta podría volver a darla y el efecto se doblaría.
+		# Sin forzadas no se toca nada.
+		for rel in forzadas:
+			r.bolsa.anadir(rel)
 		while not r.terminada():
 			var opciones := r.opciones()
 			if opciones.is_empty():
@@ -227,7 +303,8 @@ func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 				break
 			if not nodo.es_combate():
 				continue
-			var res := _combate_en_run(perfil, r, nodo.enemigo)
+			var res := _combate_en_run(perfil, r, nodo.enemigo,
+				int(semilla) * 100 + r.nodos_superados)
 			r.apuntar_medida(int(res["bolas"]), int(res["dano"]), float(res["segundos"]))
 			r.resolver_combate(bool(res["gano"]), int(res["vida"]))
 			if not bool(res["gano"]):
@@ -235,7 +312,7 @@ func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 				break
 		runs += 1
 		nodos += r.nodos_superados
-		bolsas += float(r.bolsa.reliquias.size())
+		bolsas += float(r.bolsa.reliquias.size() - forzadas.size())
 		dano_bola += r.dano_por_bola()
 		seg_combate += r.segundos_por_combate()
 		if r.victoria:
@@ -254,23 +331,35 @@ func _runs(perfil: Dictionary, enemigos: Array, reliquias: Array[Reliquia],
 ## Un combate dentro del run, con la bolsa del run puesta, la escalera de
 ## misiones real y la vida de verdad. Si el jugador muere, el combate se corta:
 ## aquí eso no es perder información, es el resultado.
-func _combate_en_run(perfil: Dictionary, r: Run, datos: Dictionary) -> Dictionary:
+##
+## LA SEMILLA DE LA MESA. `Mesa._init` aleatoriza su `rng`, y lo usa el ball
+## search. Con una bola no cambia nada —la principal descansa en el carril y el
+## empujón no la saca de ahí ni emite nada que escuche el combate—, pero con
+## extras sí, y sin fijarla el modelo deja de ser repetible justo en las builds
+## de Caos. Va por run y por nodo, sin gastar azar de nadie.
+func _combate_en_run(perfil: Dictionary, r: Run, datos: Dictionary,
+		semilla_mesa: int = 0) -> Dictionary:
 	var c := Combate.new(_copiar(r.pc))
+	c.mesa.rng.seed = semilla_mesa
 	c.bolsa = r.bolsa
 	var misiones := r.escalera_de_misiones()
 	c.mision_completada.connect(func(m: Mision) -> void:
 		if r.abrir_ruleta(m.rareza):
 			r.aceptar_premio())
+	_preparar_extras(c)
 	c.iniciar(Enemigo.new(datos), r.vida, misiones)
 
 	var bolas := 0
 	var segundos := 0.0
 	while not c.terminado() and bolas < MAX_BOLAS:
 		bolas += 1
+		_bolas_servidas += 1
 		segundos += _jugar_una_bola(c, perfil)
 		if c.terminado():
 			break
-		_drenar(c)
+		segundos += _cerrar_turno(c)
+		if c.terminado():
+			break
 		_avanzar(c, c.p.pausa_drenaje + c.p.pausa_ataque + 4.0 * DT)
 	return {
 		"bolas": bolas,
@@ -313,8 +402,12 @@ func _escalar(catalogo: Array, escala: float, escala_ataque: float) -> Array:
 	return salida
 
 func _jugar_una_bola(c: Combate, perfil: Dictionary) -> float:
+	# La principal es la servida, que es la [0] justo después de servir: las
+	# extras de Bomba se añaden detrás. Si ya está aparcada, se queda aparcada.
+	_principal = c.mesa.bolas[0]
+	_en_cola = false
 	c.mesa.bola.en_carril = false
-	c.avanzar(DT)
+	_tic(c)
 
 	var eventos: Array[String] = []
 	for _i in int(perfil["golpes"]):
@@ -430,17 +523,139 @@ func _rampa(c: Combate, cual: String, punto: Vector2) -> void:
 ## uno, o sea `cuando: multibola` encendido el run entero—. El resultado medido
 ## de ese fallo: 97 % de vida al acabar contra el 71 % de verdad.
 ##
-## OJO, Y ESTO NO LO ARREGLA: el perfil sigue sin saber JUGAR con varias bolas,
-## porque no hay física dentro. Así que la multibola aquí se cuenta con todo su
-## coste y ninguna de sus ventajas. Es el lado conservador, que es el bueno para
-## calibrar, pero significa que **el eje de Caos no está medido**.
+## Con `EXTRA=fisica` esto cierra también la multibola: las extras que sigan
+## vivas se retiran con la principal. Con `EXTRA=jugada` solo se llega aquí sin
+## extras vivas; si las hay, el turno lo cierra `_cola_multibola`.
 func _drenar(c: Combate) -> void:
 	c.mesa.retirar_bolas()
 	c.mesa.bola_drenada.emit()
 
+## Cierra el turno cuando el perfil de la principal se ha acabado. Devuelve los
+## segundos de más que se han jugado, que son los de la cola: el reloj del
+## enemigo corre durante ella igual que durante la bola.
+func _cerrar_turno(c: Combate) -> float:
+	if _modo_extra == "jugada" and _quedan_extras(c):
+		return _cola_multibola(c)
+	_drenar(c)
+	return 0.0
+
 func _avanzar(c: Combate, segundos: float) -> void:
 	for _i in int(segundos / DT):
-		c.avanzar(DT)
+		_tic(c)
+
+## UN PASO DEL MODELO. Con una bola es `c.avanzar(DT)` a secas: el maniquí no
+## tiene a quién pulsarle y los contadores solo cuentan.
+func _tic(c: Combate) -> void:
+	if _modo_extra == "jugada":
+		_palas_del_maniqui(c)
+	c.avanzar(DT)
+	_ticks_total += 1
+	if c.mesa.bolas_vivas() >= 2:
+		_ticks_multibola += 1
+
+# ------------------------------------------------------------ la multibola
+
+## Engancha lo que hace falta para jugar las extras. Va ANTES de `iniciar`: la
+## bola de Bomba sale dentro de él, al servir la primera.
+func _preparar_extras(c: Combate) -> void:
+	_principal = null
+	_en_cola = false
+	_pulso_izq = 0.0
+	_pulso_der = 0.0
+	c.bola_extra_soltada.connect(func(cuantas: int, _total: int) -> void:
+		_extras_soltadas += cuantas)
+	if _modo_extra != "jugada":
+		return
+	# Con una REFERENCIA DÉBIL al combate: la mesa guarda la conexión, y una
+	# lambda que capturase `c` cerraría el ciclo mesa → lambda → combate → mesa,
+	# y como los dos son RefCounted no se soltarían nunca. Son mil combates por
+	# barrido.
+	var debil: WeakRef = weakref(c)
+	c.mesa.bola_extra.connect(func(_p: Vector2, _total: int) -> void:
+		var cc: Combate = debil.get_ref() as Combate
+		if cc != null:
+			_al_salir_extra(cc))
+
+## Ha salido una extra. La principal se aparca, si sigue en juego: el perfil la
+## sigue jugando por señales, que no necesitan que la bola esté en ningún sitio,
+## y así no comparte carril con la extra que acaba de nacer encima de ella.
+##
+## UN SESGO QUE HAY QUE SABER: se aparca en el platillo, que es el único sitio
+## donde una bola se queda quieta sin chocar ni caerse, y en un platillo cabe
+## una. Mientras dura la multibola, las extras no pueden caer en él. El platillo
+## está escondido bajo el arco y el maniquí casi nunca lo alcanza, así que pesa
+## poco, pero es una diferencia con el juego y va a favor de NO cobrar platillos.
+func _al_salir_extra(c: Combate) -> void:
+	if _en_cola:
+		return
+	var b := c.mesa.bolas[0]
+	if not b.viva or b.platillo == PARQUE:
+		return
+	_principal = b
+	b.vel = Vector2.ZERO
+	b.en_carril = false
+	b.platillo = PARQUE
+	b.platillo_espera = 1.0e9
+	b.pos = c.mesa.platillos[PARQUE].centro
+
+func _quedan_extras(c: Combate) -> bool:
+	for b in c.mesa.bolas:
+		if b.viva and b != _principal:
+			return true
+	return false
+
+## EL MANIQUÍ, el de `medir_capas.gd`: pulsa la pala de su lado 0,14 s cuando una
+## extra libre baja hacia ella. Con un pulso por lado y no uno para las dos,
+## porque con dos bolas puede tocar una a cada lado. La principal no cuenta: está
+## aparcada, o en el carril.
+##
+## Y CON LAS DOS PLANTAS: la línea de "baja hacia la pala" es y=1150 abajo y 50 px
+## por encima de las palas cortas arriba, y cada tecla mueve las dos palas de su
+## lado, como en el juego (`VistaMesa` pulsa las cuatro con A y D). Sin esto, una
+## extra que subía a cazar en la cola no la jugaba nadie y el salvabolas la tenía
+## veinte segundos rebotando sola.
+func _palas_del_maniqui(c: Combate) -> void:
+	_pulso_izq -= DT
+	_pulso_der -= DT
+	for b in c.mesa.bolas:
+		if b == _principal or not b.viva or not b.libre() or b.en_carril:
+			continue
+		var linea := c.mesa.p.arena_y_pala - 50.0 if c.mesa.en_la_arena(b) else 1150.0
+		if b.pos.y > linea and b.vel.y > 0.0:
+			if b.pos.x < Mesa.ANCHO * 0.5:
+				if _pulso_izq <= 0.0:
+					_pulso_izq = 0.14
+			elif _pulso_der <= 0.0:
+				_pulso_der = 0.14
+	c.mesa.flipper_izq.pulsado = _pulso_izq > 0.0
+	c.mesa.flipper_alto_izq.pulsado = _pulso_izq > 0.0
+	c.mesa.flipper_der.pulsado = _pulso_der > 0.0
+	c.mesa.flipper_alto_der.pulsado = _pulso_der > 0.0
+
+## LA COLA DE UNA MULTIBOLA. La principal se cae como se caería jugando —por
+## abajo— y, como quedan otras, la mesa la saca por `bola_perdida`, sin coste.
+## Luego se sigue jugando hasta que caiga la última, que es la que trae
+## `bola_drenada` y cierra el turno. Lo decide la mesa, no el modelo.
+func _cola_multibola(c: Combate) -> float:
+	_en_cola = true
+	var b := _principal
+	if b != null and c.mesa.bolas.has(b) and b.viva:
+		b.platillo = -1
+		b.platillo_espera = 0.0
+		b.en_carril = false
+		b.vel = Vector2.ZERO
+		b.pos = Vector2(Mesa.ANCHO * 0.5, c.mesa.p.y_drenaje + 40.0)
+	var t := 0.0
+	while t < COLA_MAXIMA and not c.terminado() and _jugandose(c):
+		_tic(c)
+		t += DT
+	if not c.terminado() and _jugandose(c):
+		_drenar(c)
+	_en_cola = false
+	return t
+
+func _jugandose(c: Combate) -> bool:
+	return c.fase == Combate.Fase.LANZANDO or c.fase == Combate.Fase.BOLA_VIVA
 
 
 # ------------------------------------------------------- la capa de preparación
@@ -601,3 +816,118 @@ func _cruce_de_tiros(enemigos: Array, reliquias: Array[Reliquia],
 	print("  Si todas las filas ganan por la misma columna, no hay nueve")
 	print("  elecciones: hay un ranking con nueve nombres.")
 	print("")
+
+
+# ------------------------------------------------------------- el eje de Caos
+
+## LAS BUILDS DE CAOS, medidas por fin con bolas que se juegan.
+##
+##     godot --headless --path . --script tests/medir_daniel.gd   (con SOLO=caos)
+##
+## y con `EXTRA=jugada` para que las extras se jueguen; con `EXTRA=fisica` sale
+## lo que medía el modelo hasta ahora, que es la otra punta de la horquilla.
+##
+## Cada build se FUERZA desde el principio del run (`_runs(..., forzadas)`), y
+## eso cambia también la ruleta —quita esas reliquias de las candidatas—, así
+## que el run entero mide la build más su efecto sobre lo que te toca después.
+## Para separar las dos cosas va la columna SECO: un combate contra un saco con
+## SOLO la build en la bolsa, veinte bolas, sin misiones ni ruleta. Esa columna
+## es la que dice cuánto pega la build; la del run, cuánto le cambia la partida.
+##
+## `proceso_hijo` cobra al cerrar un BANCO, y el perfil de Daniel no cierra
+## ninguno: con él no salta nunca, salvo que una extra cierre uno por su cuenta.
+## Por eso se mide también con el `puntero` de `PERFILES_TIRO`, que cierra uno
+## por bola, con su propio control al lado.
+const BUILDS_CAOS := [
+	{"nombre": "ninguna", "ids": []},
+	{"nombre": "bomba", "ids": ["bomba_de_procesos"]},
+	{"nombre": "bifurcación", "ids": ["bifurcacion"]},
+	{"nombre": "proceso hijo", "ids": ["proceso_hijo"]},
+	{"nombre": "carrera", "ids": ["condicion_de_carrera"]},
+	{"nombre": "hilo único", "ids": ["hilo_unico"]},
+	{"nombre": "bomba+carrera", "ids": ["bomba_de_procesos", "condicion_de_carrera"]},
+	{"nombre": "bifurc+carrera", "ids": ["bifurcacion", "condicion_de_carrera"]},
+	{"nombre": "bomba+hilo", "ids": ["bomba_de_procesos", "hilo_unico"]},
+	{"nombre": "las cinco", "ids": ["bomba_de_procesos", "bifurcacion",
+		"proceso_hijo", "condicion_de_carrera", "hilo_unico"]},
+	{"nombre": "ninguna (punt.)", "ids": [], "perfil": 1},
+	{"nombre": "p. hijo (punt.)", "ids": ["proceso_hijo"], "perfil": 1},
+]
+## Bolas del combate seco. Veinte da para que una probabilidad de 1/8 por
+## recorrido salga unas cuantas veces sin que la columna tarde más que un run.
+const BOLAS_SECO := 20
+
+func _barrido_caos(enemigos: Array, reliquias: Array[Reliquia],
+		misiones: Array[Mision]) -> void:
+	print("")
+	print("CAOS  ·  bolas extra: %s  ·  %d semillas  ·  seco = %d bolas contra un saco"
+		% [_modo_extra, SEMILLAS.size(), BOLAS_SECO])
+	print("  %-16s %7s %9s %9s %7s %6s %8s %7s"
+		% ["build", "seco", "d/bola", "s/combate", "vida", "acaba", "extras", "multi"])
+	var por_id := {}
+	for r in reliquias:
+		por_id[r.id] = r
+	# Y se puede filtrar: `BUILDS=bomba,las cinco`. La de control entra siempre.
+	var filtro := OS.get_environment("BUILDS")
+	var pedidas: Array = [] if filtro == "" else Array(filtro.split(",", false))
+	for b in BUILDS_CAOS:
+		var nombre := str((b as Dictionary)["nombre"])
+		if not pedidas.is_empty() and not nombre.begins_with("ninguna") \
+				and not pedidas.has(nombre):
+			continue
+		var forzadas: Array[Reliquia] = []
+		var faltan: Array[String] = []
+		for id in (b as Dictionary)["ids"]:
+			if por_id.has(id):
+				forzadas.append(por_id[id])
+			else:
+				faltan.append(str(id))
+		if not faltan.is_empty():
+			print("  %-16s  no está en el catálogo: %s" % [nombre, ", ".join(faltan)])
+			continue
+		var perfil: Dictionary = CANDIDATOS[0]
+		if (b as Dictionary).has("perfil"):
+			perfil = PERFILES_TIRO[int((b as Dictionary)["perfil"])]
+		var seco := _seco_con_bolsa(perfil, forzadas)
+		_extras_soltadas = 0
+		_ticks_multibola = 0
+		_ticks_total = 0
+		var bolas_antes := _bolas_servidas
+		var r := _runs(perfil, enemigos, reliquias, misiones, SEMILLAS, 1.0, 1.0,
+			"", forzadas)
+		var servidas := maxi(_bolas_servidas - bolas_antes, 1)
+		print("  %-16s %7.0f %9.0f %9.1f %7s %4d/%d %8.2f %6.0f%%" % [
+			nombre, seco, float(r["dano_bola"]), float(r["seg_combate"]),
+			("%.0f%%" % (float(r["vida_frac"]) * 100.0)) if int(r["acabados"]) > 0 else "—",
+			int(r["acabados"]), SEMILLAS.size(),
+			float(_extras_soltadas) / float(servidas),
+			100.0 * float(_ticks_multibola) / float(maxi(_ticks_total, 1))])
+	print("")
+	print("  seco     daño por bola servida contra un saco, solo con la build")
+	print("  extras   bolas extra soltadas por bola servida, en el run")
+	print("  multi    parte del tiempo de juego con dos o más bolas vivas")
+	print("")
+
+## Un combate contra un saco con la build y nada más: sin ruleta, sin misiones,
+## con su propia bolsa sembrada. Determinista. Devuelve daño por bola servida.
+func _seco_con_bolsa(perfil: Dictionary, forzadas: Array[Reliquia]) -> float:
+	var p := ParametrosCombate.new()
+	p.vida_jugador = 100000000
+	var c := Combate.new(p)
+	c.mesa.rng.seed = 20260812
+	var bolsa := BolsaReliquias.new(20260812)
+	for rel in forzadas:
+		bolsa.anadir(rel)
+	c.bolsa = bolsa
+	_preparar_extras(c)
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1}))
+	for _i in BOLAS_SECO:
+		_jugar_una_bola(c, perfil)
+		if c.terminado():
+			break
+		_cerrar_turno(c)
+		if c.terminado():
+			break
+		_avanzar(c, c.p.pausa_drenaje + c.p.pausa_ataque + 4.0 * DT)
+	return float(c.dano_total) / float(BOLAS_SECO)
+

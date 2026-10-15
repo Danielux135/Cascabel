@@ -77,6 +77,37 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
+## `medir_daniel.gd` SABE JUGAR CON VARIAS BOLAS (tarea 3 · 15-oct)
+
+Era el requisito del rebalance (1b): la multibola no estaba medida. Ahora hay dos
+modos, con `EXTRA`:
+
+- **`fisica`, por defecto: el de siempre.** La bola extra vuela con la física de
+  la mesa y las palas quietas, y la retira `_drenar` al acabar el perfil. **Con
+  una bola da exactamente los mismos números que antes**: comprobado con un diff
+  de la salida entera de `SOLO=calibrar`, con todas las reliquias (838 · 127 s ·
+  96 % · 4/5) y con `SIN_BOLAS_EXTRA=1`, que quita las tres que sueltan bolas
+  (852 · 124 s). Por eso es el de defecto: cambiarlo movería las tablas viejas.
+- **`jugada`: las extras se juegan.** Las juega el maniquí de `medir_capas.gd`
+  con la física de la mesa, en las dos plantas, y SOBREVIVEN a la principal:
+  cuando se acaba el perfil, la principal se cae por `bola_perdida` y el turno
+  sigue hasta que la mesa emite `bola_drenada` con la última. Con
+  `SIN_BOLAS_EXTRA=1` da también 852 · 124 s, o sea que con una bola es el mismo
+  camino. **Ojo: el maniquí no es Daniel**, y la principal se aparca en el
+  platillo mientras hay extras, así que ellas no pueden cobrarlo.
+
+`Mesa.rng` se siembra ya por combate (antes, con extras, el modelo no era
+repetible), y `SOLO=caos` mide doce builds forzadas desde el principio del run,
+con un combate SECO contra un saco al lado para separar la build de lo que le
+hace a la ruleta.
+
+**Primeros números, PRELIMINARES** (la tabla entera se está midiendo y entra en
+«Mediciones» en el commit siguiente): con las extras jugadas, **Bomba de
+procesos sube el daño por bola de 818 a 2670 y acorta el combate de 129 s a
+51 s**; con Condición de carrera encima, 3377 y 38 s. Con `fisica` la misma
+Bomba se quedaba en 1105 y 94 s. O sea que el eje de Caos, jugado aunque sea por
+un maniquí, es lo más fuerte del juego, y el modelo de antes lo tapaba.
+
 ## FASE 6: LOS ENEMIGOS HACEN COSAS (15-oct, en curso)
 
 `DISEÑO.md` §11: *"uno con más vida no es un enemigo nuevo; cada uno altera qué
@@ -2712,6 +2743,7 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
 | Run real de Daniel (antes del rebalance) | 98 % de vida · 797 d/bola · 45 s · 43 bolas |
 | Motor de multibola, una bola: antes → después | 71 % / 3-5 runs → **idéntico** |
 | Con las 5 reliquias de Caos dentro (modelo, no veredicto) | 97 % de vida, 835 d/bola, 128 s |
+| **Bomba de procesos, extras jugadas** (`EXTRA=jugada`, preliminar) | **2670 d/bola · 51 s**, contra 818 · 129 s sin build |
 | Tope de bolas a la vez | 4 (`bolas_maximas`, elegido a ojo) |
 | **Racimo: golpes por entrada, de espaldas → girado** | **1,0 → 3,9** |
 | Tiro desde la cuna: sube a | y=893 de media, y=751 el mejor de 42 |
@@ -2808,9 +2840,10 @@ de geometría fina y se hace jugando, no midiendo.
   aproximación barata y aguanta, pero si en algún momento se quiere una física
   que destaque, el siguiente paso es momento angular, y es un cambio que toca el
   solver entero.
-- **`medir_daniel.gd` no sabe jugar con varias bolas**, así que la multibola no
-  está medida y las cinco reliquias de Caos están puestas a ojo. Es lo primero
-  que hay que arreglar antes del rebalance de la Fase 6 (ver "Siguiente" 1b).
+- ~~`medir_daniel.gd` no sabe jugar con varias bolas~~ **HECHO (tarea 3)**: ver
+  el apartado de arriba. Lo que queda es que el rebalance (1b) decida con qué
+  modo mide: `fisica` es el de las tablas viejas, `jugada` el que ve la
+  multibola.
 - **Las cinco reliquias nuevas no tienen icono**, y con ellas suben a 32 de 50
   las que no lo tienen. Los prompts están en `assets/prompts_reliquias.md`.
 - **La bola extra no tiene sonido propio**: suena con el arpegio del combo, que
