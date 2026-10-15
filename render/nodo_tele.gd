@@ -244,10 +244,20 @@ func _dibujar_mision(combate: Combate) -> void:
 	draw_string(_fuente, Vector2(x, MARCO.position.y + 13.0),
 		"x%d" % combate.multiplicador(), HORIZONTAL_ALIGNMENT_RIGHT, ancho, 8,
 		Color(C_TEXTO_TENUE, 0.9))
+	# "SIN DRENAR" EN LA FILA DE ARRIBA, centrado entre la rareza y el
+	# multiplicador. Iba en la línea del nombre, alineado a la derecha, y en
+	# captura se pintaba ENCIMA de todos los nombres de más de cuatro letras.
+	if m.sin_drenar:
+		draw_string(_fuente, Vector2(x, MARCO.position.y + 13.0), "SIN DRENAR",
+			HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, Color(C_GOMA_LUZ, 0.85))
+	# El nombre, al tamaño que QUEPA: el `width` recorta sin avisar, y "El reloj
+	# es mío" salía "El reloj es mí". Es la regla de los carteles de la mesa.
 	draw_string(_fuente, Vector2(x, MARCO.position.y + 30.0), m.nombre,
-		HORIZONTAL_ALIGNMENT_CENTER, ancho, 16, C_TEXTO)
+		HORIZONTAL_ALIGNMENT_CENTER, ancho, tam_nombre(_fuente, m.nombre, ancho), C_TEXTO)
+	# El texto, hasta TRES líneas: con dos, el de Gran vuelta perdía "la bola."
+	# Caben de sobra antes de las casillas.
 	draw_multiline_string(_fuente, Vector2(x, MARCO.position.y + 47.0), m.texto,
-		HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 2, Color(C_TEXTO_TENUE, 0.95))
+		HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, LINEAS_TEXTO, Color(C_TEXTO_TENUE, 0.95))
 
 	# Una fila de casillas por paso. Con `orden`, el paso en curso se enciende y
 	# los que aún no tocan van apagados: es lo que cuenta que hay una secuencia.
@@ -257,7 +267,9 @@ func _dibujar_mision(combate: Combate) -> void:
 	for i in m.tiros.size():
 		total += m.veces(i)
 	var hueco := ancho / float(maxi(total, 1))
-	var lado := minf(hueco - 2.0, 10.0)
+	# En píxel entero: con muchas casillas `hueco - 2` sale fraccionario, y una
+	# casilla de 9,4 px con filtro nearest tiembla de ancho entre una y otra.
+	var lado := floorf(minf(hueco - 2.0, 10.0))
 	var cx := x
 	for i in m.tiros.size():
 		var activo := not m.orden or i <= paso or paso < 0
@@ -275,9 +287,20 @@ func _dibujar_mision(combate: Combate) -> void:
 		draw_string(_fuente, Vector2(x, MARCO.end.y - 4.0),
 			m.rotulo_tiro(paso).to_upper(), HORIZONTAL_ALIGNMENT_CENTER, ancho, 8,
 			Color(col, 0.9))
-	if m.sin_drenar:
-		draw_string(_fuente, Vector2(x, MARCO.position.y + 30.0), "SIN DRENAR",
-			HORIZONTAL_ALIGNMENT_RIGHT, ancho, 8, Color(C_GOMA_LUZ, 0.85))
+
+## Las líneas que puede ocupar el texto de una misión.
+const LINEAS_TEXTO := 3
+## Lo que caben las casillas de una misión: con más, `hueco - 2` baja de 4 px y
+## dejan de leerse como cuadraditos. Y los pasos, porque cada uno añade 2 px.
+const MAX_CASILLAS := 12
+const MAX_PASOS := 4
+
+## El tamaño del nombre de una misión: 16 si cabe en el ancho de la tele, y si
+## no, 8. Es público para que la batería mida los nombres de verdad.
+static func tam_nombre(fuente: Font, nombre: String, ancho: float) -> int:
+	if fuente.get_string_size(nombre, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 16).x <= ancho:
+		return 16
+	return 8
 
 func _golpes_para_subir(combate: Combate) -> int:
 	var factor := combate.multiplicador()

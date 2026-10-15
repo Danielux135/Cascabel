@@ -2,6 +2,7 @@
   "_nota": "Las misiones de mesa. La tele las anuncia y completarlas es la UNICA forma de ganar reliquias: ganar el combate ya no da nada por si mismo, solo te deja pasar. Cada combate abre con una comun; al completarla se abre una rara, y luego una arcana. Un jugador que aguanta la bola sale de un combate con tres reliquias y uno que no, con una: ese es el margen por habilidad de DISENO.md §2, pagado en objetos en vez de en vida.",
   "_los_tiros": "Los nombres tienen que ser los que cuenta sim/combate.gd: bumper, girador, target, banco, orbita, retorno, canon, platillo. Hay una prueba que lo comprueba, porque un tiro mal escrito deja una mision imposible y eso no da error.",
   "_como_se_suben_de_nivel": "Una mision no sube de rareza pidiendo MAS de lo mismo, sino pidiendo lo que cuesta control: tiros dificiles (canon, platillo), en ORDEN, y sin drenar. Cuatro bumpers mas no es mas dificil, es mas largo.",
+  "_las_de_octubre": "Catorce mas, de la sesion del 15-oct: con 14 se veian casi todas en un run (tres por combate y doce combates). Solo usan tiros que ya existen y ninguna depende de la planta alta. Hay pruebas de que todas se pueden completar, tambien contra los enemigos que bloquean o reflejan, de que caben en la tele y de que cumplen la regla de las rarezas. ES UNA LISTA PARA REVISAR, no una decision.",
   "misiones": [
     {
       "id": "calentamiento",
@@ -218,6 +219,245 @@
           "veces": 1
         }
       ]
+    },
+    {
+      "id": "barrido",
+      "nombre": "Barrido",
+      "rareza": "comun",
+      "texto": "Cuatro targets y dos giradores.",
+      "tiros": [
+        {
+          "tiro": "target",
+          "veces": 4
+        },
+        {
+          "tiro": "girador",
+          "veces": 2
+        }
+      ]
+    },
+    {
+      "id": "mantenimiento",
+      "nombre": "Mantenimiento",
+      "rareza": "comun",
+      "texto": "Un banco y tres giradores.",
+      "tiros": [
+        {
+          "tiro": "banco",
+          "veces": 1
+        },
+        {
+          "tiro": "girador",
+          "veces": 3
+        }
+      ]
+    },
+    {
+      "id": "tanteo",
+      "nombre": "Tanteo",
+      "rareza": "comun",
+      "texto": "Ocho golpes en el racimo y dos targets.",
+      "tiros": [
+        {
+          "tiro": "bumper",
+          "veces": 8
+        },
+        {
+          "tiro": "target",
+          "veces": 2
+        }
+      ]
+    },
+    {
+      "id": "desvio",
+      "nombre": "Desvío",
+      "rareza": "comun",
+      "texto": "Un carril de retorno y dos targets.",
+      "tiros": [
+        {
+          "tiro": "retorno",
+          "veces": 1
+        },
+        {
+          "tiro": "target",
+          "veces": 2
+        }
+      ]
+    },
+    {
+      "id": "ronda",
+      "nombre": "Ronda",
+      "rareza": "comun",
+      "texto": "Seis golpes en el racimo y dos órbitas.",
+      "tiros": [
+        {
+          "tiro": "bumper",
+          "veces": 6
+        },
+        {
+          "tiro": "orbita",
+          "veces": 2
+        }
+      ]
+    },
+    {
+      "id": "doble_filo",
+      "nombre": "Doble filo",
+      "rareza": "rara",
+      "texto": "Un cañón y un platillo.",
+      "tiros": [
+        {
+          "tiro": "canon",
+          "veces": 1
+        },
+        {
+          "tiro": "platillo",
+          "veces": 1
+        }
+      ]
+    },
+    {
+      "id": "relevo",
+      "nombre": "Relevo",
+      "rareza": "rara",
+      "texto": "Cañón y luego un carril de retorno. En orden.",
+      "tiros": [
+        {
+          "tiro": "canon",
+          "veces": 1
+        },
+        {
+          "tiro": "retorno",
+          "veces": 1
+        }
+      ],
+      "orden": true
+    },
+    {
+      "id": "mano_firme",
+      "nombre": "Mano firme",
+      "rareza": "rara",
+      "texto": "Un banco y un carril de retorno sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "banco",
+          "veces": 1
+        },
+        {
+          "tiro": "retorno",
+          "veces": 1
+        }
+      ],
+      "sin_drenar": true
+    },
+    {
+      "id": "ganzua",
+      "nombre": "Ganzúa",
+      "rareza": "rara",
+      "texto": "Platillo y luego un banco. En orden.",
+      "tiros": [
+        {
+          "tiro": "platillo",
+          "veces": 1
+        },
+        {
+          "tiro": "banco",
+          "veces": 1
+        }
+      ],
+      "orden": true
+    },
+    {
+      "id": "remate",
+      "nombre": "Remate",
+      "rareza": "rara",
+      "texto": "Banco y luego órbita. En orden y sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "banco",
+          "veces": 1
+        },
+        {
+          "tiro": "orbita",
+          "veces": 1
+        }
+      ],
+      "orden": true,
+      "sin_drenar": true
+    },
+    {
+      "id": "contrarreloj",
+      "nombre": "Contrarreloj",
+      "rareza": "arcana",
+      "texto": "Platillo y luego cañón. En orden y sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "platillo",
+          "veces": 1
+        },
+        {
+          "tiro": "canon",
+          "veces": 1
+        }
+      ],
+      "orden": true,
+      "sin_drenar": true
+    },
+    {
+      "id": "sin_red",
+      "nombre": "Sin red",
+      "rareza": "arcana",
+      "texto": "Dos bancos y un platillo, sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "banco",
+          "veces": 2
+        },
+        {
+          "tiro": "platillo",
+          "veces": 1
+        }
+      ],
+      "sin_drenar": true
+    },
+    {
+      "id": "todo_o_nada",
+      "nombre": "Todo o nada",
+      "rareza": "arcana",
+      "texto": "Retorno, cañón y platillo sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "retorno",
+          "veces": 1
+        },
+        {
+          "tiro": "canon",
+          "veces": 1
+        },
+        {
+          "tiro": "platillo",
+          "veces": 1
+        }
+      ],
+      "sin_drenar": true
+    },
+    {
+      "id": "lanzadera",
+      "nombre": "Lanzadera",
+      "rareza": "arcana",
+      "texto": "Cañón y luego órbita. En orden y sin perder la bola.",
+      "tiros": [
+        {
+          "tiro": "canon",
+          "veces": 1
+        },
+        {
+          "tiro": "orbita",
+          "veces": 1
+        }
+      ],
+      "orden": true,
+      "sin_drenar": true
     }
   ]
 }

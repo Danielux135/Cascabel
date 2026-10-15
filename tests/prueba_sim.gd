@@ -5703,6 +5703,173 @@ func _prueba_misiones() -> void:
 		por_rareza.size() == Mision.NOMBRE_RAREZA.size(), str(por_rareza))
 
 	_prueba_escalera_de_misiones(catalogo)
+	_prueba_misiones_una_a_una(catalogo)
+
+## LAS MISIONES DEL JSON, UNA A UNA. Lo que se sujeta es todo lo que no daría
+## ningún error si se rompiera, y se rompió: una rareza mal escrita cae a COMÚN
+## sin avisar, una clave mal escrita ("sin_drenaje") deja la misión sin su
+## condición, un nombre largo lo recortaba la tele ("El reloj es mí"), un texto
+## de tres líneas perdía la tercera, y una misión que no se puede completar
+## atasca la escalera entera del combate. Leído del JSON crudo, que es donde
+## está el error antes de que `Mision` lo trague.
+const CLAVES_MISION := ["id", "nombre", "rareza", "texto", "tiros", "orden", "sin_drenar"]
+const CLAVES_PASO := ["tiro", "veces"]
+const TIROS_DIFICILES := ["canon", "platillo"]
+
+func _prueba_misiones_una_a_una(catalogo: Array[Mision]) -> void:
+	var crudo = JSON.parse_string(FileAccess.get_file_as_string("res://data/misiones.json"))
+	var malos: Array[String] = []
+	var ids := {}
+	for d in (crudo as Dictionary)["misiones"]:
+		var dd := d as Dictionary
+		var id_m := str(dd.get("id", "?"))
+		for k in dd:
+			if not CLAVES_MISION.has(k):
+				malos.append("%s: clave '%s'" % [id_m, k])
+		if ids.has(id_m):
+			malos.append("%s: id repetido" % id_m)
+		ids[id_m] = true
+		if not Mision.NOMBRE_RAREZA.values().has(str(dd.get("rareza", ""))):
+			malos.append("%s: rareza '%s'" % [id_m, dd.get("rareza", "")])
+		for paso in dd.get("tiros", []):
+			var pd := paso as Dictionary
+			for k in pd:
+				if not CLAVES_PASO.has(k):
+					malos.append("%s: clave de paso '%s'" % [id_m, k])
+			if not Mision.ROTULO_TIRO.has(str(pd.get("tiro", ""))):
+				malos.append("%s: tiro '%s' sin rótulo" % [id_m, pd.get("tiro", "")])
+			if typeof(pd.get("veces", 1)) not in [TYPE_INT, TYPE_FLOAT] \
+					or int(pd.get("veces", 1)) < 1:
+				malos.append("%s: veces '%s'" % [id_m, pd.get("veces", "")])
+	_comprobar("las misiones del JSON solo usan claves, rarezas y tiros que existen",
+		malos.is_empty(), str(malos))
+
+	# CABEN EN LA TELE: el nombre al tamaño que le dé la tele, el texto en sus
+	# líneas, y las casillas y los pasos dentro de su tope.
+	var fuente := FuenteUI.obtener()
+	var ancho := NodoTele.MARCO.size.x - 8.0
+	var no_caben: Array[String] = []
+	var a_8: Array[String] = []
+	for m in catalogo:
+		var tam := NodoTele.tam_nombre(fuente, m.nombre, ancho)
+		if fuente.get_string_size(m.nombre, HORIZONTAL_ALIGNMENT_LEFT, -1.0, tam).x > ancho:
+			no_caben.append("%s: nombre" % m.id)
+		if tam < 16:
+			a_8.append(m.nombre)
+		var alto := fuente.get_multiline_string_size(m.texto, HORIZONTAL_ALIGNMENT_CENTER,
+			ancho, 8).y
+		if ceilf(alto / fuente.get_height(8) - 0.01) > float(NodoTele.LINEAS_TEXTO):
+			no_caben.append("%s: texto de %.0f px" % [m.id, alto])
+		var casillas := 0
+		for i in m.tiros.size():
+			casillas += m.veces(i)
+		if casillas > NodoTele.MAX_CASILLAS or m.tiros.size() > NodoTele.MAX_PASOS:
+			no_caben.append("%s: %d casillas en %d pasos" % [m.id, casillas, m.tiros.size()])
+		for i in m.texto.length():
+			if not fuente.has_char(m.texto.unicode_at(i)):
+				no_caben.append("%s: le falta '%s'" % [m.id, m.texto[i]])
+	_comprobar("todas las misiones caben en la tele", no_caben.is_empty(),
+		"%s (a 8 px: %s)" % [str(no_caben), str(a_8)])
+
+	# LA REGLA DE `DISEÑO.md` §10: una misión no sube de rareza pidiendo más de
+	# lo mismo, sino lo que cuesta control —tiros difíciles, en orden, sin
+	# drenar—. Una común no lleva nada de eso, una rara al menos una cosa, una
+	# arcana al menos dos.
+	var fuera: Array[String] = []
+	for m in catalogo:
+		var puntos := int(m.orden) + int(m.sin_drenar)
+		for i in m.tiros.size():
+			if TIROS_DIFICILES.has(m.tiro(i)):
+				puntos += 1
+				break
+		var pide := {Mision.Rareza.COMUN: 0, Mision.Rareza.RARA: 1,
+			Mision.Rareza.ARCANA: 2}
+		if (m.rareza == Mision.Rareza.COMUN and puntos != 0) \
+				or puntos < int(pide.get(m.rareza, 0)):
+			fuera.append("%s (%s con %d)" % [m.id, m.rotulo_rareza(), puntos])
+	_comprobar("cada mision pide el control que dice su rareza", fuera.is_empty(),
+		str(fuera))
+
+	# Y en una misión EN ORDEN, un target no puede ir justo antes de un banco:
+	# el último target y el banco salen del mismo golpe, uno detrás del otro, así
+	# que ese paso se regalaría.
+	var regalos: Array[String] = []
+	for m in catalogo:
+		if not m.orden:
+			continue
+		for i in range(m.tiros.size() - 1):
+			if m.tiro(i) == "target" and m.tiro(i + 1) == "banco":
+				regalos.append(m.id)
+	_comprobar("ninguna mision en orden regala un banco detras de un target",
+		regalos.is_empty(), str(regalos))
+
+	# SE PUEDEN COMPLETAR TODAS, y contra todos los enemigos del catálogo: los
+	# que bloquean y los que reflejan las ponen más difíciles, nunca imposibles.
+	# El jugador de la prueba sabe contra quién juega: si el tiro que toca está
+	# cerrado lo abre con un target, y si el Esqueleto lo vigila mete un target
+	# en medio para no repetir.
+	var conductas: Array = [[]]
+	for datos in CatalogoEnemigos.cargar():
+		var l = (datos as Dictionary).get("comportamientos", [])
+		if typeof(l) == TYPE_ARRAY and not (l as Array).is_empty():
+			conductas.append(l)
+	var atascadas: Array[String] = []
+	for m in catalogo:
+		for conducta in conductas:
+			if not _completar_mision(m, conducta as Array):
+				atascadas.append("%s contra %s" % [m.id, str(conducta)])
+	_comprobar("todas las misiones se pueden completar, contra todos los enemigos",
+		atascadas.is_empty() and conductas.size() > 1,
+		"%s (%d conductas)" % [str(atascadas), conductas.size()])
+
+	# `orden` hace lo que dice: meter el último paso primero no cuenta. Y
+	# `sin_drenar` también: drenar con un paso hecho lo deja a cero.
+	var mal_orden: Array[String] = []
+	var mal_drenaje: Array[String] = []
+	for m in catalogo:
+		if m.orden and m.tiro(m.tiros.size() - 1) != m.tiro(0):
+			var c := _combate_de_mision(m, [])
+			_tiro_de_mision(c, m.tiro(m.tiros.size() - 1))
+			if c.llevas(m.tiros.size() - 1) != 0:
+				mal_orden.append(m.id)
+		if m.sin_drenar:
+			var c2 := _combate_de_mision(m, [])
+			_tiro_de_mision(c2, m.tiro(0))
+			var habia := c2.llevas(0)
+			_drenar(c2)
+			if habia != 1 or c2.llevas(0) != 0:
+				mal_drenaje.append(m.id)
+	_comprobar("en las misiones en orden el ultimo paso no cuenta antes de tiempo",
+		mal_orden.is_empty(), str(mal_orden))
+	_comprobar("y en las de sin drenar, drenar deja el progreso a cero",
+		mal_drenaje.is_empty(), str(mal_drenaje))
+
+## Un combate contra un saco con UNA misión puesta, ya en juego.
+func _combate_de_mision(m: Mision, conducta: Array) -> Combate:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var c := Combate.new(pc)
+	var esc: Array[Mision] = [m]
+	c.iniciar(Enemigo.new({"nombre": "Saco", "vida": 100000000, "ataque": 1,
+		"reloj": 100000.0, "comportamientos": conducta}), -1, esc)
+	_en_juego(c)
+	return c
+
+## Juega una misión paso a paso como la jugaría alguien que sabe contra quién
+## juega, y dice si se completa exactamente una vez.
+func _completar_mision(m: Mision, conducta: Array) -> bool:
+	var c := _combate_de_mision(m, conducta)
+	var hechas := [0]
+	c.mision_completada.connect(func(_m: Mision) -> void: hechas[0] += 1)
+	for i in m.tiros.size():
+		for _k in m.veces(i):
+			var tiro := m.tiro(i)
+			if c.conducta.bloquea(tiro):
+				_tiro_de_mision(c, "target")
+			if c.conducta.tiro_vigilado() == tiro:
+				_tiro_de_mision(c, "target")
+			_tiro_de_mision(c, tiro)
+	return hechas[0] == 1
 
 func _prueba_escalera_de_misiones(catalogo: Array[Mision]) -> void:
 	# Una escalera hecha a mano para no depender del sorteo.

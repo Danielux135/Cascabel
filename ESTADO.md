@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **685/685** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **692/692** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -76,6 +76,37 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## CATORCE MISIONES MÁS, Y LA TELE YA NO LAS CORTA (15-oct)
+
+Con 14 misiones y tres por combate se veían casi todas en un run. Ahora son
+**28: 10 comunes, 10 raras y 8 arcanas**, solo con tiros que ya existen y
+ninguna de la planta alta. **Es una lista para revisar** (pregunta M1). Las
+nuevas:
+
+| Rareza | Misiones |
+|---|---|
+| Comunes | Barrido, Mantenimiento, Tanteo, Desvío, Ronda |
+| Raras | Doble filo, Relevo (en orden), Mano firme (sin drenar), Ganzúa (en orden), Remate (las dos) |
+| Arcanas | Contrarreloj, Lanzadera (en orden y sin drenar), Sin red, Todo o nada (sin drenar) |
+
+Las pruebas nuevas leen el JSON crudo y sujetan lo que no da error: claves,
+rarezas y tiros que existen (una rareza mal escrita caía a común sin avisar),
+que todas caben en la tele, **la regla de `DISEÑO.md` §10** (una común no pide
+control; una rara, una cosa entre tiro difícil, orden o sin drenar; una arcana,
+dos), que en orden no se regala un banco detrás de un target, y **que todas se
+pueden completar contra todos los enemigos**, también la Calavera que bloquea y
+el Esqueleto que refleja.
+
+**Y mirándolas en captura salieron tres fallos de la tele, que ya estaban en
+las misiones de antes:** "SIN DRENAR" se pintaba ENCIMA del nombre de todas las
+que lo llevan (ahora va en la fila de arriba, centrado); "El reloj es mío" salía
+"El reloj es mí" (el nombre baja a 8 px cuando no cabe a 16); y el texto de
+Gran vuelta perdía su tercera línea (ahora caben tres).
+
+**Ojo, que esto mueve el modelo:** `medir_daniel.gd` carga el catálogo de
+misiones, y con 28 el perfil de Daniel completa otras y gana otras reliquias.
+Las medidas de la Fase 6 de esta sesión están sacadas con las 14 de antes.
 
 ## `medir_daniel.gd` SABE JUGAR CON VARIAS BOLAS (tarea 3 · 15-oct)
 
@@ -2106,6 +2137,16 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+**LO DE LAS MISIONES NUEVAS.**
+
+**M1.** **¿Valen las catorce nuevas?** Están en la tabla de arriba y en
+`data/misiones.json`, al final. Las que más pueden fallar: **Todo o nada** pide
+retorno, cañón y platillo en una sola bola, y si se hace imposible es la
+primera que sobra; y **Ronda** y **Remate** usan la órbita, que el lanzamiento a
+tope regala, así que dependen de la decisión abierta del tramo gratis.
+**M2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
+queda así, o se le busca un nombre de catorce letras?
+
 **LO DE LA FASE 6 (comportamientos de enemigo).** Para ver uno sin esperar al
 acto que le toca: la tabla del apartado de arriba dice qué enemigo lo lleva.
 
@@ -2994,14 +3035,17 @@ de geometría fina y se hace jugando, no midiendo.
 - **27 de las 45 reliquias no tienen icono**, y ninguna tiene sonido propio:
   quedarse una suena con el arpegio del combo, que es un préstamo. Los prompts
   para el arte que falta están en `assets/prompts_reliquias.md`.
-- **Las misiones son 14 y se ven casi todas en un run.** Con tres por combate y
-  doce combates ves 36 tiradas de un cajón de 14: se repiten. Ampliar es barato
-  —una fila de JSON— pero hay que hacerlo.
+- ~~Las misiones son 14 y se ven casi todas en un run~~ **HECHO (15-oct): son
+  28**, ver arriba. Siguen sorteándose con reemplazo, así que dos combates
+  seguidos pueden repetir; el comentario de `Run.escalera_de_misiones` dice que
+  no, y el código no lo impide.
 - **Una misión puede quedar imposible en una mesa concreta.** Si pide tres
   platillos y el platillo es el tiro más difícil de la mesa, esa escalera se
   atasca ahí y el jugador se queda sin las dos siguientes. No hay tiempo límite
   ni forma de saltarla a propósito: si esto molesta, lo que falta es poder
-  cambiar de misión con un tiro, no bajarles la exigencia.
+  cambiar de misión con un tiro, no bajarles la exigencia. **Imposible de verdad
+  ya no puede quedar ninguna**: desde el 15-oct hay una prueba que las completa
+  todas contra todos los enemigos. Lo que sigue abierto es la dificultad.
 - **La duración larga puede destapar que los enemigos son sacos.** Con combates
   de 25 s daba igual que un enemigo solo tuviera vida y un ataque; con tres
   minutos, no. `DISEÑO.md` §11 tiene los seis comportamientos que hacen falta
