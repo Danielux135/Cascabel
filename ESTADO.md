@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **673/673** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **680/680** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -93,12 +93,20 @@ enemigos que responden desde el acto II.
 
 | Enemigo | Acto | Comportamiento | Estado |
 |---|---|---|---|
+| Calavera llameante | II | **bloquea el cañón** hasta que le pegas por otro sitio | hecho |
 | Esqueleto | II | **refleja si repites recorrido** (te devuelve su ataque) | hecho |
 | Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
 | Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
 | Armadura vacía | III | **blindaje** (3 capas; lo flojo entra a ¼; el cañón rompe) | hecho |
 | Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
 
+- **Calavera llameante, bloquea el cañón.** Su fuego lo cierra: meterlo no cobra
+  nada ("BLOQUEADO") hasta que le pegas por otro sitio —un target, un banco u
+  otro recorrido; el racimo no, que lo abriría solo—, y entonces se abre
+  ("CAÑÓN ABIERTO") y se vuelve a cerrar a los 8 s de juego. El panel dice qué
+  está cerrado o cuánto falta para que se cierre. Solo se puede bloquear un
+  recorrido, nunca un target (haría imposible un banco), y nunca el regreso de
+  la caza. **El modelo no lo ve**: el perfil de Daniel no mete cañones.
 - **Esqueleto, refleja.** Si metes el mismo recorrido (órbita, retorno, cañón o
   platillo) dos veces seguidas, el segundo no le hace nada —ni daño, ni misión,
   ni premio de recorrido— y te devuelve su ataque, y sigue así mientras no
@@ -2085,6 +2093,10 @@ encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales
 cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas?
 ¿Y está bien que el veneno lo atraviese entero? Diales: `blindaje_capas`,
 `blindaje_umbral` (fracción del cañón), `blindaje_factor`, `blindaje_regenera`.
+**F8.** **La Calavera cierra el cañón** hasta que le das por otro sitio. ¿Se
+entiende con el "BLOQUEADO" y el "CAÑÓN ABIERTO"? ¿Es el cañón el que tiene que
+cerrar, o otro recorrido? Una fila del JSON lo cambia (`"tiro"`); los diales son
+`bloqueo_tiro` y `bloqueo_rearme`.
 **F7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
 solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
 lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.

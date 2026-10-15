@@ -1244,6 +1244,12 @@ func _prueba_comportamientos() -> void:
 			for clave in (fila as Dictionary):
 				if clave != "id" and not (Comportamientos.CLAVES[el_id] as Array).has(clave):
 					malos.append("%s: %s no lee '%s'" % [dd.get("id", "?"), el_id, clave])
+			# El recorrido que se bloquea tiene que ser un recorrido: con otra cosa
+			# se cae al de los parámetros sin avisar.
+			if el_id == "bloquea" and (fila as Dictionary).has("tiro") \
+					and not Comportamientos.TIROS_REFLEJABLES.has(str((fila as Dictionary)["tiro"])):
+				malos.append("%s: no se puede bloquear '%s'" % [dd.get("id", "?"),
+					(fila as Dictionary)["tiro"]])
 	_comprobar("los comportamientos del JSON existen y sus claves se leen",
 		malos.is_empty(), str(malos))
 	_comprobar("y hay al menos un enemigo que lleva alguno", con_alguno > 0)
@@ -1317,6 +1323,71 @@ func _prueba_comportamientos() -> void:
 	_prueba_comportamiento_castigo()
 	_prueba_comportamiento_blindaje()
 	_prueba_comportamiento_reflejo()
+	_prueba_comportamiento_bloqueo()
+
+## (1) BLOQUEA UN RECORRIDO HASTA QUE LE PEGAS POR OTRO SITIO.
+func _prueba_comportamiento_bloqueo() -> void:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var datos := {"nombre": "Calavera llameante", "vida": 1000000, "ataque": 1,
+		"reloj": 1000.0, "comportamientos": [{"id": "bloquea", "tiro": "canon"}]}
+	var c := Combate.new(pc)
+	c.iniciar(Enemigo.new(datos))
+	_en_juego(c)
+	var bloqueos := [0]
+	var aperturas := [0]
+	c.recorrido_bloqueado.connect(func(_t: String, _p: Vector2) -> void: bloqueos[0] += 1)
+	c.recorrido_abierto.connect(func(_t: String, _p: Vector2) -> void: aperturas[0] += 1)
+	var vida := c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	_comprobar("empieza con el cañón cerrado: meterlo no cobra nada, y lo avisa",
+		c.enemigo.vida == vida and bloqueos[0] == 1, "%d avisos" % bloqueos[0])
+	# El racimo no lo abre.
+	c.mesa.bumper_golpeado.emit(Vector2(200, 800), 300.0)
+	vida = c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	_comprobar("el racimo no lo abre", c.enemigo.vida == vida and bloqueos[0] == 2)
+	# Un target sí.
+	c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	vida = c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	_comprobar("un target lo abre, lo avisa, y el cañón vuelve a pegar",
+		c.enemigo.vida < vida and aperturas[0] == 1 and c.conducta.bloqueado == "",
+		"%d aperturas" % aperturas[0])
+	# Se vuelve a cerrar a los `bloqueo_rearme` segundos de juego.
+	_avanzar_combate(c, pc.bloqueo_rearme + 0.1)
+	vida = c.enemigo.vida
+	_recorrido(c, Rampa.Premio.DANO_FUERTE)
+	_comprobar("y se vuelve a cerrar a los segundos de rearme",
+		c.conducta.bloqueado == "canon" and c.enemigo.vida == vida)
+	# Y no corre el rearme en las pausas.
+	c.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	c.mesa.retirar_bolas()
+	c.mesa.bola_drenada.emit()
+	var rearme := c.conducta.rearme
+	var t := 0.0
+	while c.fase != Combate.Fase.LANZANDO and t < 5.0:
+		c.avanzar(DT)
+		t += DT
+	_comprobar("el rearme no corre en las pausas",
+		c.conducta.bloqueado == "" and is_equal_approx(c.conducta.rearme, rearme),
+		"%.2f -> %.2f" % [rearme, c.conducta.rearme])
+	# El regreso de la caza no se bloquea nunca, aunque lo bloqueado sea un retorno.
+	var c2 := Combate.new(pc)
+	c2.iniciar(Enemigo.new({"nombre": "Calavera", "vida": 1000000, "ataque": 1,
+		"reloj": 1000.0, "comportamientos": [{"id": "bloquea", "tiro": "retorno"}]}))
+	_en_juego(c2)
+	var v2 := c2.enemigo.vida
+	c2.mesa.rampa_salida.emit(Vector2(200, 800), c2.mesa.regreso)
+	_comprobar("el regreso de la caza no se bloquea aunque lo cerrado sea un retorno",
+		c2.mesa.regreso >= 0 and c2.enemigo.vida < v2)
+	# Y un tiro que no es un recorrido se rechaza: un target cerrado haría
+	# imposible un banco.
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new({"nombre": "Calavera", "vida": 1000000, "ataque": 1,
+		"reloj": 1000.0, "comportamientos": [{"id": "bloquea", "tiro": "target"}]}))
+	_comprobar("no se puede bloquear un target: se cae al recorrido de los parametros",
+		c3.conducta.bloqueado == pc.bloqueo_tiro, c3.conducta.bloqueado)
 
 ## (3) REFLEJA SI REPITES TIRO. Lo que se sujeta es la racha: cuándo empieza a
 ## reflejar, que siga mientras repites y que cambiar de tiro la rompa. Y dos

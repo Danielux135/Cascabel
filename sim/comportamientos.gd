@@ -32,12 +32,14 @@ extends RefCounted
 
 ## Los que existen. Lista CERRADA: un id mal escrito en el JSON no da error, deja
 ## un enemigo que no hace nada, y eso se diagnostica como balance. Hay prueba.
-const IDS := ["cura", "refleja", "blindaje", "castiga_combo", "caza_acelera"]
+const IDS := ["bloquea", "cura", "refleja", "blindaje", "castiga_combo",
+	"caza_acelera"]
 
 ## Las claves que cada uno sabe leer del JSON, además de `id`. Misma razón: una
 ## clave mal escrita no pisa nada y nadie se entera. Hay prueba.
 const CLAVES := {
 	"cura": ["espera", "periodo", "fraccion"],
+	"bloquea": ["tiro", "rearme"],
 	"refleja": ["repeticiones", "factor_ataque"],
 	"blindaje": ["capas", "umbral", "factor", "regenera"],
 	"castiga_combo": ["desde", "factor_por_tramo", "tramos_robados"],
@@ -49,13 +51,20 @@ var p: ParametrosCombate
 ## el parámetro con nombre).
 var activos: Dictionary = {}
 
-## Los tiros que vigila el reflejo: los recorridos que se APUNTAN. Ni el racimo
-## ni los targets (un banco pide tres targets seguidos, y reflejar el segundo
-## haría imposible cerrarlo).
+## Los tiros que vigila el reflejo y los que se pueden bloquear: los recorridos
+## que se APUNTAN. Ni el racimo ni los targets (un banco pide tres targets
+## seguidos, y reflejar o bloquear uno haría imposible cerrarlo).
 const TIROS_REFLEJABLES := ["orbita", "retorno", "canon", "platillo"]
+## Los que ABREN un recorrido bloqueado: cualquier tiro apuntado que no sea él.
+## El racimo y el girador no: se los come la bola sola y lo abrirían sin jugar.
+const TIROS_QUE_ABREN := ["target", "banco", "orbita", "retorno", "canon", "platillo"]
 
 ## (2) Segundos de juego sin que le toquen. Solo corre con la bola en juego.
 var sin_tocar: float = 0.0
+## (1) El recorrido cerrado ahora mismo ("" si está abierto), y lo que le falta
+## para volver a cerrarse.
+var bloqueado: String = ""
+var rearme: float = 0.0
 ## (3) El último recorrido vigilado y cuántas veces seguidas va.
 var ultimo_tiro: String = ""
 var seguidas: int = 0
@@ -70,6 +79,8 @@ func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 	p = parametros if parametros != null else ParametrosCombate.new()
 	activos.clear()
 	sin_tocar = 0.0
+	bloqueado = ""
+	rearme = 0.0
 	ultimo_tiro = ""
 	seguidas = 0
 	capas = 0
@@ -84,6 +95,8 @@ func preparar(lista: Array, parametros: ParametrosCombate) -> void:
 		activos[el_id] = _resolver(el_id, d)
 	if activos.has("blindaje"):
 		capas = int(activos["blindaje"]["capas"])
+	if activos.has("bloquea"):
+		bloqueado = str(activos["bloquea"]["tiro"])
 
 func tiene(el_id: String) -> bool:
 	return activos.has(el_id)
@@ -101,6 +114,11 @@ func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 			r["espera"] = maxf(float(fila.get("espera", p.cura_espera)), 0.0)
 			r["periodo"] = maxf(float(fila.get("periodo", p.cura_periodo)), 0.05)
 			r["fraccion"] = maxf(float(fila.get("fraccion", p.cura_fraccion)), 0.0)
+		"bloquea":
+			var t := str(fila.get("tiro", p.bloqueo_tiro))
+			# Solo un recorrido: con cualquier otra cosa, el de los parámetros.
+			r["tiro"] = t if TIROS_REFLEJABLES.has(t) else p.bloqueo_tiro
+			r["rearme"] = maxf(float(fila.get("rearme", p.bloqueo_rearme)), 0.5)
 		"refleja":
 			r["repeticiones"] = maxi(int(fila.get("repeticiones",
 				p.reflejo_repeticiones)), 2)
@@ -181,6 +199,38 @@ func cura_en() -> float:
 	if not activos.has("cura"):
 		return 0.0
 	return maxf(float(activos["cura"]["espera"]) - sin_tocar, 0.0)
+
+# ----------------------------------------------------------------- el bloqueo
+
+## (1) BLOQUEA UN RECORRIDO HASTA QUE LE PEGAS POR OTRO SITIO: el tiro que más
+## te gusta está cerrado, y para abrirlo tienes que jugar otra parte de la mesa.
+## Lo pregunta `Combate._filtrar_tiro` LO PRIMERO: un tiro bloqueado no cuenta ni
+## para el reflejo.
+func bloquea(tiro: String) -> bool:
+	return activos.has("bloquea") and bloqueado != "" and tiro == bloqueado
+
+## Un tiro que ha entrado de verdad. Si es otro sitio, abre el bloqueado y arma
+## el reloj del rearme. Devuelve el tiro que se ha abierto, o "".
+func tiro_entrado(tiro: String) -> String:
+	if not activos.has("bloquea") or bloqueado == "" or tiro == bloqueado \
+			or not TIROS_QUE_ABREN.has(tiro):
+		return ""
+	var abierto := bloqueado
+	bloqueado = ""
+	rearme = float(activos["bloquea"]["rearme"])
+	return abierto
+
+## Avanza el rearme con la bola en juego. Devuelve el tiro que se acaba de
+## volver a cerrar, o "".
+func avanzar_bloqueo(dt: float) -> String:
+	if not activos.has("bloquea") or bloqueado != "":
+		return ""
+	rearme -= dt
+	if rearme > 0.0:
+		return ""
+	rearme = 0.0
+	bloqueado = str(activos["bloquea"]["tiro"])
+	return bloqueado
 
 # ------------------------------------------------------------- el reflejo
 
@@ -284,6 +334,12 @@ func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
 				salida.append({"rotulo": "SE CURA",
 					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
 					"activo": falta <= 0.0})
+			"bloquea":
+				var tiro_b := str(activos["bloquea"]["tiro"])
+				salida.append({"rotulo": "BLOQUEA",
+					"detalle": str(Mision.ROTULO_TIRO.get(tiro_b, tiro_b)).to_upper()
+						if bloqueado != "" else "en %d s" % int(ceilf(rearme)),
+					"activo": bloqueado != ""})
 			"refleja":
 				var vigilado := tiro_vigilado()
 				salida.append({"rotulo": "REFLEJA",

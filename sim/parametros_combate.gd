@@ -225,3 +225,11 @@ var blindaje_regenera: float = 10.0
 ## racimo no se apunta.
 var reflejo_repeticiones: int = 2
 var reflejo_factor_ataque: float = 1.0
+## (1) BLOQUEA UN RECORRIDO HASTA QUE LE PEGAS POR OTRO SITIO: empieza el combate
+## con `bloqueo_tiro` cerrado —meterlo no cobra nada—, se abre en cuanto metes
+## otro tiro de los que se apuntan (un target, un banco, otro recorrido; el
+## racimo no, que lo abriría solo), y se vuelve a cerrar a los `bloqueo_rearme`
+## segundos de juego. Solo puede ser un recorrido: un target bloqueado haría
+## imposible cerrar un banco.
+var bloqueo_tiro: String = "canon"
+var bloqueo_rearme: float = 8.0

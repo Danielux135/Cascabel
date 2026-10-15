@@ -46,6 +46,10 @@ signal blindaje_roto(capas: int, punto: Vector2)
 ## Has repetido tiro contra un enemigo que refleja (`refleja`): el tiro no le ha
 ## hecho nada y te devuelve `dano`.
 signal golpe_reflejado(punto: Vector2, dano: int)
+## El recorrido está cerrado (`bloquea`): lo has metido y no ha cobrado nada.
+signal recorrido_bloqueado(tiro: String, punto: Vector2)
+## Le has pegado por otro sitio y el recorrido cerrado se ha abierto.
+signal recorrido_abierto(tiro: String, punto: Vector2)
 ## La red de seguridad ha comido un drenaje. Igual: si no se anuncia, parece que
 ## el juego se ha olvidado de castigarte.
 signal drenaje_perdonado()
@@ -417,6 +421,7 @@ func avanzar(dt: float) -> void:
 		_dano_de_estados(int(paso["dano"]), mesa.bola_en_peligro().pos)
 		_avanzar_cura(dt)
 		conducta.avanzar_blindaje(dt)
+		conducta.avanzar_bloqueo(dt)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
@@ -544,11 +549,15 @@ func _al_golpear_bumper(punto: Vector2, _fuerza: float) -> void:
 		bolsa.factor("factor_dano_relleno"))
 
 func _al_abatir_target(punto: Vector2, _banco: int) -> void:
+	# Un target no se bloquea ni se refleja nunca; pasa por el filtro porque es
+	# "otro sitio" y abre un recorrido cerrado.
+	_filtrar_tiro("target", punto)
 	_apuntar("target")
 	_robar_reloj(bolsa.suma("suma_robo_reloj_target"))
 	_golpear(p.dano_target + int(round(bolsa.suma("suma_dano_target"))), punto, true)
 
 func _al_completar_banco(punto: Vector2, _banco: int) -> void:
+	_filtrar_tiro("banco", punto)
 	_apuntar("banco")
 	_robar_reloj(bolsa.suma("suma_robo_reloj_banco"))
 	_tirar_por_bola_extra("azar_bola_extra_banco")
@@ -669,6 +678,11 @@ func _tiro_de_rampa(r: Rampa) -> String:
 func _filtrar_tiro(tiro: String, punto: Vector2, nombre_rampa: String = "") -> bool:
 	if not _en_juego() or nombre_rampa == "regreso" or enemigo == null:
 		return true
+	# (1) EL BLOQUEO, lo primero: un tiro cerrado no ha entrado, así que ni
+	# cuenta para el reflejo ni abre nada.
+	if conducta.bloquea(tiro):
+		recorrido_bloqueado.emit(tiro, punto)
+		return false
 	# (3) EL REFLEJO: el tiro repetido no hace nada y te devuelve su ataque. Por
 	# `_atacar`, que es por donde pasa todo golpe suyo —armadura de reliquias y
 	# derrota incluidas—, y sin marcarlo como de reloj: no lo castiga el combo.
@@ -678,6 +692,10 @@ func _filtrar_tiro(tiro: String, punto: Vector2, nombre_rampa: String = "") -> b
 		if dano > 0:
 			_atacar(dano, false)
 		return false
+	# El tiro ha entrado: si es otro sitio, abre el recorrido cerrado.
+	var abierto := conducta.tiro_entrado(tiro)
+	if abierto != "":
+		recorrido_abierto.emit(abierto, punto)
 	return true
 
 ## Las rampas pagan al SALIR, no al entrar: el premio es completarlas. Y cada

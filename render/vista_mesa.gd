@@ -391,6 +391,14 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	combate.combo_castigado.connect(_al_castigar_combo)
 	combate.blindaje_roto.connect(_al_romper_blindaje)
 	combate.golpe_reflejado.connect(_al_reflejar_golpe)
+	combate.recorrido_bloqueado.connect(func(_tiro: String, punto: Vector2) -> void:
+		_numeros.append({"pos": punto + Vector2(0, -20), "t": 1.0,
+			"texto": "BLOQUEADO", "col": C_GOMA_LUZ, "tam": 8.0, "subida": 26.0})
+		impactos.onda(punto, C_GOMA_LUZ, 1.0))
+	combate.recorrido_abierto.connect(func(tiro: String, punto: Vector2) -> void:
+		_numeros.append({"pos": punto + Vector2(0, -20), "t": 1.2,
+			"texto": "%s ABIERTO" % str(Mision.ROTULO_TIRO.get(tiro, tiro)).to_upper(),
+			"col": C_VERDE, "tam": 8.0, "subida": 26.0}))
 	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 

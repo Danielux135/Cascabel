@@ -16,7 +16,8 @@
     { "id": "limo_moneda",         "nombre": "Limo moneda",        "vida": 4380, "ataque": 7,  "reloj": 6.5,  "sprite": "res://assets/enemigos/limo_moneda.png" },
     { "id": "goblin_carroniero",   "nombre": "Goblin carroñero",   "vida": 5010, "ataque": 8,  "reloj": 7.0,  "sprite": "res://assets/enemigos/goblin_carroniero.png" },
 
-    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 5610, "ataque": 10, "reloj": 7.5,  "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true },
+    { "id": "calavera_llameante",  "nombre": "Calavera llameante", "vida": 5610, "ataque": 10, "reloj": 7.5,  "sprite": "res://assets/enemigos/calavera_llameante.png", "flota": true ,
+      "comportamientos": [{ "id": "bloquea", "tiro": "canon" }] },
     { "id": "esqueleto",           "nombre": "Esqueleto",          "vida": 6240, "ataque": 8,  "reloj": 8.0,  "sprite": "res://assets/enemigos/esqueleto.png" ,
       "comportamientos": [{ "id": "refleja" }] },
     { "id": "cultista",            "nombre": "Cultista",           "vida": 6870, "ataque": 8,  "reloj": 8.5,  "sprite": "res://assets/enemigos/cultista.png" ,
