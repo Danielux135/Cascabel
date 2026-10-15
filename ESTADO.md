@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **699/699** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **700/700** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -3080,15 +3080,16 @@ de geometría fina y se hace jugando, no midiendo.
   tienda necesita chatarra y reliquias: Fase 4 y Fase 6. Meterlos ahora como
   nodos vacíos sería acumular sistemas a medias.
 - **En el mapa, el nodo de jefe enseña el retrato del enemigo normal** del
-  que sale, porque un jefe sigue siendo "el enemigo más duro del acto con más
-  vida". Los tres sprites de `assets/jefes/` NO se usan a propósito: enseñar
+  que sale, porque un jefe sigue siendo un enemigo del acto con más vida. Los tres sprites de `assets/jefes/` NO se usan a propósito: enseñar
   un golem y meterte contra una "Rata mayor" sería el mapa mintiendo. Se
   conectan cuando los jefes sean enemigos de verdad, en Fase 6.
 - **Los jefes son de mentira.** Ahora un jefe es un enemigo AL AZAR de los tres
   del acto, con ×1,5 de vida y "mayor" en el nombre (`Mapa._enemigo`); hasta el
   15-oct esto decía "el más duro con 1,8×", y no lo era. Eso NO cumple `DISEÑO.md` §8: un
   enemigo con más vida no es un enemigo nuevo. Los jefes de verdad, con sus
-  fases y los sprites de `assets/jefes/`, son Fase 6.
+  fases y los sprites de `assets/jefes/`, son Fase 6, y NO están: lo que se
+  construyó el 15-oct son los seis comportamientos de `DISEÑO.md` §11, y un jefe
+  hoy lleva el de su enemigo.
 - **La recompensa sale del combate, no del mapa.** El nodo del mapa sigue sin
   decir qué te va a dar, porque hasta que haya chatarra y tienda (Fases 4 y 6)
   todos los combates dan lo mismo: tres reliquias al azar. Cuando un nodo pueda
@@ -3101,9 +3102,8 @@ de geometría fina y se hace jugando, no midiendo.
   quedarse una suena con el arpegio del combo, que es un préstamo. Los prompts
   para el arte que falta están en `assets/prompts_reliquias.md`.
 - ~~Las misiones son 14 y se ven casi todas en un run~~ **HECHO (15-oct): son
-  28**, ver arriba. Siguen sorteándose con reemplazo, así que dos combates
-  seguidos pueden repetir; el comentario de `Run.escalera_de_misiones` dice que
-  no, y el código no lo impide.
+  28**, ver arriba. Y ya no se repiten en dos combates seguidos, que lo decía el
+  comentario de `Run.escalera_de_misiones` y el sorteo no lo hacía.
 - **Una misión puede quedar imposible en una mesa concreta.** Si pide tres
   platillos y el platillo es el tiro más difícil de la mesa, esa escalera se
   atasca ahí y el jugador se queda sin las dos siguientes. No hay tiempo límite
@@ -3115,8 +3115,9 @@ de geometría fina y se hace jugando, no midiendo.
   de 25 s daba igual que un enemigo solo tuviera vida y un ataque; con tres
   minutos, no. `DISEÑO.md` §11 tiene los seis comportamientos que hacen falta
   (bloquear un recorrido, curarse, reflejar, blindaje, castigar el combo,
-  acelerar el reloj) y son Fase 6. Si Daniel dice que se hace largo, el orden
-  del plan cambia: la Fase 6 sube antes que la cáscara.
+  acelerar el reloj), y **desde el 15-oct están construidos** y repartidos por
+  los actos II y III, sin jugar. El acto I sigue siendo de sacos a propósito
+  (pregunta F1).
 - **La tele se come sitio en el hueco entre palas.** No es física, pero sí es
   arte: 184×124 px justo encima de los flippers, por donde pasa la bola
   constantemente. Si estorba visualmente, se encoge o se sube, pero tiene que

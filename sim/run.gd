@@ -44,6 +44,8 @@ var _reliquias_disponibles: Array[Reliquia] = []
 ## Y las misiones, que son de donde salen las reliquias. Sin ellas el run se
 ## juega igual, solo que sin premios: es lo que deja correr los medidores.
 var _misiones_disponibles: Array[Mision] = []
+## La escalera del combate anterior, para no repetirla en el siguiente.
+var _ultima_escalera: Array[Mision] = []
 var _rng := RandomNumberGenerator.new()
 
 ## Dónde estás. `fila` es -1 antes de entrar en el primer nodo: se empieza fuera
@@ -244,16 +246,27 @@ func _candidatas(rareza: int) -> Array[Reliquia]:
 ## La escalera de misiones de un combate: una común, una rara y una arcana,
 ## sorteadas. Se sortea aquí y no en el combate porque el combate no lee ficheros
 ## y porque así dos combates del mismo run no repiten la misma misión seguida.
+##
+## ESO ÚLTIMO LO DECÍA ESTE COMENTARIO Y EL CÓDIGO NO LO HACÍA: sorteaba con
+## reemplazo, y con diez comunes la misma salía en dos combates seguidos una vez
+## de cada diez. Ahora la del combate anterior no entra en el sorteo, salvo que
+## sea la única de su rareza: una escalera con un hueco es peor que una repetida.
 func escalera_de_misiones() -> Array[Mision]:
 	var salida: Array[Mision] = []
 	for rareza in [Mision.Rareza.COMUN, Mision.Rareza.RARA, Mision.Rareza.ARCANA]:
 		var candidatas: Array[Mision] = []
+		var nuevas: Array[Mision] = []
 		for m in _misiones_disponibles:
 			if m.rareza == rareza:
 				candidatas.append(m)
+				if not _ultima_escalera.has(m):
+					nuevas.append(m)
+		if not nuevas.is_empty():
+			candidatas = nuevas
 		if candidatas.is_empty():
 			continue
 		salida.append(candidatas[_rng.randi_range(0, candidatas.size() - 1)])
+	_ultima_escalera = salida
 	return salida
 
 ## Vuelve a tirar, si queda tirada. Devuelve si de verdad ha girado.

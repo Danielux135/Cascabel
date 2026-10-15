@@ -313,6 +313,11 @@ Uno con más vida no es un enemigo nuevo. Cada uno altera qué tiro compensa:
 - **Castiga el multiplicador alto**: obliga a gastarlo
 - **Acelera su reloj** cuando subes a cazar: castiga farmear
 
+*Los seis están construidos desde la Fase 6 (oct-2026), en
+`sim/comportamientos.gd`, con sus números en `ParametrosCombate`, y sin jugar.
+Quién lleva cada uno es una propuesta en `data/enemigos.json`, razonada en
+`ESTADO.md`.*
+
 ---
 
 ## 12. Estructura del run

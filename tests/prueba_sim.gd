@@ -5994,6 +5994,39 @@ func _prueba_misiones_y_la_mesa() -> void:
 		"subio %s, del mismo golpe %d, del siguiente %d" % [subio, mismo_golpe,
 			c2.llevas(0)])
 
+	# (3) DOS COMBATES SEGUIDOS NO REPITEN MISIÓN. Lo prometía el comentario de
+	# `Run.escalera_de_misiones` y el sorteo era con reemplazo. Con el catálogo
+	# de verdad, y con uno de una sola misión por rareza, que tiene que seguir
+	# dando escalera entera aunque repita.
+	var catalogo := CatalogoMisiones.cargar()
+	var sin_reliquias: Array[Reliquia] = []
+	var r := Run.new(ParametrosRun.new(), ParametrosCombate.new(),
+		CatalogoEnemigos.cargar(), 5, sin_reliquias, catalogo)
+	var antes := r.escalera_de_misiones()
+	var repetidas := 0
+	var incompletas := 0
+	for _i in 200:
+		var ahora := r.escalera_de_misiones()
+		if ahora.size() != 3:
+			incompletas += 1
+		for m in ahora:
+			if antes.has(m):
+				repetidas += 1
+		antes = ahora
+	var una_de_cada: Array[Mision] = []
+	for rareza in [Mision.Rareza.COMUN, Mision.Rareza.RARA, Mision.Rareza.ARCANA]:
+		for m in catalogo:
+			if m.rareza == rareza:
+				una_de_cada.append(m)
+				break
+	var r2 := Run.new(ParametrosRun.new(), ParametrosCombate.new(),
+		CatalogoEnemigos.cargar(), 5, sin_reliquias, una_de_cada)
+	r2.escalera_de_misiones()
+	_comprobar("dos combates seguidos no repiten mision, y la escalera sale entera",
+		repetidas == 0 and incompletas == 0 and antes.size() == 3
+			and r2.escalera_de_misiones().size() == 3,
+		"%d repetidas, %d incompletas en 200 combates" % [repetidas, incompletas])
+
 ## Un combate contra un saco con UNA misión puesta, ya en juego.
 func _combate_de_mision(m: Mision, conducta: Array) -> Combate:
 	var pc := ParametrosCombate.new()
