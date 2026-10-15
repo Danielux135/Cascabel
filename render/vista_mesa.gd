@@ -28,6 +28,10 @@ const C_ORO         := Paleta.ORO
 ## dos, que es lo correcto — a esa distancia lo único que importa es por dónde.
 const AVISO_MARGEN := 10.0
 const AVISO_ALCANCE := 540.0
+## El mensaje del cuadro de error que abre el cañón (`PROPÓSITO.md` §8). Vive
+## aquí, como constante, para que la batería mida si cabe en el cuadro con el
+## texto de verdad y no con uno de ejemplo.
+const ERROR_CANON := "kernel32.dll ha dejado de responder"
 const C_ORO_CLARO   := Paleta.ORO_CLARO
 const C_TEXTO       := Paleta.TEXTO
 const C_TEXTO_TENUE := Paleta.TEXTO_TENUE
@@ -845,6 +849,15 @@ func _al_drenar_bola() -> void:
 	_sonido.reproducir("drenaje")
 	impactos.polvo(Vector2(Mesa.ANCHO * 0.5, mesa.p.y_drenaje - 26.0),
 		Vector2.UP, C_PIEDRA, 1.4)
+	# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): el sistema escribe una línea en
+	# el registro. Con multibola esto solo pasa con la ÚLTIMA bola —es la señal
+	# `bola_drenada`, no `bola_perdida`—, así que la línea siempre corresponde
+	# a un turno de verdad perdido.
+	if sistema != null:
+		var proceso := "cascabel.exe"
+		if combate != null and combate.enemigo != null and cascara != null:
+			proceso = cascara.proceso_enemigo()
+		sistema.anotar_registro("fallo de segmentación en %s" % proceso)
 
 ## Ha caído una bola pero quedan otras. NO SUENA COMO UN DRENAJE, y esa es toda
 ## la gracia: el sonido de drenar es el que dice "has perdido el turno", y aquí
@@ -878,6 +891,14 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 			_sonido.reproducir("rampa_fuerte")
 			impactos.onda(punto, C_FUEGO, 1.4)
 			impactos.chispas(punto, Vector2.DOWN, C_FUEGO, 1.2)
+			# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): el cañón abre un cuadro de
+			# error que se cierra solo. Es el golpe gordo de la mesa, así que es el
+			# único que se gana un mueble nuevo en pantalla. POR NOMBRE, no por
+			# premio: la subida a la isla de la planta alta paga `DANO_FUERTE`
+			# igual que él, y es la trampa del rótulo indexado por premio de
+			# `CLAUDE.md` — el error del cañón saltaba sin haber tocado el cañón.
+			if cascara != null and r.nombre == "canon":
+				cascara.mostrar_error(ERROR_CANON)
 		Rampa.Premio.MULTIPLICADOR:
 			impactos.onda(punto, C_ORO_CLARO, 1.1)
 		_:
@@ -933,6 +954,10 @@ func _al_empezar_descarga(punto: Vector2, segundos: float) -> void:
 	_carga_armada = false
 	_sonido.reproducir("rampa_fuerte")
 	impactos.onda(punto, C_ORO_CLARO, 1.6)
+	# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8) y la barra de tareas parpadea
+	# mientras dura la descarga, pero NO se le avisa desde aquí: `NodoCascara`
+	# pregunta a `mesa.descarga_restante` cada fotograma, que es lo único que
+	# sabe cuándo se corta una descarga antes de agotarse.
 
 func _al_terminar_descarga() -> void:
 	_descarga = 0.0
@@ -1009,8 +1034,21 @@ func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 	# el sonido de subir de tramo es un premio y sonaría a burla.
 	# Y sube de tono con el tramo: x2, x3 y x4 son el mismo arpegio cada vez
 	# más agudo, así que el oído sabe por dónde va sin mirar el número.
-	if golpes > 0:
+	#
+	# SOLO CUANDO SUBE, comparado con el último tramo que se vio. El guardián de
+	# antes era `golpes > 0`, que vale para el drenaje normal —los golpes caen a
+	# cero— y no para el drenaje con una reliquia que conserva el combo (Nudo
+	# corredizo, el cascabel de Runas): ahí los golpes siguen por encima de cero,
+	# el tramo se queda o BAJA, y sonaba el arpegio de premio y botaban los
+	# iconos en cada drenaje. Lo cazó la revisión de la tanda 0n.
+	var sube := golpes > 0 and multiplicador > _ultimo_tramo
+	_ultimo_tramo = multiplicador
+	if sube:
 		_sonido.reproducir("combo", _tono_combo(multiplicador))
+		# LA CÁSCARA REACCIONA (`PROPÓSITO.md` §8): los iconos del escritorio dan
+		# un salto, con el mismo guardián que el sonido.
+		if cascara != null:
+			cascara.pulsar_iconos()
 	if multiplicador > 1:
 		_sacudir(anim.sacudida_dano)
 
@@ -1019,6 +1057,9 @@ func _al_cambiar_combo(multiplicador: int, golpes: int) -> void:
 ## como "el mismo sonido desafinado", no como "más alto". x2 suena en su tono,
 ## x3 una tercera menor arriba, x4 una quinta.
 const TONO_COMBO := [1.0, 1.19, 1.50]
+## El tramo que se vio la última vez que cambió el combo. Es lo que distingue una
+## subida de un drenaje que conserva golpes.
+var _ultimo_tramo := 1
 
 func _tono_combo(multiplicador: int) -> float:
 	return TONO_COMBO[clampi(multiplicador - 2, 0, TONO_COMBO.size() - 1)]

@@ -26,10 +26,14 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **622/622** en Windows, con todo el repo delante. **Y desde la tanda 0m
-el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno, cada una
-con su momento, y dos buses con la música por debajo de los efectos. Lo único
-que falta de esa tanda es oírla — ver U1-U10.
+Batería **628/628** en la caja remota (Linux), con todo el repo delante. **Y desde la
+tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
+cada una con su momento, y dos buses con la música por debajo de los efectos.
+Lo único que falta de esa tanda es oírla — ver U1-U10.
+
+**Y DESDE LA TANDA 0n LA CÁSCARA REACCIONA A LA MESA** (`PROPÓSITO.md` §8):
+los cinco gestos baratos, mirados en captura y con seis arreglos — ver el
+apartado de abajo. Falta jugarlo: V1-V5.
 
 **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y `rampa_fallada` llevaban
 desde la 0h sin que nadie las escuchara.
@@ -72,6 +76,36 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## LA CÁSCARA REACCIONA A LA MESA (tanda 0n · 21-ago, mirada el 15-oct)
+
+Los cinco gestos de `PROPÓSITO.md` §8, en `NodoCascara`/`NodoSistema` y
+disparados desde `VistaMesa`: **los iconos botan** al subir de tramo (−2 y −1 px
+enteros, 0,24 s), **el cañón abre un cuadro de error**, **la barra de tareas
+parpadea** durante la descarga, **el drenaje escribe una línea** en
+`registro.log` y **la pestaña del enemigo** desaparece de la barra al matarlo.
+Se escribió el 21-ago en otra rama sin poder verlo; se trajo y **se miró en
+captura con Xvfb** el 15-oct. Tres cosas estaban rotas y están arregladas:
+
+- **El cuadro de error tapaba el nombre de una reliquia** y llevaba el texto
+  pegado al bisel. Ahora va en el hueco de la banda derecha entre `jugador.sys`
+  y `ayuda.hlp`, que está siempre vacío y cae del lado del cañón, con su texto
+  medido (`cabe_error`) y una prueba que impide que pise un panel.
+- **La barra seguía parpadeando después de cortarse la descarga** (al drenar, o
+  al empezar el combate siguiente), porque llevaba su propia cuenta atrás.
+  Ahora pregunta a `mesa.descarga_restante` cada fotograma, como la música.
+- "sesion" y "segmentacion" iban sin tilde. Y el nombre de proceso del enemigo
+  sale de una sola función (`NodoCascara.proceso_enemigo`) para el panel, la
+  pestaña y el registro.
+- Y una revisión adversarial del diff cazó tres más: **los iconos botaban, y
+  sonaba el arpegio del combo, al DRENAR** con una reliquia que conserva el combo
+  (el guardián era `golpes > 0`, ahora es "el tramo sube"); **el cuadro del cañón
+  saltaba también al coronar la subida a la isla**, que paga igual (ahora va por
+  nombre de rampa); y **el parpadeo se quedaba fijo en oro** con la mesa
+  congelada (ruleta, ventana), y su periodo de 0,12 s no dividía a 60.
+
+Duraciones en `ParametrosAnimacion` (`pulso_iconos_duracion`, `error_duracion`,
+`parpadeo_barra_periodo`). **Sin jugar: preguntas V1-V5.**
 
 ## POR QUÉ NINGÚN BUCLE ACABA DE CONVENCER (21-ago)
 
@@ -1959,6 +1993,25 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
+
+**LO DE LA TANDA 0n (la cáscara reacciona a la mesa).** Mirado en captura, sin
+jugar. Para verlo sin esperar a la suerte: un cañón (la boca de la derecha), una
+descarga (llenar la barra de carga y completar otra rampa) y un drenaje.
+
+**V1.** El bote de los iconos al subir de tramo, ¿se ve de reojo o es demasiado
+sutil? Son 2 px y luego 1, durante 0,24 s (`pulso_iconos_duracion`).
+**V2.** El cuadro de error del cañón sale ahora en el hueco de la DERECHA, entre
+`jugador.sys` y `ayuda.hlp` (en la izquierda tapaba una reliquia). ¿Se lee como
+un error que salta, o como un cuarto panel? ¿Dan tiempo los 1,6 s
+(`error_duracion`) con la vista en la bola?
+**V3.** El parpadeo de la barra de tareas durante la descarga, ¿se nota, o
+compite con la barra de la mesa que parpadea a la vez?
+**V4.** El registro en vivo (Inicio → registro, durante un combate), ¿se lee
+bien debajo de los ficheros de lore, o hace falta separarlo más?
+**V5.** La pestaña del enemigo en la barra de tareas, ¿ayuda a leer que hay un
+combate corriendo, o es ruido que nadie mira ahí abajo? Ojo, que se llama
+`.exe` también para un élite o un jefe, igual que su panel; el mapa los llama
+`.dll` y `.sys`.
 
 **LO DE ESTA SESIÓN (tanda 0m, la música). NADA DE ESTO SE HA OÍDO, así que la
 lista entera es de oreja y no hay ninguna medida detrás que la respalde.**

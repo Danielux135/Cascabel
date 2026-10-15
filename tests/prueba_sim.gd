@@ -3861,7 +3861,37 @@ func _prueba_regiones_clic() -> void:
 				% [id_e, s._proceso_de(id_e), esperado])
 	_comprobar("la papelera escribe el NOMBRE del enemigo, no su clave",
 		procesos_malos.is_empty(), str(procesos_malos))
+
+	# EL REGISTRO EN VIVO de la tanda 0n (`PROPÓSITO.md` §8): una cola que se lee
+	# de reojo, no un archivo. Si dejara de recortarse, cada drenaje de un run de
+	# cuarenta minutos sería una línea más en memoria y en la ventana.
+	for i in NodoSistema.MAX_LINEAS_REGISTRO + 3:
+		s.anotar_registro("linea %d" % i)
+	_comprobar("el registro en vivo se queda en sus ultimas lineas, la nueva al final",
+		s.lineas_registro.size() == NodoSistema.MAX_LINEAS_REGISTRO
+			and s.lineas_registro.back().ends_with(
+				"linea %d" % (NodoSistema.MAX_LINEAS_REGISTRO + 2)),
+		str(s.lineas_registro))
 	s.free()
+
+	# LA PESTAÑA DEL ENEMIGO en la barra de tareas (tanda 0n): un proceso más
+	# mientras dura el combate, que desaparece EN EL INSTANTE de matarlo. Lee la
+	# fase del combate en vez de llevar su propia cuenta, y eso es justo lo que
+	# hay que sujetar: con dos sitios contando, uno se queda desincronizado.
+	var run_p := Run.new(ParametrosRun.new(), ParametrosCombate.new(),
+		CatalogoEnemigos.cargar(), 7)
+	var c_p := Combate.new()
+	_comprobar("sin combate empezado no hay pestaña de enemigo",
+		not NodoCascara.pestana_enemigo_visible_en(c_p, run_p))
+	c_p.iniciar(Enemigo.new({"nombre": "Rata", "vida": 20, "ataque": 1}))
+	var viva_p := NodoCascara.pestana_enemigo_visible_en(c_p, run_p)
+	c_p.mesa.bola.en_carril = false
+	for _i in 4:
+		c_p.mesa.bumper_golpeado.emit(Vector2(200, 600), 300.0)
+	_comprobar("la pestaña del enemigo esta mientras vive y se va al matarlo",
+		viva_p and c_p.fase == Combate.Fase.VICTORIA
+			and not NodoCascara.pestana_enemigo_visible_en(c_p, run_p),
+		"fase %d" % c_p.fase)
 
 func _prueba_giradores() -> void:
 	var m := _nueva_mesa()
@@ -5587,6 +5617,24 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 				solapados.append("%s con %s" % [str(lista[i]), str(lista[j])])
 	_comprobar("los tres paneles caben en la banda sin solaparse",
 		solapados.is_empty(), str(solapados))
+
+	# EL CUADRO DE ERROR DEL CAÑÓN (`PROPÓSITO.md` §8, tanda 0n). Se escribió en
+	# la banda izquierda y en captura tapaba el nombre de una reliquia; ahora va
+	# en el hueco entre `jugador.sys` y `ayuda.hlp`. Lo que no puede pasar es lo
+	# mismo con otro mueble: que pise un panel, la mesa o la barra de tareas, o
+	# que su texto no quepa y el `width` de `draw_string` lo recorte sin avisar.
+	var err := cascara.caja_error()
+	var pisa: Array[String] = []
+	for nombre in paneles:
+		if err.intersects(paneles[nombre]):
+			pisa.append(str(nombre))
+	if err.intersects(ventana) or err.end.y > der.end.y or not der.encloses(err):
+		pisa.append("fuera de la banda")
+	_comprobar("el cuadro de error del canon no pisa ningun panel ni la mesa",
+		pisa.is_empty() and err.size.y > 0.0, "%s — %s" % [str(err), str(pisa)])
+	_comprobar("y su mensaje cabe entero, sin que el width lo recorte",
+		cascara.cabe_error(VistaMesa.ERROR_CANON),
+		"hueco %s" % str(cascara.hueco_texto_error()))
 
 	# Y el enemigo tiene que caber ENTERO dentro del suyo. Un sprite de 96 px que
 	# se sale por abajo se come el nombre y la barra de vida, y eso no da error:
