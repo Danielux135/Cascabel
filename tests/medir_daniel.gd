@@ -78,7 +78,16 @@ var _ticks_total := 0
 ## se puede comparar un cambio de balance contra el de ayer.
 var _rng := RandomNumberGenerator.new()
 const MAX_BOLAS := 200
-const SEMILLAS := [13, 271, 4242, 90210, 31337]
+## LAS SEMILLAS DE LOS RUNS. Cinco por defecto, que es con lo que están medidas
+## todas las tablas viejas. Con `SEMILLAS=N` se añaden hasta N (siempre las
+## mismas), y hace falta para comparar dos versiones del juego: con cinco, el
+## ruido es del tamaño de lo que se mide. Medido el 15-oct: con las mismas 14
+## misiones, cambiar solo el ORDEN en que se sortean movía el daño por bola de
+## Daniel de 810 a 690, y el del perfil puntero de 1699 a 1126 —reordenar qué
+## reliquias salen ya es un 15-35 %—. Y el `_rng` de las velocidades de entrada
+## es uno para todo el proceso, así que una fila depende de las que se midieron
+## antes: con un filtro (`BUILDS`, `CASCABELES`) no sale el mismo número.
+var SEMILLAS: Array = [13, 271, 4242, 90210, 31337]
 
 ## Los dos números de Daniel, medidos en un run ganado entero. Todo lo de aquí
 ## se juzga contra ellos: si el modelo no los reproduce, el modelo miente.
@@ -105,6 +114,9 @@ const CANDIDATOS := [
 
 func _initialize() -> void:
 	_rng.seed = 20260820
+	var n_semillas := int(OS.get_environment("SEMILLAS"))
+	for i in range(SEMILLAS.size(), n_semillas):
+		SEMILLAS.append(1000 + i * 7919)
 	var enemigos := CatalogoEnemigos.cargar()
 	var reliquias := CatalogoReliquias.cargar()
 	var misiones := CatalogoMisiones.cargar()
