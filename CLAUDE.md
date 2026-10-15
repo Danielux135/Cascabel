@@ -871,6 +871,26 @@ son los tres que hay hoy. Las herramientas: `Bola.de_lanzamiento`,
 decidido:** la órbita del lanzamiento sigue pagando su tramo y contando para las
 misiones, porque eso es la decisión abierta del tramo gratis.
 
+### Cinco semillas medían una tirada con suerte (oct-2026)
+
+Todas las tablas de `medir_daniel.gd` se sacaron con 5 semillas, y la referencia
+del balance era "838 de daño por bola, 4 de 5 runs acabados". **Con 30 semillas,
+el mismo juego da 672 y 13 de 30.** Las cinco de siempre caían del lado bueno.
+
+Lo destapó un efecto que no cuadraba: con las mismas 14 misiones, cambiar solo el
+ORDEN en que se sortean movía el daño por bola de 810 a 690, y el de otro perfil
+de 1699 a 1126. Reordenar qué reliquias salen ya es un 15-35 %, o sea que con 5
+semillas **cualquier cambio que toque el azar del run sale "medido" aunque no haga
+nada**. Y el `_rng` de las velocidades de entrada es uno para todo el proceso:
+una fila depende de las que se midieron antes, y con un filtro no sale el mismo
+número.
+
+**La regla: para comparar dos versiones del juego, `SEMILLAS=30` como mínimo.**
+Si el efecto que se busca es más pequeño que lo que se mueve el número al
+reordenar el sorteo, con 5 semillas no se ha medido nada. Y la pregunta antes de
+fiarse de una diferencia es la misma que en "medir por la cara que no es": ¿qué
+pasa con este número si cambio algo que NO debería importar?
+
 ### Una señal que nadie escucha es un evento mudo, y no da error (ago-2026)
 
 `bola_cayo` y `rampa_fallada` se construyeron con el sistema de capas, se

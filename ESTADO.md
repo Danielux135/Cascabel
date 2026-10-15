@@ -31,9 +31,11 @@ tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
 
-**Y DESDE LA TANDA 0n LA CÁSCARA REACCIONA A LA MESA** (`PROPÓSITO.md` §8):
-los cinco gestos baratos, mirados en captura y con seis arreglos — ver el
-apartado de abajo. Falta jugarlo: V1-V5.
+**Y LA SESIÓN DEL 15-OCT CERRÓ CINCO TANDAS, NINGUNA JUGADA**: la cáscara
+reacciona a la mesa (0n), la ventana de recuperación de disco (0o), el medidor
+con varias bolas y la tabla de Caos, los seis comportamientos de enemigo de la
+Fase 6 y 28 misiones. Resumen en «Hecho» y la Fase 6 en su apartado, abajo;
+preguntas V, W, K, E y MI.
 
 **Y desde la tanda 0h2 caerse suena**: `bola_cayo` y `rampa_fallada` llevaban
 desde la 0h sin que nadie las escuchara.
@@ -47,7 +49,10 @@ preparación, con la cáscara elegida detrás.
 0k): 16621,1901 → **23563,4970**, 8,142 s → **18,351 s**. La tumba que todas las
 rampas que suben se puedan fallar, que lo pidió Fátima. Las dos referencias están
 escritas juntas en `tests/medir_capas.gd`, y el balance de verdad —el de
-`medir_daniel.gd`— no se ha movido: 838 de daño por bola contra 835.
+`medir_daniel.gd`— no se movió con ella: 838 de daño por bola contra 835. **Sí
+se ha movido el 15-oct**, con las misiones nuevas, y además salió que las 5
+semillas de siempre eran una tirada con suerte: con 30, la referencia es 672 y
+solo acaban 13 runs de 30. Ver «Mediciones».
 
 **Lo primero que hay que hacer, en este orden y antes de tocar nada:**
 
@@ -77,234 +82,73 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
-## CATORCE MISIONES MÁS, Y LA TELE YA NO LAS CORTA (15-oct)
+## FASE 6: QUIÉN LLEVA CADA COMPORTAMIENTO, Y ES UNA PROPUESTA (15-oct · pregunta E1)
 
-Con 14 misiones y tres por combate se veían casi todas en un run. Ahora son
-**28: 10 comunes, 10 raras y 8 arcanas**, solo con tiros que ya existen y
-ninguna de la planta alta. **Es una lista para revisar** (pregunta MI1). Las
-nuevas:
+Cada uno con sus números con nombre en `ParametrosCombate` (una fila del JSON
+puede pisarlos), **neutro exacto con la lista vacía** y sin gastar azar. El panel
+del enemigo los escribe a la izquierda del retrato y enciende el que actúa; cada
+uno tiene su texto flotante. Los tiros anulados (bloqueo, reflejo) pasan por un
+solo filtro, `Combate._filtrar_tiro`, y no cobran nada: ni daño, ni misión, ni
+premio de recorrido, ni celebración (el cañón bloqueado no abre el cuadro de
+error).
 
-| Rareza | Misiones |
-|---|---|
-| Comunes | Barrido, Mantenimiento, Tanteo, Desvío, Ronda |
-| Raras | Doble filo, Relevo (en orden), Mano firme (sin drenar), Ganzúa (en orden), Remate (las dos) |
-| Arcanas | Contrarreloj, Lanzadera (en orden y sin drenar), Sin red, Todo o nada (sin drenar) |
+**El bloqueo y el reflejo solo miran lo que el jugador apunta.** No cuentan el
+regreso de la caza, la órbita del lanzamiento (un lanzamiento a tope la engancha
+siempre: la de la bola servida y la de cada bola extra) ni los recorridos de la
+planta alta (pregunta E9). Contándolos, con la Bomba de procesos el Esqueleto te
+reflejaba la órbita del lanzamiento en cada bola. **Sigue así, a sabiendas:** un
+tiro anulado carga la barra al entrar y gasta la descarga armada al salir,
+porque eso lo decide la mesa antes que el combate.
 
-Las pruebas nuevas leen el JSON crudo y sujetan lo que no da error: claves,
-rarezas y tiros que existen (una rareza mal escrita caía a común sin avisar),
-que todas caben en la tele, **la regla de `DISEÑO.md` §10** (una común no pide
-control; una rara, una cosa entre tiro difícil, orden o sin drenar; una arcana,
-dos), que en orden no se regala un banco detrás de un target, y **que todas se
-pueden completar contra todos los enemigos**, también la Calavera que bloquea y
-el Esqueleto que refleja.
+**Mirados en captura, los seis** (Xvfb). El rótulo va arriba a la izquierda del
+panel del enemigo, en naranja cuando actúa y en amarillo cuando no, con una línea
+de detalle debajo: "BLOQUEA / CAÑÓN" y "BLOQUEA / en 8 s", "REFLEJA / RETORNO",
+"SE CURA / curándose" con la barra de vida en verde, "CASTIGA / combo x3",
+"BLINDAJE / 2 capas" y "ACELERA / en la caza". Ninguno se corta ni pisa el
+retrato. Los avisos de la mesa ("BLOQUEADO", "CAÑÓN ABIERTO", "REFLEJADO", "CAPA
+ROTA") salen a 8 px junto a la bola y se leen. El "de x4 a x3" del Goblin caía
+encima de la tele y tapaba la misión: subió por encima del marco, y en la caza,
+donde la tele no está en plano, sale junto a la bola. Dos cosas que se ven y no
+son de esta tanda: "CAÑÓN" lleva la Ó comprimida (la decisión abierta de la Ó
+mayúscula), y los retratos siguen siendo los provisionales (la Gárgola es una
+rata).
 
-**Y mirándolas en captura salieron tres fallos de la tele, que ya estaban en
-las misiones de antes:** "SIN DRENAR" se pintaba ENCIMA del nombre de todas las
-que lo llevan (ahora va en la fila de arriba, centrado); "El reloj es mío" salía
-"El reloj es mí" (el nombre baja a 8 px cuando no cabe a 16); y el texto de
-Gran vuelta perdía su tercera línea (ahora caben tres).
-
-**Ojo, que esto mueve el modelo:** `medir_daniel.gd` carga el catálogo de
-misiones, y con 28 el perfil de Daniel completa otras y gana otras reliquias.
-Las medidas de la Fase 6 de esta sesión están sacadas con las 14 de antes.
-
-**La revisión cazó tres regalos, y dos eran de antes de las misiones nuevas:**
-el regreso de la caza contaba como retorno (es la mesa, no tú); el banco que
-sale del mismo golpe que el target que cierra una misión contaba ya para la
-siguiente; y la racha del Esqueleto cruzaba de una bola a otra, así que te
-reflejaba la órbita del lanzamiento. Arreglados los tres, con prueba, y con
-otras dos que miran `orden` y `sin_drenar` por el otro lado: sin la condición,
-el paso cuenta y drenar no borra.
-
-## `medir_daniel.gd` SABE JUGAR CON VARIAS BOLAS (tarea 3 · 15-oct)
-
-Era el requisito del rebalance (1b): la multibola no estaba medida. Ahora hay dos
-modos, con `EXTRA`:
-
-- **`fisica`, por defecto: el de siempre.** La bola extra vuela con la física de
-  la mesa y las palas quietas, y la retira `_drenar` al acabar el perfil. **Con
-  una bola da exactamente los mismos números que antes**: comprobado con un diff
-  de la salida entera de `SOLO=calibrar`, con todas las reliquias (838 · 127 s ·
-  96 % · 4/5) y con `SIN_BOLAS_EXTRA=1`, que quita las tres que sueltan bolas
-  (852 · 124 s). Por eso es el de defecto: cambiarlo movería las tablas viejas.
-- **`jugada`: las extras se juegan.** Las juega el maniquí de `medir_capas.gd`
-  con la física de la mesa, en las dos plantas, y SOBREVIVEN a la principal:
-  cuando se acaba el perfil, la principal se cae por `bola_perdida` y el turno
-  sigue hasta que la mesa emite `bola_drenada` con la última. Con
-  `SIN_BOLAS_EXTRA=1` da también 852 · 124 s, o sea que con una bola es el mismo
-  camino. **Ojo: el maniquí no es Daniel**, y la principal se aparca en el
-  platillo mientras hay extras, así que ellas no pueden cobrarlo.
-
-`Mesa.rng` se siembra ya por combate (antes, con extras, el modelo no era
-repetible), y `SOLO=caos` mide doce builds forzadas desde el principio del run,
-con un combate SECO contra un saco al lado para separar la build de lo que le
-hace a la ruleta.
-
-**LA TABLA DE CAOS**, medida con el juego de ANTES de la Fase 6 y las 14 misiones
-de entonces (`SOLO=caos`, 5 semillas; "seco" son 20 bolas contra un saco con solo
-la build). Daño por bola · segundos por combate · vida al acabar · runs acabados:
-
-| Build | `fisica` | `jugada` | Seco (f → j) | Multi (j) |
-|---|---|---|---|---|
-| ninguna | 818 · 129 s · 95 % · 4/5 | igual | 439 | 0 % |
-| **Bomba de procesos** | 1105 · 94 s · 97 % · 4/5 | **2642 · 50 s · 99 % · 5/5** | 652 → 1658 | 66 % |
-| Bifurcación | 901 · 119 s · 98 % · 4/5 | 1242 · 103 s · 74 % · 4/5 | 557 → 805 | 14 % |
-| Proceso hijo | 832 · 128 s · 96 % · 4/5 | 811 · 129 s · 97 % · 4/5 | 477 → 431 | 0 % |
-| Condición de carrera | 846 · 125 s · 97 % · 4/5 | 851 · 123 s · 97 % · 4/5 | 460 → 458 | 0 % |
-| Hilo único | 819 · 125 s · 80 % · 3/5 | 846 · 123 s · 82 % · 3/5 | 532 → 495 | 0 % |
-| **Bomba + carrera** | 1247 · 83 s · 98 % · 4/5 | **3139 · 41 s · 100 % · 5/5** | 738 → 2652 | 61 % |
-| Bifurcación + carrera | 961 · 112 s · 98 % · 4/5 | 1406 · 88 s · 99 % · 4/5 | 643 → 1525 | 13 % |
-| Bomba + hilo | 1146 · 92 s · 89 % · 3/5 | 2541 · 50 s · 84 % · 5/5 | 725 → 1894 | 67 % |
-| **Las cinco** | 1436 · 73 s · 71 % · 5/5 | **3858 · 34 s · 98 % · 5/5** | 1071 → 5207 | 73 % |
-| ninguna, perfil puntero | 1586 · 66 s · 89 % · 5/5 | 1675 · 66 s · 89 % · 5/5 | 667 → 751 | 3 % |
-| Proceso hijo, puntero | 1797 · 58 s · 95 % · 5/5 | 2225 · 56 s · 98 % · 5/5 | 810 → 812 | 16 % |
-
-Lo que dice, sin tocar un número:
-
-- **El eje de Caos jugado es lo más fuerte del juego, y el modelo de antes lo
-  tapaba.** Bomba de procesos sola triplica el daño por bola y deja el combate en
-  el 39 % de lo que dura; con las cinco, casi ×5 y combates de 34 s. Y como un
-  combate corto come menos relojes, **acaba con MÁS vida que sin build** — es la
-  trampa de "más daño hace el juego más fácil" con números.
-- **Lo que separa `fisica` de `jugada` es jugar la extra**, no soltarla: con las
-  palas quietas, la extra de la Bomba cobra 652 en seco; jugada, 1658. Las tablas
-  viejas con multibola (todas en `fisica`) se quedaban cortas por ahí.
-- **Proceso hijo y Condición de carrera solas no hacen nada con el perfil de
-  Daniel**: él no cierra bancos, que es lo que dispara Proceso hijo, y Carrera
-  necesita dos bolas. Con el perfil `puntero` (un banco por bola) Proceso hijo sí
-  sube, +33 % jugada.
-- **Hilo único cuesta vida y no da nada a cambio** en este modelo (80 % y 3/5 en
-  los dos modos).
-- **Bifurcación jugada acaba con el 74 % de vida** contra el 98 % en `fisica`, con
-  el mismo 4/5. No sé por qué y no lo he perseguido: el maniquí que juega la
-  extra no es Daniel, y una sola semilla que se tuerza mueve esa columna.
-
-**El maniquí no es Daniel** (ver arriba): lo que mide `jugada` es lo que da la
-mesa cuando alguien aporrea las palas con la extra, no lo que haría él. Es la
-otra punta de la horquilla, y la verdad está entre las dos columnas (pregunta K1).
-
-## FASE 6: LOS ENEMIGOS HACEN COSAS (15-oct, en curso)
-
-`DISEÑO.md` §11: *"uno con más vida no es un enemigo nuevo; cada uno altera qué
-tiro compensa"*. Va en `sim/comportamientos.gd`, con la forma de `Estados`: filas
-`"comportamientos": [{"id": ...}]` en `data/enemigos.json`, números con nombre en
-`ParametrosCombate` (una fila puede pisarlos con la clave corta), estado que se
-rehace en cada `iniciar` y **neutro exacto con la lista vacía**. No gasta azar.
-El panel del enemigo los escribe a la izquierda del retrato, y se enciende el que
-está actuando. Uno por commit.
-
-**QUIÉN LLEVA CADA UNO ES UNA PROPUESTA** (pregunta E1). El acto I va sin
-ninguno, a propósito: es donde se aprende la mesa. `DISEÑO.md` §12 pone los
-enemigos que responden desde el acto II.
-
-| Enemigo | Acto | Comportamiento | Estado |
+| Enemigo | Acto | Comportamiento | Por qué ahí |
 |---|---|---|---|
-| Calavera llameante | II | **bloquea el cañón** hasta que le pegas por otro sitio | hecho |
-| Esqueleto | II | **refleja si repites recorrido** (te devuelve su ataque) | hecho |
-| Cultista | II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
-| Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
-| Armadura vacía | III | **blindaje** (3 capas; lo flojo entra a ¼; el cañón rompe) | hecho |
-| Gárgola | III | **acelera su reloj al cazar** (×1,6) | hecho |
+| Calavera llameante | II | **bloquea el cañón** hasta que le pegas por otro sitio; se cierra otra vez a los 8 s | el fuego "cierra" el tiro gordo |
+| Esqueleto | II | **refleja el recorrido repetido**: el segundo seguido no pega y te devuelve su ataque | obliga a variar; el panel dice cuál no repetir |
+| Cultista | II | **se cura** el 1 %/s si pasan 6 s sin tocarle | el acto II es donde se empieza a jugar "seguro" en la cuna |
+| Goblin bruto | III | **castiga el combo**: su reloj con x3 o más pega +50 %/tramo y te roba uno | obliga a gastar el combo antes del 3-2-1 |
+| Armadura vacía | III | **blindaje**: 3 capas; lo que no llega al cañón entra a ¼ | la evidente; mata al build de racimo, el veneno la atraviesa |
+| Gárgola | III | **acelera su reloj ×1,6 mientras cazas** | vigila desde arriba; cazar al final del run sale caro |
 
-- **Calavera llameante, bloquea el cañón.** Su fuego lo cierra: meterlo no cobra
-  nada ("BLOQUEADO") hasta que le pegas por otro sitio —un target, un banco u
-  otro recorrido; el racimo no, que lo abriría solo—, y entonces se abre
-  ("CAÑÓN ABIERTO") y se vuelve a cerrar a los 8 s de juego. El panel dice qué
-  está cerrado o cuánto falta para que se cierre. Solo se puede bloquear un
-  recorrido, nunca un target (haría imposible un banco), y nunca el regreso de
-  la caza. **El modelo no lo ve**: el perfil de Daniel no mete cañones.
-- **Esqueleto, refleja.** Si metes el mismo recorrido (órbita, retorno, cañón o
-  platillo) dos veces seguidas, el segundo no le hace nada —ni daño, ni misión,
-  ni premio de recorrido— y te devuelve su ataque, y sigue así mientras no
-  cambies. El panel dice CUÁL no repetir ("REFLEJA / RETORNO", en rojo), y al
-  reflejar sale "REFLEJADO". Solo se reflejan recorridos, pero la racha la rompe
-  cualquier tiro apuntado: "cañón, banco, cañón" no es repetir. El racimo no
-  cuenta, y el regreso de la caza nunca, que no es un tiro tuyo. Los tiros anulados pasan todos por
-  un filtro común al principio de cada gancho, `Combate._filtrar_tiro`.
-- **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
-  el 1 % de su vida cada segundo hasta que le vuelvas a dar. Va en el acto II,
-  que es donde un run empieza a jugarse "seguro" aguantando la bola en la cuna,
-  y es lo que este comportamiento prohíbe. La espera empieza de cero con cada
-  bola servida. Solo cuenta con la bola en
-  juego, nunca en las pausas. **El modelo tampoco lo ve**: reparte los golpes
-  cada 0,86 s, así que nunca pasan seis sin tocarle.
-- **Goblin bruto, castiga el combo.** Se ensaña con el que acumula: si su reloj
-  pega con el combo en x3 o más, pega un 50 % más por tramo y te deja en el
-  tramo de abajo. El daño es lo de menos; lo que pica es perder el x4, y obliga a
-  gastarlo antes del 3-2-1. Sale escrito "de x4 a x3" encima de la tele, y el
-  rótulo se enciende en cuanto estás en el umbral. Los tramos que se roban son
-  los de verdad, con las reliquias que los mueven.
-- **Armadura vacía, blindaje.** Es la evidente. Tres capas: mientras le quede
-  una, lo que pegue por debajo del cañón (el umbral es una fracción de
-  `dano_rampa_fuerte`, no un número) entra a un cuarto, y lo que llegue rompe
-  una capa y entra entero. Regenera una cada 10 s de juego. El racimo, que es lo
-  que alimenta el combo, pega a un cuarto: contra ella hay que buscar el cañón o
-  subir el multiplicador para que un retorno llegue. **El veneno lo atraviesa**,
-  porque no es un golpe, y eso la deja como el enemigo contra el que el veneno
-  brilla (pregunta E6).
-- **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y va en el
-  último acto: subir a cazar al final del run es lo más tentador y contra ella
-  sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
-- **La segunda revisión (12 hallazgos, 11 confirmados).** Lo que la mesa hace
-  sola NO cuenta para el bloqueo ni el reflejo: la órbita del lanzamiento (la de
-  la bola servida y la de cada bola extra) y los recorridos de la planta alta.
-  Contándolos, con la Bomba de procesos el Esqueleto te reflejaba la órbita del
-  lanzamiento en cada bola, y arriba los túneles se repetían solos rebotando en
-  los bumpers. El umbral rompe la racha y abre el cañón; el cañón anulado ya no
-  se celebra con el cuadro de error; el regreso no cobra el premio de recorrido;
-  el "de x4 a x3" sale junto a la bola si la tele no está en plano; y el reloj
-  que te mata cierra el paso (antes un tic de veneno podía dar VICTORIA después
-  de DERROTA). Y seis pruebas reforzadas que pasaban con el código roto.
-  **Sigue así, a sabiendas:** un tiro anulado carga la barra al entrar y gasta la
-  descarga armada al salir, porque eso lo decide la mesa antes que el combate.
-- **Ojo con los jefes, que estaba mal escrito:** el jefe de cada acto NO es el
-  enemigo más duro, como decía «Abierto», sino uno **al azar** de los tres del
-  acto, con ×1,5 de vida y "mayor" en el nombre (`Mapa._enemigo`). Así que
-  cualquiera de los tres de un acto puede tocar de jefe, con su comportamiento.
+**El acto I va sin ninguno, a propósito:** es donde se aprende la mesa
+(`DISEÑO.md` §12 pone los que responden desde el acto II). Y **el jefe de cada
+acto no es el enemigo más duro**, como decía «Abierto», sino uno de los tres al
+azar con ×1,5 de vida (`Mapa._enemigo`): cualquiera puede tocar de jefe, con su
+comportamiento.
 
-## LA VENTANA DE RECUPERACIÓN DE DISCO DURANTE LA CAZA (tanda 0o · 15-oct)
+**Cómo cambia la banda de dificultad**, con las 14 misiones de antes en las dos
+filas para que lo único que cambie sea la Fase 6, y con **30 semillas**
+(`SEMILLAS=30 SOLO=calibrar`, perfil de Daniel), porque con las 5 de siempre el
+ruido es del tamaño del efecto (ver «Mediciones»):
 
-`CAZA.md` §3.7, decidido por Fátima. Al subir a cazar se abre encima de
-`ayuda.hlp`, ocupando justo su sitio, una ventana "recuperación de disco" con el
-icono del disco, "N % completado" (y "defectuosos: N", que son las salvadas) y
-una barra que es el **tiempo de caza consumido**. No congela la mesa y **no tiene estado propio**:
-`NodoSistema` pregunta a `mesa.en_caza` cada fotograma, así que sigue abierta
-con el salvabolas y se cierra sola al acabar la caza o al servirse bola nueva.
-Ocho pruebas nuevas, con una mesa de verdad recorriendo las tres puertas.
-Mirada en captura con F1+F3. Una revisión adversarial cazó que se comía el canto
-del cuadro de error del cañón, que sí puede salir en la caza (una bola extra de
-abajo); ahora no sube al hueco de encima de `ayuda.hlp`, y hay prueba. **Falta** que el fichero recuperado aparezca en
-`RECUPERADO/`, que depende de la captura (0k). Preguntas W1-W4.
+| | d/bola | s/combate | vida al acabar | runs acabados |
+|---|---|---|---|---|
+| Sin comportamientos | 672 | 145 | 92 % | 13/30 |
+| **Con los seis** | **663** | **146** | **90 %** | **13/30** |
 
-## LA CÁSCARA REACCIONA A LA MESA (tanda 0n · 21-ago, mirada el 15-oct)
+**En el modelo, la Fase 6 casi no se nota**: un 1 % menos de daño por bola, dos
+puntos menos de vida y los mismos runs acabados. El barrido de 5 semillas dice lo
+mismo en sus nueve filas (de 2 a 8 puntos menos de vida, más cuanto más ataque).
+Y no es que los comportamientos no hagan nada: es que **el modelo solo ve tres de
+seis** (ver abajo). La tabla no se ha tocado para compensar; eso es el rebalance
+(1b).
 
-Los cinco gestos de `PROPÓSITO.md` §8, en `NodoCascara`/`NodoSistema` y
-disparados desde `VistaMesa`: **los iconos botan** al subir de tramo (−2 y −1 px
-enteros, 0,24 s), **el cañón abre un cuadro de error**, **la barra de tareas
-parpadea** durante la descarga, **el drenaje escribe una línea** en
-`registro.log` y **la pestaña del enemigo** desaparece de la barra al matarlo.
-Se escribió el 21-ago en otra rama sin poder verlo; se trajo y **se miró en
-captura con Xvfb** el 15-oct. Tres cosas estaban rotas y están arregladas:
-
-- **El cuadro de error tapaba el nombre de una reliquia** y llevaba el texto
-  pegado al bisel. Ahora va en el hueco de la banda derecha entre `jugador.sys`
-  y `ayuda.hlp`, que está siempre vacío y cae del lado del cañón, con su texto
-  medido (`cabe_error`) y una prueba que impide que pise un panel.
-- **La barra seguía parpadeando después de cortarse la descarga** (al drenar, o
-  al empezar el combate siguiente), porque llevaba su propia cuenta atrás.
-  Ahora pregunta a `mesa.descarga_restante` cada fotograma, como la música.
-- "sesion" y "segmentacion" iban sin tilde. Y el nombre de proceso del enemigo
-  sale de una sola función (`NodoCascara.proceso_enemigo`) para el panel, la
-  pestaña y el registro.
-- Y una revisión adversarial del diff cazó tres más: **los iconos botaban, y
-  sonaba el arpegio del combo, al DRENAR** con una reliquia que conserva el combo
-  (el guardián era `golpes > 0`, ahora es "el tramo sube"); **el cuadro del cañón
-  saltaba también al coronar la subida a la isla**, que paga igual (ahora va por
-  nombre de rampa); y **el parpadeo se quedaba fijo en oro** con la mesa
-  congelada (ruleta, ventana), y su periodo de 0,12 s no dividía a 60.
-
-Duraciones en `ParametrosAnimacion` (`pulso_iconos_duracion`, `error_duracion`,
-`parpadeo_barra_periodo`). **Sin jugar: preguntas V1-V5.**
+**Lo que el modelo NO ve, y por eso esa medida se queda corta:** el perfil de
+Daniel no mete cañones (la Calavera no le cierra nada), reparte los golpes cada
+0,86 s (el Cultista nunca llega a curarse) y no simula la caza (la Gárgola no
+existe para él). Lo que mide es la Armadura, el Goblin y el Esqueleto.
 
 ## POR QUÉ NINGÚN BUCLE ACABA DE CONVENCER (21-ago)
 
@@ -2000,6 +1844,32 @@ intención.
 
 ## Hecho
 
+- **LA SESIÓN DEL 15-OCT, cinco tandas y NINGUNA JUGADA** (en la nube, sin
+  supervisión; batería de 623 a **715/715** en Linux). Cada una pasó una revisión
+  adversarial, y lo que cazó está arreglado con prueba comprobada fallando sin
+  su arreglo. **Van encadenadas**: las pruebas de las misiones juegan contra los
+  comportamientos de la Fase 6, así que revertir la Fase 6 obliga a tocarlas.
+  - **0n · la cáscara reacciona a la mesa** (`PROPÓSITO.md` §8): iconos que botan
+    al subir de tramo, cuadro de error al coronar el cañón, barra que parpadea en
+    la descarga, línea en `registro.log` al drenar y pestaña del enemigo que se va
+    al matarlo. Mirada en captura: seis cosas rotas, arregladas. **V1-V5.**
+  - **0o · la ventana de recuperación de disco** (`CAZA.md` §3.7): se abre encima
+    de `ayuda.hlp` al subir a cazar, sigue con el salvabolas y se cierra al
+    acabar; no tiene estado propio. Falta el fichero en `RECUPERADO/`, que va con
+    la captura (0k). **W1-W4.**
+  - **`medir_daniel.gd` juega con varias bolas**: `EXTRA=fisica` (el de siempre,
+    idéntico con una bola, comprobado con un diff de la salida entera) o
+    `EXTRA=jugada` (las extras las juega el maniquí). `SOLO=caos` mide doce
+    builds, y `SEMILLAS=N` mide con más de 5, que no bastan: tablas en
+    «Mediciones». **K1.**
+  - **Fase 6, los seis comportamientos** de `DISEÑO.md` §11: apartado propio,
+    arriba. **E1-E9.**
+  - **28 misiones en vez de 14**, solo con tiros que existen, y una prueba que las
+    completa todas contra todos los enemigos y comprueba que caben en la tele.
+    Mirándolas salieron tres fallos de la tele que ya estaban, y la revisión
+    cazó tres regalos (el regreso contaba como retorno, el banco del golpe que
+    cierra una misión contaba para la siguiente, y dos combates seguidos podían
+    repetir misión). **MI1-MI4.**
 - **EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` + `Reproductor`, con el
   candado de catálogo que impide que una hoja vuelva a quedarse sin cargar, y el
   retrato de 64 de la preparación donde se ve. La física, igual al decimal.
@@ -2187,22 +2057,26 @@ era verdad: los textos cortados de la cáscara y las dos averías de la cámara 
 encontró Fátima jugando, con la batería en verde encima de las dos.
 
 
-**Primero importar y luego la batería. En ese orden. Lo de la tanda 7 SÍ se ha
-ejecutado en una caja Linux (528/528), lo anterior no:**
+**Primero importar y luego la batería. En ese orden. Todo lo de hasta el 15-oct
+SÍ se ha ejecutado en una caja Linux (715/715, con `assets/`); en Windows la
+última vez fue 622/622, antes de esa sesión:**
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
 **LO DE LAS MISIONES NUEVAS.**
 
-**MI1.** **¿Valen las catorce nuevas?** Están en la tabla de arriba y en
-`data/misiones.json`, al final. Las que más pueden fallar: **Todo o nada** pide
-retorno, cañón y platillo en una sola bola, y si se hace imposible es la
-primera que sobra; y **Ronda** usa la órbita, que el lanzamiento a tope regala,
+**MI1.** **¿Valen las catorce nuevas?** Están al final de `data/misiones.json`:
+comunes Barrido, Mantenimiento, Tanteo, Desvío y Ronda; raras Doble filo, Relevo,
+Mano firme, Ganzúa y Remate; arcanas Contrarreloj, Lanzadera, Sin red y Todo o
+nada. Las que más pueden fallar: **Todo o nada** pide retorno, cañón y platillo
+en una sola bola, y si se hace imposible es la primera que sobra; y **Ronda** usa la órbita, que el lanzamiento a tope regala,
 así que depende de la decisión abierta del tramo gratis. **Remate y Lanzadera
 acababan en órbita y se cambiaron** por eso mismo: una misión en orden que
 termina en el tiro que regala el lanzamiento se cierra sirviendo la bola. Ahora
 Remate es banco y retorno, y Lanzadera retorno, cañón y retorno.
+**MI2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
+queda así, o se le busca un nombre de catorce letras?
 **MI3.** **La planta alta cuenta para las misiones**, y es una decisión que nadie
 ha tomado: la subida a la isla paga como el cañón, la órbita alta como la
 órbita y los túneles como retornos, así que cuentan como esos tiros. Y como
@@ -2210,8 +2084,13 @@ arriba hay salvabolas, **"sin drenar" no corre ningún riesgo mientras dura la
 caza**. ¿Está bien así —la caza como sitio para avanzar misiones— o los tiros de
 arriba no deberían contar? Lo que sí se quitó es el regreso: lo hace la mesa
 sola al acabarse el tiempo y contaba un retorno gratis en cada caza.
-**MI2.** **"El reloj es mío" sale a 8 px** porque a 16 no cabe en la tele. ¿Se
-queda así, o se le busca un nombre de catorce letras?
+**MI4.** **El perfil de Daniel del medidor no mete cañones, ni bancos, ni
+giradores**, y 12 de las 14 misiones nuevas piden uno de los tres (las cinco
+raras nuevas, todas). Con las 28, el modelo gana menos reliquias y acaba menos
+runs: con 30 semillas, de 13 a 9 de 30 (ver «Mediciones»). ¿Juegas así de
+verdad, o el perfil está desfasado? Si metes cañones y bancos, hay que dárselos
+al perfil antes del rebalance; si no, puede que a las misiones nuevas les sobre
+cañón y banco. Es la que más mueve el balance de esta lista.
 
 **LO DE CAOS (la tabla de la tarea 3).**
 
@@ -2247,6 +2126,9 @@ encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales
 cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas?
 ¿Y está bien que el veneno lo atraviese entero? Diales: `blindaje_capas`,
 `blindaje_umbral` (fracción del cañón), `blindaje_factor`, `blindaje_regenera`.
+**E7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
+solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
+lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.
 **E8.** **La Calavera cierra el cañón** hasta que le das por otro sitio. ¿Se
 entiende con el "BLOQUEADO" y el "CAÑÓN ABIERTO"? ¿Es el cañón el que tiene que
 cerrar, o otro recorrido? Una fila del JSON lo cambia (`"tiro"`); los diales son
@@ -2258,9 +2140,6 @@ Gárgola. ¿Bien así, o la Calavera y el Esqueleto también deberían mirar arr
 Por lo mismo, **el rearme del bloqueo no corre mientras cazas**: el umbral abre el
 cañón y lo encuentras abierto al bajar.
 Y la E8 tiene un matiz: el cañón cerrado sigue cargando la barra de descarga.
-**E7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
-solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
-lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.
 
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.
@@ -2546,6 +2425,7 @@ R1. **¿SE HACE PESADO UN COMBATE?** Ahora duran 137 s de media contra los 45 de
     antes: tres veces más. **Esta es LA pregunta de la sesión.** Si se hace
     pesado, no es que la vida esté alta: es que el enemigo es un saco, y lo que
     toca es la Fase 6, que ya está puesta la primera de "Siguiente" por medida.
+    **Y desde el 15-oct está hecha**: con ella dentro, ¿sigue pesando?
 R2. **¿En qué nodo mueres y con cuánta vida llegas al jefe de cada acto?** El
     modelo dice 3 de 5 runs acabados y el 71 % de vida al ganar. Si acabas
     siempre y por encima del 90 %, el modelo se ha vuelto a quedar corto.
@@ -2784,20 +2664,23 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    línea de tiro de cada pala con algo que merezca la pena arriba. **Y hasta
    que esto no esté, el 265 contra 1999 no se arregla tocando premios.**
 
-1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto) — **EN
-   CURSO**, ver el apartado de arriba: uno por commit. Lo que queda de esta
-   tanda es jugarla y contestar E1-E3.
+1. ~~**FASE 6: comportamientos de enemigo**~~ **LOS SEIS, HECHOS Y SIN JUGAR
+   (15-oct).** Lo que queda de esta tanda es jugarla y contestar E1-E9, sobre
+   todo E1: quién lleva cada uno es una propuesta. Los jefes con fases y los
+   sprites de `assets/jefes/` siguen sin hacer.
 1a. ~~**PONER LA BATERÍA EN VERDE**~~ **HECHA. 321/321.** Ver el detalle en
    "Abierto". Falta el commit.
-1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes,
-   **y ahora tiene que contar la multibola**: `medir_daniel.gd` juega con
-   perfiles sin física dentro, así que no sabe soltar bolas ni jugarlas y lo que
-   diga de una build de Caos no vale. Antes del rebalance hace falta que el
-   medidor sepa jugar con N bolas, o las cinco reliquias nuevas se calibran a
-   ojo. Lo de siempre:
-   con comportamientos dentro, `tests/medir_daniel.gd` vuelve a barrer y la
-   banda del 25-60 % pasa a ser alcanzable. Hasta entonces, tocar la tabla es
-   mover el mismo número por cuarta vez
+1b. **Rebalance, segunda pasada** (Opus, alto). **Ya tiene lo que le faltaba**:
+   los comportamientos están dentro y `medir_daniel.gd` sabe jugar con varias
+   bolas (`EXTRA=jugada`) y con más semillas (`SEMILLAS=30`, **que es como hay
+   que medir**: con las 5 de siempre el ruido es del tamaño del efecto). Lo que
+   dice está en «Mediciones»: el modelo es "todo o nada" —más de la mitad de los
+   runs mueren y los que llegan, llegan sobrados—, la Fase 6 casi no lo mueve y
+   el eje de Caos jugado es lo más fuerte del juego (K1). **Antes de tocar la
+   tabla hacen falta tres respuestas**: E1 (si cambia quién lleva qué, la medida
+   cambia con ello), K1 (con qué modo se mide la multibola) y MI4 (el perfil de
+   Daniel no mete cañones, bancos ni giradores, y 12 de las 14 misiones nuevas
+   los piden).
 2. ~~**Tanda de assets A: la hoja del espectro**~~ **HECHA sin gastar tanda:**
    la hoja del 13 de agosto ya lo había regenerado y nadie lo había medido.
    Sale de la lista de intocables de `limpiar.py`. Falta que Daniel lo mire (M3)
@@ -2895,6 +2778,73 @@ las tablas viejas siguen comparables con él. `tests/medir_daniel.gd` mide el RU
 con reliquias, y es el único que reproduce a Daniel: **para tocar balance, ese**.
 La tabla ya se hizo tres veces contra el jugador equivocado.
 
+### Caos, medido (tarea 3 · 15-oct)
+
+Medida con el juego de ANTES de la Fase 6 y las 14 misiones
+de entonces (`SOLO=caos`, 5 semillas; "seco" son 20 bolas contra un saco con solo
+la build). Daño por bola · segundos por combate · vida al acabar · runs acabados:
+
+| Build | `fisica` | `jugada` | Seco (f → j) | Multi (j) |
+|---|---|---|---|---|
+| ninguna | 818 · 129 s · 95 % · 4/5 | igual | 439 | 0 % |
+| **Bomba de procesos** | 1105 · 94 s · 97 % · 4/5 | **2642 · 50 s · 99 % · 5/5** | 652 → 1658 | 66 % |
+| Bifurcación | 901 · 119 s · 98 % · 4/5 | 1242 · 103 s · 74 % · 4/5 | 557 → 805 | 14 % |
+| Proceso hijo | 832 · 128 s · 96 % · 4/5 | 811 · 129 s · 97 % · 4/5 | 477 → 431 | 0 % |
+| Condición de carrera | 846 · 125 s · 97 % · 4/5 | 851 · 123 s · 97 % · 4/5 | 460 → 458 | 0 % |
+| Hilo único | 819 · 125 s · 80 % · 3/5 | 846 · 123 s · 82 % · 3/5 | 532 → 495 | 0 % |
+| **Bomba + carrera** | 1247 · 83 s · 98 % · 4/5 | **3139 · 41 s · 100 % · 5/5** | 738 → 2652 | 61 % |
+| Bifurcación + carrera | 961 · 112 s · 98 % · 4/5 | 1406 · 88 s · 99 % · 4/5 | 643 → 1525 | 13 % |
+| Bomba + hilo | 1146 · 92 s · 89 % · 3/5 | 2541 · 50 s · 84 % · 5/5 | 725 → 1894 | 67 % |
+| **Las cinco** | 1436 · 73 s · 71 % · 5/5 | **3858 · 34 s · 98 % · 5/5** | 1071 → 5207 | 73 % |
+| ninguna, perfil puntero | 1586 · 66 s · 89 % · 5/5 | 1675 · 66 s · 89 % · 5/5 | 667 → 751 | 3 % |
+| Proceso hijo, puntero | 1797 · 58 s · 95 % · 5/5 | 2225 · 56 s · 98 % · 5/5 | 810 → 812 | 16 % |
+
+**El eje de Caos jugado es lo más fuerte del juego**: Bomba de procesos triplica
+el daño por bola y, como un combate corto come menos relojes, acaba con MÁS vida
+que sin build. Lo que separa `fisica` de `jugada` es jugar la extra, no soltarla.
+Con el juego de hoy (Fase 6 y 28 misiones) sigue igual: Bomba 2598 · 51 s · 5/5
+contra 730 · 137 s · 2/5 sin nada. Son efectos de ×3 a ×5, muy por encima del
+ruido de 5 semillas. **El maniquí que juega las extras no es Daniel**: la verdad
+está entre las dos columnas (pregunta K1).
+
+### La Fase 6 y las 28 misiones, medidas (15-oct)
+
+**LO PRIMERO: CINCO SEMILLAS NO BASTAN.** Todas las tablas de `medir_daniel.gd` se
+han sacado con 5, y con 5 el ruido es del tamaño de lo que se mide: con las
+mismas 14 misiones, cambiar solo el ORDEN en que se sortean movía el daño por
+bola de Daniel de 810 a 690. Desde el 15-oct, `SEMILLAS=N` mide con más (sin la
+variable siguen siendo las 5, y las tablas viejas salen idénticas). **Con 30, la
+referencia de antes de la sesión no es 838 de daño por bola y 4 de 5 runs
+acabados, sino 672 y 13 de 30**: las cinco semillas de siempre eran una tirada
+con suerte.
+
+`SEMILLAS=30 SOLO=calibrar`, perfil de Daniel, `EXTRA=fisica`. Cada fila cambia
+una sola cosa respecto de la de arriba:
+
+| Juego | d/bola | s/combate | reliquias | vida al acabar | runs acabados |
+|---|---|---|---|---|---|
+| Antes de la sesión (14 misiones) | 672 | 145 | 6,9 | 92 % | 13/30 |
+| + la Fase 6 | 663 | 146 | 6,8 | 90 % | 13/30 |
+| + las 28 misiones | 615 | 152 | 6,2 | 88 % | 9/30 |
+| **+ sin repetir misión: el juego de hoy** | **614** | **147** | **5,9** | **91 %** | **9/30** |
+
+(El sorteo sin repetir, aparte: con la Fase 6 y las 14 misiones, 684 · 145 s ·
+14/30. No empeora nada.)
+
+- **El modelo no dice "demasiado fácil", dice "todo o nada"**: la vida al acabar
+  es la de los runs que ACABAN, y más de la mitad mueren. El rebalance no es
+  bajarle la vida al que gana, es acortar la distancia entre el run que muere y
+  el que llega entero.
+- **La Fase 6 casi no lo mueve** (un 1 %): el modelo solo ve tres de los seis.
+- **Las misiones nuevas sí** (−7 % de daño, de 13 a 9 runs acabados): 12 de las
+  14 piden cañón, banco o girador, que el perfil de Daniel no mete nunca. Con 28
+  misiones puede cerrar 2 de 10 raras y 1 de 8 arcanas; con 14 eran 2 de 5 y 1
+  de 4. Es del modelo tanto como del juego (pregunta MI4).
+
+**El perfil `puntero`** (el que mete cañones y bancos) pasa de 1675 a 1060 de daño
+por bola en la tabla de Caos de hoy, y **no es la Calavera**: con la Fase 6 y las
+14 misiones da 1699. Más fino que eso, con 5 semillas, no se puede atribuir.
+
 ## El pilar: la cuna ya alcanza
 
 `DISEÑO.md` §1 dice que la mesa es un menú de tiros, y el único tiro
@@ -2928,6 +2878,15 @@ de geometría fina y se hace jugando, no midiendo.
 
 ## Abierto
 
+- **Cabos sueltos de la sesión del 15-oct, a sabiendas.** (1) Un tiro que el
+  bloqueo o el reflejo anulan **carga la barra al entrar y gasta la descarga
+  armada al salir**: eso lo decide la mesa antes que el combate, y arreglarlo
+  obliga a que la mesa pregunte al combate. (2) **El modelo no ve a la Calavera,
+  al Cultista ni a la Gárgola**: el perfil de Daniel no mete cañones, golpea cada
+  0,86 s y no caza, así que la medida de la Fase 6 se queda corta. (3) En la
+  primera tabla de Caos, Bifurcación jugada acababa con el 74 % de vida contra el
+  98 % en `fisica`; con el juego de hoy sale al 98 %, así que probablemente era
+  una semilla torcida, pero no lo he perseguido.
 - **El racimo de abajo pasa de 3,09 a 3,08 golpes por entrada, y NO es una
   regresión.** La huella de 60 bolas jugadas enteras es idéntica al decimal
   (16621,1901), así que la física de abajo no se ha movido. Lo que se mueve es
@@ -3157,7 +3116,10 @@ de geometría fina y se hace jugando, no midiendo.
 - **Los perfiles del medidor son una aproximación.** Un perfil describe lo que
   produce una bola, no juega con las palas: no hay física dentro. Sirve para la
   economía del combate, que es lo que se estaba midiendo, pero no dice nada de
-  si un tiro es cazable ni de cómo se siente nada.
+  si un tiro es cazable ni de cómo se siente nada. Desde el 15-oct las bolas
+  EXTRA sí se pueden jugar con física (`EXTRA=jugada`), pero la principal sigue
+  siendo un perfil, **y el de Daniel no mete cañones, bancos ni giradores**: no
+  ve a la Calavera y no puede completar 12 de las 14 misiones nuevas (MI4).
 - **Los paneles de la derecha siguen encendidos durante la ruleta.** La mesa se
   apaga y la tele manda, pero el enemigo y las barras siguen a plena luz en su
   banda, que es otra capa. Es a propósito —así se ve contra quién estás—, pero
