@@ -117,6 +117,11 @@ var drenajes: int = 0
 ## banco uno detrás de otro, y si no, una misión que empieza por banco se abría
 ## con su primer paso ya hecho. Se apaga al principio de cada paso del combate.
 var _banco_del_mismo_golpe := false
+## Si el último tiro que pasó por `_filtrar_tiro` se anuló (bloqueado o
+## reflejado). Lo lee la vista en SU gancho de la misma señal —el combate se
+## conecta antes, en `_init`— para no celebrar un cañón que no ha pagado nada.
+## Se reescribe en cada tiro, así que no hay nada que apagar.
+var tiro_anulado := false
 
 # --------------------------------------------------------------- la medida
 #
@@ -293,9 +298,8 @@ func _apuntar(tiro: String) -> void:
 	else:
 		mision_cambiada.emit(m)
 
-## Los estados de un tiro SIN contarlo para la misión: para lo que pasa en la
-## mesa sin ser un tiro del jugador —el regreso de la caza— o que ya ha cobrado
-## otra misión en el mismo golpe.
+## Los estados de un tiro SIN contarlo para la misión: para el banco que sale
+## del mismo golpe que el target que acaba de cerrar una misión.
 func _solo_estados(tiro: String) -> void:
 	if _en_juego():
 		_aplicar_estados(tiro)
@@ -426,6 +430,12 @@ func avanzar(dt: float) -> void:
 	if _en_juego():
 		tiempo_jugado += dt
 		_avanzar_reloj(dt)
+		# SI EL RELOJ TE HA MATADO, EL PASO SE ACABA AQUÍ. Si no, un tic de veneno
+		# podía rematar al enemigo en el mismo fotograma y salían los dos finales,
+		# DERROTA y luego VICTORIA, cada uno con su `combate_terminado`. Era de
+		# antes, pero el Goblin bruto sube el golpe del reloj y lo hace más fácil.
+		if terminado():
+			return
 		# Los estados corren con el combate, no con la bola: el veneno sigue
 		# haciendo efecto mientras la bola está en una rampa o en el platillo.
 		var paso := estados.avanzar(dt)
@@ -699,21 +709,24 @@ func _tiro_de_rampa(r: Rampa) -> String:
 ## paga daño, ni misión, ni estados, ni el premio de recorrido —ni bola extra ni
 ## cura—. La bola completa la rampa igual, que es física; lo que no hay es cobro.
 ##
-## Devuelve si el tiro sigue. El regreso de la caza no se filtra nunca: lo hace
-## la mesa sola al acabarse el tiempo, no es un tiro tuyo, y reflejarlo te
-## pegaría por haber cazado.
-func _filtrar_tiro(tiro: String, punto: Vector2, nombre_rampa: String = "") -> bool:
-	if not _en_juego() or nombre_rampa == "regreso" or enemigo == null:
+## Devuelve si el tiro sigue. Con `exento` pasa sin mirarlo, y es para los
+## recorridos que no son un tiro tuyo o que no van con estos comportamientos
+## (`_rampa_exenta`).
+func _filtrar_tiro(tiro: String, punto: Vector2, exento: bool = false) -> bool:
+	tiro_anulado = false
+	if not _en_juego() or exento or enemigo == null:
 		return true
 	# (1) EL BLOQUEO, lo primero: un tiro cerrado no ha entrado, así que ni
 	# cuenta para el reflejo ni abre nada.
 	if conducta.bloquea(tiro):
+		tiro_anulado = true
 		recorrido_bloqueado.emit(tiro, punto)
 		return false
 	# (3) EL REFLEJO: el tiro repetido no hace nada y te devuelve su ataque. Por
 	# `_atacar`, que es por donde pasa todo golpe suyo —armadura de reliquias y
 	# derrota incluidas—, y sin marcarlo como de reloj: no lo castiga el combo.
 	if conducta.reflejar(tiro):
+		tiro_anulado = true
 		var dano := conducta.ataque_reflejo(enemigo.ataque)
 		golpe_reflejado.emit(punto, dano)
 		if dano > 0:
@@ -725,13 +738,35 @@ func _filtrar_tiro(tiro: String, punto: Vector2, nombre_rampa: String = "") -> b
 		recorrido_abierto.emit(abierto, punto)
 	return true
 
+## LOS RECORRIDOS QUE EL BLOQUEO Y EL REFLEJO NO MIRAN. Pagan lo de siempre;
+## lo único que no hacen es contar para estos dos comportamientos:
+##   · EL REGRESO de la caza, que lo hace la mesa sola al acabarse el tiempo:
+##     reflejarlo te pegaría por haber cazado.
+##   · LA ÓRBITA DEL LANZAMIENTO, de la bola servida o de una extra: un
+##     lanzamiento a tope la engancha siempre. Contándola, la bola extra de la
+##     Bomba de procesos daba su órbita sola y la tuya del lanzamiento salía
+##     REFLEJADA en cada bola, y contra la Calavera abría el cañón sin jugar.
+##   · LOS DE LA PLANTA ALTA. Los túneles pagan como retornos y la subida como
+##     el cañón, y con un bumper pegado a cada boca la bola repite túnel sola: el
+##     Esqueleto te quitaba vida en el bonus por recorridos que no apuntas, con
+##     un rótulo de "RETORNO" que arriba no existe. Si deben contar, es pregunta.
+func _rampa_exenta(r: Rampa, indice: int) -> bool:
+	return r.nombre == "regreso" or mesa.salida_de_lanzamiento \
+		or mesa.rampas_altas.has(indice)
+
 ## Las rampas pagan al SALIR, no al entrar: el premio es completarlas. Y cada
 ## una paga una cosa distinta, que es lo que las hace tres tiros de verdad.
 func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 	var r := mesa.rampas[indice] as Rampa
-	if not _filtrar_tiro(_tiro_de_rampa(r), punto, r.nombre):
+	if not _filtrar_tiro(_tiro_de_rampa(r), punto, _rampa_exenta(r, indice)):
 		return
-	_premio_de_recorrido()
+	# EL REGRESO NO ES UN TIRO TUYO: lo hace la mesa sola al acabarse la caza. No
+	# cobra el premio de recorrido de las reliquias (cura, combo, bola extra), ni
+	# cuenta para la misión, ni aplica estados. Lo único que conserva es su daño,
+	# que es el premio que trae la rampa.
+	var es_regreso := r.nombre == "regreso"
+	if not es_regreso:
+		_premio_de_recorrido()
 	var comun := bolsa.factor("factor_dano_recorrido")
 	match (mesa.rampas[indice] as Rampa).premio:
 		Rampa.Premio.CAZA:
@@ -748,12 +783,9 @@ func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 			_golpear(p.dano_rampa_fuerte, punto, true, true,
 				comun * bolsa.factor("factor_dano_canon"))
 		_:
-			# EL REGRESO NO CUENTA PARA LA MISIÓN. Lo hace la mesa sola al
-			# acabarse la caza, no es un tiro tuyo, y contando como retorno
-			# regalaba ese paso en cada caza. Sigue pagando su daño, como antes.
-			if r.nombre == "regreso":
-				_solo_estados("retorno")
-			else:
+			# Contando como retorno, el regreso regalaba un paso de misión en
+			# cada caza (ver arriba).
+			if not es_regreso:
 				_apuntar("retorno")
 			_golpear(p.dano_rampa, punto, true,
 				true, comun * bolsa.factor("factor_dano_retorno"))

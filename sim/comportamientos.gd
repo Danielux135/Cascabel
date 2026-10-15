@@ -57,7 +57,10 @@ var activos: Dictionary = {}
 const TIROS_REFLEJABLES := ["orbita", "retorno", "canon", "platillo"]
 ## Los que ABREN un recorrido bloqueado: cualquier tiro apuntado que no sea él.
 ## El racimo y el girador no: se los come la bola sola y lo abrirían sin jugar.
-const TIROS_QUE_ABREN := ["target", "banco", "orbita", "retorno", "canon", "platillo"]
+## El umbral sí, que es el tiro más difícil de la mesa: sin él, "cañón, umbral,
+## cañón" contaba como repetir.
+const TIROS_QUE_ABREN := ["target", "banco", "orbita", "retorno", "canon",
+	"platillo", "umbral"]
 
 ## (2) Segundos de juego sin que le toquen. Solo corre con la bola en juego.
 var sin_tocar: float = 0.0
@@ -347,7 +350,11 @@ func factor_reloj(en_caza: bool) -> float:
 ##
 ## `herido` es si al enemigo le falta vida: a vida llena no se está curando nada,
 ## y encender "curándose" en rojo sería mentir.
-func rotulos(en_caza: bool, multiplicador: int = 1, herido: bool = true) -> Array:
+##
+## SIN VALORES POR DEFECTO, a propósito: con `multiplicador = 1` y `herido =
+## true`, un panel que llamara solo con `en_caza` compilaba, ponía "curándose" a
+## vida llena y no encendía nunca el castigo, y ninguna prueba lo veía.
+func rotulos(en_caza: bool, multiplicador: int, herido: bool) -> Array:
 	var salida: Array = []
 	for el_id in IDS:
 		if not activos.has(el_id):

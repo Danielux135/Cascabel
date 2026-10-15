@@ -903,6 +903,12 @@ func _bumper_mas_cercano(punto: Vector2) -> int:
 ## aquí: su premio es subir de tramo, y ya suena el arpegio del multiplicador.
 func _al_salir_de_rampa(punto: Vector2, indice: int) -> void:
 	var r: Rampa = mesa.rampas[indice]
+	# UN TIRO ANULADO NO SE CELEBRA. Contra la Calavera el cañón cerrado sacaba a
+	# la vez "BLOQUEADO" y el golpe gordo entero —sonido, chispas y el cuadro de
+	# error de la cáscara— por un tiro que había pagado cero. Lo suyo ya lo dice
+	# su propio aviso (`recorrido_bloqueado`, `golpe_reflejado`).
+	if combate != null and combate.tiro_anulado:
+		return
 	match r.premio:
 		Rampa.Premio.DANO_FUERTE:
 			_sonido.reproducir("rampa_fuerte")
@@ -1156,6 +1162,17 @@ func _al_castigar_combo(antes: int, ahora: int) -> void:
 	# JUSTO ENCIMA del marco de la tele, no dentro: dentro tapaba las casillas de
 	# la misión, que es lo que la tele está diciendo en ese momento.
 	var donde := Vector2(Mesa.ANCHO * 0.5, NodoTele.MARCO.position.y - 12.0)
+	# PERO SI LA TELE NO ESTÁ EN PLANO, junto a la bola. En la caza la cámara se
+	# queda fija ~640 px por encima de la tele, el reloj sigue pegando, y el
+	# jugador bajaba con un x3 sin saber por qué: la ruleta girando fuera de plano
+	# de `CLAUDE.md`, otra vez.
+	if camara != null and cam != null:
+		var rect := camara.rect_visible()
+		var arriba := rect.position.y + cam.alto_franja_hud + AVISO_MARGEN
+		var abajo := rect.end.y - AVISO_MARGEN
+		if donde.y < arriba or donde.y > abajo:
+			donde.y = roundf(clampf(mesa.bola_en_peligro().pos.y - 40.0,
+				arriba + 16.0, abajo))
 	_numeros.append({"pos": donde, "t": 1.2, "texto": "de x%d a x%d" % [antes, ahora],
 		"col": C_FUEGO, "tam": 16.0, "subida": 20.0})
 	impactos.onda(donde, C_FUEGO, 1.2)

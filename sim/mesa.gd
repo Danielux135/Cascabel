@@ -134,6 +134,13 @@ var rampas: Array[Rampa] = []
 ## Índices de los dos recorridos de la zona alta. -1 si no están montados.
 var umbral: int = -1
 var regreso: int = -1
+## Los recorridos que viven en la planta alta: los dos túneles, la subida a la
+## isla y la órbita alta. Ni el umbral ni el regreso, que son los que unen.
+var rampas_altas: Array[int] = []
+## SOLO es verdad DURANTE la emisión de `rampa_salida`: la rampa que acaba de
+## completarse la ha recorrido una bola recién lanzada (`Bola.de_lanzamiento`).
+## Se apaga justo después de emitir, para que nadie pueda leer uno viejo.
+var salida_de_lanzamiento := false
 ## El modo de caza está abierto, y cuánto le queda.
 var en_caza := false
 var caza_restante: float = 0.0
@@ -534,6 +541,7 @@ func _girador(centro: Vector2) -> void:
 ## llega abajo a 1500 px/s, o sea 67 ms, cuando el cañón ya se tuvo que ablandar
 ## porque 900 px/s era incazable.
 func _arena() -> void:
+	var primera_rampa := rampas.size()
 	var cx := ANCHO * 0.5
 	var rx := cx - 20.0
 	var yp := p.arena_y_pala
@@ -670,6 +678,8 @@ func _arena() -> void:
 	orbita.nombre = "orbita_alta"
 	orbita.premio = Rampa.Premio.MULTIPLICADOR
 	rampas.append(orbita)
+	for i in range(primera_rampa, rampas.size()):
+		rampas_altas.append(i)
 
 ## Las cuatro paredes que sostienen una región elevada. Existen SOLO en la capa
 ## que se les diga —la de abajo—, así que la bola que va por el tablero choca con
@@ -1036,6 +1046,7 @@ func _preparar_bola(b: Bola) -> void:
 	b.platillo_espera = 0.0
 	b.busqueda = 0.0
 	b.tocando_flipper = false
+	b.de_lanzamiento = false
 	b.girador_dentro.clear()
 	for _i in giradores.size():
 		b.girador_dentro.append(false)
@@ -1084,6 +1095,7 @@ func soltar_bola_extra() -> Bola:
 	b.vel = Vector2(0.0, -p.impulso_lanzador)
 	b.viva = true
 	b.en_carril = true
+	b.de_lanzamiento = true
 	bolas.append(b)
 	bola_extra.emit(b.pos, bolas.size())
 	return b
@@ -1159,6 +1171,7 @@ func soltar_lanzador() -> void:
 	if b != null:
 		var ratio := p.ratio_minimo_lanzador + (1.0 - p.ratio_minimo_lanzador) * carga_lanzador
 		b.vel.y -= p.impulso_lanzador * ratio
+		b.de_lanzamiento = true
 	carga_lanzador = 0.0
 
 # ---------------------------------------------------------------------- avance
@@ -1345,12 +1358,16 @@ func _avanzar_rampa(b: Bola, h: float) -> void:
 	# dos salidas porque mira el sentido de avance y no la boca de entrada.
 	b.capa = r.capa_salida if b.rampa_sentido > 0 else r.capa_entrada
 	b.rampa = -1
+	var lanzada := b.de_lanzamiento
+	b.de_lanzamiento = false
 	if not completado:
 		rampa_devuelta.emit(b.pos, indice)
 		return
 	if descarga:
 		gastar_descarga(b.pos)
+	salida_de_lanzamiento = lanzada
 	rampa_salida.emit(b.pos, indice)
+	salida_de_lanzamiento = false
 	if indice == umbral:
 		_empezar_caza(b.pos)
 
@@ -1614,6 +1631,7 @@ func _colisionar(b: Bola, h: float) -> void:
 		if not (c.origen is Flipper):
 			continue
 		var f := c.origen as Flipper
+		b.de_lanzamiento = false
 		if f.pulsado:
 			b.tocando_flipper = true
 			# Atrapada: la pala ya ha terminado de subir y la bola está posada

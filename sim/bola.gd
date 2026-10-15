@@ -21,6 +21,14 @@ var viva := false
 var capa: int = Colisionador.CAPA_TABLERO
 ## Mientras esté en el carril lanzador, el lanzador funciona y el ball search no.
 var en_carril := true
+## RECIÉN LANZADA, y todavía no la ha tocado nadie. Se enciende al soltar el
+## lanzador (o al salir disparada una bola extra) y se apaga en cuanto toca una
+## pala o sale de su primera rampa. Existe porque un lanzamiento a tope engancha
+## la órbita SIEMPRE, y esa órbita la hace la mesa, no el jugador: los
+## comportamientos de enemigo que miran qué tiro metes (`Comportamientos`) no
+## pueden contarla. Lo que PAGA esa órbita no cambia: eso es la decisión abierta
+## del tramo gratis del lanzamiento.
+var de_lanzamiento := false
 
 ## Enganchada a una rampa: mientras `rampa >= 0` no hay física, la bola recorre
 ## la curva. `rampa_sentido` es +1 o -1 (las órbitas se recorren en los dos).

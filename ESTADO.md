@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **700/700** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **712/712** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -245,6 +245,18 @@ enemigos que responden desde el acto II.
 - **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y va en el
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
+- **La segunda revisión (12 hallazgos, 11 confirmados).** Lo que la mesa hace
+  sola NO cuenta para el bloqueo ni el reflejo: la órbita del lanzamiento (la de
+  la bola servida y la de cada bola extra) y los recorridos de la planta alta.
+  Contándolos, con la Bomba de procesos el Esqueleto te reflejaba la órbita del
+  lanzamiento en cada bola, y arriba los túneles se repetían solos rebotando en
+  los bumpers. El umbral rompe la racha y abre el cañón; el cañón anulado ya no
+  se celebra con el cuadro de error; el regreso no cobra el premio de recorrido;
+  el "de x4 a x3" sale junto a la bola si la tele no está en plano; y el reloj
+  que te mata cierra el paso (antes un tic de veneno podía dar VICTORIA después
+  de DERROTA). Y seis pruebas reforzadas que pasaban con el código roto.
+  **Sigue así, a sabiendas:** un tiro anulado carga la barra al entrar y gasta la
+  descarga armada al salir, porque eso lo decide la mesa antes que el combate.
 - **Ojo con los jefes, que estaba mal escrito:** el jefe de cada acto NO es el
   enemigo más duro, como decía «Abierto», sino uno **al azar** de los tres del
   acto, con ×1,5 de vida y "mayor" en el nombre (`Mapa._enemigo`). Así que
@@ -2239,6 +2251,11 @@ cosquillas y que hay que ir al cañón, con el "CAPA ROTA" y el rótulo de capas
 entiende con el "BLOQUEADO" y el "CAÑÓN ABIERTO"? ¿Es el cañón el que tiene que
 cerrar, o otro recorrido? Una fila del JSON lo cambia (`"tiro"`); los diales son
 `bloqueo_tiro` y `bloqueo_rearme`.
+**F9.** **En la planta alta ni se bloquea ni se refleja nada**: los túneles y la
+subida no son tiros que se apunten igual que abajo (un túnel se repite solo
+rebotando en su bumper) y la caza es un bonus. La que castiga cazar es la
+Gárgola. ¿Bien así, o la Calavera y el Esqueleto también deberían mirar arriba?
+Y la F8 tiene un matiz: el cañón cerrado sigue cargando la barra de descarga.
 **F7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
 solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser
 lo primero. Diales: `reflejo_repeticiones` y `reflejo_factor_ataque`.

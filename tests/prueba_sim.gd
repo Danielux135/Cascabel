@@ -1283,9 +1283,10 @@ func _prueba_comportamientos() -> void:
 	_comprobar("cada clave que se admite en el JSON se lee de verdad",
 		no_leidas.is_empty(), str(no_leidas))
 	_comprobar("cada comportamiento sale en el panel con su rotulo",
-		completo.rotulos(false, 1).size() == Comportamientos.IDS.size()
+		completo.rotulos(false, 1, true).size() == Comportamientos.IDS.size()
 			and completo.activos.size() == Comportamientos.IDS.size(),
-		"%d rótulos de %d" % [completo.rotulos(false).size(), Comportamientos.IDS.size()])
+		"%d rótulos de %d" % [completo.rotulos(false, 1, true).size(),
+			Comportamientos.IDS.size()])
 
 	# --- Alguien LEE la clave: del JSON al combate.
 	var lee := false
@@ -1369,6 +1370,173 @@ func _prueba_comportamientos() -> void:
 	_prueba_comportamiento_blindaje()
 	_prueba_comportamiento_reflejo()
 	_prueba_comportamiento_bloqueo()
+	_prueba_comportamientos_y_la_mesa()
+
+## LO QUE LA MESA HACE SOLA NO ES UN TIRO TUYO, y el bloqueo y el reflejo no lo
+## miran. Lo cazó la segunda revisión de la Fase 6: la órbita del lanzamiento,
+## la de las bolas extra y los túneles de la planta alta contaban, y el Esqueleto
+## te pegaba por cosas que la bola hacía sola.
+func _prueba_comportamientos_y_la_mesa() -> void:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var esqueleto := {"nombre": "Esqueleto", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0, "comportamientos": [{"id": "refleja"}]}
+	var calavera := {"nombre": "Calavera", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0, "comportamientos": [{"id": "bloquea"}]}
+
+	# (1) LA ÓRBITA DEL LANZAMIENTO, con la física de verdad: lanzar a tope
+	# engancha la órbita siempre, y esa órbita ni cuenta para la racha ni abre el
+	# cañón. Y la mesa solo dice "de lanzamiento" durante la propia señal.
+	var orbitas := 0
+	var de_lanzamiento := 0
+	var sin_racha := true
+	var sigue_cerrado := true
+	for datos in [esqueleto, calavera]:
+		var c := Combate.new(pc)
+		c.iniciar(Enemigo.new(datos))
+		var vistas := [0, 0]
+		c.mesa.rampa_salida.connect(func(_pt: Vector2, i: int) -> void:
+			if (c.mesa.rampas[i] as Rampa).nombre == "orbita":
+				vistas[0] += 1
+				if c.mesa.salida_de_lanzamiento:
+					vistas[1] += 1)
+		c.mesa.cargar_lanzador(10.0)
+		c.mesa.soltar_lanzador()
+		for _i in int(4.0 / DT):
+			c.avanzar(DT)
+			if vistas[0] > 0:
+				break
+		orbitas += vistas[0]
+		de_lanzamiento += vistas[1]
+		sin_racha = sin_racha and c.conducta.seguidas == 0 \
+			and not c.mesa.salida_de_lanzamiento
+		sigue_cerrado = sigue_cerrado and (datos == esqueleto
+			or c.conducta.bloqueado == "canon")
+	_comprobar("la orbita del lanzamiento no cuenta para el reflejo ni abre el bloqueo",
+		orbitas == 2 and de_lanzamiento == 2 and sin_racha and sigue_cerrado,
+		"%d orbitas, %d de lanzamiento, sin racha %s, cerrado %s" % [orbitas,
+			de_lanzamiento, sin_racha, sigue_cerrado])
+	var c2 := Combate.new(pc)
+	c2.iniciar(Enemigo.new(esqueleto))
+	var extra := c2.mesa.soltar_bola_extra()
+	_comprobar("y la bola extra sale marcada como recien lanzada",
+		extra != null and extra.de_lanzamiento)
+
+	# (2) LA PLANTA ALTA: cuatro recorridos, ni el umbral ni el regreso. Repetir
+	# túnel no se refleja y la subida a la isla no se bloquea, y siguen pagando.
+	var m := c2.mesa
+	var nombres: Array[String] = []
+	for i in m.rampas_altas:
+		nombres.append((m.rampas[i] as Rampa).nombre)
+	_comprobar("la mesa sabe cuales son los cuatro recorridos de la planta alta",
+		m.rampas_altas.size() == 4 and not m.rampas_altas.has(m.umbral)
+			and not m.rampas_altas.has(m.regreso), str(nombres))
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new(esqueleto))
+	_en_juego(c3)
+	var reflejos := [0]
+	c3.golpe_reflejado.connect(func(_pt: Vector2, _d: int) -> void: reflejos[0] += 1)
+	var vida3 := c3.enemigo.vida
+	for i in c3.mesa.rampas_altas:
+		for _k in 3:
+			c3.mesa.rampa_salida.emit(Vector2(200, 300), i)
+	var c4 := Combate.new(pc)
+	c4.iniciar(Enemigo.new(calavera))
+	_en_juego(c4)
+	var bloqueos := [0]
+	c4.recorrido_bloqueado.connect(func(_t: String, _pt: Vector2) -> void: bloqueos[0] += 1)
+	var vida4 := c4.enemigo.vida
+	# La subida PRIMERO: un túnel antes abriría el cañón y la prueba no vería
+	# nada que bloquear.
+	var orden_altas: Array[int] = []
+	for i in c4.mesa.rampas_altas:
+		if (c4.mesa.rampas[i] as Rampa).premio == Rampa.Premio.DANO_FUERTE:
+			orden_altas.push_front(i)
+		else:
+			orden_altas.append(i)
+	for i in orden_altas:
+		c4.mesa.rampa_salida.emit(Vector2(200, 300), i)
+	_comprobar("en la planta alta ni se refleja ni se bloquea, y se sigue pagando",
+		reflejos[0] == 0 and bloqueos[0] == 0 and c3.enemigo.vida < vida3
+			and c4.enemigo.vida < vida4 and c4.conducta.bloqueado == "canon",
+		"%d reflejos, %d bloqueos" % [reflejos[0], bloqueos[0]])
+
+	# (3) EL UMBRAL ROMPE LA RACHA Y ABRE EL CAÑÓN: es un tiro apuntado, el más
+	# difícil de la mesa. "Cañón, umbral, cañón" no es repetir.
+	var c5 := Combate.new(pc)
+	c5.iniciar(Enemigo.new(esqueleto))
+	_en_juego(c5)
+	_recorrido(c5, Rampa.Premio.DANO_FUERTE)
+	c5.mesa.rampa_salida.emit(Vector2(380, 300), c5.mesa.umbral)
+	var antes5 := c5.enemigo.vida
+	_recorrido(c5, Rampa.Premio.DANO_FUERTE)
+	c5.mesa.cortar_caza()
+	var c6 := Combate.new(pc)
+	c6.iniciar(Enemigo.new(calavera))
+	_en_juego(c6)
+	c6.mesa.rampa_salida.emit(Vector2(380, 300), c6.mesa.umbral)
+	c6.mesa.cortar_caza()
+	_comprobar("el umbral rompe la racha del reflejo y abre el recorrido cerrado",
+		c5.enemigo.vida < antes5 and c6.conducta.bloqueado == "")
+
+	# (4) UN TIRO ANULADO LO DICE, para que la vista no lo celebre: el cañón
+	# cerrado sacaba "BLOQUEADO" y a la vez el cuadro de error del golpe gordo.
+	var c7 := Combate.new(pc)
+	c7.iniciar(Enemigo.new(calavera))
+	_en_juego(c7)
+	_recorrido(c7, Rampa.Premio.DANO_FUERTE)
+	var anulado := c7.tiro_anulado
+	_recorrido(c7, Rampa.Premio.DANO)
+	_comprobar("el combate dice si el ultimo recorrido se anulo",
+		anulado and not c7.tiro_anulado)
+
+	# (6) UN TIRO ANULADO NO COBRA NADA: ni misión, ni estados, ni el premio de
+	# recorrido. Con una bolsa y una escalera de verdad, que con las vacías
+	# `_apuntar` y `_premio_de_recorrido` no hacen nada y la prueba no vería si
+	# se subieran por encima del filtro.
+	var bolsa := BolsaReliquias.new()
+	bolsa.anadir(Reliquia.new({"id": "prueba_recorrido", "nombre": "Prueba",
+		"efectos": {"suma_golpes_por_recorrido": 3, "aplica_veneno_canon": 1}}))
+	var de_canon := Mision.new({"id": "prueba_canon", "nombre": "Prueba",
+		"texto": "x", "tiros": [{"tiro": "canon", "veces": 2}]})
+	var esc: Array[Mision] = [de_canon]
+	var c9 := Combate.new(pc)
+	c9.bolsa = bolsa
+	c9.iniciar(Enemigo.new(calavera), -1, esc)
+	_en_juego(c9)
+	var golpes9 := c9.golpes
+	_recorrido(c9, Rampa.Premio.DANO_FUERTE)
+	var bloqueado_limpio := c9.llevas(0) == 0 and c9.golpes == golpes9 \
+		and not c9.estados.tiene("veneno")
+	var c10 := Combate.new(pc)
+	c10.bolsa = bolsa
+	c10.iniciar(Enemigo.new(esqueleto), -1, esc)
+	_en_juego(c10)
+	_recorrido(c10, Rampa.Premio.DANO_FUERTE)
+	var golpes10 := c10.golpes
+	var veneno10 := c10.estados.acumulaciones("veneno")
+	_recorrido(c10, Rampa.Premio.DANO_FUERTE)
+	var reflejado_limpio := c10.llevas(0) == 1 and c10.golpes == golpes10 \
+		and c10.estados.acumulaciones("veneno") == veneno10 and veneno10 > 0
+	_comprobar("un tiro bloqueado o reflejado no cuenta para la mision, ni aplica estados, ni paga el recorrido",
+		bloqueado_limpio and reflejado_limpio,
+		"bloqueado %s, reflejado %s" % [bloqueado_limpio, reflejado_limpio])
+
+	# (5) SI EL RELOJ TE MATA, EL PASO SE ACABA: un tic de veneno en el mismo
+	# fotograma ya no puede rematar al enemigo y sacar el segundo final.
+	var c8 := Combate.new(pc)
+	c8.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1, "ataque": 50,
+		"reloj": 1.0}))
+	_en_juego(c8)
+	c8.estados.aplicar("veneno", 5)
+	c8.estados.activos["veneno"]._hasta_tic = 0.0
+	c8.vida_jugador = 1
+	c8.carga_reloj = 0.9999
+	var finales: Array = []
+	c8.combate_terminado.connect(func(gana: bool) -> void: finales.append(gana))
+	c8.avanzar(DT)
+	_comprobar("si el reloj te mata, el veneno ya no puede ganar en el mismo paso",
+		finales == [false] and c8.fase == Combate.Fase.DERROTA, str(finales))
 
 ## (1) BLOQUEA UN RECORRIDO HASTA QUE LE PEGAS POR OTRO SITIO.
 func _prueba_comportamiento_bloqueo() -> void:
@@ -1426,6 +1594,16 @@ func _prueba_comportamiento_bloqueo() -> void:
 	c2.mesa.rampa_salida.emit(Vector2(200, 800), c2.mesa.regreso)
 	_comprobar("el regreso de la caza no se bloquea aunque lo cerrado sea un retorno",
 		c2.mesa.regreso >= 0 and c2.enemigo.vida < v2)
+	# Y EL "tiro" DEL JSON MANDA: con un retorno cerrado, el retorno no cobra y el
+	# cañón sí (y lo abre). Con `p.bloqueo_tiro` leído en vez de la fila, esto
+	# cerraría el cañón con el panel diciendo "BLOQUEA RETORNO".
+	var v2b := c2.enemigo.vida
+	_recorrido(c2, Rampa.Premio.DANO)
+	var retorno_cerrado := c2.enemigo.vida == v2b and c2.conducta.bloqueado == "retorno"
+	_recorrido(c2, Rampa.Premio.DANO_FUERTE)
+	_comprobar("el recorrido que cierra es el que dice la fila del JSON",
+		retorno_cerrado and c2.enemigo.vida < v2b and c2.conducta.bloqueado == "",
+		c2.conducta.bloqueado)
 	# Y un tiro que no es un recorrido se rechaza: un target cerrado haría
 	# imposible un banco.
 	var c3 := Combate.new(pc)
@@ -1533,6 +1711,22 @@ func _prueba_comportamiento_reflejo() -> void:
 	_comprobar("el regreso de la caza no se refleja aunque se repita",
 		c2.mesa.regreso >= 0 and reflejos2[0] == 0 and c2.enemigo.vida < vida2,
 		"%d reflejos" % reflejos2[0])
+	# Y EL NÚMERO DEL JSON MANDA: con "repeticiones": 3, el segundo seguido pega y
+	# el tercero se refleja. Ninguna otra prueba usa un número distinto del de
+	# `ParametrosCombate`, y leer el parámetro en vez de la fila pasaría en verde.
+	var c6 := Combate.new(pc)
+	c6.iniciar(Enemigo.new({"nombre": "Esqueleto", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0, "comportamientos": [{"id": "refleja", "repeticiones": 3}]}))
+	_en_juego(c6)
+	var reflejos6 := [0]
+	c6.golpe_reflejado.connect(func(_p: Vector2, _d: int) -> void: reflejos6[0] += 1)
+	_recorrido(c6, Rampa.Premio.DANO)
+	_recorrido(c6, Rampa.Premio.DANO)
+	var tras_dos: int = reflejos6[0]
+	_recorrido(c6, Rampa.Premio.DANO)
+	_comprobar("las repeticiones del JSON mandan: con 3, refleja el tercero y no el segundo",
+		pc.reflejo_repeticiones != 3 and tras_dos == 0 and reflejos6[0] == 1,
+		"%d tras dos, %d tras tres" % [tras_dos, reflejos6[0]])
 	# Sin el comportamiento, dos retornos seguidos pegan los dos.
 	var c3 := Combate.new(pc)
 	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000000, "ataque": 10,
@@ -1589,7 +1783,9 @@ func _prueba_comportamiento_blindaje() -> void:
 	_avanzar_combate(c, pc.blindaje_regenera + 0.1)
 	_comprobar("regenera una capa con la bola en juego",
 		c.conducta.capas == 1, "%d capas" % c.conducta.capas)
-	# Y no en las pausas.
+	# Y no en las pausas. A medio segundo de la siguiente capa, que si no la pausa
+	# entera (1,6 s) no llega a los 10 s y la prueba pasaría sin el guardián.
+	c.conducta._hasta_capa = pc.blindaje_regenera - 0.5
 	c.mesa.retirar_bolas()
 	c.mesa.bola_drenada.emit()
 	var capas_pausa := c.conducta.capas
@@ -1598,6 +1794,42 @@ func _prueba_comportamiento_blindaje() -> void:
 		c.avanzar(DT)
 		t += DT
 	_comprobar("y no regenera en las pausas", c.conducta.capas == capas_pausa)
+	# EL UMBRAL SE MIDE CON EL GOLPE ENTERO, multiplicador y crítico incluidos:
+	# por eso "un retorno necesita x3" (`ParametrosCombate`). Contra los
+	# parámetros, y con la premisa comprobada: si x2 y x3 cayeran del mismo lado
+	# del umbral, esta prueba no distinguiría nada.
+	var umbral := pc.blindaje_umbral * float(pc.dano_rampa_fuerte)
+	var golpes_de := func(factor: int) -> int:
+		for tramo in c.tramos():
+			if int((tramo as Dictionary)["factor"]) == factor:
+				return int((tramo as Dictionary)["golpes"])
+		return -1
+	var rompe_a := func(factor: float) -> bool:
+		return float(pc.dano_rampa) * factor >= umbral
+	var cb := Combate.new(pc)
+	cb.iniciar(Enemigo.new(datos))
+	_en_juego(cb)
+	cb.golpes = golpes_de.call(3)
+	_recorrido(cb, Rampa.Premio.DANO)
+	var tras_x3 := cb.conducta.capas
+	cb.golpes = golpes_de.call(2)
+	_recorrido(cb, Rampa.Premio.DANO)
+	var tras_x2 := cb.conducta.capas
+	var pcc := ParametrosCombate.new()
+	pcc.prob_critico = 1.0
+	var cc := Combate.new(pcc)
+	cc.iniciar(Enemigo.new(datos))
+	_en_juego(cc)
+	cc.golpes = golpes_de.call(2)
+	_recorrido(cc, Rampa.Premio.DANO)
+	var maximo := pc.blindaje_capas
+	_comprobar("el blindaje mide el golpe entero: un retorno a x3 rompe, a x2 no, a x2 con critico si",
+		rompe_a.call(3.0) != rompe_a.call(2.0)
+			and (tras_x3 == maximo - 1) == rompe_a.call(3.0)
+			and (tras_x2 == tras_x3) != rompe_a.call(2.0)
+			and (cc.conducta.capas == maximo - 1) == rompe_a.call(2.0 * cc.factor_critico()),
+		"capas %d -> %d -> %d, con critico %d" % [maximo, tras_x3, tras_x2,
+			cc.conducta.capas])
 	# El veneno lo atraviesa: no es un golpe.
 	var c2 := Combate.new(pc)
 	c2.iniciar(Enemigo.new(datos))
@@ -1638,6 +1870,22 @@ func _prueba_comportamiento_castigo() -> void:
 			and castigos[0] == 1,
 		"pegó %d (tocaba %d), combo x%d, %d avisos" % [vida - c.vida_jugador,
 			int(round(10.0 * factor)), c.multiplicador(), castigos[0]])
+	# EN EL PROPIO UMBRAL (x3) ya castiga: un tramo por encima de `desde - 1`, y
+	# te deja en x2. Con `<` cambiado por `<=` el panel diría "CASTIGA" a x3 y el
+	# reloj no haría nada.
+	var umbral_x3_c := 0
+	for tramo in c.tramos():
+		if int((tramo as Dictionary)["factor"]) == pc.castigo_desde:
+			umbral_x3_c = int((tramo as Dictionary)["golpes"])
+	c.golpes = umbral_x3_c
+	vida = c.vida_jugador
+	c._atacar(10, true)
+	var factor_umbral := 1.0 + pc.castigo_factor_por_tramo
+	_comprobar("en el propio umbral ya castiga, y baja un tramo",
+		vida - c.vida_jugador == int(round(10.0 * factor_umbral))
+			and c.multiplicador() == pc.castigo_desde - 1,
+		"pegó %d (tocaba %d), combo x%d" % [vida - c.vida_jugador,
+			int(round(10.0 * factor_umbral)), c.multiplicador()])
 	# Por debajo del umbral, el golpe de siempre y el combo intacto.
 	c.golpes = 5
 	vida = c.vida_jugador
@@ -5953,19 +6201,28 @@ func _prueba_misiones_una_a_una(catalogo: Array[Mision]) -> void:
 ## cobra la siguiente. Dos regalos que cazó la revisión de las misiones nuevas.
 func _prueba_misiones_y_la_mesa() -> void:
 	# (1) EL REGRESO DE LA CAZA no cuenta como retorno. Lo hace la mesa sola al
-	# acabarse el tiempo, así que contaba un paso gratis en cada caza.
+	# acabarse el tiempo, así que contaba un paso gratis en cada caza. Ni cobra
+	# el premio de recorrido de las reliquias: aquí, curar 10.
 	var de_retorno := Mision.new({"id": "prueba_retorno", "nombre": "Prueba",
 		"texto": "x", "tiros": [{"tiro": "retorno", "veces": 2}]})
 	var c := _combate_de_mision(de_retorno, [])
+	var cura := BolsaReliquias.new()
+	cura.anadir(Reliquia.new({"id": "prueba_cura", "nombre": "Prueba",
+		"efectos": {"suma_vida_por_recorrido": 10}}))
+	c.bolsa = cura
+	c.vida_jugador = c.vida_maxima() - 50
+	var vida_j := c.vida_jugador
 	var vida := c.enemigo.vida
 	c.mesa.rampa_salida.emit(Vector2(200, 800), c.mesa.regreso)
 	var tras_regreso := c.llevas(0)
 	var pego := vida - c.enemigo.vida
+	var curo := c.vida_jugador - vida_j
 	_recorrido(c, Rampa.Premio.DANO)
-	_comprobar("el regreso de la caza no cuenta para la mision, y sigue pegando",
-		c.mesa.regreso >= 0 and tras_regreso == 0 and pego > 0 and c.llevas(0) == 1,
-		"tras el regreso %d, pego %d, tras un retorno %d" % [tras_regreso, pego,
-			c.llevas(0)])
+	_comprobar("el regreso de la caza no cuenta para la mision ni cura, y sigue pegando",
+		c.mesa.regreso >= 0 and tras_regreso == 0 and pego > 0 and curo == 0
+			and c.llevas(0) == 1 and c.vida_jugador - vida_j == 10,
+		"tras el regreso %d y curó %d, pego %d, tras un retorno %d" % [tras_regreso,
+			curo, pego, c.llevas(0)])
 
 	# (2) EL BANCO DEL MISMO GOLPE no cuenta para la misión que acaba de abrirse.
 	# La mesa emite el último target y su banco uno detrás de otro, en el mismo
@@ -6605,7 +6862,7 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	var col_c := NodoHud.ancho_columna_conducta(
 		cascara.interior_panel(cascara.panel_enemigo()))
 	var no_caben: Array[String] = []
-	var filas_c: Array = conducta.rotulos(true, 4)
+	var filas_c: Array = conducta.rotulos(true, 4, true)
 	# Y los detalles que solo salen en otros estados: la cura en marcha y a vida
 	# llena, y el reflejo armado con cada tiro.
 	conducta.sin_tocar = 1000.0
@@ -6614,7 +6871,7 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	for tiro in Comportamientos.TIROS_REFLEJABLES:
 		conducta.ultimo_tiro = tiro
 		conducta.seguidas = 1
-		filas_c.append_array(conducta.rotulos(true, 4))
+		filas_c.append_array(conducta.rotulos(true, 4, true))
 	for fila in filas_c:
 		for k in ["rotulo", "detalle"]:
 			var txt := str((fila as Dictionary)[k])
