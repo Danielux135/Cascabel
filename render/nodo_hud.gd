@@ -139,7 +139,7 @@ func _panel_enemigo(combate: Combate) -> void:
 ## jugador necesita saber: *"cada uno altera qué tiro compensa"*. El que está
 ## actuando ahora mismo se enciende.
 func _conducta_del_enemigo(combate: Combate, d: Rect2) -> void:
-	var lista := combate.conducta.rotulos(combate.mesa.en_caza)
+	var lista := combate.conducta.rotulos(combate.mesa.en_caza, combate.multiplicador())
 	if lista.is_empty():
 		return
 	var ancho := ancho_columna_conducta(d)

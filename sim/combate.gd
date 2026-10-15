@@ -37,6 +37,9 @@ signal curado(cantidad: int, punto: Vector2)
 ## EL ENEMIGO se ha curado (comportamiento `cura`, `DISEÑO.md` §11). Va aparte de
 ## `curado`, que es el jugador: son dos barras distintas y dos colores.
 signal enemigo_curado(cantidad: int)
+## Su reloj te ha pegado con el combo alto y te ha robado tramos (comportamiento
+## `castiga_combo`). `antes` y `ahora` son multiplicadores.
+signal combo_castigado(antes: int, ahora: int)
 ## La red de seguridad ha comido un drenaje. Igual: si no se anuncia, parece que
 ## el juego se ha olvidado de castigarte.
 signal drenaje_perdonado()
@@ -756,6 +759,14 @@ func _al_drenar() -> void:
 ## mitad de la bola y no para nada: la bola sigue rodando y tú sigues jugando.
 func _atacar(dano: int, por_reloj: bool) -> void:
 	_publicar_contexto()
+	# EL CASTIGO AL COMBO ALTO (`castiga_combo`), solo en el golpe del reloj y
+	# ANTES de la armadura de las reliquias: es este enemigo pegando más fuerte,
+	# y lo que pare una reliquia lo para igual que cualquier otro golpe suyo.
+	if por_reloj:
+		var castigo := conducta.castigo_combo(multiplicador())
+		if int(castigo["tramos"]) > 0 or float(castigo["factor"]) != 1.0:
+			dano = int(round(float(dano) * float(castigo["factor"])))
+			_robar_tramos(int(castigo["tramos"]))
 	# Lo que pega el enemigo puede bajarlo una reliquia. Se aplica AQUÍ y no en
 	# los dos sitios que llaman: el golpe del reloj y el del drenaje son el mismo
 	# golpe cobrado por dos motivos, y una armadura que solo parase uno de los
@@ -770,6 +781,26 @@ func _atacar(dano: int, por_reloj: bool) -> void:
 		_temporizador = 0.0
 		mesa.retirar_bolas()
 		combate_terminado.emit(false)
+
+## Le quita tramos al combo, bajando los golpes al principio del tramo que
+## queda. Con los tramos DE VERDAD, los que mueven las reliquias (`tramos()`), y
+## no con `p.tramos_combo`: con una que adelanta los tramos, el umbral del x3 ya
+## no está en 10 golpes.
+func _robar_tramos(cuantos: int) -> void:
+	if cuantos <= 0:
+		return
+	var antes := multiplicador()
+	var objetivo := maxi(antes - cuantos, 1)
+	var umbral_golpes := 0
+	for tramo in tramos():
+		if int((tramo as Dictionary)["factor"]) <= objetivo:
+			umbral_golpes = int((tramo as Dictionary)["golpes"])
+	if golpes <= umbral_golpes:
+		return
+	golpes = umbral_golpes
+	var ahora := multiplicador()
+	combo_cambiado.emit(ahora, golpes)
+	combo_castigado.emit(antes, ahora)
 
 ## Drenar pega menos que el reloj: ya no es la única presión del combate.
 func _dano_drenaje() -> int:

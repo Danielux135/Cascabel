@@ -1255,7 +1255,7 @@ func _prueba_comportamientos() -> void:
 	var completo := Comportamientos.new()
 	completo.preparar(todos, ParametrosCombate.new())
 	_comprobar("cada comportamiento sale en el panel con su rotulo",
-		completo.rotulos(false).size() == Comportamientos.IDS.size()
+		completo.rotulos(false, 1).size() == Comportamientos.IDS.size()
 			and completo.activos.size() == Comportamientos.IDS.size(),
 		"%d rótulos de %d" % [completo.rotulos(false).size(), Comportamientos.IDS.size()])
 
@@ -1314,6 +1314,71 @@ func _prueba_comportamientos() -> void:
 		not c6.mesa.en_caza and c6.ritmo_reloj() == 1.0, "%.3f" % c6.ritmo_reloj())
 
 	_prueba_comportamiento_cura()
+	_prueba_comportamiento_castigo()
+
+## (5) CASTIGA EL MULTIPLICADOR ALTO. El golpe del reloj pega más y roba tramos
+## si el combo está en el umbral; por debajo, y en el golpe del drenaje, nada.
+func _prueba_comportamiento_castigo() -> void:
+	var pc := ParametrosCombate.new()
+	pc.prob_critico = 0.0
+	var datos := {"nombre": "Goblin bruto", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0, "comportamientos": [{"id": "castiga_combo"}]}
+	# A x4: el golpe sube por los dos tramos desde x3 y baja el combo a x3.
+	var c := Combate.new(pc)
+	c.iniciar(Enemigo.new(datos))
+	_en_juego(c)
+	c.golpes = 20
+	var castigos := [0]
+	c.combo_castigado.connect(func(_a: int, _b: int) -> void: castigos[0] += 1)
+	var vida := c.vida_jugador
+	c._atacar(10, true)
+	var factor := 1.0 + pc.castigo_factor_por_tramo * float(4 - pc.castigo_desde + 1)
+	_comprobar("a x4 el reloj pega mas y roba un tramo, y lo avisa",
+		vida - c.vida_jugador == int(round(10.0 * factor)) and c.multiplicador() == 3
+			and castigos[0] == 1,
+		"pegó %d (tocaba %d), combo x%d, %d avisos" % [vida - c.vida_jugador,
+			int(round(10.0 * factor)), c.multiplicador(), castigos[0]])
+	# Por debajo del umbral, el golpe de siempre y el combo intacto.
+	c.golpes = 5
+	vida = c.vida_jugador
+	c._atacar(10, true)
+	_comprobar("por debajo del umbral pega lo de siempre y no roba nada",
+		vida - c.vida_jugador == 10 and c.multiplicador() == 2,
+		"pegó %d, combo x%d" % [vida - c.vida_jugador, c.multiplicador()])
+	# El golpe del drenaje no castiga: ya llega con el combo perdido.
+	c.golpes = 20
+	vida = c.vida_jugador
+	c._atacar(10, false)
+	_comprobar("el golpe del drenaje no castiga el combo",
+		vida - c.vida_jugador == 10 and c.multiplicador() == 4)
+	# Con los tramos DE VERDAD: una reliquia que adelanta los tramos mueve el
+	# umbral del x3, y el robo tiene que dejarte en el principio del x3 de ella.
+	var c2 := Combate.new(pc)
+	var bolsa := BolsaReliquias.new()
+	bolsa.anadir(Reliquia.new({"id": "prueba_adelanto", "nombre": "Adelanto",
+		"efectos": {"suma_adelanto_tramo": 3}}))
+	c2.bolsa = bolsa
+	c2.iniciar(Enemigo.new(datos))
+	_en_juego(c2)
+	c2.golpes = 30
+	c2._atacar(10, true)
+	var umbral_x3 := 0
+	for tramo in c2.tramos():
+		if int((tramo as Dictionary)["factor"]) == 3:
+			umbral_x3 = int((tramo as Dictionary)["golpes"])
+	_comprobar("el robo baja al principio del tramo de verdad, con las reliquias",
+		c2.multiplicador() == 3 and c2.golpes == umbral_x3,
+		"x%d con %d golpes, el x3 empieza en %d" % [c2.multiplicador(), c2.golpes, umbral_x3])
+	# Y sin el comportamiento, neutro exacto.
+	var c3 := Combate.new(pc)
+	c3.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000000, "ataque": 10,
+		"reloj": 1000.0}))
+	_en_juego(c3)
+	c3.golpes = 20
+	vida = c3.vida_jugador
+	c3._atacar(10, true)
+	_comprobar("sin el comportamiento el reloj no castiga el combo",
+		vida - c3.vida_jugador == 10 and c3.multiplicador() == 4)
 
 ## (2) SE CURA SI NO LE TOCAS. Contra los parámetros, nunca contra números.
 func _prueba_comportamiento_cura() -> void:
@@ -5905,12 +5970,17 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	var col_c := NodoHud.ancho_columna_conducta(
 		cascara.interior_panel(cascara.panel_enemigo()))
 	var no_caben: Array[String] = []
-	for fila in conducta.rotulos(true):
+	for fila in conducta.rotulos(true, 4):
 		for k in ["rotulo", "detalle"]:
 			var txt := str((fila as Dictionary)[k])
 			if FuenteUI.obtener().get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT,
 					-1.0, 8).x > col_c:
 				no_caben.append(txt)
+			# Y que la fuente tenga todas sus letras: un glifo que falta deja un
+			# hueco y no da ningún error (pasó con la ñ).
+			for i in txt.length():
+				if not FuenteUI.obtener().has_char(txt.unicode_at(i)):
+					no_caben.append("%s (le falta '%s')" % [txt, txt[i]])
 	_comprobar("los rotulos de los comportamientos caben al lado del retrato",
 		no_caben.is_empty() and col_c > 40.0,
 		"columna de %.0f px — %s" % [col_c, str(no_caben)])

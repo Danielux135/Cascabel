@@ -196,3 +196,12 @@ var cura_fraccion: float = 0.01
 ## si contara, una build de veneno anularía este comportamiento entero sin jugar
 ## la mesa, y lo que prohíbe es justo eso, jugar seguro. Es diseño: pregunta F4.
 var cura_tocan_los_estados: bool = false
+## (5) CASTIGA EL MULTIPLICADOR ALTO: cuando su reloj pega con el combo en
+## `castigo_desde` o más, el golpe sube `castigo_factor_por_tramo` por cada
+## tramo desde ahí (x3 pega ×1,5 y x4 ×2) y te roba `castigo_tramos_robados`
+## tramos. El daño es lo de menos —un ataque es el 1 % de tu vida—: lo que
+## pica es perder el x4 que llevabas un minuto subiendo. Obliga a GASTARLO en
+## tiros que escalan antes de que llegue el reloj, y el 3-2-1 ya avisa.
+var castigo_desde: int = 3
+var castigo_factor_por_tramo: float = 0.5
+var castigo_tramos_robados: int = 1

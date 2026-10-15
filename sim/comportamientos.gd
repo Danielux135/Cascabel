@@ -32,12 +32,13 @@ extends RefCounted
 
 ## Los que existen. Lista CERRADA: un id mal escrito en el JSON no da error, deja
 ## un enemigo que no hace nada, y eso se diagnostica como balance. Hay prueba.
-const IDS := ["cura", "caza_acelera"]
+const IDS := ["cura", "castiga_combo", "caza_acelera"]
 
 ## Las claves que cada uno sabe leer del JSON, además de `id`. Misma razón: una
 ## clave mal escrita no pisa nada y nadie se entera. Hay prueba.
 const CLAVES := {
 	"cura": ["espera", "periodo", "fraccion"],
+	"castiga_combo": ["desde", "factor_por_tramo", "tramos_robados"],
 	"caza_acelera": ["factor"],
 }
 
@@ -81,6 +82,12 @@ func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 			r["espera"] = maxf(float(fila.get("espera", p.cura_espera)), 0.0)
 			r["periodo"] = maxf(float(fila.get("periodo", p.cura_periodo)), 0.05)
 			r["fraccion"] = maxf(float(fila.get("fraccion", p.cura_fraccion)), 0.0)
+		"castiga_combo":
+			r["desde"] = maxi(int(fila.get("desde", p.castigo_desde)), 2)
+			r["factor_por_tramo"] = maxf(float(fila.get("factor_por_tramo",
+				p.castigo_factor_por_tramo)), 0.0)
+			r["tramos_robados"] = maxi(int(fila.get("tramos_robados",
+				p.castigo_tramos_robados)), 0)
 		"caza_acelera":
 			r["factor"] = float(fila.get("factor", p.caza_factor_reloj))
 	return r
@@ -120,6 +127,26 @@ func avanzar_cura(dt: float, vida_maxima: int) -> int:
 		return 0
 	return veces * maxi(int(round(float(vida_maxima) * float(c["fraccion"]))), 1)
 
+## (5) CASTIGA EL MULTIPLICADOR ALTO: *"obliga a gastarlo"*. Lo pregunta
+## `Combate._atacar` SOLO cuando pega el reloj —el golpe del drenaje ya llega con
+## el combo perdido—, con el multiplicador de ese instante. Devuelve por cuánto
+## multiplicar el golpe y cuántos tramos quitar; con el combo por debajo del
+## umbral, o sin el comportamiento, el neutro exacto: 1.0 y 0.
+func castigo_combo(multiplicador: int) -> Dictionary:
+	if not activos.has("castiga_combo"):
+		return {"factor": 1.0, "tramos": 0}
+	var c: Dictionary = activos["castiga_combo"]
+	var desde := int(c["desde"])
+	if multiplicador < desde:
+		return {"factor": 1.0, "tramos": 0}
+	return {
+		"factor": 1.0 + float(c["factor_por_tramo"]) * float(multiplicador - desde + 1),
+		"tramos": int(c["tramos_robados"]),
+	}
+
+func castigo_desde() -> int:
+	return int(activos["castiga_combo"]["desde"]) if activos.has("castiga_combo") else 0
+
 ## Lo que le falta para empezar a curarse, para enseñarlo. Cero si ya se cura.
 func cura_en() -> float:
 	if not activos.has("cura"):
@@ -151,7 +178,7 @@ func factor_reloj(en_caza: bool) -> float:
 ## compensa contra este enemigo, que es para lo que están.
 ##
 ## `en_caza` hace falta para encender el que está actuando ahora mismo.
-func rotulos(en_caza: bool) -> Array:
+func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
 	var salida: Array = []
 	for el_id in IDS:
 		if not activos.has(el_id):
@@ -162,6 +189,12 @@ func rotulos(en_caza: bool) -> Array:
 				salida.append({"rotulo": "SE CURA",
 					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
 					"activo": falta <= 0.0})
+			"castiga_combo":
+				# Se enciende en cuanto estás en el umbral, que es justo cuando hay
+				# que gastar el combo antes de que llegue el reloj.
+				salida.append({"rotulo": "CASTIGA",
+					"detalle": "combo x%d" % castigo_desde(),
+					"activo": multiplicador >= castigo_desde()})
 			"caza_acelera":
 				salida.append({"rotulo": "ACELERA", "detalle": "en la caza",
 					"activo": en_caza})

@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **653/653** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **658/658** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -94,6 +94,7 @@ enemigos que responden desde el acto II.
 | Enemigo | Acto | Comportamiento | Estado |
 |---|---|---|---|
 | Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
+| Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
 | Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
 
 - **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
@@ -102,6 +103,12 @@ enemigos que responden desde el acto II.
   cuna, y es lo que este comportamiento prohíbe. Solo cuenta con la bola en
   juego, nunca en las pausas. **El modelo tampoco lo ve**: reparte los golpes
   cada 0,86 s, así que nunca pasan seis sin tocarle.
+- **Goblin bruto, castiga el combo.** Se ensaña con el que acumula: si su reloj
+  pega con el combo en x3 o más, pega un 50 % más por tramo y te deja en el
+  tramo de abajo. El daño es lo de menos; lo que pica es perder el x4, y obliga a
+  gastarlo antes del 3-2-1. Sale escrito "de x4 a x3" encima de la tele, y el
+  rótulo se enciende en cuanto estás en el umbral. Los tramos que se roban son
+  los de verdad, con las reliquias que los mueven.
 - **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y es el jefe del
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
@@ -2053,6 +2060,10 @@ enemigo, y el que está actuando se pone en rojo. ¿Se lee de reojo?
 barra se pone verde. ¿Se nota la presión de "no puedo esperar en la cuna"? ¿Y el
 veneno debería contar como tocarle? Hoy NO (`cura_tocan_los_estados`): si
 contara, la build de veneno anularía el comportamiento sin jugar la mesa.
+**F5.** **El Goblin bruto te roba un tramo** si su reloj pega con el combo en x3
+o más. ¿Se entiende por qué ha pasado, con el "de x4 a x3" y el rótulo
+encendido? ¿Te hace gastar el combo antes del 3-2-1, o solo te fastidia? Diales:
+`castigo_desde`, `castigo_factor_por_tramo`, `castigo_tramos_robados`.
 
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.

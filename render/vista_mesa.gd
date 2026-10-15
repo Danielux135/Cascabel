@@ -388,6 +388,7 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 	combate.curado.connect(_al_curar)
 	combate.enemigo_curado.connect(func(_cantidad: int) -> void:
 		flash_cura_enemigo = 0.7)
+	combate.combo_castigado.connect(_al_castigar_combo)
 	combate.drenaje_perdonado.connect(_al_perdonar_drenaje)
 	combate.combate_terminado.connect(_al_terminar_combate)
 
@@ -1136,6 +1137,18 @@ func _al_criticar(punto: Vector2, dano: int) -> void:
 	impactos.chispas(punto, Vector2.ZERO, C_FUEGO, 1.4)
 	_sacudir(anim.sacudida_dano * 1.6)
 	_congelar(900.0)
+
+## EL ENEMIGO TE HA ROBADO COMBO (`castiga_combo`). Se dice donde se MIDE el
+## multiplicador, que es la tele de encima de las palas, y con los dos números:
+## "de x4 a x3" se lee de un vistazo y dice exactamente qué has perdido. Sin
+## flecha: la fuente no la tiene, y un glifo que falta deja un hueco sin avisar.
+func _al_castigar_combo(antes: int, ahora: int) -> void:
+	# JUSTO ENCIMA del marco de la tele, no dentro: dentro tapaba las casillas de
+	# la misión, que es lo que la tele está diciendo en ese momento.
+	var donde := Vector2(Mesa.ANCHO * 0.5, NodoTele.MARCO.position.y - 12.0)
+	_numeros.append({"pos": donde, "t": 1.2, "texto": "de x%d a x%d" % [antes, ahora],
+		"col": C_FUEGO, "tam": 16.0, "subida": 20.0})
+	impactos.onda(donde, C_FUEGO, 1.2)
 
 ## Curarse también lleva número. Sale en verde y donde estaba la bola, que es
 ## donde ha pasado.
