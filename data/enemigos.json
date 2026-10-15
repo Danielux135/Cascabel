@@ -7,6 +7,8 @@
 
   "_por_que_cada_uno_lleva_su_reloj": "El coste crece con lo que dura el combate. Con un reloj unico, un enemigo del acto III duraba el doble y comia el doble de golpes, o sea que costaba cuatro veces mas sin que nadie lo hubiera decidido. Con el reloj propio se separan las dos cosas: LA VIDA DICE CUANTO DURA Y EL RELOJ DICE CUANTO APRIETA.",
 
+  "_comportamientos": "Fase 6 (DISENO.md 11). Cada enemigo puede traer una lista de comportamientos, cada uno con su id y, si quiere, sus propios numeros con las claves cortas de sim/comportamientos.gd; si no los trae, valen los parametros con nombre de ParametrosCombate. QUE ENEMIGO LLEVA CADA UNO ES UNA PROPUESTA, NO UNA DECISION: esta razonada en ESTADO.md y es una pregunta para Daniel y Fatima. El acto I va sin ninguno, a proposito: es donde se aprende la mesa.",
+
   "_orden": "El orden IMPORTA: sim/mapa.gd parte el catalogo en tercios y cada tercio es un acto. Hay una prueba que lo vigila, y otra que comprueba que el reloj crece con la vida.",
 
   "enemigos": [
@@ -20,6 +22,7 @@
 
     { "id": "goblin_bruto",        "nombre": "Goblin bruto",       "vida": 7800, "ataque": 9,  "reloj": 9.0,  "sprite": "res://assets/enemigos/goblin_bruto.png" },
     { "id": "armadura_vacia",      "nombre": "Armadura vacía",     "vida": 8730, "ataque": 10, "reloj": 9.5,  "sprite": "res://assets/enemigos/armadura_vacia.png" },
-    { "id": "gargola",             "nombre": "Gárgola",            "vida": 9660, "ataque": 11, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png" }
+    { "id": "gargola",             "nombre": "Gárgola",            "vida": 9660, "ataque": 11, "reloj": 10.0, "sprite": "res://assets/enemigos/gargola.png",
+      "comportamientos": [{ "id": "caza_acelera" }] }
   ]
 }

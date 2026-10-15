@@ -128,6 +128,32 @@ func _panel_enemigo(combate: Combate) -> void:
 	_texto(Vector2(d.position.x, y + 30.0), "%d/%d" % [e.vida, e.vida_maxima],
 		8, C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_CENTER, d.size.x)
 	_estados_del_enemigo(combate, d, y + 44.0)
+	_conducta_del_enemigo(combate, d)
+
+## LO QUE HACE ESTE ENEMIGO (`DISEÑO.md` §11), en la columna libre a la izquierda
+## del retrato. Un comportamiento que no se ve no existe —se diagnostica como que
+## falta, es la avería del platillo de `CLAUDE.md`—, y además es justo lo que el
+## jugador necesita saber: *"cada uno altera qué tiro compensa"*. El que está
+## actuando ahora mismo se enciende.
+func _conducta_del_enemigo(combate: Combate, d: Rect2) -> void:
+	var lista := combate.conducta.rotulos(combate.mesa.en_caza)
+	if lista.is_empty():
+		return
+	var ancho := ancho_columna_conducta(d)
+	var y := d.position.y + 12.0
+	for f in lista:
+		var activo := bool((f as Dictionary).get("activo", false))
+		_texto(Vector2(d.position.x + 4.0, y), str((f as Dictionary)["rotulo"]), 8,
+			C_FUEGO if activo else C_ORO_CLARO, HORIZONTAL_ALIGNMENT_LEFT, ancho)
+		_texto(Vector2(d.position.x + 4.0, y + 10.0), str((f as Dictionary)["detalle"]),
+			8, C_TEXTO if activo else C_TEXTO_TENUE, HORIZONTAL_ALIGNMENT_LEFT, ancho)
+		y += 24.0
+
+## El ancho de esa columna: lo que deja el retrato centrado, menos un margen. Es
+## público para que la batería mida que los rótulos caben —el `width` de
+## `draw_string` recorta sin avisar—.
+static func ancho_columna_conducta(interior: Rect2) -> float:
+	return floorf((interior.size.x - NodoCascara.LADO_RETRATO_PANEL) * 0.5) - 8.0
 
 ## LOS ESTADOS, DEBAJO DE LA BARRA DE VIDA. Sin esto el sistema entero no
 ## existe: `CLAUDE.md` tiene anotado que un efecto que el jugador no ve se

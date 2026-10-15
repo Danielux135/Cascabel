@@ -173,3 +173,14 @@ var descarga_factor_dano: float = 2.0
 ## el jugador ve. Si se subiera para "recuperar los 6 segundos", el platillo
 ## pasaría a robar dos tercios de la barra y sería el tiro obligatorio.
 var platillo_atrasa_reloj: float = 0.35
+
+# --- Comportamientos de enemigo (`DISEÑO.md` §11, Fase 6) ---
+## Los números con nombre de cada comportamiento. Un enemigo puede traer los
+## suyos en `data/enemigos.json`, con la misma clave corta, y entonces pisan a
+## estos; si no, valen estos. Están puestos a ojo y son DIALES: lo que dicen de
+## la banda de dificultad lo mide `tests/medir_daniel.gd`, y lo que dicen en la
+## mano solo se sabe jugando.
+##
+## (6) ACELERA AL CAZAR: por cuánto se multiplica lo rápido que carga su reloj
+## mientras estás en la planta alta. 1,6 son unos 20 s de caza cobrados como 32.
+var caza_factor_reloj: float = 1.6

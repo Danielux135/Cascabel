@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **636/636** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **646/646** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -76,6 +76,28 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## FASE 6: LOS ENEMIGOS HACEN COSAS (15-oct, en curso)
+
+`DISEÑO.md` §11: *"uno con más vida no es un enemigo nuevo; cada uno altera qué
+tiro compensa"*. Va en `sim/comportamientos.gd`, con la forma de `Estados`: filas
+`"comportamientos": [{"id": ...}]` en `data/enemigos.json`, números con nombre en
+`ParametrosCombate` (una fila puede pisarlos con la clave corta), estado que se
+rehace en cada `iniciar` y **neutro exacto con la lista vacía**. No gasta azar.
+El panel del enemigo los escribe a la izquierda del retrato, y se enciende el que
+está actuando. Uno por commit.
+
+**QUIÉN LLEVA CADA UNO ES UNA PROPUESTA** (pregunta F1). El acto I va sin
+ninguno, a propósito: es donde se aprende la mesa. `DISEÑO.md` §12 pone los
+enemigos que responden desde el acto II.
+
+| Enemigo | Acto | Comportamiento | Estado |
+|---|---|---|---|
+| Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
+
+- **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y es el jefe del
+  último acto: subir a cazar al final del run es lo más tentador y contra ella
+  sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
 
 ## LA VENTANA DE RECUPERACIÓN DE DISCO DURANTE LA CAZA (tanda 0o · 15-oct)
 
@@ -2008,6 +2030,19 @@ ejecutado en una caja Linux (528/528), lo anterior no:**
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --import
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/prueba_sim.gd
 
+**LO DE LA FASE 6 (comportamientos de enemigo).** Para ver uno sin esperar al
+acto que le toca: la tabla del apartado de arriba dice qué enemigo lo lleva.
+
+**F1.** **¿Quién lleva cada uno?** La tabla es una propuesta razonada, no una
+decisión. Las dos preguntas de fondo: ¿el acto I sin ninguno está bien, o se
+hace largo aprender la mesa contra sacos? ¿Y los jefes —que hoy son el enemigo
+más duro del acto con más vida— deberían llevar DOS comportamientos?
+**F2.** **La Gárgola acelera su reloj ×1,6 mientras cazas.** ¿Se nota? ¿Te hace
+pensártelo antes de subir, que es para lo que está, o la caza sigue siendo un
+regalo? El dial es `caza_factor_reloj`, y una fila del JSON puede traer el suyo.
+**F3.** Los comportamientos salen escritos a la izquierda del retrato del
+enemigo, y el que está actuando se pone en rojo. ¿Se lee de reojo?
+
 **LO DE LA TANDA 0o (la ventana de recuperación de disco).** Con F1 y luego F3
 en un combate, o subiendo por el umbral de verdad.
 
@@ -2530,13 +2565,9 @@ selector de dificultad → tapar agujeros → **Fase 6** → reabrir §13.
    línea de tiro de cada pala con algo que merezca la pena arriba. **Y hasta
    que esto no esté, el 265 contra 1999 no se arregla tocando premios.**
 
-1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto). **Baja de
-   puesto por decisión de Fátima, no porque la medida haya cambiado:** el
-   barrido sigue diciendo que con un solo ataque por reloj no existe ninguna
-   tabla que deje el run en la banda de dificultad que se busca. `DISEÑO.md` §11
-   tiene los seis (bloquear un recorrido, curarse, reflejar, blindaje, castigar
-   el combo, acelerar el reloj). Y con combates de 137 s, un enemigo que solo
-   tiene vida se nota que es un saco
+1. **FASE 6: comportamientos de enemigo** (Opus, razonamiento alto) — **EN
+   CURSO**, ver el apartado de arriba: uno por commit. Lo que queda de esta
+   tanda es jugarla y contestar F1-F3.
 1a. ~~**PONER LA BATERÍA EN VERDE**~~ **HECHA. 321/321.** Ver el detalle en
    "Abierto". Falta el commit.
 1b. **Rebalance, segunda pasada** (Opus, alto), DESPUÉS de la Fase 6 y no antes,

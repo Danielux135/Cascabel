@@ -65,6 +65,10 @@ var bolsa := BolsaReliquias.new()
 ## que faltaba para que un cascabel pudiera hacer algo que se VEA pasar en vez de
 ## mover un porcentaje. Ver `sim/estados.gd`.
 var estados := Estados.new()
+## LO QUE HACE EL ENEMIGO ADEMÁS DE TENER VIDA (`DISEÑO.md` §11). Se rehace en
+## `iniciar`, como los estados, y con la lista vacía cada pregunta devuelve el
+## neutro exacto. Ver `sim/comportamientos.gd`.
+var conducta := Comportamientos.new()
 
 var vida_jugador: int = 0
 ## Golpes seguidos sin drenar. Es lo que manda en el multiplicador.
@@ -196,6 +200,8 @@ func iniciar(el_enemigo: Enemigo, vida_inicial: int = -1,
 	# antes de empezar. El frenesí tampoco, que si no la build de crítico
 	# arrancaría a tope en el combate dos.
 	estados.limpiar()
+	# Y LOS COMPORTAMIENTOS TAMPOCO: son de ESTE enemigo, y se preparan con él.
+	conducta.preparar(enemigo.comportamientos if enemigo != null else [], p)
 	bolas_jugadas = 1
 	dano_total = 0
 	tiempo_jugado = 0.0
@@ -365,8 +371,13 @@ func reloj_restante() -> float:
 ## uno solo dejaría los otros dos mintiendo —y mintiendo justo en el número que
 ## el jugador usa para decidir—, que es la avería del denominador escrito a mano
 ## de `CLAUDE.md`.
+##
+## Y es el sitio del comportamiento que ACELERA AL CAZAR: se le pregunta a la mesa
+## si hay caza en cada llamada, en vez de guardar un booleano que se encienda con
+## `caza_empezada` y haya que acordarse de apagar.
 func ritmo_reloj() -> float:
-	return maxf(bolsa.factor("factor_carga_reloj") * estados.factor_reloj(), 0.001)
+	return maxf(bolsa.factor("factor_carga_reloj") * estados.factor_reloj()
+		* conducta.factor_reloj(mesa.en_caza), 0.001)
 
 ## Los segundos que tarda en cargar el reloj DE ESTE enemigo. Cada uno tiene el
 ## suyo; el parámetro general es solo el de reserva.

@@ -45,6 +45,7 @@ func _initialize() -> void:
 	_prueba_racimo()
 	_prueba_zona_alta()
 	_prueba_ventana_de_la_caza()
+	_prueba_comportamientos()
 	_prueba_sin_rebote_encerrado()
 	_prueba_slingshot_tiene_espalda()
 	_prueba_outlanes()
@@ -1214,6 +1215,103 @@ func _prueba_ventana_de_la_caza() -> void:
 	m2.nueva_bola()
 	_comprobar("y se cierra si se sirve bola nueva a mitad de caza",
 		abierta_antes and not NodoSistema.ventana_caza_abierta(m2))
+
+## LOS COMPORTAMIENTOS DE ENEMIGO (`DISEÑO.md` §11, Fase 6). Lo que se sujeta
+## aquí es lo que no daría ningún error si se rompiera: que el JSON nombre un
+## comportamiento o una clave que no existen (el enemigo no haría nada y se
+## diagnosticaría como balance), que nadie lea la clave, y que un enemigo SIN
+## comportamientos deje de ser exactamente el de antes.
+func _prueba_comportamientos() -> void:
+	# --- Lista cerrada: ids y claves del JSON.
+	var malos: Array[String] = []
+	var con_alguno := 0
+	for datos in CatalogoEnemigos.cargar():
+		var dd := datos as Dictionary
+		var lista = dd.get("comportamientos", [])
+		if typeof(lista) != TYPE_ARRAY:
+			malos.append("%s: no es una lista" % dd.get("id", "?"))
+			continue
+		if not (lista as Array).is_empty():
+			con_alguno += 1
+		for fila in lista:
+			if typeof(fila) != TYPE_DICTIONARY:
+				malos.append("%s: fila que no es un diccionario" % dd.get("id", "?"))
+				continue
+			var el_id := str((fila as Dictionary).get("id", ""))
+			if not Comportamientos.IDS.has(el_id):
+				malos.append("%s: '%s' no existe" % [dd.get("id", "?"), el_id])
+				continue
+			for clave in (fila as Dictionary):
+				if clave != "id" and not (Comportamientos.CLAVES[el_id] as Array).has(clave):
+					malos.append("%s: %s no lee '%s'" % [dd.get("id", "?"), el_id, clave])
+	_comprobar("los comportamientos del JSON existen y sus claves se leen",
+		malos.is_empty(), str(malos))
+	_comprobar("y hay al menos un enemigo que lleva alguno", con_alguno > 0)
+	# Cada comportamiento con su parámetro con nombre y su rótulo: uno que se
+	# añada a `IDS` sin escribir las dos cosas queda mudo o con números a cero.
+	var todos: Array = []
+	for el_id in Comportamientos.IDS:
+		todos.append({"id": el_id})
+	var completo := Comportamientos.new()
+	completo.preparar(todos, ParametrosCombate.new())
+	_comprobar("cada comportamiento sale en el panel con su rotulo",
+		completo.rotulos(false).size() == Comportamientos.IDS.size()
+			and completo.activos.size() == Comportamientos.IDS.size(),
+		"%d rótulos de %d" % [completo.rotulos(false).size(), Comportamientos.IDS.size()])
+
+	# --- Alguien LEE la clave: del JSON al combate.
+	var lee := false
+	for datos in CatalogoEnemigos.cargar():
+		var e := Enemigo.new(datos)
+		if e.comportamientos.is_empty():
+			continue
+		var c := Combate.new()
+		c.iniciar(e)
+		lee = not c.conducta.vacio()
+		break
+	_comprobar("la clave comportamientos llega del JSON al combate", lee)
+
+	# --- Neutro EXACTO sin comportamientos, dentro y fuera de la caza.
+	var c0 := Combate.new()
+	c0.iniciar(Enemigo.new({"nombre": "Saco", "vida": 1000, "ataque": 1}))
+	var fuera := c0.ritmo_reloj()
+	c0.mesa.en_caza = true
+	var dentro := c0.ritmo_reloj()
+	c0.mesa.en_caza = false
+	_comprobar("sin comportamientos el reloj va igual con caza que sin ella",
+		fuera == 1.0 and dentro == 1.0, "%.6f y %.6f" % [fuera, dentro])
+
+	# --- (6) ACELERA AL CAZAR, con una caza de verdad.
+	var c6 := Combate.new()
+	c6.iniciar(Enemigo.new({"nombre": "Gárgola", "vida": 100000, "ataque": 1,
+		"reloj": 10.0, "comportamientos": [{"id": "caza_acelera"}]}))
+	_en_juego(c6)
+	var f := c6.p.caza_factor_reloj
+	_comprobar("acelera al cazar: fuera de la caza el reloj va a su ritmo",
+		c6.ritmo_reloj() == 1.0, "%.3f" % c6.ritmo_reloj())
+	var t6 := 0.0
+	while t6 < 6.0 and not c6.mesa.en_caza:
+		c6.mesa.abrir_caza_a_mano()
+		c6.avanzar(DT)
+		t6 += DT
+	var carga_antes := c6.carga_reloj
+	var tramo := 1.0
+	for _i in int(tramo / DT):
+		c6.avanzar(DT)
+	var esperado := tramo * f / c6.reloj_carga()
+	var subio := c6.carga_reloj - carga_antes
+	_comprobar("y en la caza carga %.1f veces mas rapido, contado en la barra" % f,
+		c6.mesa.en_caza and absf(subio - esperado) < 0.01,
+		"en caza %s, subió %.4f y tocaba %.4f" % [str(c6.mesa.en_caza), subio, esperado])
+	# Y los segundos que se enseñan salen de lo mismo: un aviso de 3-2-1 que
+	# contara al ritmo de fuera mentiría justo cuando más se mira.
+	_comprobar("y los segundos que quedan se cuentan al mismo ritmo",
+		is_equal_approx(c6.reloj_restante(),
+			(1.0 - c6.carga_reloj) * c6.reloj_carga() / (f)),
+		"%.3f s" % c6.reloj_restante())
+	c6.mesa.nueva_bola()
+	_comprobar("y al cortarse la caza vuelve a su ritmo, sin nadie que lo apague",
+		not c6.mesa.en_caza and c6.ritmo_reloj() == 1.0, "%.3f" % c6.ritmo_reloj())
 
 ## Cuántos colisionadores de un tipo hay en la planta alta. Contar sin decir de
 ## qué planta hablas es de donde salen las pruebas que miden otra cosa.
@@ -5707,6 +5805,26 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 	# propósito —es lo único que se puede tapar veinte segundos—, pero nada más:
 	# ni la mesa, ni la vida del enemigo, ni la tuya. Y su texto tiene que caber
 	# con el número más largo que pueda llegar a escribir.
+	# LOS RÓTULOS DE LOS COMPORTAMIENTOS, en la columna libre del panel del
+	# enemigo. El `width` recorta sin avisar, así que se miden todos.
+	var todos_c: Array = []
+	for el_id in Comportamientos.IDS:
+		todos_c.append({"id": el_id})
+	var conducta := Comportamientos.new()
+	conducta.preparar(todos_c, ParametrosCombate.new())
+	var col_c := NodoHud.ancho_columna_conducta(
+		cascara.interior_panel(cascara.panel_enemigo()))
+	var no_caben: Array[String] = []
+	for fila in conducta.rotulos(true):
+		for k in ["rotulo", "detalle"]:
+			var txt := str((fila as Dictionary)[k])
+			if FuenteUI.obtener().get_string_size(txt, HORIZONTAL_ALIGNMENT_LEFT,
+					-1.0, 8).x > col_c:
+				no_caben.append(txt)
+	_comprobar("los rotulos de los comportamientos caben al lado del retrato",
+		no_caben.is_empty() and col_c > 40.0,
+		"columna de %.0f px — %s" % [col_c, str(no_caben)])
+
 	var rec := NodoSistema.caja_recuperacion_en(cascara)
 	var tapa: Array[String] = []
 	for nombre in ["enemigo", "jugador"]:

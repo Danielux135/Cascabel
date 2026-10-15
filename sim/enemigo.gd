@@ -22,6 +22,12 @@ var sprite: String
 ## La calavera llameante flota: se dibuja con desplazamiento propio en vez de
 ## alinearse al suelo como los demás.
 var flota: bool
+## Lo que hace además de tener vida (`DISEÑO.md` §11): filas `{"id": ...}` que
+## lee `Comportamientos`. COPIA HONDA a propósito: `Mapa` duplica los datos de
+## cada nodo en superficie, así que dos nodos del mismo enemigo compartirían esta
+## lista, y un comportamiento que escribiera en ella le cambiaría el enemigo al
+## nodo de al lado.
+var comportamientos: Array = []
 
 func _init(datos: Dictionary) -> void:
 	id = str(datos.get("id", ""))
@@ -32,6 +38,9 @@ func _init(datos: Dictionary) -> void:
 	reloj = float(datos.get("reloj", 0.0))
 	sprite = str(datos.get("sprite", ""))
 	flota = bool(datos.get("flota", false))
+	var lista = datos.get("comportamientos", [])
+	if typeof(lista) == TYPE_ARRAY:
+		comportamientos = (lista as Array).duplicate(true)
 
 func vivo() -> bool:
 	return vida > 0
