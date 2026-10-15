@@ -1319,6 +1319,29 @@ func _prueba_comportamientos() -> void:
 	_comprobar("y al cortarse la caza vuelve a su ritmo, sin nadie que lo apague",
 		not c6.mesa.en_caza and c6.ritmo_reloj() == 1.0, "%.3f" % c6.ritmo_reloj())
 
+	# LA CUENTA ATRÁS NO VA HACIA ATRÁS cuando el ritmo baja a mitad del aviso:
+	# en plena caza avisa "1", la caza se acaba, los segundos suben, y lo que
+	# no puede salir es otro "2" después del "1".
+	var c9 := Combate.new()
+	c9.iniciar(Enemigo.new({"nombre": "Gárgola", "vida": 100000, "ataque": 1,
+		"reloj": 10.0, "comportamientos": [{"id": "caza_acelera"}]}))
+	_en_juego(c9)
+	var avisos: Array[int] = []
+	c9.reloj_avisa.connect(func(s: int) -> void: avisos.append(s))
+	c9.mesa.en_caza = true
+	while c9.reloj_restante() > 0.9:
+		c9.avanzar(DT)
+		c9.mesa.en_caza = true
+	c9.mesa.en_caza = false
+	for _i in 6:
+		c9.avanzar(DT)
+	var hacia_atras := false
+	for i in range(1, avisos.size()):
+		if avisos[i] > avisos[i - 1]:
+			hacia_atras = true
+	_comprobar("la cuenta atras del reloj nunca vuelve a subir",
+		not avisos.is_empty() and not hacia_atras, str(avisos))
+
 	_prueba_comportamiento_cura()
 	_prueba_comportamiento_castigo()
 	_prueba_comportamiento_blindaje()
@@ -1675,6 +1698,31 @@ func _prueba_comportamiento_cura() -> void:
 	_comprobar("el veneno no le impide curarse",
 		not pc.cura_tocan_los_estados and c5.conducta.cura_en() == 0.0,
 		"le faltan %.1f s" % c5.conducta.cura_en())
+
+	# Con cada bola servida la espera empieza de cero.
+	var c7 := Combate.new(pc)
+	c7.iniciar(Enemigo.new(datos))
+	c7.enemigo.vida = 3000
+	_en_juego(c7)
+	_avanzar_combate(c7, pc.cura_espera - 1.0)
+	c7.mesa.retirar_bolas()
+	c7.mesa.bola_drenada.emit()
+	var t7 := 0.0
+	while c7.fase != Combate.Fase.LANZANDO and t7 < 5.0:
+		c7.avanzar(DT)
+		t7 += DT
+	_avanzar_combate(c7, 1.5)
+	_comprobar("la espera de la cura empieza de cero con cada bola",
+		c7.enemigo.vida == 3000, "se curó con la bola nueva: %d" % c7.enemigo.vida)
+	# Y a vida llena no dice que se está curando.
+	var c8 := Combate.new(pc)
+	c8.iniciar(Enemigo.new(datos))
+	_en_juego(c8)
+	_avanzar_combate(c8, pc.cura_espera + 1.0)
+	var fila_c8: Dictionary = c8.conducta.rotulos(false, 1, false)[0]
+	_comprobar("a vida llena no se enciende curandose",
+		not bool(fila_c8["activo"]) and str(fila_c8["detalle"]) != "curándose",
+		str(fila_c8))
 
 	# Y un enemigo sin el comportamiento no se cura nunca.
 	var c6 := Combate.new(pc)
@@ -6188,7 +6236,11 @@ func _prueba_paneles_de_la_cascara(cascara: NodoCascara, ventana: Rect2,
 		cascara.interior_panel(cascara.panel_enemigo()))
 	var no_caben: Array[String] = []
 	var filas_c: Array = conducta.rotulos(true, 4)
-	# Y los detalles que solo salen con el reflejo armado, uno por tiro.
+	# Y los detalles que solo salen en otros estados: la cura en marcha y a vida
+	# llena, y el reflejo armado con cada tiro.
+	conducta.sin_tocar = 1000.0
+	filas_c.append_array(conducta.rotulos(true, 4, true))
+	filas_c.append_array(conducta.rotulos(true, 4, false))
 	for tiro in Comportamientos.TIROS_REFLEJABLES:
 		conducta.ultimo_tiro = tiro
 		conducta.seguidas = 1

@@ -149,6 +149,13 @@ func _resolver(el_id: String, fila: Dictionary) -> Dictionary:
 func tocado() -> void:
 	sin_tocar = 0.0
 
+## Con cada bola servida la espera de la cura empieza de cero. Sin esto, los
+## segundos que llevaba la bola anterior pasaban a la nueva y el enemigo podía
+## curarse con la bola todavía en el lanzador, sin que hubieras tenido ocasión
+## de tocarle. Lo cazó la revisión de la Fase 6.
+func nueva_bola() -> void:
+	sin_tocar = 0.0
+
 ## Avanza el reloj de la cura y devuelve cuánto se cura en este paso. SOLO lo
 ## llama `Combate.avanzar` con la bola en juego: en las pausas de drenaje y de
 ## ataque el jugador no tiene la bola, y cobrarle ahí sería cobrarle por esperar.
@@ -323,7 +330,10 @@ func factor_reloj(en_caza: bool) -> float:
 ## compensa contra este enemigo, que es para lo que están.
 ##
 ## `en_caza` hace falta para encender el que está actuando ahora mismo.
-func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
+##
+## `herido` es si al enemigo le falta vida: a vida llena no se está curando nada,
+## y encender "curándose" en rojo sería mentir.
+func rotulos(en_caza: bool, multiplicador: int = 1, herido: bool = true) -> Array:
 	var salida: Array = []
 	for el_id in IDS:
 		if not activos.has(el_id):
@@ -331,9 +341,12 @@ func rotulos(en_caza: bool, multiplicador: int = 1) -> Array:
 		match el_id:
 			"cura":
 				var falta := cura_en()
-				salida.append({"rotulo": "SE CURA",
-					"detalle": "curándose" if falta <= 0.0 else "en %d s" % int(ceilf(falta)),
-					"activo": falta <= 0.0})
+				var curando := falta <= 0.0 and herido
+				var detalle := "curándose" if curando else "en %d s" % int(ceilf(falta))
+				if falta <= 0.0 and not herido:
+					detalle = "en espera"
+				salida.append({"rotulo": "SE CURA", "detalle": detalle,
+					"activo": curando})
 			"bloquea":
 				var tiro_b := str(activos["bloquea"]["tiro"])
 				salida.append({"rotulo": "BLOQUEA",

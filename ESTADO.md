@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **680/680** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **683/683** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -95,10 +95,10 @@ enemigos que responden desde el acto II.
 |---|---|---|---|
 | Calavera llameante | II | **bloquea el cañón** hasta que le pegas por otro sitio | hecho |
 | Esqueleto | II | **refleja si repites recorrido** (te devuelve su ataque) | hecho |
-| Cultista | II, y jefe del II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
+| Cultista | II | **se cura si no le tocas** (1 %/s tras 6 s) | hecho |
 | Goblin bruto | III | **castiga el combo alto** (desde x3: +50 %/tramo y roba uno) | hecho |
 | Armadura vacía | III | **blindaje** (3 capas; lo flojo entra a ¼; el cañón rompe) | hecho |
-| Gárgola | III, y jefe del III | **acelera su reloj al cazar** (×1,6) | hecho |
+| Gárgola | III | **acelera su reloj al cazar** (×1,6) | hecho |
 
 - **Calavera llameante, bloquea el cañón.** Su fuego lo cierra: meterlo no cobra
   nada ("BLOQUEADO") hasta que le pegas por otro sitio —un target, un banco u
@@ -115,9 +115,10 @@ enemigos que responden desde el acto II.
   de la caza nunca, que no es un tiro tuyo. Los tiros anulados pasan todos por
   un filtro común al principio de cada gancho, `Combate._filtrar_tiro`.
 - **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
-  el 1 % de su vida cada segundo hasta que le vuelvas a dar. Es el jefe del acto
-  II, que es donde un run empieza a jugarse "seguro" aguantando la bola en la
-  cuna, y es lo que este comportamiento prohíbe. Solo cuenta con la bola en
+  el 1 % de su vida cada segundo hasta que le vuelvas a dar. Va en el acto II,
+  que es donde un run empieza a jugarse "seguro" aguantando la bola en la cuna,
+  y es lo que este comportamiento prohíbe. La espera empieza de cero con cada
+  bola servida. Solo cuenta con la bola en
   juego, nunca en las pausas. **El modelo tampoco lo ve**: reparte los golpes
   cada 0,86 s, así que nunca pasan seis sin tocarle.
 - **Goblin bruto, castiga el combo.** Se ensaña con el que acumula: si su reloj
@@ -134,9 +135,13 @@ enemigos que responden desde el acto II.
   subir el multiplicador para que un retorno llegue. **El veneno lo atraviesa**,
   porque no es un golpe, y eso la deja como el enemigo contra el que el veneno
   brilla (pregunta F6).
-- **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y es el jefe del
+- **Gárgola, acelera al cazar.** Es la que vigila desde arriba, y va en el
   último acto: subir a cazar al final del run es lo más tentador y contra ella
   sale caro. No lo puede medir `medir_daniel.gd`: el modelo no simula la caza.
+- **Ojo con los jefes, que estaba mal escrito:** el jefe de cada acto NO es el
+  enemigo más duro, como decía «Abierto», sino uno **al azar** de los tres del
+  acto, con ×1,5 de vida y "mayor" en el nombre (`Mapa._enemigo`). Así que
+  cualquiera de los tres de un acto puede tocar de jefe, con su comportamiento.
 
 ## LA VENTANA DE RECUPERACIÓN DE DISCO DURANTE LA CAZA (tanda 0o · 15-oct)
 
@@ -2939,8 +2944,9 @@ de geometría fina y se hace jugando, no midiendo.
   vida". Los tres sprites de `assets/jefes/` NO se usan a propósito: enseñar
   un golem y meterte contra una "Rata mayor" sería el mapa mintiendo. Se
   conectan cuando los jefes sean enemigos de verdad, en Fase 6.
-- **Los jefes son de mentira.** Ahora un jefe es el enemigo más duro del acto
-  con 1,8× de vida y "mayor" en el nombre. Eso NO cumple `DISEÑO.md` §8: un
+- **Los jefes son de mentira.** Ahora un jefe es un enemigo AL AZAR de los tres
+  del acto, con ×1,5 de vida y "mayor" en el nombre (`Mapa._enemigo`); hasta el
+  15-oct esto decía "el más duro con 1,8×", y no lo era. Eso NO cumple `DISEÑO.md` §8: un
   enemigo con más vida no es un enemigo nuevo. Los jefes de verdad, con sus
   fases y los sprites de `assets/jefes/`, son Fase 6.
 - **La recompensa sale del combate, no del mapa.** El nodo del mapa sigue sin

@@ -452,10 +452,17 @@ func _avanzar_reloj(dt: float) -> void:
 		_aviso_dado = -1
 		_atacar(enemigo.ataque, true)
 		return
+	# LA CUENTA ATRÁS SOLO BAJA. El ritmo del reloj puede cambiar a mitad —se
+	# acaba la caza contra la Gárgola, caduca la escarcha— y entonces los
+	# segundos que quedan SUBEN: con `!=`, eso volvía a avisar "2" después de
+	# "1". Si salen de la ventana del aviso, la cuenta se rearma entera, como
+	# hace el platillo al robar reloj.
 	var restante := reloj_restante()
-	if restante <= p.reloj_aviso:
+	if restante > p.reloj_aviso:
+		_aviso_dado = -1
+	else:
 		var segundos := int(ceil(restante))
-		if segundos != _aviso_dado:
+		if _aviso_dado < 0 or segundos < _aviso_dado:
 			_aviso_dado = segundos
 			reloj_avisa.emit(segundos)
 
@@ -893,5 +900,6 @@ func _siguiente_fase() -> void:
 			# la bola perdonada por la red de seguridad también lo reciba.
 			_sumar_golpes(maxi(int(round(bolsa.suma("suma_golpes_inicio"))) - golpes, 0))
 			mesa.nueva_bola()
+			conducta.nueva_bola()
 			_soltar_bolas(int(round(bolsa.suma("suma_bolas_al_servir"))))
 			bola_servida.emit()
