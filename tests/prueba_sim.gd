@@ -1409,7 +1409,7 @@ func _prueba_comportamientos_y_la_mesa() -> void:
 		orbitas += vistas[0]
 		de_lanzamiento += vistas[1]
 		sin_racha = sin_racha and c.conducta.seguidas == 0 \
-			and not c.mesa.salida_de_lanzamiento
+			and not c.mesa.salida_de_lanzamiento and not c.mesa.bola.de_lanzamiento
 		sigue_cerrado = sigue_cerrado and (datos == esqueleto
 			or c.conducta.bloqueado == "canon")
 	_comprobar("la orbita del lanzamiento no cuenta para el reflejo ni abre el bloqueo",
@@ -1421,6 +1421,63 @@ func _prueba_comportamientos_y_la_mesa() -> void:
 	var extra := c2.mesa.soltar_bola_extra()
 	_comprobar("y la bola extra sale marcada como recien lanzada",
 		extra != null and extra.de_lanzamiento)
+	# Y AL REVÉS, que es lo que se rompería sin avisar: la misma órbita, con la
+	# física de verdad y SIN la marca, cuenta para la racha. Sin esto, una marca
+	# que no se apagara dejaría al Esqueleto y a la Calavera sin hacer nada
+	# jugando, con la batería en verde.
+	var c11 := Combate.new(pc)
+	c11.iniciar(Enemigo.new(esqueleto))
+	_en_juego(c11)
+	var io := -1
+	for i in c11.mesa.rampas.size():
+		if (c11.mesa.rampas[i] as Rampa).nombre == "orbita":
+			io = i
+	var b11 := c11.mesa.bola
+	b11.en_carril = false
+	b11.de_lanzamiento = false
+	b11.rampa = io
+	b11.rampa_sentido = 1
+	b11.rampa_subida = 1
+	b11.rampa_distancia = 0.0
+	b11.rampa_velocidad = 1400.0
+	b11.pos = (c11.mesa.rampas[io] as Rampa).punto_en(0.0)
+	b11.vel = Vector2.ZERO
+	var vistas11 := [0, 0]
+	c11.mesa.rampa_salida.connect(func(_pt: Vector2, i: int) -> void:
+		if i == io:
+			vistas11[0] += 1
+			if c11.mesa.salida_de_lanzamiento:
+				vistas11[1] += 1)
+	for _i in int(3.0 / DT):
+		c11.avanzar(DT)
+		if vistas11[0] > 0:
+			break
+	_comprobar("la misma orbita sin la marca de lanzamiento si cuenta para la racha",
+		vistas11[0] == 1 and vistas11[1] == 0 and c11.conducta.ultimo_tiro == "orbita"
+			and c11.conducta.seguidas == 1,
+		"%d salidas, %d de lanzamiento, racha %s x%d" % [vistas11[0], vistas11[1],
+			c11.conducta.ultimo_tiro, c11.conducta.seguidas])
+	# Y UNA PALA APAGA LA MARCA: una bola lanzada que cae a la pala sin pasar por
+	# ninguna rampa ya es tuya.
+	var c12 := Combate.new(pc)
+	c12.iniciar(Enemigo.new(esqueleto))
+	_en_juego(c12)
+	var pala: Flipper = null
+	for f in c12.mesa.flippers:
+		if pala == null or f.eje.y > pala.eje.y:
+			pala = f
+	var b12 := c12.mesa.bola
+	b12.en_carril = false
+	b12.de_lanzamiento = true
+	b12.pos = (pala.eje + pala.punta()) * 0.5 + Vector2(0, -30)
+	b12.vel = Vector2(0, 60)
+	var apagada := false
+	for _i in int(1.0 / DT):
+		c12.avanzar(DT)
+		if not b12.de_lanzamiento:
+			apagada = true
+			break
+	_comprobar("tocar una pala apaga la marca de lanzamiento", apagada)
 
 	# (2) LA PLANTA ALTA: cuatro recorridos, ni el umbral ni el regreso. Repetir
 	# túnel no se refleja y la subida a la isla no se bloquea, y siguen pagando.
@@ -1478,6 +1535,33 @@ func _prueba_comportamientos_y_la_mesa() -> void:
 	c6.mesa.cortar_caza()
 	_comprobar("el umbral rompe la racha del reflejo y abre el recorrido cerrado",
 		c5.enemigo.vida < antes5 and c6.conducta.bloqueado == "")
+	# Y LO QUE ABRE SE PUEDE COBRAR: la caza dura más que el rearme, así que
+	# mientras se caza el rearme no corre (arriba no se bloquea nada). Con la caza
+	# de verdad, subiendo por el umbral: al bajar, el cañón sigue abierto, y se
+	# cierra a los segundos de rearme de juego abajo.
+	var c13 := Combate.new(pc)
+	c13.iniciar(Enemigo.new(calavera))
+	_en_juego(c13)
+	var subio := c13.mesa.abrir_caza_a_mano()
+	var t13 := 0.0
+	while not c13.mesa.en_caza and t13 < 5.0:
+		c13.avanzar(DT)
+		t13 += DT
+	var abierto_al_subir := c13.conducta.bloqueado == ""
+	var rearme := c13.p.bloqueo_rearme
+	_avanzar_combate(c13, rearme + 1.0)
+	var abierto_en_caza := c13.mesa.en_caza and c13.conducta.bloqueado == ""
+	c13.mesa.cortar_caza()
+	var abierto_al_bajar := c13.conducta.bloqueado == ""
+	# Con margen para las pausas: la bola baja por el regreso y, sin nadie en las
+	# palas, drena, y en las pausas del drenaje el rearme no corre.
+	_avanzar_combate(c13, rearme + c13.p.pausa_drenaje + c13.p.pausa_ataque + 1.0)
+	_comprobar("el canon que abre el umbral sigue abierto al bajar, y luego se cierra",
+		subio and abierto_al_subir and c13.mesa.p.caza_tiempo > rearme + 1.0
+			and abierto_en_caza and abierto_al_bajar
+			and c13.conducta.bloqueado == "canon",
+		"subio %s, al subir %s, en caza %s, al bajar %s, luego '%s'" % [subio,
+			abierto_al_subir, abierto_en_caza, abierto_al_bajar, c13.conducta.bloqueado])
 
 	# (4) UN TIRO ANULADO LO DICE, para que la vista no lo celebre: el cañón
 	# cerrado sacaba "BLOQUEADO" y a la vez el cuadro de error del golpe gordo.
@@ -6208,7 +6292,7 @@ func _prueba_misiones_y_la_mesa() -> void:
 	var c := _combate_de_mision(de_retorno, [])
 	var cura := BolsaReliquias.new()
 	cura.anadir(Reliquia.new({"id": "prueba_cura", "nombre": "Prueba",
-		"efectos": {"suma_vida_por_recorrido": 10}}))
+		"efectos": {"suma_vida_por_recorrido": 10, "aplica_veneno_retorno": 1}}))
 	c.bolsa = cura
 	c.vida_jugador = c.vida_maxima() - 50
 	var vida_j := c.vida_jugador
@@ -6217,9 +6301,11 @@ func _prueba_misiones_y_la_mesa() -> void:
 	var tras_regreso := c.llevas(0)
 	var pego := vida - c.enemigo.vida
 	var curo := c.vida_jugador - vida_j
+	var envenena := c.estados.tiene("veneno")
 	_recorrido(c, Rampa.Premio.DANO)
-	_comprobar("el regreso de la caza no cuenta para la mision ni cura, y sigue pegando",
+	_comprobar("el regreso de la caza no cuenta para la mision, ni cura, ni aplica estados, y sigue pegando",
 		c.mesa.regreso >= 0 and tras_regreso == 0 and pego > 0 and curo == 0
+			and not envenena and c.estados.tiene("veneno")
 			and c.llevas(0) == 1 and c.vida_jugador - vida_j == 10,
 		"tras el regreso %d y curó %d, pego %d, tras un retorno %d" % [tras_regreso,
 			curo, pego, c.llevas(0)])

@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **712/712** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **715/715** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -2255,6 +2255,8 @@ cerrar, o otro recorrido? Una fila del JSON lo cambia (`"tiro"`); los diales son
 subida no son tiros que se apunten igual que abajo (un túnel se repite solo
 rebotando en su bumper) y la caza es un bonus. La que castiga cazar es la
 Gárgola. ¿Bien así, o la Calavera y el Esqueleto también deberían mirar arriba?
+Por lo mismo, **el rearme del bloqueo no corre mientras cazas**: el umbral abre el
+cañón y lo encuentras abierto al bajar.
 Y la F8 tiene un matiz: el cañón cerrado sigue cargando la barra de descarga.
 **F7.** **El Esqueleto refleja el recorrido repetido.** ¿Te obliga a variar, o
 solo te pilla por sorpresa? Con el panel diciendo cuál no repetir debería ser

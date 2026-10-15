@@ -1166,15 +1166,21 @@ func _al_castigar_combo(antes: int, ahora: int) -> void:
 	# queda fija ~640 px por encima de la tele, el reloj sigue pegando, y el
 	# jugador bajaba con un x3 sin saber por qué: la ruleta girando fuera de plano
 	# de `CLAUDE.md`, otra vez.
+	var subida := 20.0
 	if camara != null and cam != null:
 		var rect := camara.rect_visible()
 		var arriba := rect.position.y + cam.alto_franja_hud + AVISO_MARGEN
 		var abajo := rect.end.y - AVISO_MARGEN
-		if donde.y < arriba or donde.y > abajo:
+		# Lo que el texto queda POR ENCIMA de su ancla: los 10 px fijos y hasta
+		# 0,75 de su recorrido que sube en `_dibujar_numeros`, más el alto de la
+		# letra. Con el ancla sola, en lo alto de la arena la línea se metía bajo
+		# la barra de título al subir, que va en la capa 5.
+		var encima := 10.0 + 0.75 * subida + _fuente.get_ascent(int(FuenteUI.tam(16.0)))
+		if donde.y - encima < arriba or donde.y > abajo:
 			donde.y = roundf(clampf(mesa.bola_en_peligro().pos.y - 40.0,
-				arriba + 16.0, abajo))
+				arriba + encima, abajo))
 	_numeros.append({"pos": donde, "t": 1.2, "texto": "de x%d a x%d" % [antes, ahora],
-		"col": C_FUEGO, "tam": 16.0, "subida": 20.0})
+		"col": C_FUEGO, "tam": 16.0, "subida": subida})
 	impactos.onda(donde, C_FUEGO, 1.2)
 
 ## UN GOLPE CONCENTRADO HA ROTO UNA CAPA DEL BLINDAJE. Se dice donde ha pasado,

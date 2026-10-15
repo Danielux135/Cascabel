@@ -444,7 +444,12 @@ func avanzar(dt: float) -> void:
 		_dano_de_estados(int(paso["dano"]), mesa.bola_en_peligro().pos)
 		_avanzar_cura(dt)
 		conducta.avanzar_blindaje(dt)
-		conducta.avanzar_bloqueo(dt)
+		# EL REARME DEL BLOQUEO NO CORRE EN LA CAZA. Arriba no se bloquea nada
+		# (`_rampa_exenta`), y la caza dura más que el rearme: corriendo, el
+		# cañón que abre el umbral estaba siempre cerrado otra vez al bajar, y el
+		# "CAÑÓN ABIERTO" prometía algo que no se podía cobrar.
+		if not mesa.en_caza:
+			conducta.avanzar_bloqueo(dt)
 	if _temporizador > 0.0:
 		_temporizador -= dt
 		if _temporizador <= 0.0:
