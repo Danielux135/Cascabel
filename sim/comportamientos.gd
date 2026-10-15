@@ -242,18 +242,26 @@ func avanzar_bloqueo(dt: float) -> String:
 # ------------------------------------------------------------- el reflejo
 
 ## (3) REFLEJA SI REPITES TIRO: *"obliga a variar"*. Lo pregunta
-## `Combate._filtrar_tiro` con cada recorrido completado. Lleva la cuenta de los
+## `Combate._filtrar_tiro` con cada tiro apuntado. Lleva la cuenta de los
 ## seguidos y dice si ESTE se refleja: a partir de `repeticiones` seguidas, y
-## mientras no cambies. Los tiros que no vigila no tocan la cuenta.
+## mientras no cambies.
+##
+## LA RACHA LA ROMPE CUALQUIER TIRO APUNTADO, aunque solo los recorridos se
+## puedan reflejar. Si un target o un banco no la rompieran, "cañón, banco,
+## cañón" contaría como repetir, que no es lo que nadie entiende por repetir, y
+## una misión como Cadena larga (cañón → banco → cañón → banco) se reflejaría
+## entera sin haber repetido nada. El racimo y el girador no la tocan: no se
+## apuntan.
 func reflejar(tiro: String) -> bool:
-	if not activos.has("refleja") or not TIROS_REFLEJABLES.has(tiro):
+	if not activos.has("refleja") or not TIROS_QUE_ABREN.has(tiro):
 		return false
 	if tiro == ultimo_tiro:
 		seguidas += 1
 	else:
 		ultimo_tiro = tiro
 		seguidas = 1
-	return seguidas >= int(activos["refleja"]["repeticiones"])
+	return TIROS_REFLEJABLES.has(tiro) \
+		and seguidas >= int(activos["refleja"]["repeticiones"])
 
 ## Lo que te devuelve un tiro reflejado.
 func ataque_reflejo(ataque: int) -> int:
@@ -264,7 +272,7 @@ func ataque_reflejo(ataque: int) -> int:
 ## El tiro que reflejaría si lo metieras ahora, o "" si ninguno. Es lo que dice
 ## el panel: no "refleja si repites", sino "REFLEJA: CAÑÓN".
 func tiro_vigilado() -> String:
-	if not activos.has("refleja") or ultimo_tiro == "":
+	if not activos.has("refleja") or not TIROS_REFLEJABLES.has(ultimo_tiro):
 		return ""
 	if seguidas + 1 >= int(activos["refleja"]["repeticiones"]):
 		return ultimo_tiro

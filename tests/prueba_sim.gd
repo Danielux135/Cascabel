@@ -1461,6 +1461,26 @@ func _prueba_comportamiento_reflejo() -> void:
 	_comprobar("los targets seguidos no se reflejan",
 		antes_t > c.enemigo.vida and reflejos[0] == 3,
 		"pegaron %d, %d avisos" % [antes_t - c.enemigo.vida, reflejos[0]])
+	# UN TARGET O UN BANCO ENTRE DOS RECORRIDOS IGUALES ROMPE LA RACHA: "cañón,
+	# banco, cañón" no es repetir. Sin esto, Cadena larga se reflejaba entera.
+	var c4 := Combate.new(pc)
+	c4.iniciar(Enemigo.new(datos))
+	_en_juego(c4)
+	var reflejos4 := [0]
+	c4.golpe_reflejado.connect(func(_p: Vector2, _d: int) -> void: reflejos4[0] += 1)
+	_recorrido(c4, Rampa.Premio.DANO_FUERTE)
+	c4.mesa.banco_completado.emit(Vector2(200, 800), 0)
+	_recorrido(c4, Rampa.Premio.DANO_FUERTE)
+	c4.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_recorrido(c4, Rampa.Premio.DANO_FUERTE)
+	_comprobar("un target o un banco entre dos recorridos iguales rompe la racha",
+		reflejos4[0] == 0 and c4.conducta.tiro_vigilado() == "canon",
+		"%d reflejos" % reflejos4[0])
+	# Y el panel no vigila un target: no se puede reflejar.
+	c4.mesa.target_abatido.emit(Vector2(200, 800), 0)
+	_comprobar("y el panel nunca dice que vigila un target",
+		c4.conducta.tiro_vigilado() == "", c4.conducta.tiro_vigilado())
+
 	# El regreso de la caza lo hace la mesa sola: nunca se refleja.
 	var c2 := Combate.new(pc)
 	c2.iniciar(Enemigo.new(datos))

@@ -26,7 +26,7 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **683/683** en la caja remota (Linux), con todo el repo delante. **Y desde la
+Batería **685/685** en la caja remota (Linux), con todo el repo delante. **Y desde la
 tanda 0m el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno,
 cada una con su momento, y dos buses con la música por debajo de los efectos.
 Lo único que falta de esa tanda es oírla — ver U1-U10.
@@ -142,8 +142,9 @@ enemigos que responden desde el acto II.
   platillo) dos veces seguidas, el segundo no le hace nada —ni daño, ni misión,
   ni premio de recorrido— y te devuelve su ataque, y sigue así mientras no
   cambies. El panel dice CUÁL no repetir ("REFLEJA / RETORNO", en rojo), y al
-  reflejar sale "REFLEJADO". Ni el racimo ni los targets cuentan, y el regreso
-  de la caza nunca, que no es un tiro tuyo. Los tiros anulados pasan todos por
+  reflejar sale "REFLEJADO". Solo se reflejan recorridos, pero la racha la rompe
+  cualquier tiro apuntado: "cañón, banco, cañón" no es repetir. El racimo no
+  cuenta, y el regreso de la caza nunca, que no es un tiro tuyo. Los tiros anulados pasan todos por
   un filtro común al principio de cada gancho, `Combate._filtrar_tiro`.
 - **Cultista, se cura.** El ritual: si le dejas respirar seis segundos, recupera
   el 1 % de su vida cada segundo hasta que le vuelvas a dar. Va en el acto II,
