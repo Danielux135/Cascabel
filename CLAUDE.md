@@ -120,6 +120,10 @@ Godot en `%APPDATA%\Godot\export_templates\<versión>.stable`. Se sirve con
 `python -m http.server`. Todo lo demás —tamaños, qué se excluye y por qué, lo
 que falta— está en `WEB.md`.
 
+**Publicado en https://danielux.es/Cascabel/.** Se actualiza A MANO desde la
+pestaña Actions → "Publicar en la web" (`.github/workflows/web.yml`), que pasa
+la batería en Linux y no publica si falla.
+
 ### En una sesión remota se puede lanzar el juego CON VENTANA
 
 No solo los medidores sin `render/`. Con un display virtual, Godot abre la

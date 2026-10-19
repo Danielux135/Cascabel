@@ -79,9 +79,9 @@ son las fases de la captura (§2) y las nueve criaturas.
 Daniel quiere que un amigo pruebe el juego desde un enlace. **Hecho: los seis
 arreglos de la auditoría, cuatro más de la revisión, el preset `Web` y el primer
 build, jugado en un navegador.** Batería 647/647. Todo en `WEB.md`, con el
-comando para sacar el build. Y se publica con `.github/workflows/web.yml`
-(pestaña Actions → "Publicar en la web" → Run workflow) en
-`danielux.es/Cascabel/`.
+comando para sacar el build. **Y ESTÁ PUBLICADO en
+https://danielux.es/Cascabel/**: se actualiza desde la pestaña Actions →
+"Publicar en la web" → Run workflow, que no publica si la batería no pasa.
 
 **Lo siguiente:** medir el rendimiento con el navegador a la vista.
 

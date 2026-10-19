@@ -1,8 +1,35 @@
 # WEB.md — CASCABEL EN EL NAVEGADOR
 
-**Estado (19-oct-2026): los arreglos están hechos, la batería da 647/647 y el
-primer build web se ha jugado en un navegador.** Falta medir el rendimiento con
-el navegador a la vista, OÍRLO, y publicarlo.
+**Estado (19-oct-2026): PUBLICADO en https://danielux.es/Cascabel/.** Los
+arreglos están hechos, la batería da 647/647 (también en Linux, en el CI) y el
+build se ha jugado en un navegador. Falta medir el rendimiento con el navegador
+a la vista y OÍRLO.
+
+## Cómo se publica
+
+Pestaña **Actions** del repo → **"Publicar en la web"** → **Run workflow**.
+Lo hace `.github/workflows/web.yml`, y se lanza A MANO a propósito: publicar es
+una decisión, y con cada push lo que se juega en el enlace sería lo último que
+se haya tocado. El workflow:
+
+1. baja Godot 4.7.2 y sus plantillas web, comprobando el SHA512 (la primera vez;
+   luego tira de caché);
+2. importa y **pasa la batería**: con un fallo, o con un `SCRIPT ERROR`, que no
+   sube el contador de fallos, **no publica**;
+3. exporta en release y lo sube a GitHub Pages. Tarda unos minutos.
+
+Sale en `danielux.es` porque `Danielux135.github.io` tiene ese dominio, y los
+sitios de proyecto lo heredan con el nombre del repo detrás. **Pages no tiene
+contraseña**: lo ve quien tenga el enlace.
+
+**Comprobado que lo publicado es lo probado.** El `.wasm`, el `.js` y el
+`index.html` publicados son idénticos byte a byte a los del build local, y del
+`.pck` lo son los 832 ficheros salvo dos cachés del motor
+(`global_script_class_cache.cfg` y `uid_cache.bin`), que tienen el mismo
+contenido en otro orden: el del escaneo del disco de Linux. Ojo si se repite la
+comprobación: comparar los dos `.pck` byte a byte da 357.000 bytes distintos y
+engaña, porque Linux los guarda en otro orden; hay que comparar fichero a
+fichero por su ruta.
 
 Cómo funciona: Godot compila su motor (C++) a WebAssembly, y el juego va al
 lado en un `.pck`. El navegador descarga los dos y los ejecuta. No hay que
@@ -96,13 +123,12 @@ En el Chromium del panel de Claude, lienzo de 1024×768 a escala 1,25, o sea
    sin hilos, Stream mezcla en el hilo principal**. Un fotograma de más de ~40 ms
    deja sin datos al reproductor y la música corta. Si corta al cambiar de
    pantalla o en multibola, subir `audio/driver/output_latency.web`.
-3. **Publicarlo.** El plan es GitHub Pages desde este repo, con un workflow de
-   Actions que descargue Godot 4.7.2 y sus plantillas, exporte con
-   `--export-release` y publique. Saldría en **`danielux.es/Cascabel/`**, porque
-   `danielux.es` ya es el sitio de usuario de Pages con dominio propio, y en git
-   no entraría ningún binario. **Pages no tiene contraseña**: lo ve quien tenga
-   el enlace. Si hace falta privado, itch.io (Draft, o Restricted con
-   contraseña; HTML, 960×540, botón de pantalla completa, sin "Mobile
+3. **Mirar el publicado con los ojos**: que arranca apagado, que un clic lo
+   enciende y que el mapa tiene enemigos. Lo que se comprobó al publicar fue que
+   el motor arranca (la consola lo dice) y que los ficheros son los probados,
+   porque con el panel del navegador oculto no hay fotogramas que mirar.
+4. Si algún día hace falta que sea **privado**, itch.io (Draft, o Restricted
+   con contraseña; HTML, 960×540, botón de pantalla completa, sin "Mobile
    friendly"). Cloudflare Pages no vale: 25 MiB por fichero, y el `.wasm` pasa.
 
 ## Pantalla
