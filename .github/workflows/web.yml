@@ -44,10 +44,12 @@ jobs:
         uses: actions/checkout@v4
 
       # El paquete de plantillas pesa 1,2 GB y de él solo hacen falta 10 MB: se
-      # baja una vez, se queda lo web y se guarda en la caché.
+      # baja una vez, se queda lo web y se guarda en la caché. SE GUARDA NADA MÁS
+      # BAJARLO, y no al final: `actions/cache` a secas solo guarda si el job
+      # entero acaba bien, así que una batería en rojo obligaba a bajarlo otra vez.
       - name: Caché de Godot y sus plantillas web
         id: cache_godot
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/godot
@@ -77,6 +79,15 @@ jobs:
             templates/web_nothreads_release.zip -d "$destino"
           rm -rf "$RUNNER_TEMP/godot_dl"
 
+      - name: Guardar Godot en la caché
+        if: steps.cache_godot.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_TEMPLATES }}
+          key: ${{ steps.cache_godot.outputs.cache-primary-key }}
+
       - name: Preparar Godot
         run: |
           echo "GODOT=$HOME/godot/Godot_v${GODOT_RELEASE}_linux.x86_64" >> "$GITHUB_ENV"
@@ -100,7 +111,9 @@ jobs:
             echo "::error::La batería tuvo un SCRIPT ERROR: hay pruebas que no se han ejecutado"
             exit 1
           fi
-          grep -E "^OK [0-9]+/[0-9]+ pruebas" "$RUNNER_TEMP/bateria.log"
+          # Con DOS espacios, que es como lo escribe la batería: con uno, el grep
+          # no casaba y el paso fallaba con la batería entera en verde.
+          grep -E "^OK +[0-9]+/[0-9]+ pruebas" "$RUNNER_TEMP/bateria.log"
 
       # FUERA DEL REPO, como todo lo de paso: Godot escanea el proyecto entero.
       # Y SIEMPRE RELEASE: en un build de depuración vuelven F1, F2 y F3.
