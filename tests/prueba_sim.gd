@@ -41,6 +41,7 @@ func _initialize() -> void:
 	_prueba_carga()
 	_prueba_sonido()
 	_prueba_musica()
+	_prueba_web()
 	_prueba_impactos()
 	_prueba_racimo()
 	_prueba_zona_alta()
@@ -5859,3 +5860,235 @@ func _prueba_musica() -> void:
 	_comprobar("el juego no pide ninguna pieza que no exista",
 		pedidas.is_empty(),
 		"%s: falta su fila en NodoMusica.PIEZAS" % str(pedidas))
+
+
+# ---------------------------------------------------------------------- web
+
+## EL JUEGO EN UN NAVEGADOR (`WEB.md`).
+##
+## Casi todo lo de aquí solo se nota en web, y la batería corre en escritorio:
+## `OS.has_feature("web")` no se puede fingir. Por eso la mitad se comprueba
+## LEYENDO EL FICHERO, que es como esta batería sujeta una guarda que no puede
+## pisar —igual que las señales mudas y los tamaños de letra—, y la otra mitad
+## sobre `NodoEncendido`, que acepta que se le diga que está en web.
+##
+## Y LO PRIMERO ES QUE EN ESCRITORIO NO CAMBIE NADA: todo el balance y el tacto
+## están medidos ahí.
+func _prueba_web() -> void:
+	var ne := NodoEncendido.new()
+	_comprobar("en escritorio la maquina arranca encendida y no frena la mesa",
+		not ne.apagado and not ne.bloquea())
+	ne.apagar()
+	_comprobar("en escritorio apagar no deja la maquina apagada",
+		not ne.apagado and not ne.bloquea())
+	ne.free()
+
+	# EN WEB ARRANCA APAGADA, Y LO PRIMERO QUE SE PULSE LA ENCIENDE UNA VEZ. Los
+	# contadores van en Array porque un lambda copia las locales: con un `int`
+	# suelto, el `+= 1` sube la copia y la prueba miente (trampa de `CLAUDE.md`).
+	var nw := NodoEncendido.new(true)
+	_comprobar("en web la maquina arranca apagada y frena la mesa",
+		nw.apagado and nw.bloquea())
+	var veces := [0]
+	var reinicios := [0]
+	nw.encendido.connect(func(reinicio: bool) -> void:
+		veces[0] += 1
+		if reinicio:
+			reinicios[0] += 1)
+	var primera := nw.pulsar()
+	var segunda := nw.pulsar()
+	_comprobar("la primera pulsacion la enciende y la segunda ya no hace nada",
+		primera and not segunda and veces[0] == 1 and not nw.apagado,
+		"veces=%d apagado=%s" % [veces[0], nw.apagado])
+	_comprobar("encenderla la primera vez no empieza otro run",
+		reinicios[0] == 0, "el run ya estaba montado detras")
+	nw.apagar()
+	_comprobar("apagar en web la deja apagada y frena la mesa",
+		nw.apagado and nw.bloquea())
+	nw.pulsar()
+	_comprobar("encender despues de apagar empieza un run nuevo",
+		reinicios[0] == 1 and veces[0] == 2,
+		"veces=%d reinicios=%d" % [veces[0], reinicios[0]])
+	nw.free()
+
+	# LA PAUSA SALE DEL AVISO DE FOCO, NO DE PREGUNTAR. En web `has_focus()` dice
+	# siempre que sí, y la primera versión preguntaba: la pausa no salía nunca, y
+	# eso solo se vio en el navegador. Esto sujeta el camino que sí funciona.
+	var np := NodoEncendido.new(true)
+	np.pulsar()
+	np.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
+	np._process(0.0)
+	var pausa_al_perder := np.en_pausa and np.bloquea()
+	np.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_IN)
+	np._process(0.0)
+	_comprobar("en web perder el foco pausa la mesa y recuperarlo la suelta",
+		pausa_al_perder and not np.en_pausa and not np.bloquea())
+	np.free()
+	var nd := NodoEncendido.new()
+	nd.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
+	nd._process(0.0)
+	_comprobar("en escritorio perder el foco no pausa nada",
+		not nd.en_pausa and not nd.bloquea())
+	nd.free()
+
+	# SOLO LO QUE ENCIENDE DE VERDAD ENCIENDE. Una tecla o un botón del ratón; ni
+	# la rueda ni Esc, que el navegador no cuenta como gesto y dejaban el arranque
+	# sonando contra un audio todavía bloqueado.
+	var tecla_a := InputEventKey.new()
+	tecla_a.keycode = KEY_A
+	tecla_a.physical_keycode = KEY_A
+	tecla_a.pressed = true
+	var tecla_esc := InputEventKey.new()
+	tecla_esc.keycode = KEY_ESCAPE
+	tecla_esc.physical_keycode = KEY_ESCAPE
+	tecla_esc.pressed = true
+	var clic := InputEventMouseButton.new()
+	clic.button_index = MOUSE_BUTTON_LEFT
+	clic.pressed = true
+	var rueda := InputEventMouseButton.new()
+	rueda.button_index = MOUSE_BUTTON_WHEEL_DOWN
+	rueda.pressed = true
+	var tecla_eco := tecla_a.duplicate() as InputEventKey
+	tecla_eco.echo = true
+	_comprobar("una tecla o un clic encienden la maquina",
+		NodoEncendido.enciende(tecla_a) and NodoEncendido.enciende(clic))
+	_comprobar("ni la rueda, ni Esc, ni una tecla repetida la encienden",
+		not NodoEncendido.enciende(rueda) and not NodoEncendido.enciende(tecla_esc)
+			and not NodoEncendido.enciende(tecla_eco))
+
+	# Y LA RED DE SEGURIDAD DE LA PAUSA: si el aviso de recuperar el foco se
+	# pierde, la primera tecla que llega la quita, porque una tecla solo llega con
+	# el lienzo enfocado. Sin esto, un aviso perdido dejaba la mesa en pausa para
+	# siempre. Va con tecla y no con clic porque fuera del árbol no hay viewport,
+	# y el clic se traga contra él.
+	var nr := NodoEncendido.new(true)
+	nr.pulsar()
+	nr.notification(Node.NOTIFICATION_WM_WINDOW_FOCUS_OUT)
+	nr._process(0.0)
+	var pausada := nr.en_pausa
+	nr._input(tecla_a)
+	nr._process(0.0)
+	_comprobar("una tecla que llega quita la pausa aunque se pierda el aviso",
+		pausada and not nr.en_pausa)
+	nr.free()
+
+	# NADIE MÁS QUE `VistaMesa.salir` LLAMA A `quit`. En una página, `quit()`
+	# apaga el motor y deja el lienzo muerto con el último fotograma hasta
+	# recargar, sin un error. Lo pedían ESC y "Apagar..." cada uno por su lado;
+	# ahora pasan los dos por `salir`, y esto impide que vuelva a aparecer un
+	# tercero. SE BUSCA ANCHO A PROPÓSITO, y en todo el proyecto menos la batería:
+	# `get_tree().quit.call_deferred()`, `arbol.quit()` o `call_deferred("quit")`
+	# no contienen `get_tree().quit(`, y un patrón que enumera las formas buenas se
+	# salta las que no se te ocurrieron (`CLAUDE.md`). Los comentarios no cuentan:
+	# `salir` lo explica.
+	var re_quit := RegEx.new()
+	re_quit.compile("\\.quit\\b|[\"']quit[\"']")
+	var con_quit: Array[String] = []
+	for ruta in _guiones_del_juego("res://"):
+		var texto := FileAccess.get_file_as_string(ruta)
+		for linea in texto.split("\n"):
+			if linea.strip_edges().begins_with("#"):
+				continue
+			if re_quit.search(linea) != null:
+				con_quit.append(ruta.get_file())
+	_comprobar("solo vista_mesa.gd sale del juego, y una sola vez",
+		con_quit == ["vista_mesa.gd"], str(con_quit))
+	# Y SALE COMO TIENE QUE SALIR: en web la rama apaga y VUELVE antes de llegar
+	# al `quit`; en escritorio sale. Se fija la forma y no solo que el texto de la
+	# guarda esté delante: sin el `return`, o con la condición al revés, el texto
+	# seguiría ahí y la página volvería a quedarse muerta.
+	var vm := FileAccess.get_file_as_string("res://render/vista_mesa.gd")
+	var re_salir := RegEx.new()
+	re_salir.compile("func salir\\(\\) -> void:\\r?\\n\\tif OS\\.has_feature\\(\"web\"\\):"
+		+ "\\r?\\n(?:\\t\\t[^\\n]*\\r?\\n)*\\t\\treturn\\r?\\n\\tget_tree\\(\\)\\.quit\\(\\)")
+	_comprobar("salir() apaga y vuelve en web, y solo sale en escritorio",
+		re_salir.search(vm) != null)
+
+	# QUIEN TIENE QUE PASAR POR `salir` PASA. "Apagar..." en el sistema, y ESC con
+	# nada abierto, que en web abre el menú de Inicio en vez de apagar: en el
+	# mapa, la primera pantalla, bastaba un Esc para perderlo todo.
+	var ns := FileAccess.get_file_as_string("res://render/nodo_sistema.gd")
+	var re_apagar := RegEx.new()
+	re_apagar.compile("if id == \"apagar\":\\r?\\n\\t\\tif vista != null:\\r?\\n\\t\\t\\tvista\\.salir\\(\\)")
+	_comprobar("Apagar... pasa por VistaMesa.salir()", re_apagar.search(ns) != null)
+	var i_esc := vm.find("KEY_ESCAPE:")
+	var i_fin_esc := vm.find("KEY_LEFT, KEY_A:", i_esc) if i_esc >= 0 else -1
+	var bloque_esc := vm.substr(i_esc, i_fin_esc - i_esc) if i_fin_esc > i_esc else ""
+	var i_web := bloque_esc.find("elif OS.has_feature(\"web\"):")
+	var i_else := bloque_esc.find("else:", i_web) if i_web >= 0 else -1
+	_comprobar("Esc en web abre el menu y solo en escritorio pasa por salir()",
+		i_web >= 0 and bloque_esc.find("sistema.abrir(\"inicio\")", i_web) > i_web
+			and i_else > i_web and bloque_esc.find("salir()", i_else) > i_else,
+		"web=%d else=%d" % [i_web, i_else])
+
+	# Y LA MESA DE VERDAD ESCUCHA AL INTERRUPTOR: la física se congela, y la
+	# ruleta y la cuenta atrás de la victoria se paran. Sin la física, perder el
+	# foco volvía a dejar la bola drenando; sin lo otro, la ruleta se aceptaba sola
+	# debajo del cartel de pausa.
+	var re_fisica := RegEx.new()
+	re_fisica.compile("sistema\\.congela_la_mesa\\(\\)\\)\\s*\\\\\\s*\\r?\\n\\s*or \\(encendido != null and encendido\\.bloquea\\(\\)\\)")
+	_comprobar("la fisica se congela con la maquina apagada o en pausa",
+		re_fisica.search(vm) != null)
+	_comprobar("y la ruleta y la cuenta atras de la victoria tambien",
+		vm.contains("var en_marcha := encendido == null or not encendido.bloquea()")
+			and vm.contains("if tele != null and en_marcha:")
+			and vm.contains("not _en_ruleta and en_marcha:"))
+	# EL RUN NUEVO SUELTA LA BANDA DE LA CÁMARA: tirar la mesa a mitad de caza no
+	# emite `caza_terminada`, que es lo único que la soltaba.
+	var i_nuevo := vm.find("func _nuevo_run()")
+	var i_tras := vm.find("\nfunc ", i_nuevo + 1) if i_nuevo >= 0 else -1
+	_comprobar("un run nuevo suelta la banda de la camara",
+		i_nuevo >= 0 and vm.substr(i_nuevo, i_tras - i_nuevo).contains("camara.soltar_banda()"))
+
+	# F1 SOLO EN UN BUILD DE DEPURACIÓN. F2 y F3 cuelgan de `_depuracion`, así que
+	# con esto basta: en una exportación release no hay multibola ni caza a mano.
+	var re_f1 := RegEx.new()
+	re_f1.compile("KEY_F1:\\s*\\n(?:\\s*#[^\\n]*\\n)*\\s*if OS\\.is_debug_build\\(\\):")
+	_comprobar("F1 solo enciende la depuracion en un build de depuracion",
+		re_f1.search(vm) != null)
+	var re_dep := RegEx.new()
+	re_dep.compile("_depuracion\\s*=\\s*not _depuracion")
+	_comprobar("y es el unico sitio que la enciende",
+		re_dep.search_all(vm).size() == 1)
+
+	# LAS DOS VOCES DE LA MÚSICA VAN EN STREAM. En escritorio no cambia nada; en
+	# web, Sample rehace el bucle desde JavaScript con un hueco en cada empalme y
+	# decodifica la pieza entera en el primer `play()`. Se mira sobre el nodo
+	# montado, que es quien las crea.
+	var nm := NodoMusica.new()
+	root.add_child(nm)
+	nm.preparar()
+	var en_sample := 0
+	for v in nm._voces:
+		if v.playback_type != AudioServer.PLAYBACK_TYPE_STREAM:
+			en_sample += 1
+	_comprobar("las dos voces de la musica van en Stream",
+		nm._voces.size() == 2 and en_sample == 0,
+		"%d voces, %d fuera de Stream" % [nm._voces.size(), en_sample])
+	# CALLAR SÍ CORTA A LAS QUE TERMINAN, que es para lo que existe: con la
+	# máquina apagada, `poner("")` dejaba un arranque a medias sonando. Lo que se
+	# comprueba es el estado; que el reproductor pare de verdad no se oye sin
+	# tarjeta de sonido.
+	nm.poner("arranque")
+	nm.callar()
+	_comprobar("callar deja la musica en silencio aunque sonara el arranque",
+		nm.sonando == "" and not nm.protegida(), nm.sonando)
+	nm.poner("arranque")
+	_comprobar("y despues de callar el arranque vuelve a entrar",
+		nm.sonando == "arranque", nm.sonando)
+	nm.queue_free()
+
+## Todos los guiones del juego bajo `carpeta`, recorriendo subcarpetas, sin la
+## batería ni la caché de Godot. Para las comprobaciones que tienen que cubrir
+## TODO el juego: una lista de carpetas escrita a mano se queda corta el día que
+## alguien cree una nueva.
+func _guiones_del_juego(carpeta: String) -> Array[String]:
+	var lista: Array[String] = []
+	for archivo in DirAccess.get_files_at(carpeta):
+		if archivo.ends_with(".gd"):
+			lista.append(carpeta.path_join(archivo))
+	for sub in DirAccess.get_directories_at(carpeta):
+		if sub.begins_with(".") or sub == "tests":
+			continue
+		lista.append_array(_guiones_del_juego(carpeta.path_join(sub)))
+	return lista

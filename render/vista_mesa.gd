@@ -177,6 +177,8 @@ var cursor: NodoCursor
 ## Lo que sobrevive a cerrar el juego, y el sistema operativo que lo enseña.
 var guardado: Guardado
 var sistema: NodoSistema
+## La máquina apagada y la pausa al perder el foco. Solo hace algo en web.
+var encendido: NodoEncendido
 ## Lo elegido antes del run: cascabel, criatura y palas (`DISEÑO.md` §5).
 var preparacion: Preparacion
 ## La pantalla azul de derrota. Es lo último que ve el jugador de un run, así
@@ -260,7 +262,14 @@ func _ready() -> void:
 	# EL ARRANQUE SUENA UNA VEZ Y AQUÍ, que es lo único que pasa antes del
 	# escritorio (`assets/prompts_musica.md` §4.10). En cuanto `_musica_que_toca`
 	# empiece a mandar, la cruzará por la del escritorio ella sola.
-	_musica.poner("arranque")
+	#
+	# EN WEB NO, y es lo único que cambia aquí: en un navegador la máquina
+	# arranca APAGADA (`NodoEncendido`) y el arranque suena con la primera tecla,
+	# que es lo primero que el navegador deja sonar. Lanzado aquí, se quedaba
+	# "sonando" contra un audio suspendido y no dejaba entrar al mapa.
+	encendido = NodoEncendido.new()
+	if not encendido.apagado:
+		_musica.poner("arranque")
 	cascara = NodoCascara.new(self, cam, anim)
 	add_child(cascara)
 	_nodo_suelo = NodoSuelo.new(self)
@@ -302,6 +311,11 @@ func _ready() -> void:
 	preparacion.sanear(guardado)
 	sistema = NodoSistema.new(self, guardado)
 	add_child(sistema)
+	# DESPUÉS DEL SISTEMA A PROPÓSITO: `_input` llega antes al último hermano, y
+	# con la máquina apagada el primer clic tiene que ser del interruptor y no de
+	# un icono del escritorio.
+	add_child(encendido)
+	encendido.encendido.connect(_al_encender)
 
 	# EL TAMAÑO REAL DE LA PANTALLA, antes que nada. Con `aspect = expand` el
 	# viewport crece en una pantalla que no sea 16:9 exacto, y si `cam` se queda
@@ -393,6 +407,33 @@ func _montar_combate(pm: ParametrosMesa) -> void:
 func nueva_partida() -> void:
 	_nuevo_run()
 
+## SALIR DEL JUEGO, y es el único sitio que puede hacerlo: hay una prueba que
+## impide que se cuele otro `quit()` en `render/` o en `sim/`.
+##
+## EN WEB NO SE SALE, SE APAGA. En una página, `get_tree().quit()` no cierra
+## ninguna ventana: apaga el motor y deja el lienzo muerto con el último
+## fotograma, mudo y sin un mensaje, hasta recargar, y el run en curso se pierde
+## igual. Apagar la máquina pierde lo mismo y se vuelve a encender con una tecla.
+func salir() -> void:
+	if OS.has_feature("web"):
+		if sistema != null:
+			sistema.cerrar()
+		# Una máquina apagada no suena, y `poner("")` no basta: no puede
+		# interrumpir una pieza de las que terminan, así que un arranque o un TILT
+		# a medias seguían sonando sobre la pantalla apagada.
+		_musica.callar()
+		encendido.apagar()
+		return
+	get_tree().quit()
+
+## La máquina se ha encendido (solo en web; en escritorio nace encendida y el
+## arranque ya sonó en `_ready`). Si venía de "Apagar...", lo que hubiera en
+## marcha se perdió al apagar, como en un equipo de verdad, y se empieza de cero.
+func _al_encender(reinicio: bool) -> void:
+	if reinicio:
+		_nuevo_run()
+	_musica.poner("arranque")
+
 func _nuevo_run() -> void:
 	# LAS PALAS SE PONEN REHACIENDO LA MESA, y tiene que ser aquí: la mesa copia
 	# sus parámetros dentro de los colisionadores al construirse, así que no hay
@@ -403,6 +444,15 @@ func _nuevo_run() -> void:
 	if preparacion != null:
 		preparacion.sanear(guardado)
 		_montar_combate(preparacion.parametros_mesa())
+	# LA BANDA DE LA CÁMARA SE SUELTA AQUÍ, porque la mesa nueva no puede
+	# hacerlo: quien la suelta es la señal `caza_terminada`, y una mesa que se
+	# tira a mitad de caza muere sin emitirla. Con R, con "Empezar" o encendiendo
+	# después de "Apagar..." en plena caza, el run nuevo empezaba con la cámara
+	# clavada en la planta alta y la bola 640 px más abajo: "se juega pero no se
+	# ve" (`CLAUDE.md`), la misma avería de la caza que cruzaba de un combate al
+	# siguiente, entrando por otra puerta.
+	if camara != null:
+		camara.soltar_banda()
 	run = Run.new(ParametrosRun.new(), combate.p, _catalogo,
 		int(Time.get_unix_time_from_system()), _catalogo_reliquias,
 		_catalogo_misiones)
@@ -571,7 +621,13 @@ func _physics_process(delta: float) -> void:
 	# de 520 px encima del tablero tapa justo la bola, así que dejarla viva sería
 	# perderla mientras lees. La cámara sí sigue, como en la ruleta: congelarla
 	# también dejaría la vuelta descuadrada.
-	if sistema != null and sistema.congela_la_mesa():
+	#
+	# Y LA MÁQUINA APAGADA O EN PAUSA, por lo mismo y de la misma forma. La pausa
+	# es la que importa: al perder el foco el navegador suelta las teclas, las
+	# palas bajan, y con la mesa viva la bola drenaba y el reloj pegaba mientras
+	# el jugador leía otra pestaña.
+	if (sistema != null and sistema.congela_la_mesa()) \
+			or (encendido != null and encendido.bloquea()):
 		var quieta := mesa.bola_en_peligro()
 		camara.avanzar(delta, quieta.pos.y, quieta.vel.y, false)
 		return
@@ -666,6 +722,11 @@ func _musica_que_toca() -> void:
 	# bolas son cuatro veces más golpes por segundo, y ahí la música estorba.
 	_musica.agachar(mesa != null and mesa.bolas.size() > 1)
 
+	# Con la máquina apagada no suena nada. Va lo primero porque una máquina
+	# apagada lo tapa todo, TILT incluido, igual que en pantalla.
+	if encendido != null and encendido.apagado:
+		_musica.poner("")
+		return
 	if tilt != null and tilt.visible:
 		_musica.poner("tilt")
 		return
@@ -739,12 +800,18 @@ func _process(delta: float) -> void:
 	_numeros = _caducar(_numeros, delta)
 	# La ruleta va en `_process` y no en la física: es animación, no simulación,
 	# y durante ella la física está parada a propósito.
-	if tele != null:
+	#
+	# Y SE PARA CON LA MÁQUINA APAGADA O EN PAUSA, igual que la cuenta atrás de
+	# abajo. Sin foco no llegan las teclas: la ruleta giraba entera debajo del
+	# cartel de pausa, se pasaba la ventana de pedir otra tirada y el premio se
+	# aceptaba solo. Y la cuenta atrás cerraba el combate a escondidas.
+	var en_marcha := encendido == null or not encendido.bloquea()
+	if tele != null and en_marcha:
 		tele.avanzar(delta)
 	# La cuenta atrás de la victoria NO corre con la ruleta delante: si corriera,
 	# el combate se cerraría por debajo de la ruleta y el run se quedaría colgado
 	# en la fase de la ruleta para siempre. Es el cuelgue de la pantalla del mapa.
-	if _espera_victoria > 0.0 and not _en_ruleta:
+	if _espera_victoria > 0.0 and not _en_ruleta and en_marcha:
 		_espera_victoria = maxf(_espera_victoria - delta, 0.0)
 		if _espera_victoria <= 0.0 and _esperando_confirmacion:
 			_cerrar_combate()
@@ -766,7 +833,13 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 		KEY_R:
 			_nuevo_run()
 		KEY_F1:
-			_depuracion = not _depuracion
+			# SOLO EN UN BUILD DE DEPURACIÓN: el editor y la batería lo son, una
+			# exportación release no. Con F1 suelto, un amigo que pulse F1 buscando
+			# la ayuda —o F3, que en el navegador es "buscar"— se encontraba la
+			# multibola y la caza a demanda, que es justo lo que se le pide juzgar.
+			# F2 y F3 cuelgan de esto, así que no hace falta guardarlos aparte.
+			if OS.is_debug_build():
+				_depuracion = not _depuracion
 		KEY_F2:
 			# SUELTA UNA BOLA EXTRA A MANO, y solo con la depuración encendida
 			# (F1 primero). Es banco de pruebas, no un atajo del juego: por el
@@ -792,10 +865,19 @@ func _unhandled_key_input(evento: InputEvent) -> void:
 			# ESC cierra lo que haya abierto ANTES de salir del juego. Antes
 			# salía siempre, y con un menú de Inicio delante eso es cerrar la
 			# partida por querer cerrar un menú. Para salir está "Apagar".
+			#
+			# EN WEB ESC NO SALE NUNCA. Es la tecla refleja de "pausa" y la que
+			# saca al navegador de pantalla completa, y en el mapa —la primera
+			# pantalla, donde no hay nada abierto— bastaba un Esc para apagarlo
+			# todo. Ahí abre el menú de Inicio, que es lo que espera alguien
+			# delante de un escritorio, y apagar sigue estando en "Apagar...".
 			if sistema != null and sistema.hay_algo():
 				sistema.cerrar()
+			elif OS.has_feature("web"):
+				if sistema != null and sistema.disponible():
+					sistema.abrir("inicio")
 			else:
-				get_tree().quit()
+				salir()
 		KEY_LEFT, KEY_A:
 			# Durante la ruleta las palas piden otra tirada. Es la única entrada
 			# que ya tienes en la mano, así que no hay que aprender nada nuevo.

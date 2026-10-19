@@ -31,6 +31,11 @@ var _ocupado: Texture2D
 ## Si no hay arte no se toca el ratón del sistema: es peor quedarse sin puntero
 ## que tener uno que no pega.
 var _hay_arte := false
+## Si el ratón está dentro de la ventana. Fuera, el puntero dibujado se quedaba
+## congelado en el último sitio por el que salió, pegado al borde, al lado del
+## puntero de verdad: dos flechas. En pantalla completa no pasa nunca; en una
+## ventana y en el iframe de un navegador, cada vez que se saca el ratón.
+var _dentro := true
 
 func _init(la_vista: VistaMesa) -> void:
 	vista = la_vista
@@ -61,6 +66,12 @@ func _process(_delta: float) -> void:
 		Input.set_mouse_mode(quiere)
 	_lienzo.queue_redraw()
 
+func _notification(que: int) -> void:
+	if que == NOTIFICATION_WM_MOUSE_EXIT:
+		_dentro = false
+	elif que == NOTIFICATION_WM_MOUSE_ENTER:
+		_dentro = true
+
 func _exit_tree() -> void:
 	# Que el ratón no se quede escondido si esta capa se va antes que el juego.
 	if _hay_arte:
@@ -80,7 +91,7 @@ func _dibujar() -> void:
 	if not _hay_arte:
 		return
 	var foco := get_window() != null and get_window().has_focus()
-	if not foco:
+	if not foco or not _dentro:
 		return
 	var tex := textura()
 	if tex == null:

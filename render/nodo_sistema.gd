@@ -213,8 +213,11 @@ func _activar(id: String) -> void:
 	if id == "volver":
 		leyendo = ""
 		return
+	# APAGAR PASA POR LA VISTA, que es el único sitio que sabe salir: en web no
+	# se sale, se apaga la máquina (`VistaMesa.salir`).
 	if id == "apagar":
-		get_tree().quit()
+		if vista != null:
+			vista.salir()
 		return
 	if id == "vaciar":
 		guardado.vaciar_papelera()
@@ -668,6 +671,15 @@ func _dibujar_maquina(d: Rect2) -> void:
 	if g.ilegible:
 		_lienzo.draw_string(_fuente, Vector2(d.position.x + 10.0, d.end.y - 10.0),
 			"aviso: el guardado anterior no se pudo leer",
+			HORIZONTAL_ALIGNMENT_LEFT, d.size.x - 20.0, 8, C_GOMA_LUZ)
+	# Y SI NO SE VA A PODER GUARDAR, también. Solo pasa en un navegador (modo
+	# incógnito, cookies de terceros bloqueadas): en escritorio `user://` es
+	# siempre persistente. La máquina apagada ya lo avisa al encender; esto es
+	# para quien vuelve a mirar sus números y no entiende por qué están a cero.
+	if not OS.is_userfs_persistent():
+		_lienzo.draw_string(_fuente,
+			Vector2(d.position.x + 10.0, d.end.y - (24.0 if g.ilegible else 10.0)),
+			"aviso: este navegador no guarda la partida",
 			HORIZONTAL_ALIGNMENT_LEFT, d.size.x - 20.0, 8, C_GOMA_LUZ)
 
 ## LA PAPELERA: los enemigos que has matado. `DISEÑO.md` §3 dice que los

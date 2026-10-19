@@ -26,7 +26,8 @@ BÚMPERES sueltos pegados a las bocas y su ÓRBITA por la franja izquierda. Con
 ella, las capas de altura de la tanda 0h dejan de estar apagadas: **no hizo falta
 construir ningún sistema, solo encender el que ya estaba medido**.
 
-Batería **622/622** en Windows, con todo el repo delante. **Y desde la tanda 0m
+Batería **647/647** en Windows, con todo el repo delante (las 24 últimas son
+las de la web, 19-oct). **Y desde la tanda 0m
 el juego tiene MÚSICA**: ocho piezas recortadas de las tomas de Suno, cada una
 con su momento, y dos buses con la música por debajo de los efectos. Lo único
 que falta de esa tanda es oírla — ver U1-U10.
@@ -72,6 +73,25 @@ veces por run y no se puede juzgar.
 **El diseño está en `CAZA.md`** (tanda 0i-diseño, 17-ago), con el sistema de
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
+
+## JUGARLO EN EL NAVEGADOR (19-oct)
+
+Daniel quiere que un amigo pruebe el juego desde un enlace. **Hecho: los seis
+arreglos de la auditoría, cuatro más de la revisión, el preset `Web` y el primer
+build, jugado en un navegador.** Batería 647/647. Todo en `WEB.md`, con el
+comando para sacar el build. Y se publica con `.github/workflows/web.yml`
+(pestaña Actions → "Publicar en la web" → Run workflow) en
+`danielux.es/Cascabel/`.
+
+**Lo siguiente:** medir el rendimiento con el navegador a la vista.
+
+**Que prueben:** abrir el build y OÍR que el arranque suena con el primer clic y
+que los bucles empalman sin hueco; jugar un combate entero en el navegador; y
+pulsar Esc, "Apagar..." y hacer clic fuera del juego para ver la pausa.
+
+En la máquina de oscar el repo está en `C:\Users\oscar\Desktop\Daniel\Cascabel`
+y Godot es la **4.7.2**, en `C:\Users\oscar\Desktop\Daniel\Godot`, con las
+plantillas web instaladas.
 
 ## POR QUÉ NINGÚN BUCLE ACABA DE CONVENCER (21-ago)
 

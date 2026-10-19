@@ -21,6 +21,9 @@ o estructura de run.**
 Preparación (cascabeles y palas), selector de dificultad, rampas fallables con
 su barra de carga, y la cáscara como metajuego. **Ábrelo antes de tocar
 desbloqueos, dificultad o la capa de Preparación.**
+`WEB.md` tiene el juego en el navegador: cómo se exporta, qué se arregló para
+la web y qué falta. **Ábrelo antes de tocar la entrada, el audio, la pantalla
+o la forma de salir del juego**, que en web se comportan distinto.
 `CONTEXTO.md` tiene la referencia densa: paleta, assets, proporciones,
 estética. **Ábrelo solo para buscar un dato concreto**, no por costumbre, y
 no es fuente de verdad para parámetros ni geometría: esos viven en el
@@ -106,6 +109,16 @@ Medidas (no son pruebas: no fallan, imprimen tablas):
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_balance.gd
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_reliquias.gd
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --headless --path C:\dev\tilt-os --script tests/medir_capas.gd
+
+### Exportar a web
+
+    & "<Godot console>" --headless --path <repo> --export-release "Web" <carpeta FUERA del repo>\index.html
+
+Con el preset de `export_presets.cfg`. **Siempre release**, que en depuración
+vuelven F1, F2 y F3. Hacen falta las plantillas web de la versión exacta de
+Godot en `%APPDATA%\Godot\export_templates\<versión>.stable`. Se sirve con
+`python -m http.server`. Todo lo demás —tamaños, qué se excluye y por qué, lo
+que falta— está en `WEB.md`.
 
 ### En una sesión remota se puede lanzar el juego CON VENTANA
 
@@ -396,6 +409,14 @@ Decisiones cerradas. No las reabras sin que Daniel o Fátima lo pidan.
   remates ni tornillos en las puntas: un detalle cerca del final de una tira se
   convierte en un patrón que se repite y canta.
 - **Escalado por enteros siempre.**
+- **SOLO `VistaMesa.salir()` SALE DEL JUEGO, y en web no sale: apaga la
+  máquina.** En una página, `get_tree().quit()` no cierra nada: apaga el motor y
+  deja el lienzo muerto con el último fotograma, sin un mensaje, hasta recargar.
+  Esc y "Apagar..." lo pedían cada uno por su lado, y un Esc en el mapa bastaba
+  para matar el juego en el navegador. La batería busca cualquier forma de
+  `quit` en todo el proyecto. **Y todo lo que sea solo de web va detrás de
+  `OS.has_feature("web")`: en escritorio el juego es el de siempre.** Ver
+  `WEB.md`.
 
 ## Las capas de dibujo
 
@@ -414,12 +435,34 @@ donde no se ve.
 | 20 | `NodoPantallaMapa` | el explorador de carpetas, maximizado |
 | 30 | `NodoSistema` | el menú de Inicio y las ventanas del sistema |
 | 40 | `NodoTilt` | la pantalla azul |
+| 50 | `NodoEncendido` | la máquina apagada y la pausa al perder el foco — **solo en web** |
 | 100 | `NodoCursor` | el puntero |
 
 La regla que sale de la tabla: **la capa −2 tapa todo lo que haya detrás dentro
 de la columna de 400 px de la mesa.** Lo que caiga ahí va en la 5.
 
 ## Trampas que ya nos han costado tiempo
+
+### En web, `Window.has_focus()` dice siempre que sí (oct-2026)
+
+La pausa al perder el foco se escribió preguntando `get_window().has_focus()`
+cada fotograma, que es la forma de la casa (la de la música: preguntar en vez de
+acordarse). La batería estaba en verde. **En el navegador no salía nunca.**
+`DisplayServerWeb::window_is_focused` devuelve `true` a pelo en la 4.7.2, así que
+en web esa pregunta no informa de nada. Y `NodoCursor` la usa también: en web no
+sirve para saber si hay foco.
+
+Lo que sí llega es el `blur` y el `focus` del lienzo, convertidos en
+`NOTIFICATION_WM_WINDOW_FOCUS_OUT` / `_IN`, que Godot reparte por todo el árbol.
+De eso vive la pausa, con una red de seguridad: cualquier tecla o clic que
+llegue la quita, porque solo llegan con el lienzo enfocado.
+
+**La regla: lo que dependa de la plataforma web se MIRA en un navegador, no se
+deduce de la batería.** La batería corre en escritorio y no puede fingir
+`OS.has_feature("web")`. Se ve en el build: `WEB.md` dice cómo sacarlo y
+servirlo, y el panel del navegador de Claude lo abre. **Y con el panel oculto,
+el navegador estrangula la pestaña a 1 fps**: ahí se puede mirar si algo está,
+pero no medir cuánto tarda.
 
 ### Una pared que muere EN el eje de la pala es una trampa para la bola (ago-2026)
 

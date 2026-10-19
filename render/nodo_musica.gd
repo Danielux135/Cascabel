@@ -113,6 +113,16 @@ func preparar() -> void:
 	for _i in 2:
 		var v := AudioStreamPlayer.new()
 		v.bus = BUS
+		# EN STREAM, Y SOLO IMPORTA EN WEB. En escritorio ya lo es: no cambia
+		# nada. En un navegador el modo por defecto es Sample (Web Audio), y ahí
+		# el bucle no lo hace el mezclador de Godot: lo rehace JavaScript al
+		# acabar cada vuelta, creando una fuente nueva, y eso deja un hueco en el
+		# empalme justo donde `musica.py` corta en frontera de compás. Además, el
+		# primer `play()` de cada pieza la decodifica ENTERA en el hilo principal,
+		# y la peor de esas paradas caía al abrir la caza. En Stream el OGG se
+		# decodifica poco a poco y se repite dentro del mezclador, como aquí.
+		# Los efectos se quedan en Sample, que con ellos va bien (`WEB.md`).
+		v.playback_type = AudioServer.PLAYBACK_TYPE_STREAM
 		add_child(v)
 		_voces.append(v)
 
@@ -155,6 +165,21 @@ func poner(nombre: String) -> void:
 	# escrita sobre esto: el contador de pruebas cambia sin que nadie lo diga.
 	if v.is_inside_tree():
 		v.play()
+
+## CALLA LAS DOS VOCES EN EL ACTO, sin cruce y sin respetar a las que terminan.
+## Es lo único que puede cortar un arranque o un TILT a medias, y por eso solo lo
+## llama quien apaga la máquina (`VistaMesa.salir`, en web): un sistema que se
+## apaga no espera a que acabe la canción. Después, lo que se pida con `poner`
+## entra limpio, porque ya no suena nada.
+func callar() -> void:
+	for v in _voces:
+		v.stop()
+	# Casilla a casilla y no con `_lleva = ["", ""]`: reasignar una lista tipada
+	# es justo donde `CLAUDE.md` ya ha visto colarse un `Array` sin tipo.
+	_lleva[0] = ""
+	_lleva[1] = ""
+	sonando = ""
+	_cruce = 1.0
 
 ## Si lo que suena es de las que TERMINAN y todavía no ha acabado. Mientras sea
 ## cierto, `poner` no cambia de pieza.
