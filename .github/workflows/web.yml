@@ -1,0 +1,136 @@
+# PUBLICA EL JUEGO EN LA WEB: https://danielux.es/Cascabel/
+#
+# Saca el build web y lo sube a GitHub Pages. Sale bajo danielux.es porque el
+# sitio de usuario (Danielux135.github.io) tiene ese dominio, y los sitios de
+# proyecto lo heredan con el nombre del repo detrás. Nada del build entra en git:
+# se genera aquí cada vez. Todo lo demás —qué se excluye, tamaños, lo que falta—
+# está en WEB.md.
+#
+# SE LANZA A MANO, desde la pestaña Actions ("Run workflow"). Publicar es una
+# decisión: con cada push, lo que se juega en el enlace sería lo último que se
+# haya tocado, a medias o no.
+#
+# Y NO PUBLICA SI LA BATERÍA NO ESTÁ EN VERDE: un enlace que se manda a un amigo
+# es justo el sitio donde menos se quiere un juego roto.
+
+name: Publicar en la web
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Una publicación a la vez, y la que está en marcha no se corta.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  # La MISMA versión que el editor: las plantillas tienen que ser de la versión
+  # exacta, y un build hecho con otro Godot no es el juego que se ha probado.
+  GODOT_RELEASE: 4.7.2-stable
+  GODOT_TEMPLATES: 4.7.2.stable
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    # Si algo se cuelga, que no se quede seis horas, que es el tope por defecto.
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # El paquete de plantillas pesa 1,2 GB y de él solo hacen falta 10 MB: se
+      # baja una vez, se queda lo web y se guarda en la caché.
+      - name: Caché de Godot y sus plantillas web
+        id: cache_godot
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates/${{ env.GODOT_TEMPLATES }}
+          key: godot-${{ env.GODOT_RELEASE }}-web-nothreads-v1
+
+      - name: Descargar Godot y las plantillas web
+        if: steps.cache_godot.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_RELEASE}"
+          motor="Godot_v${GODOT_RELEASE}_linux.x86_64.zip"
+          plantillas="Godot_v${GODOT_RELEASE}_export_templates.tpz"
+          destino="$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES}"
+          mkdir -p "$RUNNER_TEMP/godot_dl" "$HOME/godot" "$destino"
+          cd "$RUNNER_TEMP/godot_dl"
+          curl -fsSL --retry 3 -O "$base/SHA512-SUMS.txt"
+          curl -fsSL --retry 3 -O "$base/$motor"
+          curl -fsSL --retry 3 -O "$base/$plantillas"
+          # Lo que se baja se comprueba contra lo que publica Godot antes de
+          # ejecutar nada.
+          grep -E "  (${motor}|${plantillas})$" SHA512-SUMS.txt > comprobar.txt
+          test "$(wc -l < comprobar.txt)" -eq 2
+          sha512sum -c comprobar.txt
+          unzip -q "$motor" -d "$HOME/godot"
+          unzip -q -j "$plantillas" templates/version.txt \
+            templates/web_nothreads_release.zip -d "$destino"
+          rm -rf "$RUNNER_TEMP/godot_dl"
+
+      - name: Preparar Godot
+        run: |
+          echo "GODOT=$HOME/godot/Godot_v${GODOT_RELEASE}_linux.x86_64" >> "$GITHUB_ENV"
+          chmod +x "$HOME/godot/Godot_v${GODOT_RELEASE}_linux.x86_64"
+          ls -la "$HOME/.local/share/godot/export_templates/${GODOT_TEMPLATES}"
+
+      # Sin importar no hay `.godot/`: ni recursos convertidos ni clases
+      # registradas, y todo lo de abajo fallaría con "Could not find type".
+      - name: Importar el proyecto
+        run: '"$GODOT" --headless --path . --import'
+
+      # UN SCRIPT ERROR NO SUBE EL CONTADOR DE FALLOS: corta el bloque de
+      # pruebas en curso, la batería sigue con menos pruebas y sale en verde
+      # (`CLAUDE.md`: las 312 de 321). En local alguien mira el contador; aquí
+      # no lo mira nadie, así que se mira solo.
+      - name: Batería
+        run: |
+          set -euo pipefail
+          "$GODOT" --headless --path . --script tests/prueba_sim.gd 2>&1 | tee "$RUNNER_TEMP/bateria.log"
+          if grep -q "SCRIPT ERROR" "$RUNNER_TEMP/bateria.log"; then
+            echo "::error::La batería tuvo un SCRIPT ERROR: hay pruebas que no se han ejecutado"
+            exit 1
+          fi
+          grep -E "^OK [0-9]+/[0-9]+ pruebas" "$RUNNER_TEMP/bateria.log"
+
+      # FUERA DEL REPO, como todo lo de paso: Godot escanea el proyecto entero.
+      # Y SIEMPRE RELEASE: en un build de depuración vuelven F1, F2 y F3.
+      - name: Exportar el build web
+        run: |
+          set -euo pipefail
+          salida="$RUNNER_TEMP/web"
+          mkdir -p "$salida"
+          "$GODOT" --headless --path . --export-release "Web" "$salida/index.html"
+          ls -la "$salida"
+          test -s "$salida/index.html"
+          test -s "$salida/index.wasm"
+          test -s "$salida/index.pck"
+          echo "SALIDA_WEB=$salida" >> "$GITHUB_ENV"
+
+      - name: Configurar GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir el build
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.SALIDA_WEB }}
+
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Publicar en GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
