@@ -35,64 +35,11 @@ código. Si contradice a este archivo, manda este archivo.
 abierto, qué es lo siguiente y qué necesitas que Daniel pruebe. Si no lo
 haces, la siguiente sesión empieza a ciegas.
 
-**Y actualiza la memoria del proyecto** si has tocado código significativo:
-
-    codebase-memory-mcp cli index_repository --repo-path C:\dev\tilt-os
-
-**Y ya está: no hay nada que commitear.** Ver el apartado de abajo.
-
-## Codebase Memory MCP — cuándo y cómo
-
-**Qué es:** El MCP indexa tu codebase (1.833 nodos, 7.599 relaciones) y pone
-esa red de conexiones a disposición de Claude, evitando la lectura archivo
-por archivo.
-
-**Cuándo SÍ lo necesitas:**
-- Buscar dónde se usa una función/clase en todo el proyecto
-- Trazar la cadena completa de llamadas (quién llama a quién)
-- Encontrar impacto arquitectónico de un cambio
-- Auditar si algo está muerto o sin usar
-- Preguntas de "¿cómo está organizado esto?" que cruzan módulos
-
-**Cuándo NO lo necesitas:**
-- Cambios locales dentro de un archivo que ya abierto
-- Cuando ya sabes dónde buscar
-- Un bugfix simple que solo toca una pieza
-- Si la batería pasa, está todo bien sin MCP
-
-**Cómo actualizar (al final de cambios significativos):**
-
-    codebase-memory-mcp cli index_repository --repo-path C:\dev\tilt-os
-
-Detecta automáticamente cambios incrementales (rápido, ~4 s), y **con eso ya
-está hecho**.
-
-**NO HAY NADA QUE COMMITEAR, y esto decía lo contrario.** Este apartado y el de
-arriba mandaban `git add .codebase-memory/graph.db.zst`, y **ese fichero no
-existe ni lo genera esta versión del CLI**: sus quince herramientas son
-`index_repository`, `search_graph`, `query_graph`, `trace_path`,
-`get_code_snippet`, `get_graph_schema`, `get_architecture`, `search_code`,
-`list_projects`, `delete_project`, `index_status`, `check_index_coverage`,
-`detect_changes`, `manage_adr` e `ingest_traces`, y ninguna exporta un
-artefacto. El propio indexado lo dice en su salida: `"artifact_present": false`.
-El grafo vive en el almacén local del daemon, así que **el índice NO viaja con
-el repo**: en otra máquina hay que volver a indexar, que cuesta cuatro
-segundos. `.codebase-memory/README.md` sigue describiendo el fichero y su
-número de nodos como si existiera; está escrito de cuando lo generaba.
-
-**Y hay que lanzarlo con Claude Code cerrado**, o el daemon rechaza al cliente
-con `CBM daemon is active or starting but could not accept this client within
-30000 ms`: el servidor MCP de la sesión lo tiene tomado. Si se atasca,
-`taskkill /F /IM codebase-memory-mcp.exe` y reintentar.
+## Consola de Daniel
 
 **Ojo con `&&` al copiar comandos**: la consola de Daniel es Windows PowerShell
 5.1 y ahí `&&` es un error de sintaxis. Se encadena con `;` o con
 `A; if ($?) { B }`.
-
-**Cómo ver el grafo 3D** (arquitectura visual):
-
-    codebase-memory-mcp daemon start
-    # Luego abre: http://localhost:9749
 
 ## Godot
 
