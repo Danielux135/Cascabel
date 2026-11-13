@@ -116,6 +116,7 @@ var rot_vista: Label
 var rot_caza: Label
 var rot_criaturas: Array[Label] = []
 var rot_clic: Label
+var caja_clic: PanelContainer
 
 ## Solo en web: la página acaba de abrirse y nadie ha tocado nada todavía.
 var _web := OS.has_feature("web")
@@ -326,10 +327,24 @@ func _montar_marcador(capa: CanvasLayer) -> void:
 		consejo.text = CONSEJO.get(c.especie, "")
 	rot_aviso = _rotulo(capa, 26, BLANCO)
 	rot_aviso.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rot_clic = _rotulo(capa, 18, BLANCO)
-	rot_clic.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	# El aviso de arranque lleva su propio fondo. Suelto no vale: cae encima de
+	# la mesa, y el canto de neón lo cruzaba de lado a lado como si estuviera
+	# tachado —visto en la página ya publicada, no antes—.
+	caja_clic = PanelContainer.new()
+	var fondo := StyleBoxFlat.new()
+	fondo.bg_color = Color(0.0, 0.01, 0.04, 0.78)
+	fondo.border_color = Color(CIAN.r, CIAN.g, CIAN.b, 0.6)
+	fondo.set_border_width_all(1)
+	fondo.set_corner_radius_all(6)
+	fondo.content_margin_left = 18.0
+	fondo.content_margin_right = 18.0
+	fondo.content_margin_top = 7.0
+	fondo.content_margin_bottom = 7.0
+	caja_clic.add_theme_stylebox_override("panel", fondo)
+	capa.add_child(caja_clic)
+	rot_clic = _rotulo(caja_clic, 16, BLANCO)
 	rot_clic.text = "HAZ CLIC O PULSA UNA TECLA PARA JUGAR"
-	rot_clic.visible = _falta_clic
+	caja_clic.visible = _falta_clic
 	rot_ayuda = _rotulo(capa, 10, GRIS)
 	rot_ayuda.text = "A / D   palas\nESPACIO   lanzar (mantener)\n\nC   cambiar de cámara\nX   seguir a otra criatura\n1 2 3   poner o quitar criaturas\nM   bola extra\nR   bola nueva\nT   piloto automático\nG   calidad de los gráficos\nH   ocultar esto"
 	if not _web:
@@ -520,10 +535,9 @@ func _ajustar_pantalla() -> void:
 	vp_reflejo.size = Vector2i(real * maxf(float(_cal.get("reflejo", 0.5)), 0.1)).maxi(16)
 	rot_aviso.position = Vector2(0.0, 30.0)
 	rot_aviso.size = Vector2(lienzo.x, 40.0)
-	# Abajo y en el centro: es la única franja que la mesa no pisa en la cámara
-	# de arranque. Arriba quedaba encima de los raíles y no se leía.
-	rot_clic.position = Vector2(0.0, lienzo.y - 58.0)
-	rot_clic.size = Vector2(lienzo.x, 28.0)
+	# Abajo y en el centro. Arriba quedaba encima de los raíles y no se leía.
+	caja_clic.size = caja_clic.get_combined_minimum_size()
+	caja_clic.position = Vector2((lienzo.x - caja_clic.size.x) * 0.5, lienzo.y - 72.0)
 	rot_ayuda.position = Vector2(lienzo.x - 220.0, lienzo.y - 192.0)
 	rot_vista.position = Vector2(30.0, lienzo.y - 30.0)
 
@@ -548,7 +562,7 @@ func _input(evento: InputEvent) -> void:
 	if clic or (tecla != null and tecla.pressed):
 		_falta_clic = false
 		piloto = false
-		rot_clic.visible = false
+		caja_clic.visible = false
 		_avisar("TÚ JUEGAS", CIAN)
 		_refrescar_marcador()
 		if tecla != null:
@@ -811,7 +825,7 @@ func _process(delta: float) -> void:
 	else:
 		rot_aviso.modulate.a = 0.0
 	if _falta_clic:
-		rot_clic.modulate.a = 0.78 + 0.22 * sin(_tiempo * 4.0)
+		caja_clic.modulate.a = 0.84 + 0.16 * sin(_tiempo * 4.0)
 
 	var b := mesa.bola_en_peligro()
 	var p3 := mundo.posicion_bola(b)
