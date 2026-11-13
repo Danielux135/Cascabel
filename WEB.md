@@ -5,6 +5,10 @@ arreglos están hechos, la batería da 647/647 (también en Linux, en el CI) y e
 build se ha jugado en un navegador. Falta medir el rendimiento con el navegador
 a la vista y OÍRLO.
 
+**Y desde el 13-nov hay una segunda página, https://danielux.es/cascabel-3d/**,
+con la prueba 3D de la rama `prueba-3d`. No es el juego y no comparte nada con
+esta publicación: tiene su sección al final.
+
 ## Cómo se publica
 
 Pestaña **Actions** del repo → **"Publicar en la web"** → **Run workflow**.
@@ -117,7 +121,9 @@ En el Chromium del panel de Claude, lienzo de 1024×768 a escala 1,25, o sea
 
 1. **Medir el rendimiento con el navegador a la vista.** Con el panel oculto el
    navegador estrangula la pestaña a 1 fotograma por segundo y la medida no
-   vale.
+   vale. **Ya no hace falta tenerlo a la vista:** midiendo la prueba 3D salió
+   una forma de hacerlo con un Chrome sin ventana (ver "Cómo se miró sin tener
+   el panel a la vista", al final). Con el juego sigue sin hacer.
 2. **Oírlo**, que no se puede deducir. El arranque tiene que sonar con el primer
    clic, y los bucles tienen que empalmar sin hueco. Y ojo: **en la plantilla
    sin hilos, Stream mezcla en el hilo principal**. Un fotograma de más de ~40 ms
@@ -189,3 +195,123 @@ ninguno toca un invariante:
   izquierda es la tecla que pone Q.
 - La rama de reserva de `FuenteUI` (`Image.load_from_file`) no puede funcionar
   en un export. Hoy no se usa.
+
+## LA PRUEBA 3D EN LA WEB (13-nov)
+
+**Publicada en https://danielux.es/cascabel-3d/.** Es la escena de prueba de la
+rama `prueba-3d` (`prueba3d/`, ver `ESTADO.md`), no el juego. La página del
+juego y su workflow no se han tocado.
+
+### Cómo se publica
+
+En Pages, la ruta de un sitio de proyecto ES el nombre del repo, así que para
+esa dirección hace falta un repo que se llame así: **`Danielux135/cascabel-3d`,
+que no guarda ni código ni build, solo `.github/workflows/publicar.yml`**. Ese
+workflow baja la rama `prueba-3d` de Cascabel, importa, **pasa la batería**,
+arranca la escena 3D sin ventana seiscientos fotogramas —la batería no la
+cubre—, exporta con el preset **"Web 3D"** y lo sube a Pages de su propio repo.
+
+- **Para actualizarla:** push a `prueba-3d` y, en `cascabel-3d`, Actions →
+  "Publicar la prueba 3D" → Run workflow. Unos tres minutos.
+- **Para deshacerla:** borrar el repo `cascabel-3d`. No queda nada más.
+- Tras publicar, **Pages sirve lo anterior hasta diez minutos**
+  (`Cache-Control: max-age=600`). Un navegador que ya había entrado enseña la
+  versión vieja y parece que no se ha publicado.
+
+El preset "Web 3D" es el del juego con dos diferencias: excluye además la
+música y las sondas, y lleva `custom_features="prueba3d"`. Con esa etiqueta
+manda la línea `run/main_scene.prueba3d` de `project.godot`, y por eso ese
+build arranca en la escena 3D y el del juego no. El `.pck` mide 1,6 MB; el
+motor son los mismos 39,5 MB. En local se saca igual que el del juego:
+
+    & "<Godot console>" --headless --path <repo> --export-release "Web 3D" <carpeta FUERA del repo>\index.html
+
+### Lo que hubo que cambiar para el navegador
+
+- **Arranca jugando sola**, con el piloto, hasta el primer clic o la primera
+  tecla: hasta entonces el navegador no da ni teclado ni sonido. Con un dedo no
+  se puede jugar —no hay palas que tocar—, así que en un móvil sigue sola y lo
+  dice.
+- **Ni Ctrl ni Mayús son palas en web**: con otra tecla son atajos del navegador
+  (Ctrl+W cierra la pestaña y no se puede impedir).
+- **El marcador escala fraccional.** El proyecto escala por enteros, y en una
+  pestaña casi nunca caben dos veces 960×540: se quedaba a ×1, diminuto. La
+  escena lo cambia para sí misma al arrancar; el juego sigue por enteros.
+- **La letra es la de reserva de Godot** (Open Sans): en web no hay fuentes del
+  sistema. Comprobado carácter a carácter que trae las tildes que se escriben.
+
+### EL NAVEGADOR DIBUJA CON LA GRÁFICA INTEGRADA
+
+**En el portátil de oscar hay una GTX 1650 y los navegadores no la usan**: tanto
+el panel de Claude como Chrome dibujan con la Intel UHD. En escritorio Godot
+pide la buena y la prueba va a 130-144 fotogramas por segundo; en el navegador,
+tal como estaba, a **21**. Se pregunta desde la página con
+`WEBGL_debug_renderer_info`; el motor no lo sabe, WebGL se lo esconde.
+
+Lo que se midió y lo que se hizo con cada cosa (Intel UHD, ventana de 1902×984,
+Chrome sin tope de fotogramas):
+
+| Qué | Medido | Arreglo |
+|---|---|---|
+| **El cielo** | quince capas de ruido por píxel y por fotograma: 3,9 ms de 15 | la nebulosa se pinta UNA vez en una textura (`nebulosa.gdshader`) y el cielo solo la lee |
+| **Cada llamada de dibujo** | unas 30 µs de hilo principal; el reflejo repetía 133 | el reflejo no dibuja lo que está a ras de cristal ni, en las cámaras de juego, patas y ojos |
+| **El suavizado de bordes** | 7 ms a 1080p con 4 muestras | solo en la calidad ALTA |
+| **Las sombras** | 3,4 ms, y sobre un cristal oscuro casi no se ven | fuera de MEDIA y de BAJA |
+| El tamaño del mapa de sombras | de 4096 a 1024, nada | mando descartado |
+
+Con eso: **ALTA de 21 a unos 35, MEDIA de 34 a 60-78, BAJA de 57 a unos 85.**
+Arranca en MEDIA, que a 1080p es el 75 % de la resolución, con reflejo y sin
+sombras.
+
+**La calidad va con un tope de MEGAPÍXELES, no con una fracción de la ventana**:
+con una fracción, una pantalla 4K le pediría cuatro veces más píxeles a la misma
+gráfica. Y la lleva un vigilante que baja un nivel si no se llega a 47
+fotogramas por segundo y prueba a subir si va sobrada. **Bajar no es para
+siempre**: la primera versión no volvía a probar el nivel que había fallado, y
+bastaba pasar por la cámara de CRIATURA, que carga más, para quedarse en BAJA el
+resto de la partida. Ahora cada subida que falla hace esperar el doble a la
+siguiente. La G la cambia a mano, y con `?calidad=alta` (o `media`, `baja`) en
+la dirección se fuerza.
+
+**La primera visita va lenta, y no es un fallo.** Son los mismos 39,5 MB de
+motor que el juego: entre 35 y 45 s hasta arrancar en frío, y el primer minuto
+el navegador todavía está optimizando el motor, así que va a 45-50 y el
+vigilante la baja a BAJA; luego vuelve sola a MEDIA. Las siguientes visitas
+arrancan en 3-4 s. Comprobado en la página publicada.
+
+### Cómo se miró sin tener el panel a la vista
+
+El panel del navegador de Claude estaba oculto, y oculto no dibuja: las capturas
+no salen y la página va a 1,5 fotogramas por segundo. Lo que funcionó fue **un
+Chrome sin ventana, con perfil propio y puerto de depuración**, conducido desde
+Node, que ya trae `WebSocket` y `fetch` y no hay que instalar nada:
+
+    chrome --headless=new --remote-debugging-port=9333 --user-data-dir=<carpeta de paso> --window-size=1920,1080 --ignore-gpu-blocklist --enable-gpu --mute-audio about:blank
+
+Con cuatro órdenes del protocolo sale todo: `Page.navigate`,
+`Page.captureScreenshot`, `Input.dispatchKeyEvent` y `Runtime.evaluate`, que es
+con la que se cuentan los fotogramas desde `requestAnimationFrame`. Y
+`Emulation.setDeviceMetricsOverride` para probar un tamaño de portátil o una
+escala de 125 %. Sin ventana Chrome no tiene tope de 60, así que **se ve cuánto
+margen hay**, que con el panel a la vista no se sabría.
+
+La escena lleva además su propio medidor: con `?medir=1` (o `-- --medir` en
+escritorio) dice cada segundo cuánto se llevan la física y el guion y cuántas
+llamadas de dibujo salen.
+
+Tres avisos, y los tres costaron una vuelta:
+
+- **Un perfil nuevo mide el arranque en frío, no el juego.** Los números de
+  régimen se sacan en la segunda visita con el mismo perfil.
+- **El navegador se queda con la versión anterior diez minutos.** Para comprobar
+  lo recién publicado, perfil nuevo.
+- **Apagar cosas de una en una no dice lo que cuestan cuando el cuello es otro.**
+  Quitar el reflejo o las sombras a resolución completa no ganaba nada, porque
+  mandaban los píxeles; a resolución baja ganaban 13 ms entre los dos. Hay que
+  medir con el tiempo del hilo principal al lado, no solo los fotogramas.
+
+### Lo que falta de la prueba en web
+
+- **Oírla y jugarla a mano** en el navegador.
+- **Otros navegadores y otros equipos.** Solo Chrome, y solo en este portátil.
+- Los sonidos de la caza son los del juego; no hay ninguno nuevo.

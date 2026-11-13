@@ -74,6 +74,48 @@ veces por run y no se puede juzgar.
 CAPTURA entero. La geometría de §3 ya está construida; lo que queda de esa nota
 son las fases de la captura (§2) y las nueve criaturas.
 
+## LA PRUEBA 3D (13-nov) — aparte, en la rama `prueba-3d`
+
+Daniel quiso ver cómo quedaría Cascabel en 3D antes de decidir nada. **No es el
+juego ni lo sustituye: es una escena de prueba, en `prueba3d/`.** Mesa nueva
+(«ÓRBITA»), gráficos hechos por código y una caza de tres criaturas a las que
+se pega con la bola; del juego solo usa el motor de colisiones de `sim/`. **Está
+en la rama `prueba-3d`: `master` no la tiene, y ni la mesa ni el arte ni la
+página del juego se han tocado.**
+
+**PUBLICADA en https://danielux.es/cascabel-3d/**, desde un repo aparte,
+`Danielux135/cascabel-3d`, que solo guarda la receta. Se actualiza subiendo a
+`prueba-3d` y lanzando allí Actions → "Publicar la prueba 3D". Lo de web está al
+final de `WEB.md`.
+
+En escritorio se lanza así, y dentro salen las teclas:
+
+    & "<Godot console>" --path <repo> res://prueba3d/prueba_3d.tscn
+
+Batería 647/647 con la prueba dentro. Lleva dos sondas sin ventana que no
+fallan, miden: `prueba3d/sonda_orbita.gd` (la mesa: 12,6 s de bola media y
+ninguna parada) y `prueba3d/sonda_caza.gd` (la caza: 5,9 golpes y 1,8 capturas
+por minuto, ningún estado sin salida).
+
+**Lo que NO está, y hay que saberlo antes de juzgarla:** nadie la ha jugado a
+mano —solo piloto automático, sondas y capturas—; los sonidos son los del juego,
+no hay ninguno nuevo; y los números de la caza están sin afinar (van todos
+juntos al principio de `prueba3d/caza_orbita.gd`).
+
+**Que prueben**, y las dos primeras deciden si se sigue por aquí:
+
+- **3D-1. ¿Es este el nivel de gráficos que se buscaba?** En escritorio, que es
+  donde va al máximo; en el navegador depende de la gráfica (ver 3D-4).
+- **3D-2. ¿Qué forma de capturar se queda?** LUMI tiene miedo en vez de vida y
+  se esconde en el túnel; GOTA se parte en dos al primer golpe; TANQUE lleva
+  coraza por delante y hay que volcarlo. Con 1, 2 y 3 se prueban de una en una.
+  El miedo, el escondite y llevarla de vuelta salen de `CAZA.md`; partirse y la
+  coraza son inventadas.
+- **3D-3. Recoger no es capturar: va dentro de la bola hasta que esa bola toca
+  una pala.** ¿Es tensión, o es un trámite?
+- **3D-4. En el navegador, ¿va fluido?** Abajo a la izquierda dice en qué
+  calidad está, y la G la cambia.
+
 ## JUGARLO EN EL NAVEGADOR (19-oct)
 
 Daniel quiere que un amigo pruebe el juego desde un enlace. **Hecho: los seis
@@ -1787,6 +1829,10 @@ intención.
 
 ## Hecho
 
+- **LA PRUEBA 3D (13-nov), en la rama `prueba-3d`.** Una escena aparte, en
+  `prueba3d/`, con mesa nueva, gráficos por código y caza de tres criaturas;
+  publicada en https://danielux.es/cascabel-3d/. No toca el juego. **647/647.**
+  Ver arriba.
 - **EL JUEGO SABE PASAR FOTOGRAMAS.** `HojaAnimada` + `Reproductor`, con el
   candado de catálogo que impide que una hoja vuelva a quedarse sin cargar, y el
   retrato de 64 de la preparación donde se ve. La física, igual al decimal.
