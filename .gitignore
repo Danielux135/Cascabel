@@ -2,7 +2,11 @@
 .godot/
 /android/
 _to_delete/
-.claude/
+
+# De .claude/ solo viajan las skills: son las instrucciones del proyecto.
+# Lo demas (settings.local.json, worktrees/) es de cada maquina.
+.claude/*
+!.claude/skills/
 
 # Las herramientas de Python del repo (musica.py, anim.py, ...)
 __pycache__/
