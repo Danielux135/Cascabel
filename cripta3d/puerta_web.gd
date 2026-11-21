@@ -36,6 +36,10 @@ const HUESO := Color(0.93, 0.89, 0.80)
 var _mesa := POR_DEFECTO
 
 func _ready() -> void:
+	# Para repartir el arranque en frío al medirlo desde fuera: en qué milisegundo
+	# de la página llega el motor hasta aquí (las mesas apuntan los demás hitos).
+	if OS.has_feature("web"):
+		JavaScriptBridge.eval("(window.__hitos = window.__hitos || {})['puerta'] = Math.round(performance.now())", true)
 	_mesa = clave(_pedida())
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	# El proyecto escala por enteros (es lo suyo para el pixelart del juego) y en

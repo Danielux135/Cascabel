@@ -310,7 +310,16 @@ func _vector_de(texto: String, por_defecto: Vector3) -> Vector3:
 		return por_defecto
 	return Vector3(float(t[0]), float(t[1]), float(t[2]))
 
+## En web, CUÁNDO llega cada cosa: milisegundos desde que se pidió la página, en
+## `window.__hitos` («puerta», «escena», «montada», «carga», «juego»). Con eso un
+## Chrome sin ventana reparte el arranque en frío: lo que es bajar, lo que es
+## arrancar el motor, lo que es montar la mesa y lo que es compilar.
+func _hito(nombre: String) -> void:
+	if _web:
+		JavaScriptBridge.eval("(window.__hitos = window.__hitos || {})['%s'] = Math.round(performance.now())" % nombre, true)
+
 func _ready() -> void:
+	_hito("escena")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capturas="):
 			_dir_capturas = arg.trim_prefix("--capturas=")
@@ -421,6 +430,7 @@ func _ready() -> void:
 	vp.add_child(mundo)
 	mundo.montar(mesa)
 	mundo.montar_caza(caza)
+	_hito("montada")
 	_fondo_propio = mundo.entorno.background_mode
 	if _ssao:
 		mundo.entorno.ssao_enabled = true
@@ -503,6 +513,7 @@ func _ready() -> void:
 const CAPA_DE_CARGA := 1 << 15
 
 func _preparar_carga(capa: CanvasLayer) -> void:
+	_hito("carga")
 	_recoger_para_cargar(mundo)
 	_cargando = true
 	_carga_cuadros = 0
@@ -722,6 +733,7 @@ func _destapar() -> void:
 	# `_carga_vistos` se queda: con él, `_apuntar_tiron` sabe qué material ha
 	# aparecido después que el telón no compiló.
 	_cargando = false
+	_hito("juego")
 	# El fotograma más largo se cuenta desde aquí: los de la carga eran de compilar.
 	# También el reloj: `_medida` se llama DESPUÉS de esto en el mismo fotograma,
 	# y sin ponerlo a cero el último paso de la carga (medio segundo de compilar
