@@ -1,5 +1,7 @@
 shader_type spatial;
-render_mode blend_mix, cull_back;
+// `unshaded`: la luz se la pone `espectro_luz.gdshaderinc`. Con la de Godot
+// tardaba 6,5 s en compilar en un navegador (banco, ANGLE, 21-nov-2026).
+render_mode blend_mix, cull_back, unshaded;
 
 // CRIPTA — un OJO del espectro. Los tres son el personaje: globos blancos con la
 // pupila negra, como en el sprite. El globo es una esfera de verdad metida en su
@@ -31,6 +33,8 @@ uniform float palidez = 0.0;
 // y de frente lo que se le ve es justo la parte de abajo del globo: con el
 // párpado de los otros, de frente parecía un ojo medio dormido.
 uniform float bajo_libre = 0.0;
+
+#include "res://cripta3d/criaturas/espectro_luz.gdshaderinc"
 
 varying vec3 pos_obj;
 // Hacia dónde mira el globo, en el espacio de la vista.
@@ -109,12 +113,12 @@ void fragment() {
 	// los ojos se tienen que leer en cualquier rincón de la cripta, también de
 	// lejos, y el fuego por un lado y la luna por el otro partían el globo en
 	// dos tonos.
-	ALBEDO = mix(ojo * 0.45, parpado * 0.35, en_parpado);
+	vec3 albedo = mix(ojo * 0.45, parpado * 0.35, en_parpado);
 	// Húmedo, no esmaltado: con 0,12 de rugosidad y especular 0,6 cada ojo era
-	// una bola de billar con su reflejo de ventana.
-	ROUGHNESS = mix(mix(0.32, 0.20, es_pupila), 0.50, en_parpado);
+	// una bola de billar con su reflejo de ventana. (Los dos van a `luz_propia`.)
+	float rugosidad = mix(mix(0.32, 0.20, es_pupila), 0.50, en_parpado);
 	// Y poco especular: el cielo se reflejaba partido en dos en el blanco.
-	SPECULAR = mix(0.12, 0.08, en_parpado);
+	float especular = mix(0.12, 0.08, en_parpado);
 
 	// --- El brillo húmedo, fijo en la vista, arriba a la izquierda: pequeño.
 	float brillo = smoothstep(0.980, 0.992, dot(NORMAL, normalize(vec3(-0.38, 0.52, 0.76))));
@@ -128,7 +132,9 @@ void fragment() {
 	// de dentro: de espaldas se veían tres cuencos de borde duro en la cabeza.
 	float detras = smoothstep(0.15, -0.35, dot(frente_vista, normalize(VIEW)));
 	vec3 humo = mix(c_parpado, c_parpado_luz, 0.35 + 0.3 * palidez);
-	ALBEDO = mix(ALBEDO, humo * 0.15, detras);
-	SPECULAR = mix(SPECULAR, 0.0, detras);
-	EMISSION = mix(em, humo * 0.32, detras) + vec3(destello * 1.2);
+	albedo = mix(albedo, humo * 0.15, detras);
+	especular = mix(especular, 0.0, detras);
+	ALBEDO = luz_propia(albedo, mix(em, humo * 0.32, detras) + vec3(destello * 1.2),
+		normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz),
+		normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz), especular, rugosidad);
 }

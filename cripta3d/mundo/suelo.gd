@@ -10,11 +10,18 @@ extends RefCounted
 ##     agua solo en las juntas y al pie de las paredes —nunca en la zona de palas
 ##     ni en el camino de la bola—, con latón embutido, hollín, surcos y una rosa
 ##     de teselas. Lo mojado REFLEJA la mesa de verdad, sumado a la losa.
-##   · Dos mapas cenitales HORNEADOS al arrancar (`suelo_mapas.gdshader`), que el
-##     material multiplica: la oclusión al pie de cada pieza, el latón, los
-##     surcos, el hollín, el uso y el rebaje de las bocas de la catacumba. Se
-##     dibujan UNA vez en dos SubViewport; a los pocos cuadros se copian a
-##     texturas con mipmaps y los SubViewport se sueltan.
+##   · Dos mapas cenitales HORNEADOS al arrancar (`suelo_mapas.gdshader`): la
+##     oclusión al pie de cada pieza, el latón, los surcos, el hollín, el uso y
+##     el rebaje de las bocas de la catacumba. Se dibujan UNA vez en dos
+##     SubViewport y a los pocos cuadros se copian a texturas.
+##   · Con ellos, un segundo horno (`suelo_horno.gdshader`) dibuja en tres
+##     atlas TODO lo que la losa calculaba en cada píxel y no depende de la
+##     cámara, del tiempo ni del grano fino: el aparejo, el color seco de cada
+##     losa, la mugre, el agua, la rosa. POR QUÉ: en el navegador (ANGLE) el
+##     sombreador de la losa tardaba 13,7 s en compilar, porque Direct3D paga
+##     cada línea del `fragment` en cuatro o cinco variantes; con lo horneado
+##     fuera, 7,5 (21-nov-2026, banco + ANGLE). Los SubViewport se sueltan en
+##     cuanto el atlas está copiado.
 ##
 ## QUÉ RELLENA EN EL NÚCLEO
 ##   mundo.mat_suelo   el `ShaderMaterial` del suelo. La escena le pone:
@@ -52,6 +59,7 @@ extends RefCounted
 const Nucleo := preload("res://cripta3d/mundo_cripta.gd")
 const LOSA: Shader = preload("res://cripta3d/mundo/suelo_losa.gdshader")
 const MAPAS: Shader = preload("res://cripta3d/mundo/suelo_mapas.gdshader")
+const HORNO: Shader = preload("res://cripta3d/mundo/suelo_horno.gdshader")
 const TEX_GRANO: Texture2D = preload("res://cripta3d/texturas/ruido_grano.png")
 const TEX_CELDAS: Texture2D = preload("res://cripta3d/texturas/ruido_celdas.png")
 const TEX_MANCHAS: Texture2D = preload("res://cripta3d/texturas/ruido_manchas.png")
@@ -68,6 +76,17 @@ const HILADAS := 6
 ## suave y le basta la mitad.
 const RES_A := 2.56
 const RES_B := 1.28
+## Los atlas del horno de la losa: el FINO a la resolución del mapa A (la junta
+## mide 4 mm y su distancia tiene que leerse entera), el BASTO a la del B, cada
+## uno con sus regiones una al lado de otra (qué lleva cada una: la cabecera de
+## `suelo_horno.gdshader`). La rosa, en su cuadrado: las teselas miden 18 mm y
+## su lechada dos, así que van a ~1.160 px por unidad.
+const REGIONES_FINO := 2
+const REGIONES_BASTO := 6
+const LADO_ROSA := 0.88
+const PX_ROSA := 1024
+## Cómo se llaman los atlas en la losa, en el orden del horno.
+const ATLAS: Array[String] = ["horno_fino", "horno_basto", "horno_rosa"]
 
 ## EL EMBLEMA: el nodo central de la plaza de la caza (`caza_orbita.gd`,
 ## NODO_CENTRO). Va escrito y no leído porque la caza se monta DESPUÉS que los
@@ -127,9 +146,13 @@ const PESOS_USO: Array[float] = [1.0, 0.75, 0.6, 0.5, 0.4, 0.8, 0.45]
 
 var _mundo: Nucleo
 var _mat: ShaderMaterial
-## Los dos SubViewport de los mapas mientras no se han copiado a textura.
+## Los dos SubViewport de los mapas, y luego los tres de los atlas, mientras no
+## se han copiado a textura.
 var _horno_a: SubViewport
 var _horno_b: SubViewport
+var _atlas: Array[SubViewport] = []
+## Lo que el horno de la losa necesita (los mismos números que el material).
+var _params_horno := {}
 var _cuadros := 0
 var _horneado := false
 
@@ -138,9 +161,14 @@ func montar(mundo: Node3D) -> void:
 	_mat = _material()
 	_mundo.mat_suelo = _mat
 	# Para mirar las máscaras: `-- --suelo-depura=N` (los modos están en la
-	# cabecera de `suelo_losa.gdshader`).
+	# cabecera de `suelo_losa.gdshader`). Van en una COPIA del sombreador con
+	# SUELO_DEPURA definido: en el de verdad no se compilan (en el navegador, la
+	# rama de depurar sola eran 0,5 s).
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--suelo-depura="):
+			var depura := Shader.new()
+			depura.code = LOSA.code.replace("shader_type spatial;", "shader_type spatial;\n#define SUELO_DEPURA")
+			_mat.shader = depura
 			_mat.set_shader_parameter("depura", int(arg.get_slice("=", 1)))
 	_hornear()
 	var ancho := Mesa.ANCHO * Nucleo.E / float(BALDAS)
@@ -157,25 +185,36 @@ func montar(mundo: Node3D) -> void:
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			_mundo.add_child(mi)
 
-## Los mapas se dibujan en el primer cuadro; en el tercero ya están y se copian
-## a texturas con mipmaps (de lejos el latón no chispea) y los SubViewport se
-## sueltan. Si la copia no sale, el material sigue leyendo los SubViewport, que
-## con UPDATE_ONCE guardan su imagen.
+## Los mapas se dibujan en el primer cuadro; en el tercero ya están, se copian a
+## textura y con ellos se encienden los atlas, que el material lee ya desde sus
+## SubViewport (con UPDATE_ONCE guardan su imagen). Tres cuadros después los
+## atlas se copian también y todos los SubViewport se sueltan. Si una copia no
+## sale, el material sigue leyendo los SubViewport.
 func actualizar(_delta: float) -> void:
 	if _horneado:
 		return
 	_cuadros += 1
-	if _cuadros < 3:
-		return
-	var a := _a_textura(_horno_a)
-	var b := _a_textura(_horno_b)
-	if a != null and b != null:
-		_mat.set_shader_parameter("mapa_a", a)
-		_mat.set_shader_parameter("mapa_b", b)
-		_horno_a.queue_free()
-		_horno_b.queue_free()
-		_horneado = true
-	elif _cuadros > 30:
+	if _cuadros == 3:
+		var a := _a_textura(_horno_a)
+		var b := _a_textura(_horno_b)
+		_hornear_atlas(a if a != null else _horno_a.get_texture(),
+			b if b != null else _horno_b.get_texture())
+	elif _cuadros >= 6:
+		var copias: Array[ImageTexture] = []
+		for vp in _atlas:
+			# El fino, con mipmaps: la losa lee de él la rampa del latón como la
+			# leía del mapa A, que los tenía (de lejos el listón no chispea).
+			var t := _a_textura(vp, vp == _atlas[0])
+			if t == null:
+				# Se reintenta; si no sale, el material se queda con los SubViewport.
+				_horneado = _cuadros > 30
+				return
+			copias.append(t)
+		for i in copias.size():
+			_mat.set_shader_parameter(ATLAS[i], copias[i])
+		for vp: SubViewport in [_horno_a, _horno_b] + _atlas:
+			vp.queue_free()
+		_atlas.clear()
 		_horneado = true
 
 ## LA CALIDAD (la llama el núcleo, `poner_calidad`): 0 ALTA, 1 MEDIA, 2 BAJA.
@@ -187,55 +226,73 @@ func calidad(n: int) -> void:
 	if _mat != null:
 		_mat.set_shader_parameter("muestras", 8 if n <= 0 else 4)
 
-func _a_textura(vp: SubViewport) -> ImageTexture:
+## Sin mipmaps, salvo que se pidan: los mapas solo los lee el horno, a su
+## tamaño, y los atlas la losa con `textureLod` a 0 (una distancia promediada
+## borraba la junta).
+func _a_textura(vp: SubViewport, mipmaps := false) -> ImageTexture:
 	var img := vp.get_texture().get_image()
 	if img == null or img.is_empty():
 		return null
 	img.convert(Image.FORMAT_RGBA8)
-	img.generate_mipmaps()
+	if mipmaps:
+		img.generate_mipmaps()
 	return ImageTexture.create_from_image(img)
 
 # ------------------------------------------------------------------ el material
 
+## El material de la losa y, en `_params_horno`, lo que necesita su horno: los
+## números que antes leía la losa y ahora solo usa el horno van allí.
 func _material() -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = LOSA
-	m.set_shader_parameter("fuerza_reflejo", 1.0)
-	m.set_shader_parameter("tex_grano", TEX_GRANO)
-	m.set_shader_parameter("tex_celdas", TEX_CELDAS)
-	m.set_shader_parameter("tex_manchas", TEX_MANCHAS)
-	m.set_shader_parameter("rect_mapa", Vector4(0.0, Y_ARRIBA * Nucleo.E,
-		Mesa.ANCHO * Nucleo.E, (Y_ABAJO - Y_ARRIBA) * Nucleo.E))
-	m.set_shader_parameter("paso_mapa", Nucleo.E / RES_A * 1.5)
+	var rect := Vector4(0.0, Y_ARRIBA * Nucleo.E, Mesa.ANCHO * Nucleo.E, (Y_ABAJO - Y_ARRIBA) * Nucleo.E)
+	var emblema := Vector3(EMBLEMA.x * Nucleo.E, EMBLEMA.y * Nucleo.E, RADIO_EMBLEMA * Nucleo.E)
 	# La losa es LA piedra de la biblioteca (decisión 6 de la revisión: una sola
 	# piedra): gris PARDO, PIEDRA_1 y PIEDRA_2. Antes el fondo era GRIS_1, que es
 	# un gris azulado, y el suelo no parecía de la misma cantera que las paredes.
 	# Los números son los de la cabecera de `materiales/biblioteca.gd` («LA
 	# PIEDRA, para quien tenga sombreador propio»): la losa una tesitura por
 	# debajo del sillar, y su misma mugre.
-	m.set_shader_parameter("piedra_a", Paleta.PIEDRA_1.darkened(0.25))
-	m.set_shader_parameter("piedra_b", Paleta.PIEDRA_1)
-	m.set_shader_parameter("piedra_c", Paleta.PIEDRA_2)
-	m.set_shader_parameter("z_adoquin", Y_ADOQUIN * Nucleo.E)
-	# La elipse seca de las palas, de los ejes de las dos palas de abajo.
-	var izq := _mundo.mesa.p.flipper_eje_izq
-	var der := _mundo.mesa.p.flipper_eje_der
-	m.set_shader_parameter("zona_palas", Vector4((izq.x + der.x) * 0.5 * Nucleo.E,
-		(izq.y + 15.0) * Nucleo.E, ((der.x - izq.x) * 0.5 + 40.0) * Nucleo.E, 60.0 * Nucleo.E))
-	var mugre := Paleta.PIEDRA_1.lerp(Paleta.TIERRA_1, 0.5).lerp(Paleta.VERDE_1, 0.15)
-	m.set_shader_parameter("color_mugre", mugre.darkened(0.55))
-	m.set_shader_parameter("color_hollin", Paleta.NEGRO.darkened(0.4))
+	var mugre := Paleta.PIEDRA_1.lerp(Paleta.TIERRA_1, 0.5).lerp(Paleta.VERDE_1, 0.15).darkened(0.55)
+	var comunes := {
+		"rect_mapa": rect,
+		"paso_mapa": Nucleo.E / RES_A * 1.5,
+		"z_adoquin": Y_ADOQUIN * Nucleo.E,
+		"piedra_a": Paleta.PIEDRA_1.darkened(0.25),
+		"color_mugre": mugre,
+		"color_hollin": Paleta.NEGRO.darkened(0.4),
+	}
+	for k: String in comunes:
+		m.set_shader_parameter(k, comunes[k])
+	m.set_shader_parameter("fuerza_reflejo", 1.0)
+	m.set_shader_parameter("tex_grano", TEX_GRANO)
+	m.set_shader_parameter("tex_celdas", TEX_CELDAS)
+	m.set_shader_parameter("rect_rosa", _rect_rosa(emblema))
 	m.set_shader_parameter("color_laton", Paleta.ORO)
 	m.set_shader_parameter("color_laton_viejo", Paleta.ORO_OSCURO)
 	m.set_shader_parameter("color_cardenillo", Paleta.ORO_OSCURO.lerp(Paleta.VERDE_1, 0.6).darkened(0.3))
-	m.set_shader_parameter("emblema", Vector3(EMBLEMA.x * Nucleo.E, EMBLEMA.y * Nucleo.E,
-		RADIO_EMBLEMA * Nucleo.E))
-	m.set_shader_parameter("tesela_hueso", Paleta.TIERRA_5.darkened(0.35))
-	m.set_shader_parameter("tesela_ocre", Paleta.ORO_OSCURO.darkened(0.1))
-	m.set_shader_parameter("tesela_teja", Paleta.COBRE_1.lerp(Paleta.ROJO, 0.4))
-	m.set_shader_parameter("tesela_pizarra", Paleta.GRIS_1.darkened(0.25))
-	m.set_shader_parameter("tesela_carbon", Paleta.NEGRO)
+
+	_params_horno = comunes.duplicate()
+	_params_horno["tex_manchas"] = TEX_MANCHAS
+	_params_horno["piedra_b"] = Paleta.PIEDRA_1
+	_params_horno["piedra_c"] = Paleta.PIEDRA_2
+	# La elipse seca de las palas, de los ejes de las dos palas de abajo.
+	var izq := _mundo.mesa.p.flipper_eje_izq
+	var der := _mundo.mesa.p.flipper_eje_der
+	_params_horno["zona_palas"] = Vector4((izq.x + der.x) * 0.5 * Nucleo.E,
+		(izq.y + 15.0) * Nucleo.E, ((der.x - izq.x) * 0.5 + 40.0) * Nucleo.E, 60.0 * Nucleo.E)
+	_params_horno["emblema"] = emblema
+	_params_horno["tesela_hueso"] = Paleta.TIERRA_5.darkened(0.35)
+	_params_horno["tesela_ocre"] = Paleta.ORO_OSCURO.darkened(0.1)
+	_params_horno["tesela_teja"] = Paleta.COBRE_1.lerp(Paleta.ROJO, 0.4)
+	_params_horno["tesela_pizarra"] = Paleta.GRIS_1.darkened(0.25)
+	_params_horno["tesela_carbon"] = Paleta.NEGRO
 	return m
+
+## El cuadrado de mundo que cubre la rosa, centrado en el emblema (el radio de
+## las teselas es 0,42: sobra un pelo por cada lado, fuera de la rosa).
+func _rect_rosa(emblema: Vector3) -> Vector4:
+	return Vector4(emblema.x - LADO_ROSA * 0.5, emblema.y - LADO_ROSA * 0.5, LADO_ROSA, LADO_ROSA)
 
 # ------------------------------------------------------------------- los mapas
 
@@ -243,12 +300,35 @@ func _hornear() -> void:
 	var datos := _datos()
 	var tam_a := Vector2i(roundi(Mesa.ANCHO * RES_A), roundi((Y_ABAJO - Y_ARRIBA) * RES_A))
 	var tam_b := Vector2i(roundi(Mesa.ANCHO * RES_B), roundi((Y_ABAJO - Y_ARRIBA) * RES_B))
-	_horno_a = _horno(tam_a, 0, datos)
-	_horno_b = _horno(tam_b, 1, datos)
-	_mat.set_shader_parameter("mapa_a", _horno_a.get_texture())
-	_mat.set_shader_parameter("mapa_b", _horno_b.get_texture())
+	var rect_px := Vector4(0.0, Y_ARRIBA, Mesa.ANCHO, Y_ABAJO - Y_ARRIBA)
+	_horno_a = _horno(tam_a, MAPAS, datos.merged({"modo": 0, "rect_px": rect_px}))
+	_horno_b = _horno(tam_b, MAPAS, datos.merged({"modo": 1, "rect_px": rect_px}))
 
-func _horno(tam: Vector2i, modo: int, datos: Dictionary) -> SubViewport:
+## Los tres atlas del horno de la losa, con los mapas ya dibujados: el material
+## los lee desde ya (el SubViewport guarda su imagen) y `actualizar` los copia.
+## El orden es el de `ATLAS` y el de `atlas` en `suelo_horno.gdshader`.
+func _hornear_atlas(a: Texture2D, b: Texture2D) -> void:
+	var alto_a := roundi((Y_ABAJO - Y_ARRIBA) * RES_A)
+	var alto_b := roundi((Y_ABAJO - Y_ARRIBA) * RES_B)
+	var rect: Vector4 = _params_horno["rect_mapa"]
+	var tamanos: Array[Vector2i] = [
+		Vector2i(roundi(Mesa.ANCHO * RES_A) * REGIONES_FINO, alto_a),
+		Vector2i(roundi(Mesa.ANCHO * RES_B) * REGIONES_BASTO, alto_b),
+		Vector2i(PX_ROSA * 2, PX_ROSA),
+	]
+	var emblema: Vector3 = _params_horno["emblema"]
+	var rects: Array[Vector4] = [rect, rect, _rect_rosa(emblema)]
+	var regiones: Array[int] = [REGIONES_FINO, REGIONES_BASTO, 2]
+	for i in ATLAS.size():
+		var p := _params_horno.merged({"atlas": i, "regiones": regiones[i], "rect": rects[i],
+			"mapa_a": a, "mapa_b": b})
+		var vp := _horno(tamanos[i], HORNO, p)
+		# Con fondo transparente el canal A se guarda tal cual: lleva datos.
+		vp.transparent_bg = true
+		_atlas.append(vp)
+		_mat.set_shader_parameter(ATLAS[i], vp.get_texture())
+
+func _horno(tam: Vector2i, sombreador: Shader, params: Dictionary) -> SubViewport:
 	var vp := SubViewport.new()
 	vp.size = tam
 	vp.disable_3d = true
@@ -258,11 +338,9 @@ func _horno(tam: Vector2i, modo: int, datos: Dictionary) -> SubViewport:
 	lienzo.position = Vector2.ZERO
 	lienzo.size = Vector2(tam)
 	var m := ShaderMaterial.new()
-	m.shader = MAPAS
-	m.set_shader_parameter("modo", modo)
-	m.set_shader_parameter("rect_px", Vector4(0.0, Y_ARRIBA, Mesa.ANCHO, Y_ABAJO - Y_ARRIBA))
-	for k: String in datos:
-		m.set_shader_parameter(k, datos[k])
+	m.shader = sombreador
+	for k: String in params:
+		m.set_shader_parameter(k, params[k])
 	lienzo.material = m
 	vp.add_child(lienzo)
 	_mundo.add_child(vp)

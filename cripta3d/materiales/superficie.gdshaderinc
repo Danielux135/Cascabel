@@ -24,6 +24,26 @@
 //     normal por unidad de mundo: un bisel redondo da positivo, un rincón
 //     redondo negativo, una cara plana cero. No depende de la distancia de la
 //     cámara, porque se divide por lo que avanza la posición.
+//
+// LO QUE CUESTA COMPILARLO EN UN NAVEGADOR (21-nov-2026, banco con ANGLE, en
+// frío). En Windows, WebGL pasa por Direct3D y cada línea de aquí se compila
+// tres veces (dos variantes «por defecto» de Godot y la de verdad) metida en la
+// luz entera de Godot. Eran 9,3 s; la luz sola, con las salidas sin plegar
+// (ROUGHNESS, NORMAL… desde un `uniform`), ya son 6,1. Lo que se aprendió:
+//   - Una rama por `uniform` SE COMPILA aunque no la pida nadie: la depuración
+//     (0,4 s) y el espejo del suelo con su mapa de oclusión (0,3 s) iban en el
+//     programa de toda la mesa sin que ningún módulo los usara. Ahora van detrás
+//     de `#ifdef DEPURA` y `#ifdef REFLEJO`: `biblioteca.gd` arma esos programas
+//     al vuelo solo cuando alguien los pide (el muestrario, `--depura-materiales`).
+//   - QUITAR RAMAS NO AHORRA: todo calculado y enmascarado salió PEOR (9,2
+//     contra 8,8), y meter el código propio en un bloque o en un bucle de una
+//     vuelta para separarlo de la luz, mucho peor (10,6 y 18 s). Pasar las
+//     coordenadas y el giro de la normal al vértice, también peor (10,2).
+//   - FXC es caprichoso: quitar la madera ENCARECIÓ el programa (10,9), y el
+//     mismo fichero da de 8,6 a 9,0 según la lanzada. Antes de tocar nada aquí
+//     para «abaratar», se mide con el banco, varias veces, en la misma lanzada.
+//   - BACKLIGHT (la luz que atraviesa: hueso y cera) es la salida más cara:
+//     quitarla ahorra de 0,45 a 0,6 s, pero cambia el hueso. Se queda.
 
 uniform sampler2D tex_grano : filter_linear_mipmap_anisotropic, repeat_enable;
 uniform sampler2D tex_celdas : filter_linear_mipmap_anisotropic, repeat_enable;
@@ -103,23 +123,36 @@ uniform float emision_grietas = 0.0;    // solo por las grietas: el carbón ence
 uniform vec3 translucido : source_color = vec3(0.0);
 
 // --- lo que solo usa el suelo -------------------------------------------------
+// SOLO EN EL PROGRAMA «REFLEJO» (ver arriba): el suelo de la mesa tiene su
+// propio sombreador (`mundo/suelo_losa.gdshader`) y aquí solo lo pide el
+// muestrario. En el programa de la mesa costaba 0,3 s sin dibujar nada.
 // El reflejo plano: la imagen de una cámara espejo (la de juego, del revés por
 // debajo del suelo). Mismos nombres que en `prueba3d/suelo.gdshader`, para que
 // quien venga de ÓRBITA lo enchufe sin mirar. Son cuatro lecturas más, y solo
 // en el material que lo pida.
+#ifdef REFLEJO
 uniform sampler2D reflejo : source_color, filter_linear, repeat_disable, hint_default_black;
 uniform float fuerza_reflejo = 0.0;
 // La oclusión horneada: un mapa visto desde arriba. El rectángulo es x, z,
 // ancho y fondo, en unidades de mundo; con ancho 0 no hay mapa.
 uniform sampler2D mapa_oclusion : filter_linear, repeat_disable, hint_default_white;
 uniform vec4 rect_oclusion = vec4(0.0);
+varying vec2 v_suelo;
+#endif
 
+// SOLO EN EL PROGRAMA «DEPURA»: pintar una máscara es mirar, no jugar (0,4 s).
+#ifdef DEPURA
 uniform int depura = 0;                 // 1 canto · 2 suciedad · 3 oclusión · 4 mojado · 5 normal
+#endif
 
 varying vec3 v_pos;
 varying vec3 v_nor;
 varying flat vec3 v_arriba;
-varying vec2 v_suelo;
+
+// La luz de Godot, copiada a mano por lo que tarda en compilar la suya en un
+// navegador (ver el fichero). Aquí el fragment escribe BACKLIGHT.
+#define LUZ_CON_TRASLUZ
+#include "res://cripta3d/materiales/luz_godot.gdshaderinc"
 
 // Los giros de la normal (en 1/unidad de mundo) entre los que nace el canto. Un
 // bisel de 1 a 2 px de mesa da de 50 a 100; la bola da 22 y se queda sin él.
@@ -171,13 +204,17 @@ void vertex() {
 	v_pos = marco * (p + desfase);
 	v_nor = marco * n;
 	v_arriba = marco * arriba;
+#ifdef REFLEJO
 	v_suelo = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xz;
+#endif
 }
 
 void fragment() {
 	vec3 p = v_pos;
 	vec3 n0 = normalize(v_nor);
+#ifdef REFLEJO
 	vec3 n_malla = NORMAL;                          // la de la malla, antes de tocarla
+#endif
 	float sube = dot(n0, normalize(v_arriba));      // 1 mira al cielo, −1 al suelo
 
 	// LA NORMAL QUE ELIGE EL PLANO no es la del sombreado. Muchas mallas llevan
@@ -273,9 +310,11 @@ void fragment() {
 		canto = COLOR.g;
 		libre = COLOR.b;
 	}
+#ifdef REFLEJO
 	if (rect_oclusion.z > 0.0) {
 		oclu *= texture(mapa_oclusion, (v_suelo - rect_oclusion.xy) / rect_oclusion.zw).r;
 	}
+#endif
 	if (curvatura > 0.0) {
 		vec3 ax = dFdx(VERTEX);
 		vec3 ay = dFdy(VERTEX);
@@ -473,6 +512,7 @@ void fragment() {
 	ROUGHNESS = rug;
 	METALLIC = clamp(met, 0.0, 1.0);
 	SPECULAR = esp * mix(1.0, sombra, 0.8);
+	v_especular = SPECULAR;
 	NORMAL = n_vista;
 	AO = sombra;
 	BACKLIGHT = translucido;
@@ -484,6 +524,7 @@ void fragment() {
 		float aire = 0.72 + 0.28 * sin(TIME * 1.9 + grande * 17.0 + p.x * 5.0 + p.z * 3.0);
 		luz += color_emision * emision_grietas * brasa * brasa * aire * libre;
 	}
+#ifdef REFLEJO
 	if (fuerza_reflejo > 0.0) {
 		// El espejo es el plano del suelo: solo vale donde la cara mira arriba. El
 		// relieve tuerce la imagen, y la rugosidad la abre: lo seco la emborrona
@@ -503,8 +544,10 @@ void fragment() {
 		luz += imagen * mix(vec3(1.0), alb, clamp(met, 0.0, 1.0))
 				* (fuerza_reflejo * mix(0.3, 1.0, rasante) * liso * liso * plano * mix(1.0, sombra, 0.5));
 	}
+#endif
 	EMISSION = luz;
 
+#ifdef DEPURA
 	if (depura > 0) {
 		vec3 d = vec3(0.0);
 		if (depura == 1) {
@@ -520,8 +563,10 @@ void fragment() {
 		}
 		ALBEDO = vec3(0.0);
 		SPECULAR = 0.0;
+		v_especular = 0.0;
 		ROUGHNESS = 1.0;
 		METALLIC = 0.0;
 		EMISSION = d;
 	}
+#endif
 }

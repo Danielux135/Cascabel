@@ -2,9 +2,10 @@
 //
 // La llama no es una textura ni un humo: son DOS MALLAS con volumen, una dentro
 // de otra, que arden con el mismo ruido:
-//   · la MELENA  (brasa_llama)   la corona entera, translúcida en el canto
-//   · el NÚCLEO  (brasa_nucleo)  la llama clara de dentro: es la cara
-// Aquí están el ruido, el movimiento y el COLOR, para que las dos se muevan y se
+//   · la MELENA  la corona entera, translúcida en el canto
+//   · el NÚCLEO  la llama clara de dentro: es la cara
+// Las dos van con el MISMO sombreador (`brasa_llama`, ver allí por qué). Aquí
+// están el ruido, el movimiento y el COLOR, para que las dos se muevan y se
 // tiñan igual: donde la melena se abre y deja ver el núcleo, los dos tienen el
 // mismo color a la misma altura, y no queda borde.
 //
@@ -43,7 +44,6 @@ uniform float hervor_base = 0.18;
 // pone `brasa.gd`, de dónde acaban los ojos.
 uniform float encoge_desde = 0.15;
 
-uniform vec3 c_blanco : source_color = vec3(0.96, 0.91, 0.81);
 uniform vec3 c_oro_claro : source_color = vec3(0.97, 0.85, 0.42);
 uniform vec3 c_oro : source_color = vec3(0.88, 0.65, 0.24);
 uniform vec3 c_naranja : source_color = vec3(0.91, 0.51, 0.29);
@@ -51,22 +51,32 @@ uniform vec3 c_rojo_luz : source_color = vec3(0.78, 0.29, 0.24);
 uniform vec3 c_rojo : source_color = vec3(0.55, 0.18, 0.18);
 uniform vec3 c_cobre : source_color = vec3(0.42, 0.23, 0.13);
 
-float brasa_azar(vec3 p) {
-	p = fract(p * 0.3183099 + vec3(0.1, 0.17, 0.23));
-	p *= 17.0;
-	return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
-}
+// EL RUIDO SE LEE, NO SE CALCULA (web, 21-nov-2026). Era un ruido de valor 3D
+// por código —ocho `hash` y siete mezclas por llamada— y la llama lo llamaba once
+// veces: Direct3D, que es quien compila WebGL en Windows, lo despliega entero en
+// cada variante, y la melena tardaba 2,5 s en compilar y el núcleo 1,1.
+//
+// `brasa_ruido.png` (de `brasa_ruido.gd`) es EL MISMO ruido de valor, horneado:
+// la rejilla de azar con la curva suave ya dentro (8 píxeles por celda, 32 celdas
+// por lado). La tercera dimensión, con el truco de siempre: el canal G es el R
+// corrido (37, 17) celdas, así que una sola lectura trae el plano z = k en R y el
+// z = k + 1 en G, y mezclarlos con la misma curva es lo que hacía la cuenta de
+// antes. Mismo grano, mismo reparto de valores, los mismos umbrales valen. Lo que
+// cambia es que se repite cada 32 celdas, y la llama entera son 17 a la escala
+// más fina. El B es otro ruido, suelto, para lo que solo necesita un plano.
+uniform sampler2D ruido_brasa : filter_linear, repeat_enable;
 
 float brasa_ruido(vec3 x) {
-	vec3 i = floor(x);
-	vec3 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(
-		mix(mix(brasa_azar(i), brasa_azar(i + vec3(1.0, 0.0, 0.0)), f.x),
-			mix(brasa_azar(i + vec3(0.0, 1.0, 0.0)), brasa_azar(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
-		mix(mix(brasa_azar(i + vec3(0.0, 0.0, 1.0)), brasa_azar(i + vec3(1.0, 0.0, 1.0)), f.x),
-			mix(brasa_azar(i + vec3(0.0, 1.0, 1.0)), brasa_azar(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
-		f.z);
+	float k = floor(x.z);
+	vec2 t = textureLod(ruido_brasa, (x.xy + vec2(37.0, 17.0) * k) * (1.0 / 32.0), 0.0).rg;
+	float f = x.z - k;
+	return mix(t.r, t.g, f * f * (3.0 - 2.0 * f));
+}
+
+// Un solo plano: el `tiron` y el `late` de las lenguas, que no tienen fondo (eran
+// el ruido 3D en z = 1 y z = 3, o sea, ruido 2D).
+float brasa_ruido_plano(vec2 x) {
+	return textureLod(ruido_brasa, x * (1.0 / 32.0), 0.0).b;
 }
 
 // El ruido que SUBE: el dibujo entero viaja hacia arriba, así que una veta que
@@ -117,10 +127,10 @@ vec3 brasa_mover(vec3 p, vec3 n, float lengua, float fase, float cuanto) {
 	// Y un tercer tirón, rápido y a golpes, que es el lametazo de una llama.
 	float a = sin(tiempo * 6.1 - p.y * 23.0 + f);
 	float b = sin(tiempo * 9.3 - p.y * 36.0 + f * 2.3 + 1.7);
-	float tiron = brasa_ruido(vec3(fase * 7.0 + semilla, tiempo * 4.3 - p.y * 9.0, 1.0)) - 0.5;
+	float tiron = brasa_ruido_plano(vec2(fase * 7.0 + semilla, tiempo * 4.3 - p.y * 9.0)) - 0.5;
 	p += vec3(a * 0.7 + b * 0.3 + tiron * 0.9, 0.0, b * 0.7 - a * 0.3 - tiron * 0.5) * 0.032 * k * vaiven;
 	// Cada lengua se estira y se encoge a su aire: el parpadeo de las puntas.
-	float late = brasa_ruido(vec3(fase * 13.0 + semilla * 9.0, tiempo * 2.6, 3.0));
+	float late = brasa_ruido_plano(vec2(fase * 13.0 + semilla * 9.0 + 11.0, tiempo * 2.6 + 23.0));
 	p.y += (late - 0.40) * 0.12 * punta * cuanto * (0.7 + avivar * 0.9) * talla;
 	// El ruido que sube también empuja la piel: arriba mucho, abajo casi nada.
 	float hervor = brasa_ruido(vec3(p.x * 19.0, p.y * 12.0 - tiempo * 2.8, p.z * 19.0) + vec3(semilla * 2.0));

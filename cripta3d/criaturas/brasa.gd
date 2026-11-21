@@ -73,14 +73,21 @@ extends Node3D
 
 const Criatura := preload("res://prueba3d/criatura.gd")
 const MODELO := preload("res://cripta3d/modelos/criatura_brasa.glb")
+## CUATRO SOMBREADORES PARA OCHO COSAS (web, 21-nov-2026). En el navegador cada
+## sombreador se compila con ANGLE y Direct3D, y uno vacío ya cuesta 0,3 s: las
+## piezas que pintan igual van juntas, con un `es_…` que dice cuál es cada una.
+##   brasa_llama   la melena y el núcleo            (es_nucleo)
+##   brasa_carbon  el carbón y los dos ojos         (es_ojo)
+##   brasa_pavesa  las pavesas, las chispas y el hilo  (es_hilo)
+##   brasa_cerco   el cerco de la losa y el humo    (es_humo)
+## Eran ocho y 12,8 s de compilar; las cuentas, en cada sombreador.
 const SH_LLAMA := preload("res://cripta3d/criaturas/brasa_llama.gdshader")
-const SH_NUCLEO := preload("res://cripta3d/criaturas/brasa_nucleo.gdshader")
-const SH_OJO := preload("res://cripta3d/criaturas/brasa_ojo.gdshader")
 const SH_CARBON := preload("res://cripta3d/criaturas/brasa_carbon.gdshader")
 const SH_PAVESA := preload("res://cripta3d/criaturas/brasa_pavesa.gdshader")
-const SH_HUMO := preload("res://cripta3d/criaturas/brasa_humo.gdshader")
 const SH_CERCO := preload("res://cripta3d/criaturas/brasa_cerco.gdshader")
-const SH_HILO := preload("res://cripta3d/criaturas/brasa_hilo.gdshader")
+## El ruido de los sombreadores, horneado (`brasa_ruido.gd`): en el navegador un
+## ruido por código se compila desplegado en cada variante.
+const RUIDO := preload("res://cripta3d/criaturas/brasa_ruido.png")
 ## No atravesarse a la vista (agacharse bajo un raíl, hacerse a un lado): la
 ## cuenta es la de la calavera, para que los tres cuerpos midan igual.
 const Calavera := preload("res://cripta3d/criaturas/calavera.gd")
@@ -230,6 +237,7 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 	# --- El carbón
 	_mat_carbon = ShaderMaterial.new()
 	_mat_carbon.shader = SH_CARBON
+	_mat_carbon.set_shader_parameter("ruido_brasa", RUIDO)
 	_mat_carbon.set_shader_parameter("semilla", semilla)
 	_mat_carbon.set_shader_parameter("c_negro", Paleta.NEGRO)
 	_mat_carbon.set_shader_parameter("c_carbon", Paleta.GRIS_1)
@@ -252,8 +260,14 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 	_mat_llama = mat_llama
 	_llama = _pieza(malla_llama, mat_llama, _forma, false)
 	_llama.position = baja
-	var mat_nucleo := _fuego(SH_NUCLEO, semilla, templado)
+	var mat_nucleo := _fuego(SH_LLAMA, semilla, templado)
+	mat_nucleo.set_shader_parameter("es_nucleo", 1.0)
+	mat_nucleo.set_shader_parameter("cuanto", 0.55)
 	mat_nucleo.set_shader_parameter("hervor_base", 0.02)
+	# El núcleo es opaco, pero va con el sombreador de la melena, que es
+	# transparente (con alfa 1 tapa igual): un puesto antes, para que la melena
+	# se pinte siempre encima de él y no al revés.
+	mat_nucleo.render_priority = -1
 	_nucleo = _pieza(malla_nucleo, mat_nucleo, _forma, false)
 	_nucleo.position = baja
 
@@ -266,14 +280,14 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 		if nodo == null:
 			continue
 		var mat := ShaderMaterial.new()
-		mat.shader = SH_OJO
+		mat.shader = SH_CARBON
+		mat.set_shader_parameter("es_ojo", 1.0)
 		mat.set_shader_parameter("lado", -1.0 if i == 0 else 1.0)
 		mat.set_shader_parameter("c_cuenca", Paleta.ROJO)
 		mat.set_shader_parameter("c_reborde", Paleta.COBRE_1)
 		mat.set_shader_parameter("c_fondo", Paleta.TIERRA_1)
 		mat.set_shader_parameter("c_parpado", Paleta.ORO)
 		mat.set_shader_parameter("c_pupila", Paleta.ORO_CLARO)
-		mat.set_shader_parameter("c_pupila_luz", Paleta.TIERRA_6)
 		var ojo := _pieza(nodo.mesh, mat, _forma, false)
 		var reposo := Transform3D(nodo.transform.basis, nodo.transform.origin + baja)
 		ojo.transform = reposo
@@ -348,11 +362,11 @@ func _pieza(malla: Mesh, mat: Material, padre: Node3D, sombra: bool) -> MeshInst
 func _fuego(shader: Shader, semilla: float, templado: float) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	m.shader = shader
+	m.set_shader_parameter("ruido_brasa", RUIDO)
 	m.set_shader_parameter("semilla", semilla)
 	m.set_shader_parameter("pie", _pivote)
 	m.set_shader_parameter("altura", _alto)
 	m.set_shader_parameter("templado", templado)
-	m.set_shader_parameter("c_blanco", Paleta.TIERRA_6)
 	m.set_shader_parameter("c_oro_claro", Paleta.ORO_CLARO)
 	m.set_shader_parameter("c_oro", Paleta.ORO)
 	m.set_shader_parameter("c_naranja", Paleta.NARANJA)
@@ -369,6 +383,7 @@ func _montar_cerco(semilla: float) -> void:
 	plano.size = Vector2(lado, lado)
 	_mat_cerco = ShaderMaterial.new()
 	_mat_cerco.shader = SH_CERCO
+	_mat_cerco.set_shader_parameter("ruido_brasa", RUIDO)
 	_mat_cerco.set_shader_parameter("semilla", semilla)
 	_mat_cerco.set_shader_parameter("radio", c.radio * E / (lado * 0.5))
 	_mat_cerco.set_shader_parameter("c_hollin", Paleta.NEGRO)
@@ -472,7 +487,9 @@ func _montar_particulas(malla_pavesa: Mesh) -> void:
 	# El HUMO: un hilo, solo cuando se queda casi apagada. De la rampa solo se
 	# usa la transparencia: el gris lo pone el shader.
 	var mat_humo := ShaderMaterial.new()
-	mat_humo.shader = SH_HUMO
+	mat_humo.shader = SH_CERCO
+	mat_humo.set_shader_parameter("es_humo", 1.0)
+	mat_humo.set_shader_parameter("ruido_brasa", RUIDO)
 	mat_humo.set_shader_parameter("color", Paleta.PIEDRA_3)
 	var cuadro := QuadMesh.new()
 	cuadro.size = Vector2(1.0, 1.0)
@@ -501,7 +518,7 @@ func _montar_particulas(malla_pavesa: Mesh) -> void:
 	_humo.emitting = false
 	add_child(_humo)
 
-## El hilo de chispas hasta la otra ascua (`brasa_hilo.gdshader`). Un cilindro de
+## El hilo de chispas hasta la otra ascua (`brasa_pavesa.gdshader`, `es_hilo`). Un cilindro de
 ## 6 lados a lo largo de su Y, que se estira y se apunta cada cuadro.
 func _montar_hilo() -> void:
 	var tubo := CylinderMesh.new()
@@ -513,7 +530,9 @@ func _montar_hilo() -> void:
 	tubo.cap_top = false
 	tubo.cap_bottom = false
 	_mat_hilo = ShaderMaterial.new()
-	_mat_hilo.shader = SH_HILO
+	_mat_hilo.shader = SH_PAVESA
+	_mat_hilo.set_shader_parameter("es_hilo", 1.0)
+	_mat_hilo.set_shader_parameter("fuerza", 1.0)
 	_mat_hilo.set_shader_parameter("color", Paleta.NARANJA)
 	_mat_hilo.set_shader_parameter("color_vivo", Paleta.ORO_CLARO)
 	_hilo = MeshInstance3D.new()

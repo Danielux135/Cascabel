@@ -1,4 +1,10 @@
 shader_type spatial;
+// SIN LUZ DE GODOT. Con luz, este programa tardaba 6,7 s en compilar en un
+// navegador (banco con ANGLE, en frío: la luz de Godot sola son 5,5); sin luz,
+// 0,7. Lo que arde no necesita que lo alumbren: lo único que recibía luz era la
+// costra negra, y esa se alumbra aquí con una luz propia barata («luz_costra»,
+// de una dirección fija), que es lo que hacía el fuego que siempre tiene al lado.
+render_mode unshaded;
 
 // CRIPTA 3D — EL ASCUA, y con otros colores el ARCANO. Lo único de la mesa que
 // da luz propia.
@@ -39,6 +45,29 @@ uniform vec3 color_claro : source_color = vec3(1.0, 0.75, 0.25);
 uniform vec3 color_nucleo : source_color = vec3(1.0, 0.95, 0.8);
 uniform vec3 tinte : source_color = vec3(1.0);
 uniform float energia = 3.0;
+// La luz que recibe la costra, que antes ponía el fuego de al lado: un color
+// LINEAL (como la energía de una luz, no un color de paleta), cuánta, y de dónde
+// viene (en el mundo). Con un 20 % que llega por todos lados, para que la cara de
+// atrás no se quede en negro puro. Los números de la biblioteca salen de igualar
+// el muestrario de antes (la costra a la luz del farol de al lado).
+uniform vec3 luz_costra = vec3(1.0, 0.22, 0.08);
+uniform float fuerza_costra = 8.7;
+uniform vec3 dir_costra = vec3(0.05, 0.6, 0.8);
+// LA LUZ DE SU SITIO. Un mismo perfil sirve a braseros que están en luces muy
+// distintas: los del campo tienen su fuego entero encima; los de pie de la sala y
+// los de las esquinas, un fuego que «entorno» baja a un cuarto o a la mitad
+// (`entorno._peso_zona`). Con una sola luz fija la costra de la sala salía
+// alumbrada como la del campo: el crítico midió el carbón del brasero de pie de
+// 53,5 a 69,0 de luminancia (gira5 → gira6), «una pila roja». Así que la costra
+// se alumbra con lo que le toca a su sitio, con los MISMOS cortes que el reparto
+// del fuego: |x − eje| > medio campo es albardilla, más allá (o por debajo del
+// mueble) es sala, y del campo hacia el fondo (z < ábside) es ábside.
+// sitio_peso = (campo, ábside, albardilla, sala); sitio_corte = (eje x, medio
+// campo, fuera de la mesa, z del ábside); sitio_y = la y por debajo de la cual es
+// sala. Por defecto, todo a 1: igual que sin esto.
+uniform vec4 sitio_peso = vec4(1.0);
+uniform vec4 sitio_corte = vec4(2.0, 1.7, 2.6, 7.0);
+uniform float sitio_y = -0.3;
 
 uniform float calor = 0.6;              // la temperatura de partida, 0..1
 uniform float nucleo = 0.4;             // cuánto más arde lo que mira a la cámara
@@ -54,8 +83,16 @@ uniform float suciedad = 0.5;           // ceniza: cuánto apaga la oclusión de
 
 varying vec3 v_pos;
 varying vec3 v_nor;
+varying float v_sitio;
 
 void vertex() {
+	// El sitio, en el mundo y por vértice (en el vértice cuesta tres pasos; una
+	// pieza de carbón no cruza nunca un corte, así que no se ve la costura).
+	vec3 pm = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float fuera = abs(pm.x - sitio_corte.x);
+	float sitio = mix(sitio_peso.x, sitio_peso.y, step(pm.z, sitio_corte.w));
+	sitio = mix(sitio, sitio_peso.z, step(sitio_corte.y, fuera));
+	v_sitio = mix(sitio, sitio_peso.w, max(step(sitio_corte.z, fuera), step(pm.y, sitio_y)));
 	vec3 p;
 	vec3 n;
 	if (en_local > 0.5) {
@@ -63,7 +100,7 @@ void vertex() {
 		p = VERTEX * esc;
 		n = normalize(NORMAL / esc);
 	} else {
-		p = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+		p = pm;
 		n = normalize(MODEL_NORMAL_MATRIX * NORMAL);
 	}
 	v_pos = marco * (p + desfase);
@@ -155,11 +192,15 @@ void fragment() {
 		n = mat3(MODEL_MATRIX) * (n / esc);
 	}
 
-	ALBEDO = color_costra * (0.7 + h * 0.6) * mix(1.0, oclu, 0.6);
-	ROUGHNESS = 0.93;
-	METALLIC = 0.0;
-	SPECULAR = 0.3;
-	NORMAL = normalize(mat3(VIEW_MATRIX) * n);
-	AO = oclu;
-	EMISSION = c * tinte * (energia * luz);
+	// Sin luz de Godot, lo que sale es ALBEDO tal cual (EMISSION no se suma): la
+	// costra alumbrada por su luz propia, con el relieve de las placas, y encima
+	// el fuego. Godot pasa ALBEDO de sRGB a lineal al final (`scene.glsl`); con
+	// luz, la luz multiplicaba DESPUÉS de esa cuenta. Por eso la luz propia entra
+	// con la potencia 1/2,2: así la costra sale multiplicada en lineal, como antes,
+	// y «luz_costra» se lee como una energía.
+	float lambert = max(dot(normalize(n), normalize(dir_costra)), 0.0);
+	vec3 luz_lineal = luz_costra * (fuerza_costra * v_sitio * (0.2 + 0.8 * lambert));
+	vec3 costra_vista = color_costra * (0.7 + h * 0.6) * mix(1.0, oclu, 0.6)
+			* pow(luz_lineal, vec3(1.0 / 2.2));
+	ALBEDO = costra_vista + c * tinte * (energia * luz);
 }

@@ -730,6 +730,14 @@ func _montar_braseros_esquina() -> void:
 ## de fuego a los braseros del campo («entorno» se la da a la luz que más pesa).
 func _luz_esquina(pos: Vector3) -> void:
 	_luces.append(_mundo.luz_fuego(pos, 1.2, 2.4))
+	# EL FILO DE LAS CENEFAS APAGADAS es el brillo de estos dos fuegos en el
+	# bronce: con la luz por vértice no salía (gira6: el canto de la cinta, de
+	# 22–29 de rojo a 2), y la cenefa lo pinta a mano (`atrezzo_cenefa.gdshader`).
+	# Las dos esquinas quedan a los lados de la campana; el mundo está en el
+	# origen, así que su espacio es el de la escena.
+	var uniforme := "fuego_a" if pos.x < 2.0 else "fuego_b"
+	for sm in _brasas_campana:
+		sm.set_shader_parameter(uniforme, pos)
 
 # ------------------------------------------------------------------ el muro
 

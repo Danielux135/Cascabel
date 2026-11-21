@@ -30,7 +30,7 @@
 # dónde caen los ojos sobre la piel, y los ojos se colocan en ese mismo sitio.
 #
 # LOS ZARCILLOS SALEN RECTOS, a lo largo de su +X local, y es a propósito: el rizo
-# se lo pone `espectro_zarcillo.gdshader`, que integra una curvatura a lo largo
+# se lo pone `espectro_cuerpo.gdshader` (con `jiron` a 1), que sigue una curva a lo largo
 # del zarcillo. Así se enroscan y se desenroscan VIVOS (miedo, huida, taparse los
 # ojos) sin huesos. Abierto solo, el GLB los enseña estirados.
 #

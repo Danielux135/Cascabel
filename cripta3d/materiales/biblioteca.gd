@@ -38,7 +38,13 @@ extends RefCounted
 ##                        `Vector3.ZERO` las quita (la losa las trae puestas)
 ##   "relieve"    float   multiplica el relieve (1 = el del perfil)
 ##   "rugosidad"  float   multiplica la rugosidad (menos de 1 = más pulido)
-##   "doble_cara" bool    se pinta también por detrás (chapas, mallas abiertas)
+##   "doble_cara" bool    YA NO CAMBIA NADA: se acepta y avisa una vez. Era otro
+##                        programa entero (8,8 s de compilar en un navegador) por
+##                        un modo de render que no pedía ningún módulo, y pasarlo
+##                        todo a dos caras rompería la bóveda (es de una cara para
+##                        que la cámara cenital la atraviese). Una malla que tenga
+##                        que verse por detrás lleva las caras de detrás en la
+##                        propia malla (los mismos triángulos, al revés)
 ##   "reflejo"    Texture2D  SOLO EL SUELO: la imagen de la cámara espejo (la de
 ##                        juego, simétrica por debajo del suelo). Con ella lo mojado
 ##                        refleja la mesa de verdad. "fuerza_reflejo" (float) dice
@@ -91,12 +97,32 @@ extends RefCounted
 ## se puede decir con los mandos del sombreador, se añade el mando allí; no se
 ## escribe otro sombreador para una sola superficie.
 
+## UN SOLO PROGRAMA DE SUPERFICIE PARA LA MESA. Lo que cada `uniform` enciende se
+## compila igual aunque no lo pida nadie, y en un navegador cada programa con
+## luz son segundos de pantalla congelada (ver la cabecera de
+## `superficie.gdshaderinc`). Por eso la depuración y el espejo del suelo, que
+## la mesa no usa, no van en él: si alguien los pide, se arma aquí al vuelo un
+## programa con `#define DEPURA` o `#define REFLEJO` (sin fichero, para que el
+## banco de sombreadores no los cuente como de la mesa) y solo lo paga quien lo
+## pide.
 const SUPERFICIE: Shader = preload("res://cripta3d/materiales/superficie.gdshader")
-const SUPERFICIE_DOBLE: Shader = preload("res://cripta3d/materiales/superficie_doble.gdshader")
+const RUTA_SUPERFICIE := "res://cripta3d/materiales/superficie.gdshaderinc"
+## El ascua no recibe luz (`unshaded`): de 6,7 s a 0,7 en el banco con ANGLE.
 const ASCUA: Shader = preload("res://cripta3d/materiales/ascua.gdshader")
 const TEX_GRANO: Texture2D = preload("res://cripta3d/texturas/ruido_grano.png")
 const TEX_CELDAS: Texture2D = preload("res://cripta3d/texturas/ruido_celdas.png")
 const TEX_MANCHAS: Texture2D = preload("res://cripta3d/texturas/ruido_manchas.png")
+## Los cortes de zona del reparto del fuego, para la luz de la costra del ascua.
+const Entorno := preload("res://cripta3d/mundo/entorno.gd")
+## Cuánta luz recibe la costra del ascua según dónde esté: (campo, ábside,
+## albardilla, sala). El campo es la referencia (1) y queda igual. Medido con las
+## cajas del crítico de gira6 (luminancia del lecho de carbón, gira5 → con 8,7 en
+## todos → con estos pesos): brasero de pie der. 53,5 → 69,0 → 54,8; izq. 28,3 →
+## 37,5 → 28,4; desde la cenital 67,6 → 80,4 → 69,8; esquina 59,5 → 60,5 → 59,8.
+## Con 0,55 y 0,3 (los del reparto del fuego) el carbón de la sala seguía rojo:
+## la luz de la costra no cae como la de Godot, así que los pesos se miden, no se
+## copian.
+const PESO_SITIO := Vector4(1.0, 0.5, 0.3, 0.1)
 
 ## Las claves de variante que se entienden. Una que no esté aquí avisa una vez y
 ## se ignora: una clave mal escrita no da error, deja el material como estaba, y
@@ -121,6 +147,9 @@ var _avisados: Dictionary = {}
 ## la escena de verdad, con las mallas de los módulos y su color de vértice, lo
 ## que el muestrario no puede enseñar (de dónde sale una mancha, qué es canto).
 var _depura_todo := 0
+## Los programas armados al vuelo («DEPURA», «REFLEJO», «DEPURA REFLEJO»): uno por
+## combinación, como los materiales.
+var _programas: Dictionary = {}
 
 func _init() -> void:
 	_perfiles = _definir()
@@ -195,10 +224,14 @@ func _crear(nombre: String, variante: Dictionary) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
 	if es_ascua:
 		m.shader = ASCUA
-	elif bool(variante.get("doble_cara", false)):
-		m.shader = SUPERFICIE_DOBLE
 	else:
-		m.shader = SUPERFICIE
+		var con_depura := _depura_todo > 0 or int(variante.get("depura", 0)) > 0
+		var con_reflejo := false
+		for k: String in ["reflejo", "fuerza_reflejo", "oclusion", "oclusion_rect"]:
+			con_reflejo = con_reflejo or variante.has(k)
+		m.shader = _superficie(con_depura, con_reflejo)
+	if bool(variante.get("doble_cara", false)):
+		_avisar("doble_cara", "BIBLIOTECA: «doble_cara» ya no cambia nada (un solo programa de superficie, de una cara). Si la malla se tiene que ver por detrás, lleva las caras de detrás en la propia malla.")
 	m.set_shader_parameter("tex_grano", TEX_GRANO)
 	m.set_shader_parameter("tex_celdas", TEX_CELDAS)
 	m.set_shader_parameter("tex_manchas", TEX_MANCHAS)
@@ -261,7 +294,7 @@ func _crear(nombre: String, variante: Dictionary) -> ShaderMaterial:
 					m.set_shader_parameter("rugosidad", float(perfil.get("rugosidad", 0.8)) * float(v))
 					m.set_shader_parameter("rugosidad_canto", float(perfil.get("rugosidad_canto", 0.5)) * float(v))
 			"doble_cara":
-				pass    # ya decidió el sombreador
+				pass    # ya avisó arriba: no cambia nada
 			"depura":
 				if not es_ascua:
 					m.set_shader_parameter("depura", int(v))
@@ -284,6 +317,25 @@ func _crear(nombre: String, variante: Dictionary) -> ShaderMaterial:
 				_avisar("clave:" + str(k), "BIBLIOTECA: no conozco la variante «%s» (en «%s»). Las que hay: %s" % [
 					str(k), nombre, ", ".join(PackedStringArray(CLAVES))])
 	return m
+
+## El programa de superficie que toca. Sin depuración ni espejo, el de la mesa
+## (el fichero); con ellos, uno armado aquí con su `#define`, que solo se compila
+## si se usa.
+func _superficie(con_depura: bool, con_reflejo: bool) -> Shader:
+	if not con_depura and not con_reflejo:
+		return SUPERFICIE
+	var defines := ""
+	if con_depura:
+		defines += "#define DEPURA\n"
+	if con_reflejo:
+		defines += "#define REFLEJO\n"
+	if not _programas.has(defines):
+		var s := Shader.new()
+		# El mismo modo que `superficie.gdshader`: el especular lo pone la luz
+		# copiada a mano que va dentro de la inclusión (`luz_godot.gdshaderinc`).
+		s.code = "shader_type spatial;\nrender_mode specular_disabled;\n%s#include \"%s\"\n" % [defines, RUTA_SUPERFICIE]
+		_programas[defines] = s
+	return _programas[defines]
 
 ## El marco de la textura: un giro que pone su eje X a lo largo de «veta». Va
 ## transpuesto porque el sombreador hace `marco * p` y lo que quiere son las
@@ -348,6 +400,20 @@ func _luz(cambios: Dictionary) -> Dictionary:
 		"calor": 0.6, "nucleo": 0.4, "costra": 0.5, "grietas": 0.5,
 		"latido": 0.1, "ritmo": 0.45, "parpadeo": 0.2, "prisa": 0.3, "relieve": 0.6,
 		"usa_vertice": 0.0, "suciedad": 0.5, "en_local": 0.0, "desfase": Vector3.ZERO,
+		# La luz propia de la costra (el ascua va sin luz de Godot: ver su cabecera).
+		# Hace de la luz que antes le daba el fuego de al lado: cálida, de arriba
+		# y un poco de delante.
+		"luz_costra": Vector3(1.0, 0.22, 0.08), "fuerza_costra": 8.7,
+		"dir_costra": Vector3(0.05, 0.6, 0.8),
+		# Y CUÁNTA DE ESA LUZ LLEGA A SU SITIO (ver «LA LUZ DE SU SITIO» en el
+		# sombreador). La 8,7 es la del campo, que es donde se igualó; un brasero de
+		# pie de la sala con ella salía «una pila roja» (crítica de gira6). Los cortes
+		# son los del reparto del fuego (`entorno._peso_zona`: el medio campo y la
+		# altura de la sala se leen de allí; el 2,6 y el 7,0 están escritos en esa
+		# función). Los pesos se miden contra gira5 con la caja del crítico.
+		"sitio_peso": PESO_SITIO,
+		"sitio_corte": Vector4(2.0, Entorno.MEDIO_CAMPO, 2.6, 7.0),
+		"sitio_y": Entorno.Nucleo.Y_SALA + 0.6,
 	}
 	p.merge(cambios, true)
 	return p
@@ -598,5 +664,15 @@ func _definir() -> Dictionary:
 			"escala": 0.5, "energia": 2.2,
 			"calor": 0.4, "nucleo": -0.45, "costra": 0.25, "grietas": 0.7,
 			"latido": 0.12, "ritmo": 0.2, "parpadeo": 0.35, "prisa": 0.1, "relieve": 0.2,
+			# Su costra, en la boca de la catacumba, la alumbraban los fuegos de la
+			# mesa: cálida y más floja que la del ascua. Con luz violeta (la del
+			# muestrario) la boca salía morada y encendida: medido en la mesa, la
+			# boca era (34, 13, 10) de media y con violeta daba (41, 16, 43).
+			# Con (1,0 · 0,22 · 0,08) × 3,5 el fondo de la boca quedaba algo más rojizo
+		# que en gira5 (crítica de gira6: 20/11/10 → 23/10/9 y 21/14/17 → 25/15/17):
+		# la luz de fuego de la mesa (`COLOR_FUEGO`, en lineal ~1 · 0,4 · 0,13) tiene
+		# más verde, y a la boca le llegaba además el violeta de su propio resplandor.
+		# Con esta, la boca derecha de v0_00 da 22/14/17 (gira5: 21/14/16).
+		"luz_costra": Vector3(0.9, 0.33, 0.3), "fuerza_costra": 1.4,
 		}),
 	}

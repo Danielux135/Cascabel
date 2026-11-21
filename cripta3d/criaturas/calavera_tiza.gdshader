@@ -1,5 +1,12 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_back, specular_disabled;
+// LUZ POR VÉRTICE (nov-2026, para la web): con `specular_disabled` y el ruido de
+// valor por código tardaba 3,6 s en compilar con ANGLE (banco, en frío); la luz
+// por vértice cuesta 0,86 de base. La tiza tiene que seguir APAGÁNDOSE en lo
+// oscuro como la losa que pisa —no brilla sola—, así que no puede ir sin luz: va
+// por vértice, y para que la luz de un fuego cercano no se interpole a lo largo
+// de un plano de 0,8 de lado con solo cuatro esquinas, `calavera.gd` lo
+// subdivide (16 × 16). La sombra se sigue mirando por píxel.
+render_mode blend_mix, depth_draw_never, cull_back, vertex_lighting;
 
 // CRIPTA — lo que la calavera lleva pintado en el suelo. En ÓRBITA era un aro de
 // neón; aquí es TIZA sobre la losa, como el cerco de un conjuro, y recibe la luz
@@ -39,25 +46,8 @@ uniform float luz_cerco = 0.0;
 /// va más pegado a ella, de hueso claro (lo pone `calavera.gd`), con un contorno
 /// oscuro que lo despega de lo que tenga debajo, y late en grosor y en luz.
 uniform float radio_cerco = 0.60;
-
-float azar2(vec2 p) {
-	vec3 q = fract(vec3(p.xyx) * 0.1031);
-	q += dot(q, q.yzx + 33.33);
-	return fract((q.x + q.y) * q.z);
-}
-
-float ruido2(vec2 x) {
-	vec2 i = floor(x);
-	vec2 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(azar2(i), azar2(i + vec2(1.0, 0.0)), f.x),
-		mix(azar2(i + vec2(0.0, 1.0)), azar2(i + vec2(1.0, 1.0)), f.x), f.y);
-}
-
-// El grano de la tiza: la losa es rugosa y la tiza solo se queda en lo alto.
-float grano(vec2 p) {
-	return ruido2(p * 70.0) * 0.55 + ruido2(p * 190.0) * 0.45;
-}
+/// El grano de la casa (`cripta3d/texturas/ruido_grano.png`): lo pone `calavera.gd`.
+uniform sampler2D tex_grano : filter_linear_mipmap_anisotropic, repeat_enable;
 
 void fragment() {
 	vec2 p = UV * 2.0 - 1.0;
@@ -65,7 +55,17 @@ void fragment() {
 	vec2 u = p / max(r, 0.001);
 	float ang = atan(p.x, -p.y);
 	float vuelta = ang / 6.2831853 + 0.5;
-	float g = grano(p + semilla);
+	// El grano de la tiza: la losa es rugosa y la tiza solo se queda en lo alto.
+	// Antes eran dos ruidos de valor, 0,55 a 70 casillas por unidad de `p` y 0,45
+	// a 190; ahora, dos lecturas del relieve fino del grano de la casa (R), a 1,2
+	// y 2,4 teselas por unidad: su octava más fina (160 por tesela) cae a 190 y
+	// 380, y el resto de sus octavas pone el bulto que ponía el de 70. Pasado al
+	// reparto de aquel por sus percentiles (medidos: con mediana 0,671 → 0,5 y
+	// pendiente 1,15 coinciden el 5 % y el 25 % de los dos). Probado y descartado:
+	// una lectura a 0,5 teselas (la tiza salía lisa) y otra a 0,45 (los hoyos del
+	// grano, a esa escala, mordían la raya a bocados y no a motas).
+	float g = 0.5 + ((texture(tex_grano, (p + semilla) * 1.2).r - 0.671) * 0.55
+		+ (texture(tex_grano, (p + semilla) * 2.4 + vec2(0.37, 0.61)).r - 0.671) * 0.45) * 1.15;
 
 	// --- El arco del frente -----------------------------------------------------
 	float hacia = dot(u, normalize(direccion));
@@ -129,7 +129,10 @@ void fragment() {
 
 	// --- Lo oscuro: la sombra de contacto y la fosa ---------------------------------
 	float sombra = contacto * 0.55 * (1.0 - smoothstep(0.10, 0.56, r));
-	float borde = r + (ruido2(u * 3.0 + semilla) - 0.5) * 0.10 + (g - 0.5) * 0.05;
+	// El borde de la fosa, mordido: el moteado del grano (A, ecualizado) leído en
+	// un círculo, unas diez mordidas por vuelta como el `ruido2(u·3)` de antes.
+	float muerde = texture(tex_grano, u * 0.25 + vec2(semilla * 0.37, 0.5)).a;
+	float borde = r + (muerde - 0.5) * 0.07 + (g - 0.5) * 0.05;
 	float hoyo = fosa * (1.0 - smoothstep(0.36, 0.50, borde));
 	float oscuro = max(max(sombra, hoyo), contorno);
 

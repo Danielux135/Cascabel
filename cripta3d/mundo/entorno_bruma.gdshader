@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_disabled, specular_disabled, shadows_disabled;
+render_mode blend_mix, depth_draw_never, cull_disabled, specular_disabled, shadows_disabled, diffuse_lambert_wrap, vertex_lighting;
 
 // CRIPTA 3D — LA BRUMA DEL SUELO DE LA NAVE. Sábanas de niebla tendidas a ras
 // del suelo que rodea la mesa, a dos alturas, que se mueven despacio y en
@@ -7,10 +7,26 @@ render_mode blend_mix, depth_draw_never, cull_disabled, specular_disabled, shado
 // ser un suelo liso que se oscurece.
 //
 // La niebla de profundidad del `Environment` ya oscurece y funde; esto pone
-// TEXTURA y LUZ: la bruma recibe las luces de verdad con un `light()` propio que
-// no mira hacia dónde da la cara (la niebla no tiene cara: dispersa), así que al
-// lado de un fuego se enciende naranja y bajo la luna se queda fría. Sin motivo,
-// no brilla.
+// TEXTURA y LUZ: la bruma recibe las luces de verdad, casi sin mirar hacia dónde
+// da la cara (la niebla no tiene cara: dispersa), así que al lado de un fuego se
+// enciende naranja y bajo la luna se queda fría. Sin motivo, no brilla.
+//
+// LA LUZ VA POR VÉRTICE (21-nov-2026, para la web). Antes era un `light()` propio
+// por píxel, `luz · (0,55 + 0,45 · max(N·L, 0)) / π`, y el sombreador tardaba
+// 3,1 s en compilar con ANGLE; por vértice, 0,9. Por vértice no hay `light()`,
+// pero la ENVOLTURA de Godot (`diffuse_lambert_wrap`, que por vértice vale
+// `(max(N·L, 0) + w) / (1 + w)² / π` con `w` la ROUGHNESS que se da en `vertex`)
+// es la misma recta si se elige bien:
+//   · w = 0,55 / 0,45 = 1,2222 da la misma proporción entre lo que se ve de
+//     frente y de espaldas a la luz;
+//   · y queda multiplicada por 0,45 · (1 + w)² = 1/2,2222. Se devuelve subiendo
+//     ALBEDO ×2,2222… y como ALBEDO también multiplica el AMBIENTE, que antes no
+//     llevaba ese ×2,2, se le quita con AO = 0,45 (el AO solo toca el ambiente:
+//     `ao_light_affect` está a 0).
+// La luna ya no es direccional (es un foco), así que el `× 0,8` que el `light()`
+// le daba a las direccionales no hacía nada y no se echa de menos.
+// La malla tiene que ir PARTIDA para que la luz por vértice no se vea a cuadros:
+// `entorno.gd` la parte en una rejilla de medio metro.
 //
 // Se funde con lo que atraviesa de DOS maneras, y hacen falta las dos:
 //
@@ -37,8 +53,18 @@ uniform float semilla = 0.0;
 
 varying vec3 v_pos;
 
+vec3 a_lineal(vec3 c) {
+	return mix(pow((c + 0.055) / 1.055, vec3(2.4)), c / 12.92, lessThan(c, vec3(0.04045)));
+}
+
+vec3 a_srgb(vec3 c) {
+	return mix(1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, c * 12.92, lessThan(c, vec3(0.0031308)));
+}
+
 void vertex() {
 	v_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	// La envoltura (ver la cabecera): 0,55 / 0,45.
+	ROUGHNESS = 1.2222;
 }
 
 void fragment() {
@@ -62,14 +88,11 @@ void fragment() {
 	float suave = clamp((VERTEX.z - pv.z) / fundido, 0.0, 1.0);
 	float hondo = smoothstep(0.0, grosor, v_pos.y - opaco.y);
 	float de_canto = smoothstep(0.03, 0.22, abs(dot(NORMAL, VIEW)));
-	ALBEDO = color;
+	// ×2,2222 devuelve la luz directa a lo de antes, y AO = 0,45 = 1/2,2222 deja
+	// el ambiente como estaba (ver la cabecera). EN LINEAL: Godot pasa ALBEDO de
+	// sRGB a lineal antes de multiplicarlo por la luz, y multiplicar el sRGB por
+	// 2,2 lo multiplicaba por casi 6 (0,42 → 0,93 es ×5,8 en lineal).
+	ALBEDO = a_srgb(a_lineal(color) * 2.2222);
+	AO = 0.45;
 	ALPHA = densidad * n * borde * suave * hondo * de_canto;
-}
-
-void light() {
-	// La luna alumbra la nave entera y pareja, así que no se le deja todo: con
-	// toda (1,0) la bruma se volvía una sábana azul; con poca (0,3) era más oscura
-	// que el suelo y lo ensuciaba en vez de flotar. El fuego, entero.
-	float cuanto = LIGHT_IS_DIRECTIONAL ? 0.8 : 1.0;
-	DIFFUSE_LIGHT += LIGHT_COLOR * ATTENUATION * cuanto * (0.55 + 0.45 * max(dot(NORMAL, LIGHT), 0.0)) / PI;
 }

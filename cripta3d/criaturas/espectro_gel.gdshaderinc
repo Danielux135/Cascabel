@@ -20,6 +20,14 @@
 //     TRANSPARENTE. Antes tiraba a blanco y, con el fuego encima, todos los
 //     estados de miedo eran el mismo rosa pálido.
 // Los colores llegan de `Paleta` desde `espectro.gd`.
+//
+// SIN LUZ DE GODOT (21-nov-2026, para la web): quien incluye esto es `unshaded`
+// y se alumbra con `espectro_luz.gdshaderinc`; el ruido se lee de una textura
+// (`espectro_ruido.gdshaderinc`). Cuerpo y jirón costaban 7,8 s de compilar
+// cada uno con ANGLE; las cuentas, en esos dos ficheros.
+
+#include "res://cripta3d/criaturas/espectro_ruido.gdshaderinc"
+#include "res://cripta3d/criaturas/espectro_luz.gdshaderinc"
 
 uniform vec3 c_hondo : source_color = vec3(0.10, 0.05, 0.16);
 uniform vec3 c_cuerpo : source_color = vec3(0.42, 0.25, 0.62);
@@ -34,21 +42,9 @@ uniform float semilla = 0.0;
 // Reloj propio: `espectro.gd` lo para en la parada del golpe.
 uniform float reloj = 0.0;
 
-float gel_azar3(vec3 p) {
-	p = fract(p * 0.1031);
-	p += dot(p, p.zyx + 31.32);
-	return fract((p.x + p.y) * p.z);
-}
-
+// El ruido de valor 3D de siempre, ahora de una lectura de textura.
 float gel_ruido3(vec3 x) {
-	vec3 i = floor(x);
-	vec3 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	float a = mix(mix(gel_azar3(i), gel_azar3(i + vec3(1.0, 0.0, 0.0)), f.x),
-		mix(gel_azar3(i + vec3(0.0, 1.0, 0.0)), gel_azar3(i + vec3(1.0, 1.0, 0.0)), f.x), f.y);
-	float b = mix(mix(gel_azar3(i + vec3(0.0, 0.0, 1.0)), gel_azar3(i + vec3(1.0, 0.0, 1.0)), f.x),
-		mix(gel_azar3(i + vec3(0.0, 1.0, 1.0)), gel_azar3(i + vec3(1.0, 1.0, 1.0)), f.x), f.y);
-	return mix(a, b, f.z);
+	return esp_ruido3(x);
 }
 
 // Las volutas: ruido retorcido por otro ruido (domain warping), subiendo.
@@ -63,6 +59,7 @@ float gel_volutas(vec3 p, float t) {
 
 // pos = posición en el objeto (para las volutas), n y v en vista.
 // ao = oclusión horneada, canto = lo saliente.
+// La rugosidad es para el brillo de `luz_propia`.
 void gel(vec3 pos, vec3 n, vec3 v, float ao, float canto,
 		out vec3 albedo, out vec3 emision, out float alfa, out float rugosidad) {
 	float t = reloj;

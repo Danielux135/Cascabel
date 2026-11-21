@@ -1,5 +1,16 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_back;
+// `vertex_lighting`: la luz de la cripta por vértice y no por píxel. Con la luz
+// entera de Godot tardaba 6,7 s en compilar en un navegador; así, 0,83 (banco,
+// ANGLE, 21-nov-2026). La sal SÍ tiene que recibir la luz de la mesa como la
+// losa, y sobre todo el charco violeta del propio espectro, así que no es
+// `unshaded`: la luz se queda, pero se calcula en los vértices del plano, que
+// `espectro.gd` subdivide para eso (con los cuatro de las esquinas, el charco
+// del centro no llegaba al cerco).
+// Probado y descartado: `unshaded` con la luz propia del espectro por vértice
+// (`espectro_luz.gdshaderinc` con sitio y atenuación por luz). Costaba 1,06 s:
+// más que la de Godot por vértice, y había que imitarle hasta cómo suma las
+// luces con sombra.
+render_mode blend_mix, depth_draw_never, cull_back, vertex_lighting;
 
 // CRIPTA — lo que el espectro tiene pintado en la losa: UN CERCO DE SAL. Es lo
 // que se echa en el suelo para atrapar a un espíritu, y aquí es su indicador:
@@ -18,7 +29,8 @@ render_mode blend_mix, depth_draw_never, cull_back;
 //     abre y se posa.
 //   · Una sombra muy floja, que FLOTA: lo que hay debajo es poco.
 //
-// La sal recibe la luz de la cripta como la losa; solo las runas emiten.
+// La sal recibe la luz de la cripta como la losa (por vértice: ver el
+// `render_mode`); solo las runas emiten.
 
 uniform vec3 c_sal : source_color = vec3(0.96, 0.91, 0.81);
 uniform vec3 c_polvo : source_color = vec3(0.63, 0.61, 0.54);
@@ -33,27 +45,22 @@ uniform float sombra = 0.0;
 uniform float semilla = 0.0;
 uniform float reloj = 0.0;
 
-float azar2(vec2 p) {
-	vec3 q = fract(vec3(p.xyx) * 0.1031);
-	q += dot(q, q.yzx + 33.33);
-	return fract((q.x + q.y) * q.z);
-}
+// El ruido, de una textura (antes, por código: ver `espectro_ruido.gdshaderinc`).
+#include "res://cripta3d/criaturas/espectro_ruido.gdshaderinc"
 
 float ruido2(vec2 x) {
-	vec2 i = floor(x);
-	vec2 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(mix(azar2(i), azar2(i + vec2(1.0, 0.0)), f.x),
-		mix(azar2(i + vec2(0.0, 1.0)), azar2(i + vec2(1.0, 1.0)), f.x), f.y);
+	return esp_ruido2(x);
 }
 
-// Granos: una rejilla con un grano por celda, de tamaño y sitio al azar.
+// Granos: una rejilla con un grano por celda, de tamaño y sitio al azar (los
+// tres azares de la celda, de una lectura).
 float granos(vec2 p, float escala, float cuantos) {
 	vec2 g = p * escala;
 	vec2 i = floor(g);
 	vec2 f = fract(g);
-	float h = azar2(i + semilla);
-	vec2 c = vec2(azar2(i + 7.1), azar2(i + 3.7)) * 0.6 + 0.2;
+	vec4 az = esp_azar(i + floor(semilla * 7.0));
+	float h = az.r;
+	vec2 c = az.ba * 0.6 + 0.2;
 	float d = length(f - c);
 	return (1.0 - smoothstep(0.16 + 0.14 * h, 0.30 + 0.12 * h, d)) * step(1.0 - cuantos, h);
 }
@@ -75,6 +82,36 @@ float runa(vec2 p, float cual) {
 	// Encerrada en su círculo: así es un sello y no una raya suelta.
 	d = min(d, abs(length(p) - 1.45));
 	return 1.0 - smoothstep(0.07, 0.16, d);
+}
+
+// La runa `i` (0..3) del cerco, ya apagada si el barrido ha pasado por ella.
+float runa_en(vec2 p, float r_cerco, float i) {
+	float a = 0.785398 + i * 1.570796;
+	vec2 c = vec2(sin(a), -cos(a)) * (r_cerco + 0.13);
+	vec2 q = p - c;
+	// Cada runa mira hacia fuera del cerco.
+	vec2 fuera = normalize(c);
+	vec2 lado = vec2(-fuera.y, fuera.x);
+	vec2 lq = vec2(dot(q, lado), dot(q, fuera)) / 0.065;
+	float a_rel = a > 3.14159265 ? a - 6.2831853 : a;
+	float viva = 1.0 - smoothstep(queda, queda + 0.04, abs(a_rel) / 3.14159265);
+	return runa(lq, i) * viva;
+}
+
+// LA RUGOSIDAD DE LAS LUCES, EN EL VÉRTICE (arreglo tras la gira 6). Con
+// `vertex_lighting` Godot alumbra en el vértice con la rugosidad que escriba
+// `vertex()`, y si no escribe nada usa 1,0 (`scene.glsl`: `float roughness =
+// 1.0`): la de `fragment()` no llega. Y no hace GGX: hace un Blinn normalizado
+// de exponente (1,2 − r)⁵·2000. Con 1,0 el exponente es 0,6, un brillo tan
+// abierto que no es brillo, y se perdía el brillo de las luces sobre la sombra
+// de debajo, que es casi negra: bajo el cuerpo la losa salía 30 niveles más
+// oscura que en la gira 5 (toma `c0_v5_00`, luminancia 142 → 111).
+// El GGX de antes (0,55, α = 0,30) tiene el lóbulo de un Blinn de ~20, y 20 sale
+// con 0,80; los dos dan el mismo pico (~2,8·f0). Devuelve un tercio (111 → 119):
+// el resto es la cola larga del GGX, que un Blinn no tiene (con 0,90, más
+// abierto, sale peor: 114). Medido el 21-nov-2026.
+void vertex() {
+	ROUGHNESS = 0.80;
 }
 
 void fragment() {
@@ -116,20 +153,10 @@ void fragment() {
 	sal = clamp(sal * (0.85 + aviso * 0.8), 0.0, 1.0);
 
 	// --- Las cuatro runas, solo acorralado. Se apagan con el tiempo, cada una
-	// cuando el barrido pasa por ella.
-	float luz_runas = 0.0;
-	for (int i = 0; i < 4; i++) {
-		float a = 0.785398 + float(i) * 1.570796;
-		vec2 c = vec2(sin(a), -cos(a)) * (r_cerco + 0.13);
-		vec2 q = p - c;
-		// Cada runa mira hacia fuera del cerco.
-		vec2 fuera = normalize(c);
-		vec2 lado = vec2(-fuera.y, fuera.x);
-		vec2 lq = vec2(dot(q, lado), dot(q, fuera)) / 0.065;
-		float a_rel = a > 3.14159265 ? a - 6.2831853 : a;
-		float viva = 1.0 - smoothstep(queda, queda + 0.04, abs(a_rel) / 3.14159265);
-		luz_runas += runa(lq, float(i)) * viva;
-	}
+	// cuando el barrido pasa por ella. Escritas una a una y no en un bucle:
+	// Direct3D lo despliega igual, en cada variante.
+	float luz_runas = runa_en(p, r_cerco, 0.0) + runa_en(p, r_cerco, 1.0)
+		+ runa_en(p, r_cerco, 2.0) + runa_en(p, r_cerco, 3.0);
 	luz_runas *= cerrado;
 
 	// --- El polvo de la alerta: un anillo que se abre y se posa.
@@ -148,6 +175,8 @@ void fragment() {
 	color = mix(vec3(0.01, 0.008, 0.015), color, pinta / max(alfa, 0.001));
 	color = mix(color, c_runa * 0.4, luz_runas * (1.0 - pinta));
 	ALBEDO = color;
+	// Esta rugosidad ya solo la usa el reflejo del cielo, que va por píxel; la de
+	// las luces va en `vertex()`.
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.35;
 	// Sin granos que destellen: a un píxel cada uno, era lo que hacía hormiguear el

@@ -96,8 +96,11 @@ extends RefCounted
 const Nucleo := preload("res://cripta3d/mundo_cripta.gd")
 const MesaCripta := preload("res://cripta3d/mesa_cripta.gd")
 const SH_CHISPA: Shader = preload("res://cripta3d/mundo/efectos_chispa.gdshader")
+## La bocanada y la onda son el MISMO sombreador (`forma` 0 y 1): eran dos y
+## compilaban 3,4 y 3,2 s en el navegador; juntos, uno de 1,0 (ver su cabecera).
 const SH_POLVO: Shader = preload("res://cripta3d/mundo/efectos_polvo.gdshader")
-const SH_ONDA: Shader = preload("res://cripta3d/mundo/efectos_onda.gdshader")
+const FORMA_BOCANADA := 0
+const FORMA_ONDA := 1
 const SH_JIRON: Shader = preload("res://cripta3d/mundo/efectos_jiron.gdshader")
 const TEX_MANCHAS: Texture2D = preload("res://cripta3d/texturas/ruido_manchas.png")
 
@@ -362,6 +365,7 @@ func _montar_polvo() -> void:
 	bocanada.size = Vector2(0.12, 0.12)
 	var m := ShaderMaterial.new()
 	m.shader = SH_POLVO
+	m.set_shader_parameter("forma", FORMA_BOCANADA)
 	m.set_shader_parameter("tex_manchas", TEX_MANCHAS)
 	m.set_shader_parameter("opacidad", 0.3)
 	for _i in POLVOS:
@@ -551,7 +555,8 @@ func _montar_ondas() -> void:
 	var malla := _malla_onda()
 	for i in ONDAS:
 		var mat := ShaderMaterial.new()
-		mat.shader = SH_ONDA
+		mat.shader = SH_POLVO
+		mat.set_shader_parameter("forma", FORMA_ONDA)
 		mat.set_shader_parameter("tex_manchas", TEX_MANCHAS)
 		mat.set_shader_parameter("semilla", float(i) * 0.137)
 		var mi := MeshInstance3D.new()
@@ -600,7 +605,8 @@ func _montar_tanidos() -> void:
 	var malla := _malla_onda(0.93, 96)
 	for i in TANIDOS:
 		var mat := ShaderMaterial.new()
-		mat.shader = SH_ONDA
+		mat.shader = SH_POLVO
+		mat.set_shader_parameter("forma", FORMA_ONDA)
 		mat.set_shader_parameter("tex_manchas", TEX_MANCHAS)
 		mat.set_shader_parameter("semilla", 0.5 + float(i) * 0.29)
 		mat.set_shader_parameter("color_polvo", COLOR_POLVO.lerp(Paleta.ORO, 0.6))

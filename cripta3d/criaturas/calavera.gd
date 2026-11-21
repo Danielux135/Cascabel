@@ -60,6 +60,12 @@ const MODELO := preload("res://cripta3d/modelos/criatura_calavera.glb")
 const HUESO := preload("res://cripta3d/criaturas/calavera_hueso.gdshader")
 const TIZA := preload("res://cripta3d/criaturas/calavera_tiza.gdshader")
 const MIRADA := preload("res://cripta3d/criaturas/calavera_mirada.gdshader")
+## El dibujo del hueso se LEE (ver la cabecera de `calavera_hueso.gdshader`): las
+## texturas de ruido de la casa y las marcas propias (suturas, grietas y poro),
+## que hornea `generar_marcas.py`.
+const TEX_GRANO := preload("res://cripta3d/texturas/ruido_grano.png")
+const TEX_MANCHAS := preload("res://cripta3d/texturas/ruido_manchas.png")
+const TEX_MARCAS := preload("res://cripta3d/criaturas/calavera_marcas.png")
 const E := 0.01
 
 ## Las mismas capas que usa ÓRBITA: lo pintado en el suelo no sale en el reflejo
@@ -273,6 +279,9 @@ var _aparte := Vector3.ZERO
 ## Lo que está metida bajo la losa (unidades 3D) y lo que ha encogido (1 = nada).
 var _hundido := 0.0
 var _escala := 1.0
+## Las luces de la escena (ver `_alumbrar`) y cuánto falta para volver a buscarlas.
+var _luces: Array[Light3D] = []
+var _t_luces := 0.0
 
 # ------------------------------------------------------------------- montaje
 
@@ -352,6 +361,9 @@ func _material(con_suturas: float, detalle: float, semilla: Vector3,
 	m.set_shader_parameter("semilla", semilla)
 	m.set_shader_parameter("roce", roce)
 	m.set_shader_parameter("grietas", grietas)
+	m.set_shader_parameter("tex_grano", TEX_GRANO)
+	m.set_shader_parameter("tex_manchas", TEX_MANCHAS)
+	m.set_shader_parameter("tex_marcas", TEX_MARCAS)
 	_mats.append(m)
 	return m
 
@@ -430,8 +442,14 @@ func _montar_suelo() -> void:
 	var plano := PlaneMesh.new()
 	var lado := c.radio * E * 4.9
 	plano.size = Vector2(lado, lado)
+	# La tiza va con luz POR VÉRTICE (ver su sombreador): con las cuatro esquinas
+	# solas, la luz de un fuego cercano se interpolaba recta a lo largo de 0,8 y
+	# la tiza dejaba de apagarse como la losa. A 16 × 16, cada trozo mide 5 cm.
+	plano.subdivide_width = 15
+	plano.subdivide_depth = 15
 	_mat_tiza = ShaderMaterial.new()
 	_mat_tiza.shader = TIZA
+	_mat_tiza.set_shader_parameter("tex_grano", TEX_GRANO)
 	_mat_tiza.set_shader_parameter("color", Paleta.TIERRA_6)
 	_mat_tiza.set_shader_parameter("arco", deg_to_rad(arco_blindaje))
 	_mat_tiza.set_shader_parameter("semilla", 1.0 + float(c.indice) * 2.7)
@@ -500,7 +518,11 @@ func _montar_particulas() -> void:
 	redonda.width = 48
 	redonda.height = 48
 	var mat_polvo := StandardMaterial3D.new()
-	mat_polvo.shading_mode = BaseMaterial3D.SHADING_MODE_PER_PIXEL
+	# Luz POR VÉRTICE: una mota es un cuadrado de cuatro esquinas y la luz apenas
+	# cambia de una a otra, así que se ve igual que por píxel. Y por píxel este
+	# material tardaba 3,8 s en compilar en un navegador (medido con ANGLE en la
+	# carga por partes), el tercero más caro de la mesa por unas motas de polvo.
+	mat_polvo.shading_mode = BaseMaterial3D.SHADING_MODE_PER_VERTEX
 	mat_polvo.roughness = 1.0
 	mat_polvo.specular_mode = BaseMaterial3D.SPECULAR_DISABLED
 	mat_polvo.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
@@ -901,6 +923,7 @@ func actualizar(delta: float, bola: Vector3) -> void:
 	for m in _mats:
 		m.set_shader_parameter("corte", corte)
 	_pintar_golpe(_choque)
+	_alumbrar(delta)
 
 	_mover_mirada(delta, estado)
 	_pintar_suelo(delta, suelo, adelante, estado)
@@ -911,6 +934,104 @@ func _pintar_golpe(en_la_frente: float) -> void:
 		m.set_shader_parameter("golpe", _destello)
 		m.set_shader_parameter("frente", en_la_frente * 0.4)
 		m.set_shader_parameter("blindaje", _blindaje)
+
+## LAS TRES LUCES QUE MÁS LE DAN. El hueso va con luz POR VÉRTICE (para que compile
+## rápido en la web: ver su sombreador), y dos cosas que la luz por vértice no
+## sabe hacer las hace el sombreador a mano: el labio de la sutura, que coge la luz
+## de un lado y no del otro, y el reflejo duro de la frente blindada. Para eso
+## necesita saber de dónde le viene la luz: aquí se miran TODAS las luces de la
+## escena (fuegos, la luna y las de relleno del núcleo; en el visor, las suyas),
+## se calcula lo que llega de cada una al centro de la calavera con la misma
+## cuenta que Godot (`scene.glsl`: caída de la omni y del foco, energía por π) y
+## se le pasan las tres que más. La lista se rehace cada segundo: los fuegos se
+## dan de alta y de baja.
+func _alumbrar(delta: float) -> void:
+	if _raiz == null or not _raiz.is_inside_tree():
+		return
+	_t_luces -= delta
+	if _t_luces <= 0.0 or _luces.is_empty():
+		_t_luces = 1.0
+		_luces.clear()
+		for n in get_tree().root.find_children("*", "Light3D", true, false):
+			_luces.append(n as Light3D)
+	var aqui := _raiz.global_position
+	# Las tres más fuertes, de mayor a menor, por inserción.
+	var mejores: Array[Dictionary] = [{}, {}, {}]
+	var fuerzas: Array[float] = [0.0, 0.0, 0.0]
+	for luz in _luces:
+		if not is_instance_valid(luz) or not luz.is_visible_in_tree() or luz.light_energy <= 0.0:
+			continue
+		var ficha := _luz_que_llega(luz, aqui)
+		var f: float = ficha.get("fuerza", 0.0)
+		var k := 3
+		while k > 0 and f > fuerzas[k - 1]:
+			k -= 1
+		if k >= 3:
+			continue
+		for j in range(2, k, -1):
+			mejores[j] = mejores[j - 1]
+			fuerzas[j] = fuerzas[j - 1]
+		mejores[k] = ficha
+		fuerzas[k] = f
+	var especular := Vector3.ZERO
+	for i in 3:
+		var nombre: String = ["luz_a", "luz_b", "luz_c"][i]
+		var ficha: Dictionary = mejores[i]
+		var sitio: Vector4 = ficha.get("sitio", Vector4(0.0, 1.0, 0.0, 0.0))
+		var color: Vector3 = ficha.get("color", Vector3.ZERO)
+		especular[i] = ficha.get("especular", 0.0)
+		for m in _mats:
+			m.set_shader_parameter(nombre + "_sitio", sitio)
+			m.set_shader_parameter(nombre + "_color", color)
+	for m in _mats:
+		m.set_shader_parameter("luz_especular", especular)
+
+## Lo que llega de una luz a un punto: `sitio` (posición con w = 1, o dirección
+## hacia la luz con w = 0), `color` (la DIFUSA: en lineal, con la energía),
+## `especular` (su `light_specular`, para el reflejo de la coraza) y `fuerza`,
+## la luminancia de la difusa, para elegir.
+## POR LA DIFUSA Y NO POR EL ESPECULAR (21-nov-2026). Se elegían por la parte
+## especular, y en la mesa la brasa y el relleno llevan 0,3, la luna 0,35 y el
+## lavado de la bóveda 0: con más de tres luces cerca, una que alumbra mucho el
+## hueso y brilla poco se quedaba fuera de las tres, y su luz, en el Lambert por
+## vértice sin corregir. (Medido en v1_01: a la calavera le llegan el relleno,
+## 5,5; la brasa, 1,0–1,6, y la luna, 0,3–0,5. Hoy son tres y entran las tres
+## igual; con un fuego más cerca, no.)
+static func _luz_que_llega(luz: Light3D, punto: Vector3) -> Dictionary:
+	var lineal := luz.light_color.srgb_to_linear()
+	var energia := luz.light_energy * PI
+	var sitio := Vector4.ZERO
+	var caida := 1.0
+	if luz is DirectionalLight3D:
+		var hacia := luz.global_basis.z.normalized()
+		sitio = Vector4(hacia.x, hacia.y, hacia.z, 0.0)
+	else:
+		var p := luz.global_position
+		sitio = Vector4(p.x, p.y, p.z, 1.0)
+		var d := p.distance_to(punto)
+		var alcance := 1.0
+		var decae := 1.0
+		if luz is OmniLight3D:
+			alcance = (luz as OmniLight3D).omni_range
+			decae = (luz as OmniLight3D).omni_attenuation
+		elif luz is SpotLight3D:
+			var foco := luz as SpotLight3D
+			alcance = foco.spot_range
+			decae = foco.spot_attenuation
+			# El cono, como en `scene.glsl`: fuera de él no llega nada.
+			var corte := cos(deg_to_rad(foco.spot_angle))
+			var scos := maxf((punto - p).normalized().dot(-luz.global_basis.z), corte)
+			var borde := maxf(0.0001, (1.0 - scos) / maxf(1.0 - corte, 0.0001))
+			caida *= 1.0 - pow(borde, foco.spot_angle_attenuation)
+		if d >= alcance:
+			return {}
+		var nd := d / alcance
+		nd *= nd
+		nd *= nd
+		caida *= pow(maxf(1.0 - nd, 0.0), 2.0) * pow(maxf(d, 0.0001), -decae)
+	var c := Vector3(lineal.r, lineal.g, lineal.b) * energia * caida
+	return {"sitio": sitio, "color": c, "especular": luz.light_specular,
+		"fuerza": c.dot(Vector3(0.30, 0.59, 0.11))}
 
 ## A qué altura tiene que estar el centro para que el mentón, con la boca como
 ## está, toque el suelo.
@@ -1497,6 +1618,7 @@ func _tragar(delta: float, bola: Vector3) -> void:
 		m.set_shader_parameter("frente", 0.0)
 		m.set_shader_parameter("blindaje", 0.0)
 		m.set_shader_parameter("corte", -1000.0)
+	_alumbrar(delta)
 	_mat_mirada.set_shader_parameter("fuerza", 1.8)
 	# Los brazos lo abrazan: cada mano se va al costado de la bóveda, por fuera,
 	# hacia la frente, con los dedos cerrados agarrándola.

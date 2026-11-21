@@ -38,7 +38,11 @@ uniform float radio_1 = 0.36;          // en el suelo
 uniform float reja = 1.0;              // 0 = sin reja (los rayos de la bóveda)
 uniform float humo = 0.65;             // cuánto manchan las bocanadas
 uniform float prisa = 1.0;
-uniform float nucleo = 2.0;            // 2 = denso en el eje (el del óculo); 1 = parejo (los de la bóveda)
+// Las muestras por píxel. Un `uniform` y no un 8 escrito: con el largo fijo,
+// Direct3D desplegaba el bucle (ocho copias de `denso`, cada una con sus dos
+// lecturas) en cada una de las variantes que compila Godot.
+uniform int muestras = 8;
+uniform float nucleo = 2.0;           // 2 = denso en el eje (el del óculo); 1 = parejo (los de la bóveda)
 
 float denso(vec3 p) {
 	vec3 d = p - origen;
@@ -66,8 +70,12 @@ float denso(vec3 p) {
 	float sombra_reja = mix(1.0, barra_u * barra_v * aro, reja * 0.78);
 	// El humo: a lo ancho (vetas, se estiran solas a lo largo del haz) y a lo
 	// largo (bocanadas que bajan despacio).
-	float vetas = texture(ruido, vec2(u, v) * 0.33 + vec2(tn * 0.05, TIME * 0.004 * prisa)).r;
-	float bocanadas = texture(ruido, vec2(tn * 0.55 - TIME * 0.018 * prisa, u * 0.12 + v * 0.07 + 0.31)).r;
+	// `textureLod` y no `texture`: esto va dentro del bucle de las muestras, y
+	// ahí Direct3D no sabe sacar las derivadas (despliega el bucle entero para
+	// poder). Nivel 0: las manchas van tan estiradas (un tercio de textura de
+	// lado a lado del haz) que el nivel que elegía `texture` ya era el 0.
+	float vetas = textureLod(ruido, vec2(u, v) * 0.33 + vec2(tn * 0.05, TIME * 0.004 * prisa), 0.0).r;
+	float bocanadas = textureLod(ruido, vec2(tn * 0.55 - TIME * 0.018 * prisa, u * 0.12 + v * 0.07 + 0.31), 0.0).r;
 	float aire = mix(1.0, smoothstep(0.15, 0.85, vetas) * 1.35, humo)
 		* mix(1.0, 0.45 + 1.1 * bocanadas, humo * 0.7);
 	// Entra con un fundido corto por el óculo; abajo lo corta el suelo solo.
@@ -113,10 +121,10 @@ void fragment() {
 	}
 	// Ocho muestras con el punto de partida movido por píxel: sin eso salen
 	// rodajas; con eso, un grano finísimo que el posprocesado se come.
-	float paso = (s1 - s0) / 8.0;
+	float paso = (s1 - s0) / float(muestras);
 	float salto = fract(sin(dot(FRAGCOORD.xy, vec2(12.9898, 78.233))) * 43758.5453);
 	float suma = 0.0;
-	for (int i = 0; i < 8; i++) {
+	for (int i = 0; i < muestras; i++) {
 		float s = s0 + paso * (float(i) + salto);
 		suma += denso(ojo + rd * s);
 	}

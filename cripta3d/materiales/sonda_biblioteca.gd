@@ -75,8 +75,10 @@ func _init() -> void:
 				cambia = true
 				break
 		_comprobar("la variante «%s» cambia algo en la piedra" % clave, cambia)
-	_comprobar("«doble_cara» cambia de sombreador",
-		(mat.dame("hierro", {"doble_cara": true}) as ShaderMaterial).shader != (mat.dame("hierro") as ShaderMaterial).shader)
+	# UN SOLO PROGRAMA DE SUPERFICIE (ver la cabecera de `superficie.gdshaderinc`):
+	# «doble_cara» era otro programa entero, 8,8 s de compilar en un navegador.
+	_comprobar("«doble_cara» NO cambia de sombreador: la mesa compila un solo programa de superficie",
+		(mat.dame("hierro", {"doble_cara": true}) as ShaderMaterial).shader == (mat.dame("hierro") as ShaderMaterial).shader)
 	var brasa := mat.dame("ascua") as ShaderMaterial
 	var brasa_fuerte := mat.dame("ascua", {"emision": 7.0}) as ShaderMaterial
 	_comprobar("«emision» es la energía del ascua",

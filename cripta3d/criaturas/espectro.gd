@@ -16,8 +16,9 @@ extends Node3D
 ##     cámara de juego: globos que nacen de un labio de la propia gelatina
 ##     (`espectro_ojo.gdshader`). Cada uno sigue a la bola a su aire —uno más
 ##     lento, otro más nervioso— y parpadea a destiempo;
-##   · seis JIRONES en cinta (`espectro_zarcillo`), de tamaños distintos, que se
-##     curvan en S y se deshacen hacia la punta: dos grandes a los lados (los del
+##   · seis JIRONES en cinta (el sombreador de la masa, con `jiron` = 1), de
+##     tamaños distintos, que se curvan en S y se deshacen hacia la punta: dos
+##     grandes a los lados (los del
 ##     sprite), dos menores y dos detrás que van a rastras;
 ##   · una luz violeta propia, floja, que alumbra la losa: es lo ÚNICO violeta
 ##     de la mesa. Un espectro no hace sombra: debajo, en vez de sombra, luz;
@@ -63,12 +64,35 @@ extends Node3D
 
 const Criatura := preload("res://prueba3d/criatura.gd")
 const MODELO := preload("res://cripta3d/modelos/criatura_espectro.glb")
+## La gelatina: la masa, los jirones (con `jiron` = 1) y las gotas, en UN
+## sombreador (eran dos; juntos se compilan 0,45 s antes en un navegador).
 const SH_CUERPO := preload("res://cripta3d/criaturas/espectro_cuerpo.gdshader")
-const SH_ZARCILLO := preload("res://cripta3d/criaturas/espectro_zarcillo.gdshader")
 const SH_OJO := preload("res://cripta3d/criaturas/espectro_ojo.gdshader")
 const SH_SAL := preload("res://cripta3d/criaturas/espectro_sal.gdshader")
+## La luz violeta en la losa y las volutas de humo (con `es_humo` = 1), en UN
+## sombreador (eran dos; juntos se compilan 0,2 s antes en un navegador).
 const SH_BRILLO := preload("res://cripta3d/criaturas/espectro_brillo.gdshader")
-const SH_HUMO := preload("res://cripta3d/criaturas/espectro_humo.gdshader")
+## El ruido de la gelatina, de la sal, de la luz bajo la losa y del humo, en una
+## textura (`espectro_ruido.gd` la genera): por código, en un navegador, se
+## compilaba desplegado en cada variante.
+const RUIDO := preload("res://cripta3d/criaturas/espectro_ruido.png")
+
+## LA LUZ PROPIA (21-nov-2026, para la web). El cuerpo, los jirones y los ojos
+## son `unshaded`: la luz de Godot les costaba 6,5–7,8 s de compilar a cada uno
+## en un navegador. La luz se la pone `espectro_luz.gdshaderinc` con lo que
+## calcula esto en cada cuadro (`_poner_luz`): las LUCES_PROPIAS luces que más
+## le dan, con la cuenta de Godot hecha en el centro del cuerpo. Lo que dan las
+## demás va al ambiente, por RESTO_AL_AMBIENTE (lo que una luz cualquiera le da
+## de media a una bola con Lambert: un cuarto).
+const LUCES_PROPIAS := 4
+const RESTO_AL_AMBIENTE := 0.25
+## Cada cuánto se vuelven a buscar las luces de la escena (las de la bola van y
+## vienen). Lo de cada cuadro es solo leer su energía, que el fuego cambia.
+const BUSCAR_LUCES := 1.0
+## Las subdivisiones del plano de la sal. Es `vertex_lighting`: la luz se
+## calcula en sus vértices, y la que manda en el cerco es la violeta del propio
+## espectro, a un palmo del suelo. Con 24 hay un vértice cada ~3 cm.
+const SAL_SUBDIVIDE := 24
 ## No atravesarse a la vista (agacharse bajo un raíl, hacerse a un lado): la
 ## cuenta es la de la calavera, para que los tres cuerpos midan igual.
 const Calavera := preload("res://cripta3d/criaturas/calavera.gd")
@@ -155,6 +179,12 @@ var _modelo: Node3D          # dentro: el modelo a su ESCALA, con el centro en e
 var _cuerpo: MeshInstance3D
 var _mat_cuerpo: ShaderMaterial
 var _mats_gel: Array[ShaderMaterial] = []
+## Los que llevan la luz propia: los de gelatina y los de los ojos.
+var _mats_luz: Array[ShaderMaterial] = []
+## Sin tipo: las luces de la bola se crean y se liberan, y un Array[Light3D]
+## con una ya liberada da error al recorrerlo.
+var _luces: Array = []
+var _buscar_luces := 0.0
 var _ojos: Array[Dictionary] = []
 var _zarcillos: Array[Dictionary] = []
 var _centro_y := 0.15
@@ -247,6 +277,7 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 		mat.set_shader_parameter("c_parpado", Paleta.ARCANO_1)
 		mat.set_shader_parameter("c_parpado_luz", Paleta.ARCANO)
 		mat.set_shader_parameter("bajo_libre", 0.42 if i == 0 else 0.0)
+		_mats_luz.append(mat)
 		var ojo := _meter(p["malla"], mat, _modelo, CAPA_DETALLE)
 		var reposo: Transform3D = baja * (p["transform"] as Transform3D)
 		ojo.transform = reposo
@@ -263,12 +294,14 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 		var p := _pieza_del_modelo(modelo, nombre)
 		if p.is_empty():
 			continue
-		var mat := _gel(SH_ZARCILLO)
+		var mat := _gel(SH_CUERPO)
+		mat.set_shader_parameter("jiron", 1.0)
 		var malla: Mesh = p["malla"]
 		var largo := malla.get_aabb().end.x
 		var rizo: Vector2 = RIZOS[nombre]
+		var fase := float(_zarcillos.size()) * 1.7 + _semilla
 		mat.set_shader_parameter("largo", largo)
-		mat.set_shader_parameter("fase", float(_zarcillos.size()) * 1.7 + _semilla)
+		mat.set_shader_parameter("fase", fase)
 		var z := _meter(malla, mat, _modelo, CAPA_DETALLE)
 		var reposo: Transform3D = baja * (p["transform"] as Transform3D)
 		z.transform = reposo
@@ -277,8 +310,9 @@ func montar(criatura: Criatura, _fuente: Font) -> void:
 		# Solo los dos grandes de los lados se tapan los ojos; el resto se recoge.
 		_zarcillos.append({"nodo": z, "mat": mat, "reposo": reposo, "lado": lado,
 			"detras": not (nombre == "zarcillo_i" or nombre == "zarcillo_d"), "largo": largo,
-			"rizo": rizo, "r0": rizo.x, "r1": rizo.y, "onda": 0.6,
+			"rizo": rizo, "r0": rizo.x, "r1": rizo.y, "onda": 0.6, "fase": fase,
 			"tapa": _pose_tapar(reposo, lado)})
+		_linea_jiron(mat, largo, rizo.x, rizo.y, 0.6, fase, 4.5)
 
 	var p_gota := _pieza_del_modelo(modelo, "gota")
 	modelo.free()
@@ -340,7 +374,9 @@ func _gel(shader: Shader) -> ShaderMaterial:
 	m.set_shader_parameter("c_luz", Paleta.ARCANO)
 	m.set_shader_parameter("c_palido", Paleta.BLANCO)
 	m.set_shader_parameter("semilla", _semilla + float(_mats_gel.size()) * 0.9)
+	m.set_shader_parameter("ruido_espectro", RUIDO)
 	_mats_gel.append(m)
+	_mats_luz.append(m)
 	return m
 
 ## La pose de un jirón tapándose un ojo (en las unidades del modelo). La raíz
@@ -378,12 +414,15 @@ func _montar_suelo() -> void:
 	var lado := c.radio * E * 4.6
 	var plano := PlaneMesh.new()
 	plano.size = Vector2(lado, lado)
+	plano.subdivide_width = SAL_SUBDIVIDE
+	plano.subdivide_depth = SAL_SUBDIVIDE
 	_mat_sal = ShaderMaterial.new()
 	_mat_sal.shader = SH_SAL
 	_mat_sal.set_shader_parameter("c_sal", Paleta.TIERRA_6)
 	_mat_sal.set_shader_parameter("c_polvo", Paleta.PIEDRA_4)
 	_mat_sal.set_shader_parameter("c_runa", Paleta.ARCANO)
 	_mat_sal.set_shader_parameter("semilla", _semilla)
+	_mat_sal.set_shader_parameter("ruido_espectro", RUIDO)
 	_sal = _meter(plano, _mat_sal, self, CAPA_SIN_REFLEJO)
 	_sal.extra_cull_margin = 0.0
 
@@ -393,13 +432,16 @@ func _montar_suelo() -> void:
 	_mat_brillo.shader = SH_BRILLO
 	_mat_brillo.set_shader_parameter("color", Paleta.ARCANO)
 	_mat_brillo.set_shader_parameter("semilla", _semilla)
+	_mat_brillo.set_shader_parameter("ruido_espectro", RUIDO)
 	_brillo = _meter(plano_b, _mat_brillo, self, CAPA_SIN_REFLEJO)
 	_brillo.extra_cull_margin = 0.0
 
 func _material_humo(color: Color, fuerza: float, de_particula: bool = true,
 		hebras: float = 1.0) -> ShaderMaterial:
 	var m := ShaderMaterial.new()
-	m.shader = SH_HUMO
+	m.shader = SH_BRILLO
+	m.set_shader_parameter("es_humo", 1.0)
+	m.set_shader_parameter("ruido_espectro", RUIDO)
 	m.set_shader_parameter("color", color)
 	m.set_shader_parameter("fuerza", fuerza)
 	m.set_shader_parameter("hebras", hebras)
@@ -929,8 +971,147 @@ func _quieto() -> void:
 	_aparte = Vector3.ZERO
 	transform = Transform3D.IDENTITY
 
+## La línea del centro de un jirón: la integral de su tangente, en 13 puntos (de
+## la raíz a la punta). Antes la sumaba el sombreador en cada vértice con un
+## bucle de doce tramos; en un navegador ese bucle se compila desplegado en cada
+## variante. La cuenta es la de `angulo()` en `espectro_cuerpo.gdshader`, con
+## el reloj que acaba de poner `_poner_gel`, y más fina que la de antes (cuatro
+## tramos por punto: la de antes eran doce en total, y medio milímetro de error
+## en la punta).
+func _linea_jiron(mat: ShaderMaterial, largo: float, r0: float, r1: float, onda: float,
+		fase: float, frecuencia: float) -> void:
+	const PUNTOS := 12
+	const TRAMOS := 4
+	var linea := PackedVector2Array()
+	linea.resize(PUNTOS + 1)
+	var c := Vector2.ZERO
+	var ds := largo / float(PUNTOS * TRAMOS)
+	var base := _t * frecuencia + fase
+	for k in PUNTOS:
+		for j in TRAMOS:
+			var s := (float(k * TRAMOS + j) + 0.5) * ds
+			var u := s / largo
+			var a := r0 * s + r1 * s * s + onda * u * sin(base - u * 5.5)
+			c += Vector2(cos(a), sin(a)) * ds
+		linea[k + 1] = c
+	mat.set_shader_parameter("linea", linea)
+
+## LA LUZ PROPIA de la gelatina y los ojos (ver `espectro_luz.gdshaderinc`): las
+## LUCES_PROPIAS luces que más le dan, atenuadas en el centro del cuerpo con la
+## cuenta de Godot (`get_omni_spot_attenuation`, el cono del foco, el color
+## lineal por la energía; el π de Godot se va con el 1/π del difuso), como una
+## dirección y un color. La suya, la violeta, no cuenta: está DENTRO de la masa
+## y le da a la losa, no a su piel.
+func _poner_luz() -> void:
+	_buscar_luces -= 1.0
+	if _buscar_luces <= 0.0:
+		_buscar_luces = BUSCAR_LUCES * 60.0
+		_luces.clear()
+		for n in get_tree().root.find_children("*", "Light3D", true, false):
+			var l := n as Light3D
+			# Solo las de su mundo: el visor pinta en un SubViewport con mundo propio.
+			if l != null and l.get_world_3d() == get_world_3d():
+				_luces.append(l)
+	var p := global_transform * _centro_local()
+	var en_cuerpo: Array = []
+	for x in _luces:
+		if not is_instance_valid(x) or x == _luz:
+			continue
+		var l := x as Light3D
+		if not l.is_visible_in_tree() or l.light_negative:
+			continue
+		# Fuera también las que no alumbran: en web el núcleo cuelga dos luces de
+		# RELLENO (una omni y un foco a 60 de altura, energía 0,0001; ver
+		# `MundoCripta._unificar_variantes`) solo para que todas las mallas compilen
+		# la misma variante. No son ni luz fuerte ni ambiente: ocuparían dos de los
+		# cuatro huecos para nada.
+		if l.light_energy <= 0.001:
+			continue
+		var col := l.light_color.srgb_to_linear() * l.light_energy
+		# El brillo de cada luz: Godot dobla el de la omni y el del foco, no el de
+		# la direccional (`specular_amount`, en `rasterizer_scene_gles3.cpp`).
+		var brillo := l.light_specular
+		# Con sombra, Godot la pinta en una pasada aparte (y la suma en sRGB).
+		var aparte := 1.0 if l.shadow_enabled else 0.0
+		if l is DirectionalLight3D:
+			var z := l.global_basis.z.normalized()
+			en_cuerpo.append([col.get_luminance(), Vector4(z.x, z.y, z.z, aparte), col, brillo])
+			continue
+		brillo *= 2.0
+		var at := _atenuacion(l, p)
+		if at > 0.0:
+			var hacia := (l.global_position - p).normalized()
+			en_cuerpo.append([(col * at).get_luminance(), Vector4(hacia.x, hacia.y, hacia.z, aparte),
+				col * at, brillo])
+	en_cuerpo.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) > float(b[0]))
+	var dirs := PackedVector4Array()
+	var cols := PackedVector4Array()
+	var amb := _ambiente()
+	for i in en_cuerpo.size():
+		var k: Color = en_cuerpo[i][2]
+		if i < LUCES_PROPIAS:
+			dirs.append(en_cuerpo[i][1])
+			cols.append(Vector4(k.r, k.g, k.b, float(en_cuerpo[i][3])))
+		else:
+			amb += Vector3(k.r, k.g, k.b) * RESTO_AL_AMBIENTE
+	while dirs.size() < LUCES_PROPIAS:
+		dirs.append(Vector4(0.0, 1.0, 0.0, 0.0))
+		cols.append(Vector4.ZERO)
+	for m in _mats_luz:
+		m.set_shader_parameter("luz_dir", dirs)
+		m.set_shader_parameter("luz_col", cols)
+		m.set_shader_parameter("luz_ambiente", amb)
+
+
+## Lo que llega de una omni o un foco al punto `p` (0 si no llega): la
+## atenuación de Godot y el cono del foco.
+static func _atenuacion(l: Light3D, p: Vector3) -> float:
+	var omni := l as OmniLight3D
+	var foco := l as SpotLight3D
+	var rel := l.global_position - p
+	var d := maxf(rel.length(), 0.0001)
+	var alcance := omni.omni_range if omni != null else foco.spot_range
+	var decae := omni.omni_attenuation if omni != null else foco.spot_attenuation
+	if d >= alcance:
+		return 0.0
+	var nd := d / alcance
+	nd *= nd
+	nd *= nd
+	nd = maxf(1.0 - nd, 0.0)
+	var at := nd * nd * pow(d, -decae)
+	if foco != null:
+		var cono := cos(deg_to_rad(foco.spot_angle))
+		var scos := maxf((-rel / d).dot(-foco.global_basis.z.normalized()), cono)
+		var borde := maxf(0.0001, (1.0 - scos) / (1.0 - cono))
+		# El exponente es la INVERSA de `spot_angle_attenuation`: Godot sube
+		# `1 / spot_angle_attenuation` (`rasterizer_scene_gles3.cpp`,
+		# `inv_spot_attenuation`) y `scene.glsl` hace `pow(spot_rim, eso)`. Con el
+		# exponente al derecho, el foco de relleno de las palas (1,8) le daba al
+		# espectro 0,89 de su cono en vez de 0,49: casi el doble de luz de fuego, y
+		# eran los ojos color crema y el jirón lavado de la gira 6.
+		at *= 1.0 - pow(borde, 1.0 / maxf(foco.spot_angle_attenuation, 0.0001))
+	return at
+
+## El ambiente de la escena como lo pone Godot (color lineal por energía). El de
+## la cámara manda sobre el del mundo.
+func _ambiente() -> Vector3:
+	var env: Environment = null
+	var cam := get_viewport().get_camera_3d()
+	if cam != null and cam.environment != null:
+		env = cam.environment
+	elif get_world_3d() != null:
+		env = get_world_3d().environment
+	if env == null or env.ambient_light_source == Environment.AMBIENT_SOURCE_DISABLED:
+		return Vector3.ZERO
+	var k := env.ambient_light_color.srgb_to_linear() * env.ambient_light_energy
+	if env.ambient_light_source == Environment.AMBIENT_SOURCE_BG \
+			and env.background_mode == Environment.BG_COLOR:
+		k = env.background_color.srgb_to_linear() * env.background_energy_multiplier
+	return Vector3(k.r, k.g, k.b)
+
 ## Lo que comparten todas las piezas de gelatina.
 func _poner_gel() -> void:
+	_poner_luz()
 	for m in _mats_gel:
 		m.set_shader_parameter("reloj", _t)
 		m.set_shader_parameter("palidez", _palidez)
@@ -981,10 +1162,13 @@ func _mover_zarcillos(delta: float, rizo_k: float, rizo_extra: Vector2, onda: fl
 				Vector3(1.0 - 0.75 * encoge, 1.0 - 0.35 * encoge, 1.0 - 0.35 * encoge)), Vector3.ZERO)
 		# Los zarcillos cuajan después que la masa: salen de ella.
 		mat.set_shader_parameter("cuaja", smoothstep(0.45, 1.0, _cuaja))
+		var onda_z := float(z["onda"]) * (1.0 - t * 0.8)
 		mat.set_shader_parameter("rizo0", z["r0"])
 		mat.set_shader_parameter("rizo1", z["r1"])
-		mat.set_shader_parameter("onda", float(z["onda"]) * (1.0 - t * 0.8))
+		mat.set_shader_parameter("onda", onda_z)
 		mat.set_shader_parameter("frecuencia", frecuencia)
+		_linea_jiron(mat, float(z["largo"]), float(z["r0"]), float(z["r1"]), onda_z,
+			float(z["fase"]), frecuencia)
 		mat.set_shader_parameter("temblor", temblor)
 		mat.set_shader_parameter("desvanece", lerpf(DESVANECE, DESVANECE_TAPA, t))
 		if t > 0.001:

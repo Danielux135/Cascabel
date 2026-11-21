@@ -182,6 +182,16 @@ const MULT_ABSIDE := 0.5
 const MULT_ALBARDILLA := 0.55
 const ATENUACION_ALBARDILLA := 0.5
 const MULT_SALA := 0.3
+## Lo que se le sube al fuego del campo que llevaría la sombra cuando no la
+## lleva (ver `_repartir_fuego`). Medido con nueve tomas fijas, luminancia media
+## de la toma, ALTA con sombra contra MEDIA sin ella:
+##                 ALTA    ×1     ×1,6    ×2,4    ×3,4
+##   braseros      74,9   61,0   69,1    77,7    86,5
+##   lápidas       70,7   58,6   66,2    74,5    82,9
+##   coro          50,8   44,6   48,1    52,0    56,1
+##   palas         47,2   46,1   46,6    47,2    47,8
+## Por 2 cae en medio de todas. `-- --sin-sombra-por=N` lo cambia para medir.
+const SIN_SOMBRA_POR := 2.0
 ## Media anchura de lo que es CAMPO, desde el eje x = 2. Las bandas van de 0,2 a
 ## 3,8 (1,8): lo que queda más afuera es albardilla.
 const MEDIO_CAMPO := 1.7
@@ -216,6 +226,9 @@ var _fuegos_vistos := -1
 var _cielo_oculo: ShaderMaterial = null
 var _halo_oculo: ShaderMaterial = null
 var _oculo_hecho := false
+## Por cuánto se multiplica el fuego del campo que llevaría la sombra cuando no
+## la lleva (MEDIA, BAJA y la web). Ver `_repartir_fuego`.
+var _sin_sombra_por := SIN_SOMBRA_POR
 var _agitacion := 0.0
 var _avivado := 0.0
 
@@ -224,6 +237,9 @@ func montar(mundo: Node3D) -> void:
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--tono="):
 			_tono = arg.trim_prefix("--tono=").to_lower()
+		elif arg.begins_with("--sin-sombra-por="):
+			# Para volver a medir la compensación del fuego sin sombra.
+			_sin_sombra_por = float(arg.trim_prefix("--sin-sombra-por="))
 	_montar_ambiente()
 	_montar_luna()
 	_montar_rayos()
@@ -719,6 +735,12 @@ func _sabana(centro: Vector3, tam: Vector2, n: int, nivel: int) -> void:
 	m.set_shader_parameter("grosor", clampf((centro.y - Nucleo.Y_SALA) * 0.85, 0.07, 0.25))
 	var plano := PlaneMesh.new()
 	plano.size = tam
+	# PARTIDA EN UNA REJILLA DE MEDIO METRO: la luz de la bruma va por vértice
+	# (`entorno_bruma.gdshader`, para que compile en 0,9 s y no en 3,1 en la web),
+	# y una sábana de 4,4 m con solo sus cuatro esquinas no se enciende junto a un
+	# fuego que le cae en medio. Son ~160 triángulos por sábana.
+	plano.subdivide_width = maxi(ceili(tam.x / 0.5) - 1, 0)
+	plano.subdivide_depth = maxi(ceili(tam.y / 0.5) - 1, 0)
 	var mi := MeshInstance3D.new()
 	mi.mesh = plano
 	mi.material_override = m
@@ -792,6 +814,7 @@ func _repartir_fuego() -> void:
 		return
 	_fuegos_vistos = fichas.size()
 	var mejor: OmniLight3D = null
+	var mejor_ficha: Dictionary = {}
 	var mejor_peso := 0.0
 	for ficha in fichas:
 		var que: Variant = ficha.get("luz")
@@ -820,8 +843,26 @@ func _repartir_fuego() -> void:
 			if peso > mejor_peso:
 				mejor_peso = peso
 				mejor = luz
-	if mejor != null and _calidad == 0:
+				mejor_ficha = ficha
+	if mejor == null:
+		return
+	# En web no hay sombras en ninguna calidad: cada luz con sombra obliga a
+	# compilar otra pasada por material (`Nucleo._unificar_variantes`).
+	if _calidad == 0 and not _mundo.en_web:
 		mejor.shadow_enabled = true
 		mejor.shadow_bias = 0.04
 		mejor.shadow_normal_bias = 1.5
 		mejor.shadow_blur = 1.5
+	else:
+		# SIN SOMBRA, ESE FUEGO ALUMBRA MENOS, y no es por la sombra. En
+		# Compatibility una luz con sombra se dibuja en una pasada aparte que se
+		# SUMA sobre la imagen ya pasada a sRGB, y así alumbra bastante más que la
+		# misma luz dentro de la pasada de siempre, donde se suma en lineal.
+		# Medido con las mismas tomas en ALTA y en MEDIA: los braseros del campo
+		# de 75 a 61 de luminancia y las lápidas de 71 a 59; el charco cálido del
+		# fuego, que es lo primero que se mira en la mesa, casi se apagaba. Lo
+		# vio un crítico comparando la web con el escritorio; en MEDIA de
+		# escritorio pasaba desde siempre y nadie lo había medido. Aquí se le da
+		# a ese fuego la energía que pierde, para que el charco sea el mismo en
+		# las tres calidades y en la web. Las sombras de las lápidas no vuelven.
+		mejor_ficha["energia"] = float(mejor_ficha["energia"]) * _sin_sombra_por

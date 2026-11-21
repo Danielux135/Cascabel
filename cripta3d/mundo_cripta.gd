@@ -22,6 +22,8 @@ extends Node3D
 ##   tiempo, r_bola             el reloj del mundo y el radio de la bola en unidades 3D
 ##   hundimiento_platillo       cuánto asoma la bola tragada por un platillo (×radio)
 ##   forzar_reserva             para probar: usa los materiales de reserva (`--reserva`)
+##   en_web                     estamos en el navegador (o con `--como-web`): una sola
+##                              variante por sombreador y ninguna sombra
 ##
 ##   calidad                    0 ALTA, 1 MEDIA, 2 BAJA: la que ha pedido la escena
 ##
@@ -141,6 +143,13 @@ var hundimiento_platillo := 0.35
 ## Para probar: monta con los materiales de reserva aunque exista la biblioteca
 ## de verdad. Hay que ponerlo ANTES de `montar` (la escena lo hace con `--reserva`).
 var forzar_reserva := false
+## EN EL NAVEGADOR. Verdadero en el build web, y también con `-- --como-web`,
+## que es como se ensaya en escritorio lo que solo pasa allí: las luces de
+## relleno, el reflejo igualado y ninguna sombra (ver `_unificar_variantes`).
+var en_web := OS.has_feature("web") or OS.get_cmdline_user_args().has("--como-web")
+## Para medir: en web, sin las luces de relleno ni el reflejo igualado. Hay que
+## ponerlo ANTES de `montar` (la escena lo hace con `--sin-relleno` o `?relleno=0`).
+var sin_relleno := false
 
 var _fuente: Font
 ## Bola → altura suavizada de su centro.
@@ -223,6 +232,13 @@ func poner_calidad(n: int) -> void:
 	for cuerpo in _bichos:
 		if is_instance_valid(cuerpo) and cuerpo.has_method("calidad"):
 			cuerpo.call("calidad", calidad)
+	# En web, ninguna sombra: «entorno» acaba de repartir la suya (en ALTA se la
+	# da a un fuego del campo) y aquí se le quita antes de que se dibuje nada.
+	if en_web:
+		for ficha in _fuegos:
+			var que: Variant = ficha.get("luz")
+			if is_instance_valid(que) and que is Light3D:
+				(que as Light3D).shadow_enabled = false
 
 ## Los fuegos dados de alta, para quien reparte el presupuesto de luz («entorno»):
 ## una ficha por fuego, con "luz" (la OmniLight3D), "energia" (la de reposo, que
@@ -308,6 +324,9 @@ func _parpadear(delta: float) -> void:
 		var llama := 0.80 + 0.30 * _ruido(tiempo * 2.1 + fase) \
 			+ 0.12 * _ruido(tiempo * 8.7 + fase * 2.3)
 		luz.light_energy = float(ficha["energia"]) * (llama + latido * 0.30 + golpe * 4.0)
+		# En web, ningún fuego con sombra (ver `_unificar_variantes`).
+		if en_web and luz.shadow_enabled:
+			luz.shadow_enabled = false
 
 # -------------------------------------------------------------------- montaje
 
@@ -323,6 +342,57 @@ func montar(la_mesa: MesaCripta) -> void:
 	if entorno == null:
 		_entorno_de_reserva()
 	_aligerar_reflejo(self)
+	if en_web and not sin_relleno:
+		_unificar_variantes()
+
+## UNA SOLA VARIANTE POR SOMBREADOR (solo en web). El renderizador Compatibility
+## compila un PROGRAMA distinto del mismo sombreador por cada combinación de
+## luces que le toca a una malla —con omni, con foco, con las dos, con ninguna—
+## y otro más si el entorno de su cámara aplica la curva de tono dentro del
+## sombreador en vez de después (`rasterizer_scene_gles3.cpp`: `DISABLE_LIGHT_OMNI`,
+## `DISABLE_LIGHT_SPOT`, `APPLY_TONEMAPPING`). En escritorio da igual. En un
+## navegador de Windows cada programa con luz son segundos de Direct3D
+## (`banco_sombreadores.gd`), y la piedra, que está por toda la sala, acababa
+## compilándose tres y cuatro veces.
+##
+##   · DOS LUCES DE RELLENO, una omni y un foco, que alcanzan la sala entera y
+##     no alumbran nada: así a TODAS las mallas les tocan «omni y foco» y cada
+##     sombreador se compila una vez. Van muy lejos a propósito: Godot reparte
+##     las ocho luces de cada malla por cercanía, y la de relleno, que siempre
+##     es la más lejana, solo ocupa un hueco que estaba libre.
+##   · EL ENTORNO DEL REFLEJO, igualado al principal en lo único que cambia de
+##     programa: que los efectos vayan «en el post». El principal lleva brillo y
+##     ajustes; al del reflejo se le encienden unos ajustes NEUTROS (brillo,
+##     contraste y saturación a 1), que dejan su imagen como estaba.
+##
+## Y NINGUNA SOMBRA: una luz con sombra obliga a cada material que alcanza a
+## compilar otra pasada más (la aditiva). La apaga `_parpadear`, que ya recorre
+## los fuegos en cada cuadro, porque «entorno» reparte la suya cuando quiere.
+func _unificar_variantes() -> void:
+	var lejos := Vector3(2.0, 60.0, 9.5)
+	var omni := OmniLight3D.new()
+	omni.name = "RellenoOmni"
+	omni.position = lejos
+	omni.omni_range = 200.0
+	omni.light_energy = 0.0001
+	omni.light_specular = 0.0
+	omni.shadow_enabled = false
+	add_child(omni)
+	var foco := SpotLight3D.new()
+	foco.name = "RellenoFoco"
+	foco.position = lejos
+	foco.rotation_degrees = Vector3(-90.0, 0.0, 0.0)
+	foco.spot_range = 200.0
+	foco.spot_angle = 80.0
+	foco.light_energy = 0.0001
+	foco.light_specular = 0.0
+	foco.shadow_enabled = false
+	add_child(foco)
+	if entorno_reflejo != null and not entorno_reflejo.adjustment_enabled:
+		entorno_reflejo.adjustment_enabled = true
+		entorno_reflejo.adjustment_brightness = 1.0
+		entorno_reflejo.adjustment_contrast = 1.0
+		entorno_reflejo.adjustment_saturation = 1.0
 
 ## LOS MATERIALES. Si la biblioteca de verdad existe, es ella; si no —o si no
 ## carga—, una de reserva con la misma forma, para que el andamio se vea en gris
