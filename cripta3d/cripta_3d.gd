@@ -184,6 +184,32 @@ var _falta_clic := false
 var _sin_marcador := false
 var _reserva := false
 
+## LA CARGA POR PARTES (ver `_preparar_carga`). En web, siempre; en escritorio,
+## con `-- --como-web`, que es como se ensaya.
+var _con_carga := false
+var _cargando := false
+## Lo que queda por compilar: [material, con instancias].
+var _carga_pasos: Array = []
+var _carga_hechos := 0
+## Lo que se ha escondido para montar tapado: nodo → sus capas de verdad.
+var _carga_capas: Dictionary = {}
+## Los sombreadores que ya están en la lista (su huella, y si van con instancias).
+var _carga_vistos: Dictionary = {}
+## Los primeros cuadros de la carga, en los que se vuelve a recoger lo que los
+## módulos crean tarde.
+var _carga_cuadros := 0
+var _carga_muestra: GeometryInstance3D = null
+var _carga_t0 := 0
+var _carga_reloj := 0
+var _carga_apuntes: Array[String] = []
+var _carga_destape := 0
+var _telon: Telon = null
+## PARA PROBAR (`-- --ssao`, o `?ssao=1` en web): la oclusión de pantalla. El
+## renderizador Compatibility la tiene desde Godot 4.6 y «entorno» la daba por
+## imposible. No va puesta: cambia el aspecto aprobado, y eso lo deciden Daniel
+## y Fátima con la captura delante.
+var _ssao := false
+
 ## Calidad en uso, lo que vale cada mando y el vigilante que la baja sola.
 var calidad := 0
 var _cal: Dictionary = {}
@@ -208,6 +234,20 @@ var _med_fisica := 0
 var _med_proceso := 0
 var _med_n := 0
 var _med_t := 0.0
+var _med_pico := 0.0
+var _med_antes := 0
+## PARA BUSCAR UN TIRÓN (`-- --medir --tirones`, `?medir=1&tirones=1`): además
+## de lo que dice `--medir`, apunta QUÉ PIEZA se ha visto por primera vez en el
+## fotograma largo. Va aparte porque mira el mundo entero en cada fotograma
+## (medio milisegundo) y eso falsearía las cifras de `--medir`.
+var _tirones := false
+var _tir_vistas: Dictionary = {}
+var _tir_recien := PackedStringArray()
+## PARA MEDIR (`-- --sin-relleno`, `?relleno=0`): en web, sin las dos luces de
+## relleno ni el entorno del reflejo igualado (`MundoCripta._unificar_variantes`).
+## Las dos luces se cuentan en cada píxel de todo lo alumbrado; en una gráfica
+## buena no se nota, y en una integrada no está medido. Con esto se compara.
+var _sin_relleno := false
 
 var vista := 0
 var piloto := false
@@ -287,10 +327,18 @@ func _ready() -> void:
 			_demo = true
 		elif arg == "--medir":
 			_medir = true
+		elif arg == "--tirones":
+			_tirones = true
 		elif arg == "--sin-marcador":
 			_sin_marcador = true
 		elif arg == "--reserva":
 			_reserva = true
+		elif arg == "--como-web":
+			_con_carga = true
+		elif arg == "--ssao":
+			_ssao = true
+		elif arg == "--sin-relleno":
+			_sin_relleno = true
 		elif arg.begins_with("--ojo="):
 			_ojo_libre = _vector_de(arg.trim_prefix("--ojo="), _ojo_libre)
 			_camara_libre = true
@@ -331,6 +379,7 @@ func _ready() -> void:
 	if _web:
 		piloto = true
 		_falta_clic = true
+		_con_carga = true
 		_leer_direccion()
 
 	mesa = MesaCripta.new()
@@ -368,10 +417,17 @@ func _ready() -> void:
 
 	mundo = MundoCripta.new()
 	mundo.forzar_reserva = _reserva
+	mundo.sin_relleno = _sin_relleno
 	vp.add_child(mundo)
 	mundo.montar(mesa)
 	mundo.montar_caza(caza)
 	_fondo_propio = mundo.entorno.background_mode
+	if _ssao:
+		mundo.entorno.ssao_enabled = true
+		mundo.entorno.ssao_radius = 0.45
+		mundo.entorno.ssao_intensity = 1.6
+		mundo.entorno.ssao_power = 1.3
+		mundo.entorno.ssao_light_affect = 0.15
 
 	camara = Camera3D.new()
 	camara.near = 0.1
@@ -416,13 +472,351 @@ func _ready() -> void:
 			[9.4, 2, "golpe"], [10.6, 0, "rendir"], [13.2, 0, "recoger"],
 			[14.0, 2, "recoger"],
 		]
+	if _con_carga:
+		_preparar_carga(capa)
+
+# ------------------------------------------------------------------------ carga
+
+## LA CARGA POR PARTES (en web; en escritorio, con `-- --como-web`).
+##
+## En un navegador de Windows cada sombreador tarda en compilar entre tres
+## décimas y varios segundos (`banco_sombreadores.gd`), y Godot los compila la
+## primera vez que DIBUJA algo con ellos. Sin esto, el primer fotograma de la
+## mesa los compilaba todos de golpe —el lienzo congelado sin una palabra— y
+## luego, jugando, cada efecto que salía por primera vez (una chispa, la onda de
+## un golpe, la campana) era un tirón.
+##
+## Así que la mesa se monta TAPADA. Se esconde todo lo que se dibuja, y delante
+## de la cámara se va poniendo, uno por fotograma, un cuadradito con cada
+## material que hay en el mundo —también los de lo que está escondido esperando
+## su momento, que es lo que luego daría el tirón—. Cada fotograma compila uno
+## y el telón dice por cuál va. Al acabar se destapa todo, ya compilado.
+##
+##   · Los cuadraditos van en una capa que la cámara del reflejo no mira.
+##   · Lo que sale de partículas o de un `MultiMesh` se pone además CON
+##     instancias, que para Godot es otro programa del mismo sombreador.
+##   · Vale porque en web el núcleo deja una sola variante por sombreador
+##     (`MundoCripta._unificar_variantes`): el programa que compila el
+##     cuadradito es el mismo que usará la pieza de verdad.
+##   · Mientras dura no corre la física ni el piloto: la mesa no se juega sola
+##     detrás del telón.
+const CAPA_DE_CARGA := 1 << 15
+
+func _preparar_carga(capa: CanvasLayer) -> void:
+	_recoger_para_cargar(mundo)
+	_cargando = true
+	_carga_cuadros = 0
+	_carga_t0 = Time.get_ticks_msec()
+	_telon = Telon.new()
+	_telon.total = _carga_pasos.size()
+	_telon.en_web = _web
+	_telon.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_telon.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	capa.add_child(_telon)
+
+## Apunta cada cosa que se dibuja y la ESCONDE (se queda sin capas), y apunta
+## cada material distinto que lleva, para compilarlo. Dos materiales con el
+## mismo sombreador son el mismo programa: se cuentan una vez.
+##
+## SE LLAMA DOS VECES: al acabar de montar y otra vez tras el primer cuadro del
+## mundo, porque hay módulos que crean piezas en su primer `actualizar` (el
+## cielo del óculo y su halo esperan a que «arquitectura» diga dónde está el
+## hueco). La primera versión solo miraba al montar: esos dos se quedaban fuera
+## y se compilaban a la vista, medio segundo después de abrirse el telón.
+func _recoger_para_cargar(nodo: Node) -> void:
+	for hijo in nodo.get_children():
+		_recoger_para_cargar(hijo)
+	var gi := nodo as GeometryInstance3D
+	if gi == null or gi == _carga_muestra:
+		return
+	if _carga_capas.has(gi):
+		# Ya estaba escondido. Si vuelve a tener capas es que su módulo se las ha
+		# puesto en su primer cuadro: esas son las buenas, y se esconde otra vez.
+		# (Medido: sin esto la piedra se compilaba a destiempo, en el primer paso,
+		# y al destapar se le devolvían unas capas que ya no eran las suyas.)
+		if gi.layers != 0:
+			_carga_capas[gi] = gi.layers
+			gi.layers = 0
+		return
+	_carga_capas[gi] = gi.layers
+	gi.layers = 0
+	var con_instancias := gi is MultiMeshInstance3D or gi is CPUParticles3D \
+		or gi is GPUParticles3D
+	for de_la_pieza: Material in _materiales_de(gi):
+		var m := de_la_pieza
+		while m != null:
+			var clave := _clave_de_carga(m, con_instancias)
+			if not _carga_vistos.has(clave):
+				_carga_vistos[clave] = true
+				_carga_pasos.append([m, con_instancias])
+			m = m.next_pass
+
+## Lo que distingue un programa de otro para la carga: el sombreador (o el
+## material entero, si es de los de Godot) y si va con instancias.
+func _clave_de_carga(m: Material, con_instancias: bool) -> String:
+	var sombreado := m as ShaderMaterial
+	var huella := m.get_rid().get_id()
+	if sombreado != null and sombreado.shader != null:
+		huella = sombreado.shader.get_rid().get_id()
+	return "%d/%d" % [huella, int(con_instancias)]
+
+func _nombre_de_carga(m: Material, con_instancias: bool) -> String:
+	var nombre := m.get_class()
+	var sombreado := m as ShaderMaterial
+	if sombreado != null and sombreado.shader != null:
+		nombre = sombreado.shader.resource_path.get_file()
+	return nombre + (" (instancias)" if con_instancias else "")
+
+func _materiales_de(gi: GeometryInstance3D) -> Array[Material]:
+	var lista: Array[Material] = []
+	if gi.material_override != null:
+		lista.append(gi.material_override)
+	else:
+		var malla: Mesh = null
+		var pieza := gi as MeshInstance3D
+		if pieza != null:
+			if pieza.mesh != null:
+				for s in pieza.mesh.get_surface_count():
+					var activo := pieza.get_active_material(s)
+					if activo != null:
+						lista.append(activo)
+		elif gi is MultiMeshInstance3D:
+			var varias := (gi as MultiMeshInstance3D).multimesh
+			malla = varias.mesh if varias != null else null
+		elif gi is CPUParticles3D:
+			malla = (gi as CPUParticles3D).mesh
+		if malla != null:
+			for s in malla.get_surface_count():
+				var suyo := malla.surface_get_material(s)
+				if suyo != null:
+					lista.append(suyo)
+	if gi.material_overlay != null:
+		lista.append(gi.material_overlay)
+	return lista
+
+## Un paso por fotograma, al final de `_process`, con la cámara ya en su sitio.
+func _avanzar_carga() -> void:
+	_apuntar_paso()
+	if _carga_muestra != null:
+		_carga_muestra.queue_free()
+		_carga_muestra = null
+	if _carga_hechos >= _carga_pasos.size():
+		_destapar()
+		return
+	var paso: Array = _carga_pasos[_carga_hechos]
+	_carga_hechos += 1
+	var cuadro := QuadMesh.new()
+	cuadro.size = Vector2(0.04, 0.04)
+	if bool(paso[1]):
+		var varias := MultiMesh.new()
+		varias.transform_format = MultiMesh.TRANSFORM_3D
+		varias.use_colors = true
+		varias.use_custom_data = true
+		varias.mesh = cuadro
+		varias.instance_count = 1
+		varias.set_instance_transform(0, Transform3D.IDENTITY)
+		varias.set_instance_color(0, Color.WHITE)
+		var con_varias := MultiMeshInstance3D.new()
+		con_varias.multimesh = varias
+		_carga_muestra = con_varias
+	else:
+		var suelta := MeshInstance3D.new()
+		suelta.mesh = cuadro
+		_carga_muestra = suelta
+	_carga_muestra.material_override = paso[0]
+	_carga_muestra.layers = CAPA_DE_CARGA
+	_carga_muestra.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mundo.add_child(_carga_muestra)
+	# A un metro, de cara a la cámara: dentro de plano seguro, y tapado por el telón.
+	_carga_muestra.global_transform = camara.global_transform \
+		* Transform3D(Basis.IDENTITY, Vector3(0.0, 0.0, -1.0))
+	if _telon != null:
+		_telon.hechos = _carga_hechos
+		_telon.queue_redraw()
+
+## Con `--medir` (o `?medir=1`): lo que ha tardado el fotograma de cada material,
+## que es lo que tarda en compilarse DE VERDAD en esta mesa, con sus luces y su
+## entorno. El banco mide cada sombreador suelto; esto, lo que paga el que entra.
+func _apuntar_paso() -> void:
+	var ahora := Time.get_ticks_msec()
+	if _medir and _carga_hechos > 0 and _carga_hechos <= _carga_pasos.size():
+		var paso: Array = _carga_pasos[_carga_hechos - 1]
+		_carga_apuntes.append("%6.2f s  %s" % [float(ahora - _carga_reloj) / 1000.0,
+			_nombre_de_carga(paso[0], bool(paso[1]))])
+	_carga_reloj = ahora
+
+## UN TIRÓN JUGANDO (con `--medir` o `?medir=1`): un fotograma de más de 60 ms
+## después de la carga. Casi siempre es un sombreador que se compila a la vista
+## porque el telón no lo vio: una pieza que no existía al montar, o que ha
+## cambiado de material. Dice cuándo, cuánto y qué materiales hay AHORA en el
+## mundo que la carga no compiló. «Nada nuevo» apunta a otra cosa: una variante
+## del mismo sombreador (otras luces) o el sistema, que estaba ocupado.
+const TIRON := 0.06
+
+func _apuntar_tiron(segundos: float) -> void:
+	var nuevos := PackedStringArray()
+	_buscar_sin_cargar(mundo, nuevos)
+	var que := "ningún material nuevo"
+	if not nuevos.is_empty():
+		que = "sin cargar: " + ", ".join(nuevos)
+	if _tirones:
+		# Lo que se dibujó por primera vez en ese fotograma: lo apuntó el anterior.
+		que += " · recién a la vista: " + (", ".join(_tir_recien.slice(0, 10))
+			if not _tir_recien.is_empty() else "nada")
+		if _tir_recien.size() > 10:
+			que += " y %d más" % (_tir_recien.size() - 10)
+	var texto := "tirón: %d ms a los %.1f s · %s" % [int(segundos * 1000.0), _tiempo, que]
+	if _web:
+		JavaScriptBridge.eval("(window.__tirones = window.__tirones || []).push('%s')" % texto, true)
+	else:
+		print(texto)
+
+## Con `--tirones`: las piezas del mundo que se ven AHORA y no se habían visto
+## nunca (una chispa que salta, una criatura que aparece, algo que su módulo
+## enseña por primera vez). Unas partículas cuentan cuando emiten. Se llama en
+## cada fotograma; con `apuntar` deja sus nombres en `_tir_recien`.
+func _mirar_a_la_vista(nodo: Node, apuntar: bool) -> void:
+	for hijo in nodo.get_children():
+		_mirar_a_la_vista(hijo, apuntar)
+	var gi := nodo as GeometryInstance3D
+	if gi == null or gi.layers == 0 or not gi.is_visible_in_tree():
+		return
+	var de_cpu := gi as CPUParticles3D
+	var de_gpu := gi as GPUParticles3D
+	if (de_cpu != null and not de_cpu.emitting) or (de_gpu != null and not de_gpu.emitting):
+		return
+	var quien := gi.get_instance_id()
+	if _tir_vistas.has(quien):
+		return
+	_tir_vistas[quien] = true
+	if apuntar:
+		var padre := gi.get_parent()
+		_tir_recien.append("%s/%s (%s)" % [padre.name if padre != null else &"", gi.name,
+			gi.get_class()])
+
+## Los materiales del mundo que la carga no vio. Cada uno se apunta una vez.
+func _buscar_sin_cargar(nodo: Node, nuevos: PackedStringArray) -> void:
+	for hijo in nodo.get_children():
+		_buscar_sin_cargar(hijo, nuevos)
+	var gi := nodo as GeometryInstance3D
+	if gi == null:
+		return
+	var con_instancias := gi is MultiMeshInstance3D or gi is CPUParticles3D \
+		or gi is GPUParticles3D
+	for de_la_pieza: Material in _materiales_de(gi):
+		var m := de_la_pieza
+		while m != null:
+			var clave := _clave_de_carga(m, con_instancias)
+			if not _carga_vistos.has(clave):
+				_carga_vistos[clave] = true
+				nuevos.append(_nombre_de_carga(m, con_instancias))
+			m = m.next_pass
+
+func _destapar() -> void:
+	for nodo: Variant in _carga_capas:
+		# Si alguien le ha puesto capas mientras tanto, manda lo que le ha puesto.
+		if is_instance_valid(nodo) and (nodo as GeometryInstance3D).layers == 0:
+			(nodo as GeometryInstance3D).layers = int(_carga_capas[nodo])
+	_carga_capas.clear()
+	_carga_pasos.clear()
+	# `_carga_vistos` se queda: con él, `_apuntar_tiron` sabe qué material ha
+	# aparecido después que el telón no compiló.
+	_cargando = false
+	# El fotograma más largo se cuenta desde aquí: los de la carga eran de compilar.
+	# También el reloj: `_medida` se llama DESPUÉS de esto en el mismo fotograma,
+	# y sin ponerlo a cero el último paso de la carga (medio segundo de compilar
+	# el halo del óculo) salía apuntado como un tirón «a los 0,0 s» de juego.
+	_med_pico = 0.0
+	_med_antes = 0
+	# Y lo que ya está a la vista al destapar no es «recién aparecido».
+	if _tirones:
+		_mirar_a_la_vista(mundo, false)
+	# El vigilante de la calidad, a empezar de cero: lo que ha visto hasta aquí
+	# eran fotogramas de compilar, no de dibujar.
+	_cal_espera = 3.0
+	_cal_t = 0.0
+	_cal_n = 0
+	_cal_sobrada = 0.0
+	if _telon != null:
+		_telon.abrir()
+		_telon = null
+		var segundos := float(Time.get_ticks_msec() - _carga_t0) / 1000.0
+		var texto := "carga: %d materiales en %.1f s" % [_carga_hechos, segundos]
+		if _web:
+			JavaScriptBridge.eval("window.__carga = '%s'; window.__carga_pasos = %s" % [
+				texto, JSON.stringify(_carga_apuntes)], true)
+		else:
+			print(texto)
+			for apunte in _carga_apuntes:
+				print("carga: ", apunte)
+		_carga_apuntes.clear()
+		# Y lo que tarde el primer fotograma ya destapado: si es largo, es que
+		# algo se ha quedado sin compilar detrás del telón.
+		_carga_destape = Time.get_ticks_msec()
+
+## EL TELÓN de la carga: tapa la mesa mientras se compila y dice por dónde va.
+## Se dibuja a mano y con la letra de reserva de Godot, que es la única que hay
+## seguro en un navegador.
+class Telon extends Control:
+	const FONDO := Color(0.027, 0.031, 0.047)
+	const HUESO := Color(0.93, 0.89, 0.80)
+	const ORO_VIEJO := Color(0.83, 0.64, 0.30)
+	var hechos := 0
+	var total := 1
+	var en_web := false
+	var _abierto := 0.0
+
+	## Se va en medio segundo y se quita solo.
+	func abrir() -> void:
+		set_process(true)
+
+	func _ready() -> void:
+		set_process(false)
+		resized.connect(queue_redraw)
+
+	func _process(delta: float) -> void:
+		# Con un tope: el fotograma en que se destapa puede ser largo.
+		_abierto += minf(delta, 0.05) * 2.0
+		if _abierto >= 1.0:
+			queue_free()
+			return
+		queue_redraw()
+
+	func _draw() -> void:
+		# Antes de tener tamaño no hay nada que pintar (y una letra de cuerpo
+		# cero es un error por la salida).
+		if size.y < 8.0:
+			return
+		var a := 1.0 - _abierto
+		draw_rect(Rect2(Vector2.ZERO, size), Color(FONDO, a))
+		var letra := ThemeDB.fallback_font
+		var centro := size * 0.5
+		var u := size.y / 540.0
+		_centrado(letra, "C R I P T A", centro + Vector2(0.0, -34.0 * u), int(40.0 * u),
+			Color(HUESO, a))
+		var ancho := 220.0 * u
+		var barra := Rect2(centro.x - ancho * 0.5, centro.y + 4.0 * u, ancho, 2.0 * u)
+		draw_rect(barra, Color(HUESO, 0.18 * a))
+		barra.size.x = ancho * clampf(float(hechos) / float(maxi(total, 1)), 0.0, 1.0)
+		draw_rect(barra, Color(ORO_VIEJO, a))
+		_centrado(letra, "PREPARANDO LA CRIPTA  ·  %d / %d" % [mini(hechos, total), total],
+			centro + Vector2(0.0, 30.0 * u), int(11.0 * u), Color(HUESO, 0.75 * a))
+		if en_web:
+			_centrado(letra, "LA PRIMERA VEZ TARDA  ·  LAS SIGUIENTES, NO",
+				centro + Vector2(0.0, 50.0 * u), int(9.0 * u), Color(HUESO, 0.45 * a))
+
+	func _centrado(letra: Font, texto: String, donde: Vector2, cuerpo: int, color: Color) -> void:
+		var ancho := letra.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1.0, cuerpo).x
+		draw_string(letra, donde - Vector2(ancho * 0.5, 0.0), texto,
+			HORIZONTAL_ALIGNMENT_LEFT, -1.0, cuerpo, color)
 
 # --------------------------------------------------------------------- marcador
 
 ## Todo el marcador es un solo nodo: `--sin-marcador` lo esconde entero.
 func _montar_marcador(capa: CanvasLayer) -> void:
 	marcador = Marcador.new()
-	marcador.web = _web
+	# Con `--como-web`, también la letra de reserva: es lo que hay en un navegador.
+	marcador.web = _web or _con_carga
 	marcador.falta_clic = _falta_clic
 	marcador.rotulo_campana = _rotulo_campana()
 	marcador.visible = not _sin_marcador
@@ -803,6 +1197,15 @@ func _leer_direccion() -> void:
 			_cal_auto = par[1] != "0"
 		elif par[0] == "medir":
 			_medir = par[1] != "0"
+		elif par[0] == "tirones":
+			_tirones = par[1] != "0"
+		elif par[0] == "carga":
+			# `?carga=0`: sin telón, todo de golpe, para medir cuánto se gana.
+			_con_carga = par[1] != "0"
+		elif par[0] == "ssao":
+			_ssao = par[1] != "0"
+		elif par[0] == "relleno":
+			_sin_relleno = par[1] == "0"
 		elif AJUSTES_CALIDAD["ALTA"].has(par[0]) and par[1].is_valid_float():
 			_cal_forzado[par[0]] = float(par[1])
 
@@ -889,6 +1292,9 @@ func _vigilar_calidad(delta: float) -> void:
 # ------------------------------------------------------------------------ física
 
 func _physics_process(delta: float) -> void:
+	# Detrás del telón de la carga no se juega: ni la física ni el reloj corren.
+	if _cargando:
+		return
 	var t0 := Time.get_ticks_usec()
 	_tiempo += delta
 	if _pide_bola:
@@ -1091,10 +1497,33 @@ func _pilotar(delta: float) -> Array:
 
 func _process(delta: float) -> void:
 	var t0 := Time.get_ticks_usec()
-	mundo.actualizar(delta)
+	if _carga_destape > 0:
+		var destape := "destape: %.2f s el primer fotograma a la vista" % [
+			float(Time.get_ticks_msec() - _carga_destape) / 1000.0]
+		_carga_destape = 0
+		if _web:
+			JavaScriptBridge.eval("window.__destape = '%s'" % destape, true)
+		elif _medir:
+			print(destape)
+	# Cargando, el mundo avanza a pasitos FIJOS de un sesentavo: cada fotograma
+	# dura lo que tarda en compilar un sombreador, y con el tiempo de verdad daría
+	# saltos de segundos. Parado del todo no puede estar: hay módulos que acaban
+	# de montarse en sus primeros cuadros (el suelo hornea sus atlas en el tercero
+	# y los copia en el sexto; el cielo del óculo espera a «arquitectura»), y eso
+	# tiene que pasar detrás del telón. Lo que creen en esos cuadros también se
+	# esconde y se compila: por eso se vuelve a recoger.
+	if _cargando:
+		mundo.actualizar(1.0 / 60.0)
+		if _carga_cuadros < 8:
+			_carga_cuadros += 1
+			_recoger_para_cargar(mundo)
+			_telon.total = _carga_pasos.size()
+	else:
+		mundo.actualizar(delta)
 	_refrescar_caza()
 	_refrescar_marcador()
-	_vigilar_calidad(delta)
+	if not _cargando:
+		_vigilar_calidad(delta)
 
 	var b := mesa.bola_en_peligro()
 	var p3 := mundo.posicion_bola(b)
@@ -1200,6 +1629,8 @@ func _process(delta: float) -> void:
 	camara_reflejo.fov = fov
 	camara_reflejo.look_at_from_position(
 		Vector3(pos.x, -pos.y, pos.z), Vector3(mira.x, -mira.y, mira.z), Vector3.UP)
+	if _cargando:
+		_avanzar_carga()
 
 	if _dir_capturas != "" and _tiempo > 2.0 + float(_capturas_hechas) * _cada \
 			and _capturas_hechas < _cuantas:
@@ -1271,11 +1702,27 @@ func _medida(delta: float, proceso: int) -> void:
 	_med_proceso += proceso
 	_med_n += 1
 	_med_t += delta
+	# El fotograma más largo del segundo: un sombreador que se compila jugando
+	# (algo que la carga por partes no vio) sale aquí como un pico suelto. Se
+	# mide con el reloj de verdad y no con `delta`: a paso fijo (lo que pone
+	# `godot3d.py` si no se le dice `--fps 0`) `delta` vale siempre un sesentavo.
+	var ahora := Time.get_ticks_usec()
+	if _med_antes > 0:
+		var cuadro := float(ahora - _med_antes) / 1.0e6
+		_med_pico = maxf(_med_pico, cuadro)
+		if cuadro > TIRON and _con_carga and not _cargando:
+			_apuntar_tiron(cuadro)
+	if _tirones and _con_carga and not _cargando:
+		_tir_recien = PackedStringArray()
+		_mirar_a_la_vista(mundo, true)
+		# Sin contar lo que tarda en mirar: no es del juego.
+		ahora = Time.get_ticks_usec()
+	_med_antes = ahora
 	if _med_t < 1.0:
 		return
 	var n := float(_med_n)
-	var texto := "fps %.1f · física %.2f ms · guion %.2f ms · dibujos %d · objetos %d · triángulos %d · %s %dx%d" % [
-		n / _med_t, float(_med_fisica) / 1000.0 / n, float(_med_proceso) / 1000.0 / n,
+	var texto := "fps %.1f · pico %d ms · física %.2f ms · guion %.2f ms · dibujos %d · objetos %d · triángulos %d · %s %dx%d" % [
+		n / _med_t, int(_med_pico * 1000.0), float(_med_fisica) / 1000.0 / n, float(_med_proceso) / 1000.0 / n,
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME),
 		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
@@ -1290,6 +1737,7 @@ func _medida(delta: float, proceso: int) -> void:
 	_med_proceso = 0
 	_med_n = 0
 	_med_t = 0.0
+	_med_pico = 0.0
 
 func _capturar(ruta: String) -> void:
 	var img := get_viewport().get_texture().get_image()

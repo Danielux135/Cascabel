@@ -205,7 +205,11 @@ func _ready() -> void:
 func _letra(nombres: PackedStringArray, peso: int, espacio: int, ejes: Dictionary,
 		rasgos: Dictionary = {}) -> FontVariation:
 	var s := SystemFont.new()
-	s.font_names = nombres
+	# En un navegador no hay fuentes del sistema: pedida con nombres o sin ellos,
+	# sale la de reserva de Godot. Sin nombres pasa lo mismo en escritorio, y así
+	# `-- --como-web` enseña el marcador tal como lo verá quien entre por la web.
+	if not web:
+		s.font_names = nombres
 	s.font_weight = peso
 	# Sin ajuste a la rejilla: Bahnschrift se pide condensada por su eje de
 	# anchura, y las instrucciones de ajuste son las de la anchura normal. Con
@@ -213,7 +217,9 @@ func _letra(nombres: PackedStringArray, peso: int, espacio: int, ejes: Dictionar
 	s.hinting = TextServer.HINTING_NONE
 	var f := FontVariation.new()
 	f.base_font = s
-	f.spacing_glyph = espacio
+	# La de reserva es más ancha que una condensada: con un punto menos de
+	# espaciado el renglón del consejo deja de meterse en los raíles de la mesa.
+	f.spacing_glyph = maxi(espacio - 1, 0) if web else espacio
 	var ts := TextServerManager.get_primary_interface()
 	if not ejes.is_empty():
 		var v := {}
@@ -498,7 +504,7 @@ func _dibujar_caza() -> void:
 func _dibujar_vista(lienzo: Vector2) -> void:
 	# Con la ayuda abierta, lo que ocupa la esquina es el panel: el aviso no
 	# puede pasar de su borde.
-	_vista_izq = lienzo.x - MARGEN - ANCHO_AYUDA if _ayuda else lienzo.x
+	_vista_izq = lienzo.x - MARGEN - _ancho_ayuda() if _ayuda else lienzo.x
 	if _ayuda or _vista_t > 2.6:
 		return
 	var a := clampf(_vista_t / 0.2, 0.0, 1.0) * clampf((2.6 - _vista_t) / 0.5, 0.0, 1.0)
@@ -706,10 +712,15 @@ func _dibujar_teclas(lienzo: Vector2) -> void:
 	var y := _y_sello(lienzo) + 50.0
 	var y0 := y
 	var ancho := 0.0
+	# La segunda columna empieza donde acaba la tecla más ancha: con la letra de
+	# reserva de la web, que no es condensada, «ESPACIO» llegaba hasta «LANZAR».
+	var columna := 54.0
+	for par: Array in TECLAS_CORTAS:
+		columna = maxf(columna, _ancho(_letra_rotulo, PEQ, str(par[0])) + 10.0)
 	for par: Array in TECLAS_CORTAS:
 		_texto(_letra_rotulo, PEQ, Vector2(x, y), str(par[0]),
 			Color(MARFIL.r, MARFIL.g, MARFIL.b, 0.8 * a))
-		ancho = maxf(ancho, 54.0 + _texto(_letra_rotulo, PEQ, Vector2(x + 54.0, y),
+		ancho = maxf(ancho, columna + _texto(_letra_rotulo, PEQ, Vector2(x + columna, y),
 			str(par[1]), Color(TENUE.r, TENUE.g, TENUE.b, 0.8 * a)))
 		y += 13.0
 	_penumbra(Rect2(x, y0 - 9.0, ancho, y - y0), 0.35 * a)
@@ -731,12 +742,17 @@ func _dibujar_clic(lienzo: Vector2) -> void:
 	_texto(_letra_nombre, MED, Vector2(lienzo.x * 0.5, r.position.y + 19.0), texto,
 		MARFIL.lerp(ORO, 0.25 * _pulso(4.0)), 2)
 
+## Con la letra de reserva de la web, que es más ancha, el renglón «BRASA ·
+## CALAVERA · ESPECTRO» tocaba el borde del panel: allí va un poco más ancho.
+func _ancho_ayuda() -> float:
+	return ANCHO_AYUDA + (22.0 if web else 0.0)
+
 ## LA AYUDA (H): un panel a la derecha, con su fondo, entre la esquina de arriba
 ## y los puntos. Las teclas, las cuentas, la cámara y la calidad.
 func _dibujar_ayuda(lienzo: Vector2) -> void:
 	if not _ayuda:
 		return
-	var ancho := ANCHO_AYUDA
+	var ancho := _ancho_ayuda()
 	var x1 := lienzo.x - MARGEN
 	var x0 := x1 - ancho
 	var y := ARRIBA + 8.0

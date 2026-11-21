@@ -1,4 +1,4 @@
-extends Node
+extends Control
 ## LA PUERTA DEL BUILD WEB DE LAS PRUEBAS 3D.
 ##
 ## El build «Web 3D» lleva las dos pruebas dentro, y esta escena es la que
@@ -17,6 +17,9 @@ extends Node
 ## CRIPTA depende de `prueba3d/` (la caza y las criaturas son las de ÓRBITA), así
 ## que no podía ir en un build aparte sin llevársela igual.
 ##
+## Antes de abrir la mesa pinta UN fotograma con su nombre: montar CRIPTA son
+## unos segundos de página parada, y sin esto serían unos segundos en negro.
+##
 ## En escritorio no se usa —el proyecto arranca en el juego—, pero se puede
 ## probar: `res://cripta3d/puerta_web.tscn -- --mesa=cripta`.
 
@@ -24,13 +27,46 @@ const MESAS := {
 	"orbita": "res://prueba3d/prueba_3d.tscn",
 	"cripta": "res://cripta3d/cripta_3d.tscn",
 }
+const ROTULOS := {"orbita": "Ó R B I T A", "cripta": "C R I P T A"}
 const POR_DEFECTO := "orbita"
 
+const FONDO := Color(0.027, 0.031, 0.047)
+const HUESO := Color(0.93, 0.89, 0.80)
+
+var _mesa := POR_DEFECTO
+
 func _ready() -> void:
-	var escena := elegir(_pedida())
-	# Diferido: cambiar de escena desde el `_ready` de la que está entrando es un
-	# error («parent node is busy»), y a la siguiente vuelta ya no lo es.
-	get_tree().change_scene_to_file.call_deferred(escena)
+	_mesa = clave(_pedida())
+	set_anchors_preset(Control.PRESET_FULL_RECT)
+	# El proyecto escala por enteros (es lo suyo para el pixelart del juego) y en
+	# una pestaña el rótulo saldría diminuto: lo mismo que hace cada mesa.
+	get_window().content_scale_stretch = Window.CONTENT_SCALE_STRETCH_FRACTIONAL
+	resized.connect(queue_redraw)
+	queue_redraw()
+	# Dos fotogramas: el primero dibuja el rótulo y el segundo lo enseña. Cambiar
+	# de escena desde el `_ready` de la que está entrando, además, es un error.
+	await get_tree().process_frame
+	await get_tree().process_frame
+	# Si la mesa pedida no abre, la de siempre: mejor ÓRBITA que el rótulo eterno.
+	if get_tree().change_scene_to_file(MESAS[_mesa]) != OK and _mesa != POR_DEFECTO:
+		get_tree().change_scene_to_file(MESAS[POR_DEFECTO])
+
+func _draw() -> void:
+	# El primer dibujo puede llegar antes de que la ventana le dé tamaño, y una
+	# letra de cuerpo cero es un error por la salida.
+	if size.y < 8.0:
+		return
+	draw_rect(Rect2(Vector2.ZERO, size), FONDO)
+	var letra := ThemeDB.fallback_font
+	var u := size.y / 540.0
+	_centrado(letra, ROTULOS[_mesa], size * 0.5 + Vector2(0.0, -34.0 * u), int(40.0 * u), HUESO)
+	_centrado(letra, "MONTANDO LA MESA", size * 0.5 + Vector2(0.0, 30.0 * u), int(11.0 * u),
+		Color(HUESO, 0.75))
+
+func _centrado(letra: Font, texto: String, donde: Vector2, cuerpo: int, color: Color) -> void:
+	var ancho := letra.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1.0, cuerpo).x
+	draw_string(letra, donde - Vector2(ancho * 0.5, 0.0), texto,
+		HORIZONTAL_ALIGNMENT_LEFT, -1.0, cuerpo, color)
 
 ## La mesa que se ha pedido, tal cual viene: por la dirección en web y por la
 ## línea de órdenes en escritorio. Vacío si no se ha pedido ninguna.
@@ -51,7 +87,8 @@ static func de_la_consulta(consulta: String) -> String:
 			return par[1]
 	return ""
 
-## La escena de la mesa pedida. Lo que no se conoce —o nada— es la de siempre:
-## un enlace mal escrito no deja a nadie delante de una página en negro.
-static func elegir(pedida: String) -> String:
-	return MESAS.get(pedida.strip_edges().to_lower(), MESAS[POR_DEFECTO])
+## La mesa pedida, o la de siempre si no se conoce: un enlace mal escrito no
+## deja a nadie delante de una página en negro.
+static func clave(pedida: String) -> String:
+	var limpia := pedida.strip_edges().to_lower()
+	return limpia if MESAS.has(limpia) else POR_DEFECTO

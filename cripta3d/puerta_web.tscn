@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://cripta3d/puerta_web.gd" id="1"]
 
-[node name="PuertaWeb" type="Node"]
+[node name="PuertaWeb" type="Control"]
 script = ExtResource("1")

@@ -12,7 +12,7 @@ config_version=5
 
 config/name="Cascabel"
 run/main_scene="res://render/mesa.tscn"
-run/main_scene.prueba3d="res://prueba3d/prueba_3d.tscn"
+run/main_scene.prueba3d="res://cripta3d/puerta_web.tscn"
 config/features=PackedStringArray("4.7", "GL Compatibility")
 config/icon="res://icon.svg"
 
