@@ -116,6 +116,68 @@ juntos al principio de `prueba3d/caza_orbita.gd`).
 - **3D-4. En el navegador, ¿va fluido?** Abajo a la izquierda dice en qué
   calidad está, y la G la cambia.
 
+### La segunda prueba: «CRIPTA» (`cripta3d/`), CONSTRUIDA Y REVISADA (21-nov)
+
+Daniel pidió otra prueba de gráficos «que le peguen a Cascabel», con la llama,
+la calavera y el espectro, y con Saltline como listón. Y soltó la mesa: *«la mesa
+de Cascabel original no tiene ningún diseño. Haz la mesa como creas conveniente…
+el diseño de la mesa siempre puede rehacerse»*. La mesa es «CRIPTA»: el esqueleto
+medido de ÓRBITA con el tema de los sprites del juego y piezas añadidas.
+
+**Todo vive en `cripta3d/` y su `LEEME.md` manda** (dirección de arte, contratos,
+cómo se lanza y se captura). La skill es `prueba-3d`. **Nada está commiteado.**
+
+    & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --path C:\dev\tilt-os-3d res://cripta3d/cripta_3d.tscn
+
+A/D palas, ESPACIO lanzar, C cámara, G calidad, H ayuda, T piloto, 1/2/3 quitar
+o poner cada criatura.
+
+- **Lo que hay:** la mesa con la mecánica entera de ÓRBITA más la CAMPANA MAYOR
+  (la barra de carga: mientras toca, todo vale doble), un segundo torno y un
+  banco de escudos; la cripta alrededor, de noche (ábside con óculo, bóveda,
+  osarios, pilares); las tres criaturas (BRASA, CALAVERA, ESPECTRO) con cuerpo
+  propio; un marcador sobrio en las cuatro esquinas (`marcador.gd`); y tres
+  calidades que se ven como la misma cripta.
+- **Medido:** bola media 12,0 s, 0 bolas paradas, la campana toca cada 1,7
+  bolas, caza determinista. Batería 647/647. En la GTX 1060 a 1080p, ~140 fps:
+  ALTA ~640 llamadas de dibujo y 620.000 triángulos; MEDIA ~450 y 344.000;
+  BAJA ~305 y 215.000 (antes de los arreglos, 2.000 y 2,2 M en ALTA).
+- **La nota, de críticos de fuera con el listón de Saltline: 5,5 → 7 → 7,5**
+  (arte, jugabilidad y técnica, las tres iguales). Doce agentes la construyeron,
+  uno por módulo; tres críticos la miraron entera (58 hallazgos); nueve
+  arreglos con decisiones de dirección; segunda mirada (30 cosas); remate de
+  siete; veredicto, y un último retoque de lo que el remate rompió. Las
+  decisiones que la llevaron del 5,5 al 7: la luna es un FOCO por el óculo SIN
+  sombra; la sala se cierra con una bóveda de una cara; es de noche; el fuego
+  tiene jerarquía; una sola piedra; presupuesto de peso; la calidad llega a
+  cada módulo. Lo que se aprendió está en la skill.
+- **Lo que la separa de un 9, según el veredicto** (por si se sigue): que el
+  fuego de los braseros del campo mande de verdad en la cámara rasante (hoy lo
+  primero que se ve es el rayo de luna y la calavera blanca); hierro negro de
+  verdad en palas y engranajes; la nave de la bóveda, que sigue casi negra; el
+  pie del campo, vacío entre las palas y la línea de latón; más atmósfera
+  (polvo y bruma en toda la sala) y sombra de contacto bajo cada pieza; y que
+  ninguna criatura se atraviese nunca con otra ni con un raíl.
+- **Una excepción consciente:** las palas son la lágrima del sprite y su goma
+  visible se aparta hasta +2/−3 px de lo que choca (una cápsula de radio 8).
+  Está escrito en `LEEME.md` y en `mundo/piezas.gd`. Se deshace si molesta.
+- **Sin hacer:** no se ha probado en el navegador (cae en la fuente de Godot y
+  arranca en MEDIA; falta medir fps con gráfica integrada); nadie lo ha JUGADO
+  con las manos; Forward+ no es vía de entrega (tarda 4 min en compilar); el
+  filtrado anisótropo quitaría las rayas de los cantos a ras, pero es un ajuste
+  de `project.godot` y no se ha tocado.
+- **La gira** (`cripta3d/herramientas/gira.py <carpeta fuera del repo>`) saca
+  siempre las mismas vistas: es como se compara un antes con un después.
+- **Hugging Face:** el conector no ejecuta Spaces. Con el token de Daniel en su
+  variable `HF_TOKEN` salen dos mallas al día (TRELLIS.2): hechas la calavera y
+  una mano; quedaría la gárgola si se quiere (hoy son metabolas).
+- **Que prueben Daniel y Fátima** (vale cualquiera de los dos): ¿este es el
+  nivel?; ¿se lee siempre la bola, también arriba y entre los raíles?; ¿las
+  tres criaturas son las del juego?; ¿la sala de noche se ve o es negro en
+  vuestra pantalla?; ¿se entiende la campana sin leer el marcador?; ¿la punta
+  de la pala engaña al golpear?; ¿el espectro apartado de otra criatura engaña
+  al apuntar?; el tacto de la cámara de juego (se acerca cuando la bola baja).
+
 ## JUGARLO EN EL NAVEGADOR (19-oct)
 
 Daniel quiere que un amigo pruebe el juego desde un enlace. **Hecho: los seis
