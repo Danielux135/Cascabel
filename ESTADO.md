@@ -116,7 +116,7 @@ juntos al principio de `prueba3d/caza_orbita.gd`).
 - **3D-4. En el navegador, ¿va fluido?** Abajo a la izquierda dice en qué
   calidad está, y la G la cambia.
 
-### La segunda prueba: «CRIPTA» (`cripta3d/`), CONSTRUIDA Y REVISADA (21-nov)
+### La segunda prueba: «CRIPTA» (`cripta3d/`), CONSTRUIDA, REVISADA Y PUBLICADA (22-nov)
 
 Daniel pidió otra prueba de gráficos «que le peguen a Cascabel», con la llama,
 la calavera y el espectro, y con Saltline como listón. Y soltó la mesa: *«la mesa
@@ -125,12 +125,29 @@ el diseño de la mesa siempre puede rehacerse»*. La mesa es «CRIPTA»: el esqu
 medido de ÓRBITA con el tema de los sprites del juego y piezas añadidas.
 
 **Todo vive en `cripta3d/` y su `LEEME.md` manda** (dirección de arte, contratos,
-cómo se lanza y se captura). La skill es `prueba-3d`. **Nada está commiteado.**
+cómo se lanza y se captura). La skill es `prueba-3d`. Está commiteada y subida
+en `prueba-3d`.
+
+**PUBLICADA en https://danielux.es/cascabel-3d/?mesa=cripta.** Es la misma
+página de ÓRBITA: sin `?mesa=`, la dirección de siempre sigue abriendo ÓRBITA.
+Se publica igual (Actions → "Publicar la prueba 3D" en `Danielux135/cascabel-3d`).
 
     & "C:\Users\Daniel\Desktop\Godot\Godot_v4.7.1-stable_win64_console.exe" --path C:\dev\tilt-os-3d res://cripta3d/cripta_3d.tscn
 
 A/D palas, ESPACIO lanzar, C cámara, G calidad, H ayuda, T piloto, 1/2/3 quitar
-o poner cada criatura.
+o poner cada criatura. Con `-- --como-web --calidad=media` detrás se ve en
+escritorio lo mismo que en el navegador.
+
+- **EN LA WEB (22-nov), y lo que costó:** en un navegador de Windows los
+  sombreadores se compilan por Direct3D y CRIPTA tardaba **197 s** con la página
+  congelada. Ahora son **unos 40 s detrás de un telón con barra** (y 10 en la
+  segunda visita). Para eso: casi todos los sombreadores reescritos (la luz de
+  Godot por píxel solo queda en la piedra y el suelo), una carga por partes, y
+  **en web no hay sombras arrojadas** (el fuego del campo alumbra el doble para
+  compensar). Medido en Chrome contra lo publicado, con otro juego abierto en el
+  equipo: se juega a los 72 s la primera vez (7 de bajar, 13,5 de arranque con
+  el logo de Godot, 51 de telón) y a los 17 la segunda. Todo en `WEB.md`
+  («CRIPTA EN LA WEB») y las trampas, en la skill.
 
 - **Lo que hay:** la mesa con la mecánica entera de ÓRBITA más la CAMPANA MAYOR
   (la barra de carga: mientras toca, todo vale doble), un segundo torno y un
@@ -161,11 +178,15 @@ o poner cada criatura.
 - **Una excepción consciente:** las palas son la lágrima del sprite y su goma
   visible se aparta hasta +2/−3 px de lo que choca (una cápsula de radio 8).
   Está escrito en `LEEME.md` y en `mundo/piezas.gd`. Se deshace si molesta.
-- **Sin hacer:** no se ha probado en el navegador (cae en la fuente de Godot y
-  arranca en MEDIA; falta medir fps con gráfica integrada); nadie lo ha JUGADO
-  con las manos; Forward+ no es vía de entrega (tarda 4 min en compilar); el
-  filtrado anisótropo quitaría las rayas de los cantos a ras, pero es un ajuste
-  de `project.godot` y no se ha tocado.
+- **Sin hacer:** nadie lo ha JUGADO con las manos, tampoco en el navegador;
+  falta medir los fotogramas por segundo en web con el equipo libre, en una
+  gráfica integrada y en otro navegador (solo Chrome sin ventana); la receta que
+  publica no arranca CRIPTA antes de subirla (habría que editarla, y el `gh` de
+  este equipo no tiene permiso para tocar workflows); Forward+ no es vía de
+  entrega (tarda 4 min en compilar); el filtrado anisótropo quitaría las rayas
+  de los cantos a ras, pero es un ajuste de `project.godot` y no se ha tocado.
+  La oclusión de pantalla (SSAO) existe en Compatibility desde la 4.6 y está
+  puesta de prueba, apagada: `-- --ssao`, o `?ssao=1` en la página.
 - **La gira** (`cripta3d/herramientas/gira.py <carpeta fuera del repo>`) saca
   siempre las mismas vistas: es como se compara un antes con un después.
 - **Hugging Face:** el conector no ejecuta Spaces. Con el token de Daniel en su
@@ -177,6 +198,11 @@ o poner cada criatura.
   vuestra pantalla?; ¿se entiende la campana sin leer el marcador?; ¿la punta
   de la pala engaña al golpear?; ¿el espectro apartado de otra criatura engaña
   al apuntar?; el tacto de la cámara de juego (se acerca cuando la bola baja).
+  **Y en el navegador:** ¿se aguanta la espera de la primera vez (el logo de
+  Godot parado y luego el telón)?; **en web no hay sombras: ¿se echan de menos
+  las de las lápidas y las piezas del campo?** (si sí, se pueden devolver solo
+  en ALTA, al precio de un parón al subir de calidad); ¿va fluido en vuestro
+  equipo? (la G cambia la calidad, y arriba a la derecha dice cuál queda).
 
 ## JUGARLO EN EL NAVEGADOR (19-oct)
 

@@ -104,8 +104,16 @@ El proyecto es `gl_compatibility` y la web solo puede eso (WebGL2; en 4.7 no
 hay WebGPU). **Un aspecto que solo existe en Forward+ no puede ir a la web**,
 así que lo que se enseña se construye para Compatibility.
 
-- Compatibility **NO tiene** SSAO, SSIL, SSR, SDFGI, VoxelGI, niebla
-  volumétrica, profundidad de campo, decals ni buffer de normales.
+- Compatibility **NO tiene** SSIL, SSR, SDFGI, VoxelGI, niebla volumétrica,
+  profundidad de campo, decals ni buffer de normales, y dibuja en 8 bits por
+  canal (sin HDR: el tramado contra las bandas se lo pone uno).
+- **SÍ TIENE OCLUSIÓN DE PANTALLA (SSAO) desde Godot 4.6**, y esta skill decía
+  que no. Es una versión sencilla, sin pasada de desenfoque. Comprobado el
+  21-nov-2026 en 4.7.1 con OpenGL: con `Environment.ssao_enabled` (radio 0,45,
+  intensidad 1,6, potencia 1,3) sale la sombra de contacto en la base de los
+  braseros y entre los dientes de los engranajes, y la luminancia media de la
+  toma baja un 2 %. En CRIPTA es un interruptor de prueba (`-- --ssao`,
+  `?ssao=1`), no va puesta: cambia el aspecto aprobado. Sin medir en web.
 - **SÍ tiene**: brillo (glow), curva de tono, ajustes de color, niebla de
   profundidad y de altura, sombras (direccional, omni y foco), MSAA, sondas de
   reflexión, cielo con radiancia, y leer la pantalla y la profundidad desde un
@@ -121,6 +129,147 @@ así que lo que se enseña se construye para Compatibility.
 - **Forward+ tarda más de 240 s en compilar** los sombreadores de CRIPTA en
   D3D12 y `godot3d.py` lo mata (código 124) tras una o dos capturas. No es la
   vía de entrega: el proyecto y la web son Compatibility.
+
+## El navegador compila por Direct3D: se mide con ANGLE
+
+En un navegador de Windows, WebGL pasa por ANGLE: el GLSL se traduce a HLSL y lo
+compila Direct3D (FXC), cien veces más lento que el OpenGL de escritorio. Con el
+OpenGL de siempre NO SE VE: todo compila en milésimas y la caché lo tapa. Medido
+el 21-nov-2026 (GTX 1060, i5-6600K): la primera lanzada de CRIPTA con ANGLE,
+**212 s**; la segunda, con la caché caliente, 15. Eran 197 s de compilar: una
+página congelada más de tres minutos en la primera visita.
+
+- **El Godot de escritorio trae ANGLE dentro**: `--rendering-driver
+  opengl3_angle` es el mismo traductor que usa Chrome. Lo que tarda ahí es lo
+  que tardará el navegador, y se mide sin exportar nada.
+- **EN FRÍO sin tocar la caché de verdad**: `APPDATA=<carpeta vacía> python
+  cripta3d/herramientas/godot3d.py …`. Godot guarda la caché de sombreadores en
+  `%APPDATA%\Godot\app_userdata\Cascabel\shader_cache`, al lado del guardado del
+  juego (no se borra a mano); con otra `APPDATA`, usa otra. Esa caché, además,
+  crece sin fin: en cuatro días de trabajo, 628 MB.
+- **EL BANCO** (`cripta3d/banco_sombreadores.tscn`, su cabecera lo cuenta todo):
+  lo que tarda en compilar cada sombreador, uno a uno, siempre en frío.
+  `--solo=texto` filtra, `--fichero=ruta` mide uno suelto de fuera del repo,
+  `--patrones` mide el sombreador vacío con cada modo.
+- **LO QUE CUESTA LA PARTE DE GODOT** (un sombreador vacío): con luz **5,6 s**;
+  `specular_disabled` 2,9; `vertex_lighting` **0,86**; `unshaded` **0,33**;
+  escribir `CLEARCOAT`, 9,2. `diffuse_lambert`, `shadows_disabled` o
+  `fog_disabled` por sí solos no ahorran nada.
+- **POR QUÉ** (`drivers/gles3/shader_gles3.cpp`, `_initialize_version`): la
+  primera vez que se usa un sombreador Godot compila CUATRO variantes «por
+  defecto» (color, color con instancias y las dos de profundidad) con TODOS los
+  tipos de luz dentro, también las luces de ÁREA nuevas de la 4.7, que son las
+  caras. En una escena sin lightmaps no las usa nunca. Luego compila la de
+  verdad, que es barata (la de la piedra, 0,8 s). La luz por vértice no lleva
+  luces de área: por eso baja a 0,86.
+- **EL CÓDIGO PROPIO SE PAGA TRES A CINCO VECES**, una por variante. Un ruido
+  de valor con ocho `hash`, un `fbm`, unas celdas con triple bucle: Direct3D lo
+  despliega todo. La calavera, hecha entera de ruido por código, eran 34,5 s.
+  El ruido se LEE de las texturas de la casa.
+- **UNA SOLA VARIANTE DE VERDAD POR SOMBREADOR.** Godot compila un programa por
+  cada combinación de luces que le toca a una malla (`DISABLE_LIGHT_OMNI`,
+  `DISABLE_LIGHT_SPOT`) y otro si el entorno de su cámara aplica la curva de
+  tono dentro del sombreador (`APPLY_TONEMAPPING`: pasa cuando no lleva ni
+  brillo ni ajustes, como el del reflejo). En web el núcleo pone dos luces de
+  relleno que alcanzan todo y no alumbran, y le enciende al entorno del reflejo
+  unos ajustes neutros (`MundoCripta._unificar_variantes`).
+- **UNA LUZ CON SOMBRA ES OTRA PASADA POR MATERIAL** (la aditiva): en web,
+  ninguna, en ninguna calidad. ÓRBITA lo paga: 10,7 s de parón cuando el
+  vigilante sube a ALTA.
+- **Y UNA LUZ CON SOMBRA ALUMBRA MÁS QUE LA MISMA SIN ELLA.** Esa pasada aparte
+  se SUMA sobre la imagen ya en sRGB, y la pasada de siempre suma en lineal. Al
+  quitarle la sombra al fuego del campo (MEDIA, BAJA y la web) los braseros
+  bajaban de 75 a 61 de luminancia y el charco cálido del suelo casi se
+  apagaba. Pasaba en MEDIA de escritorio desde el primer día y nadie lo midió:
+  lo vio un crítico comparando la web con el escritorio. Ese fuego lleva ahora
+  el doble de energía cuando no tiene sombra (`entorno.gd`, `SIN_SOMBRA_POR`,
+  con su tabla). «Las tres calidades se ven igual» se comprueba con las mismas
+  tomas en las tres, no se da por hecho.
+- **LA CARGA POR PARTES** (`cripta_3d.gd`, `_preparar_carga`): la mesa se monta
+  tapada y delante de la cámara se pone, uno por fotograma, un cuadradito con
+  cada material del mundo —también los de lo que está escondido esperando su
+  momento, que es lo que luego daría un tirón jugando—. Un telón dice por cuál
+  va. Vale porque en web cada sombreador tiene una sola variante. Con
+  `--medir` escribe lo que tarda cada material, y «destape» dice lo que tarda
+  el primer fotograma a la vista: si no son centésimas, algo se ha quedado sin
+  compilar.
+- **UN TIRÓN JUGANDO SE BUSCA CON `--medir --tirones`**, en frío y por ANGLE:
+  cada fotograma de más de 60 ms sale apuntado con su segundo, con los
+  materiales que hay en el mundo y la carga no compiló, y con las piezas que se
+  vieron por primera vez en él. Tres minutos de piloto y de guion de caza:
+  ningún material sin cargar. *Ojo al leerlo:* el reloj de la medida se pone a
+  cero al destapar; sin eso, el último paso de la carga salía como un tirón de
+  medio segundo «a los 0,0 s». Y con otro juego abierto en el equipo salen
+  fotogramas sueltos de 60 a 200 ms que no se repiten: se mide dos veces.
+- **AL PASAR ALGO A LUZ POR VÉRTICE** (`vertex_lighting`): la normal retocada
+  en `fragment` deja de influir en la luz directa (lo que se «tallaba» en la
+  normal se lleva al color); Godot NO voltea la normal en las caras de atrás
+  con `cull_disabled`, y `diffuse_lambert_wrap` recorta N·L a cero antes de
+  sumar, así que lo que se veía de espaldas sale más claro (la onda de un golpe
+  salía al doble); y un `ALBEDO` que se escala, se escala EN LINEAL (Godot lo
+  pasa de sRGB a lineal: multiplicar el sRGB por 2,2 lo multiplica por 6). Una
+  malla con luz por vértice tiene que estar partida: la bruma, que era un plano
+  de cuatro vértices, va ahora en rejilla de medio metro.
+- **LO QUE TIENE QUE SEGUIR CON LA LUZ POR PÍXEL** (la piedra y el suelo) lleva
+  `specular_disabled` y la `light()` de `cripta3d/materiales/luz_godot.gdshaderinc`,
+  que es la del motor copiada a mano. Así las variantes por defecto se quedan
+  sin el especular de las luces de área y el programa baja un 35 % (la piedra,
+  de 8,8 a 5,7 s) viéndose IGUAL: catorce tomas fijas, diferencia media de 0,00
+  a 0,28 sobre 255, lo mismo que entre dos lanzadas del mismo código.
+- **EN COMPATIBILITY EL DIFUSO POR DEFECTO ES LAMBERT, NO BURLEY.** La
+  documentación dice Burley, pero en `scene.glsl` un sombreador sin
+  `diffuse_burley` cae en el `#else`, que es Lambert. La primera versión de esa
+  `light()` copió Burley y toda la piedra salió un 2,8 % más clara: lo cazó la
+  comparación de tomas fijas, no el ojo.
+- **PARA COMPARAR UN CAMBIO QUE NO DEBERÍA VERSE:** tomas fijas en los primeros
+  cuatro segundos (después la simulación se separa de una lanzada a otra), el
+  mismo código DOS veces para saber cuánto ruido hay, y luego el cambio contra
+  eso. Con las ocho primeras tomas el ruido es 0,00–0,22 de media.
+- **JUNTAR SOMBREADORES AHORRA 0,33 s POR PIEZA.** Dos piezas con el mismo
+  `render_mode` pueden ser un sombreador con un `uniform` que elige rama (la
+  onda y el polvo, el núcleo y la llama). Y el vértice también se compila:
+  mover `VERTEX` con algo de cuenta son de 0,1 a 0,4 s por sombreador.
+- **«EL ASPECTO NO CAMBIA» LO DICE UN CRÍTICO DE FUERA, NO QUIEN REESCRIBE.**
+  Los seis agentes que abarataron sombreadores informaron de que no se veía
+  nada. Tres críticos, con la gira de antes y la de después lado a lado
+  (`comparar.py giras`), encontraron nueve cosas, y una había que arreglarla
+  (la bóveda de la calavera, sin grietas y con manchas). Lo que enseñaron los
+  arreglos:
+  - **Una luz pintada a mano se calibra en UN sitio y sirve en varios.** El
+    ascua de los braseros de la sala salía encendida como la del campo. La
+    costra lleva ahora el peso de luz de su zona, con los mismos cortes que el
+    reparto del fuego (`ascua.gdshader`, `sitio_peso`).
+  - **Un brillo estrecho no pinta ni un píxel en una pieza pequeña.** Con
+    exponente 260 en una bombilla de 30 px, la normal gira 3,8° por píxel y el
+    lóbulo mide 2°: cero píxeles. Lóbulo más ancho, y brillo por encima de 1 y
+    recortado, como hace el GGX.
+  - **«Es un 1 % de la luz» no dice nada si el albedo es 0,01.** El especular
+    se compara con el difuso de ESA piel: en la gelatina del espectro pesaba lo
+    mismo, y en el filo, cincuenta veces más.
+  - **Con `vertex_lighting`, la rugosidad de las luces se escribe en
+    `vertex()`.** Si no, vale 1,0 (la de `fragment` no llega) y el brillo
+    desaparece. Y no es GGX: es un Blinn de exponente (1,2 − r)⁵·2000. Un GGX
+    de 0,55 se parece a ese Blinn con 0,80.
+  - **Al copiar a mano la atenuación de un foco, el exponente del cono es
+    `1 / spot_angle_attenuation`.** Al derecho daba casi el doble de luz.
+  - **Las luces de una criatura con luz propia se eligen por su DIFUSA**, no
+    por `light_specular`: una que alumbra mucho y brilla poco se quedaba fuera.
+    Y las dos de relleno (energía 0,0001) se descartan.
+  - **Una textura de marcas guarda la DISTANCIA a la raya, no la raya.**
+    Pintada y leída con mipmap, la grieta salía a puntos sueltos. Con la
+    distancia, `textureLod` 0 y `fwidth`, sale continua y nunca de menos de un
+    píxel.
+- **LA GIRA «COMO EN LA WEB»:** `gira.py <carpeta> --con=--como-web
+  --con=--calidad=media` saca las mismas tomas de siempre con lo que se
+  publica (sin sombras, calidad media, letra de reserva).
+- **Desde Git Bash, `--solo=/mundo/…` se convierte en una ruta de Windows** y
+  no casa con nada: sin la barra del principio, o con `MSYS_NO_PATHCONV=1`.
+- **`-- --como-web`** ensaya en escritorio lo que solo pasa en web: el telón, las
+  luces de relleno, ninguna sombra y la letra de reserva en el marcador.
+- **Un Chrome sin ventana** (`WEB.md`) mide la página publicada. Si corre a la
+  vez que un Godot le falsea la medida: que espere su turno con el mismo candado.
+- **El listón**: ÓRBITA, publicada, tarda 55 s en arrancar en frío en este
+  equipo, con un parón de 40 s seguidos sin una palabra.
 
 ## Lo que costó en CRIPTA (21-nov-2026)
 
@@ -238,9 +387,69 @@ así que lo que se enseña se construye para Compatibility.
 - De un GLB generado se aprovecha la FORMA; el material se le pone aquí, con la
   biblioteca, para que no desentone.
 
-## La referencia de calidad
+## La referencia de calidad: Saltline, diseccionado (21-nov-2026)
 
-Saltline (three.js, todo por código): el aspecto sale de materiales con
-detalle procedural, luz baja y cálida a través de neblina, suelo mojado que
-refleja, y etalonaje. ÓRBITA se quedaba corta justo ahí: superficies planas que
-emiten luz y bichos hechos de esferas.
+Saltline es un FPS de navegador en three.js r180 que hizo un modelo (Claude
+Fable 5.2) de una sentada; la página lleva dentro esa versión sin retocar. **No
+carga ni un modelo ni una textura: todo es código.** Lo que explica su aspecto,
+por orden de peso, y si se puede en Godot web (leído en su código):
+
+1. **UNA luz dominante** (un sol a 13°, a contraluz) y el entorno sacado del
+   mismo cielo. *Se puede: es dirección de arte.* En CRIPTA mandan a medias el
+   fuego y la luna.
+2. **La cadena de imagen:** curva de tono de cine, TONO PARTIDO (sombras
+   verdeazuladas, altas cálidas), curva en S, negros levantados, viñeta, grano
+   y tramado. *Se puede, en el sombreador de pantalla.* CRIPTA no tiene tono
+   partido.
+3. **Mojado según hacia dónde mira cada cara** (charco arriba, regueros en
+   vertical, salpicadura junto al suelo). *Se puede.* CRIPTA solo moja el suelo.
+4. **Texturas generadas UNA vez al arrancar** (27 programas de ruido que dan
+   color, rugosidad, metal y relieve), a escala real en metros y con un modelo
+   de daño común: desconchones por zonas, la mayor parte del panel limpia. *Se
+   puede:* es la regla de «el ruido se lee, no se calcula».
+5. **Variación en espacio de mundo:** nada se repite igual a cinco metros.
+6. **Modelos con MEDIDAS REALES y bisel por defecto** (la primitiva es una caja
+   achaflanada de 12 mm), perfiles barridos, tornos y extrusiones con bisel;
+   sin booleanas ni escultura. Lo que se modela es el objeto de verdad con sus
+   piezas pequeñas (un contenedor con sus esquineros, sus barras de cierre y su
+   matrícula). *Se puede.* Antes de modelar: la ficha técnica de la pieza.
+7. **La historia, en los vértices:** polvo que sube del suelo, regueros de
+   óxido, cantos gastados por curvatura, oclusión horneada.
+8. **Niebla volumétrica que lee el mapa de sombras.** *NO en Compatibility:*
+   aquí los rayos son mallas.
+9. **Sombras suaves de penumbra variable** y oclusión de pantalla que solo
+   oscurece lo que no da el sol. *Las sombras no; la oclusión sí desde 4.6.*
+10. **Reflejos y suciedad de lente** (se puede, en pantalla), **exposición
+    automática y búfer HDR** (no).
+
+Y **fusiona las mallas por material**: de 233 a 433 llamadas de dibujo con 1,7 a
+2,9 millones de triángulos. CRIPTA: 640 llamadas con 630.000.
+
+**El método que deja ver su código es el de la casa:** un agente por módulo con
+respaldo si falla, un banco de capturas por URL (cada módulo solo, cámara fija,
+determinista), los valores de dirección de arte juntos en un objeto, y
+comentarios que dicen la intención.
+
+**three.js NO se libra de Direct3D.** Medido en este equipo con un Chrome sin
+ventana: Saltline tarda entre 64 y 70 s en enseñar su primera imagen en frío
+(con un parón de 40 s seguidos) y no va fluido hasta los 86 s. ÓRBITA, 55 s.
+Cambiar de motor no arregla el arranque; solo daría lo que Godot web no dibuja
+(puntos 8 a 10).
+
+**Lo que dice la evidencia de fuera** (informe del 21-nov-2026):
+
+- Los equipos pequeños que se ven de estudio deciden LA LUZ primero y se ponen
+  pocas reglas. Con números: luz principal contra relleno de 4:1 a 8:1; albedo
+  de lo que no es metal entre 30–50 y 240 en sRGB (el negro nunca es 0: el
+  hierro de forja es un dieléctrico oscuro, hacia 40, no un metal a negro);
+  metálico 0 o 1; bisel con normales ponderadas en todo canto.
+- **Que el modelo juzgue su propio render casi no mejora nada** (3DCodeBench,
+  jun-2026); lo que sube la nota es que mire OTRO. Los dos fallos típicos de un
+  modelo en Blender: la API de versiones viejas y las piezas flotantes.
+- Para un pinball: el VPX Lightmapper hornea en Blender una base y un mapa de
+  luz por grupo de bombillas, y en juego los suma. El `LightmapGI` de Godot no
+  se puede hornear por script: el horneado va por Blender (Cycles).
+- Recursos CC0 con API: Poly Haven y ambientCG (dan 403 al `User-Agent` por
+  defecto de Python: hay que poner uno propio). HDRI para una cripta:
+  `sepulchral_chapel_basement`. No se encontró ninguna calavera escaneada ni
+  ningún sonido de campana con CC0 comprobado.

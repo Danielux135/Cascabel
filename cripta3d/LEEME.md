@@ -22,6 +22,13 @@ nada de `sim/`, `render/`, `tests/`, `assets/`, `data/` ni `prueba3d/`.
     # LA GIRA: las vistas de siempre, para comparar antes y después (juego, piezas, sala, criaturas)
     python cripta3d/herramientas/gira.py C:/ruta piezas sala
 
+    # UN CAMBIO QUE NO DEBERÍA VERSE (reescribir un sombreador, por ejemplo): catorce tomas fijas,
+    # dos veces con el código de antes para saber el ruido, una con el cambio, y a comparar con números
+    python cripta3d/herramientas/gira.py C:/ruta/antes fijas
+    python cripta3d/herramientas/comparar.py tomas C:/ruta/antes/fijas C:/ruta/despues/fijas C:/ruta/diferencias.png
+    # y dos giras enteras lado a lado, para los ojos
+    python cripta3d/herramientas/comparar.py giras C:/ruta/gira_antes C:/ruta/gira_despues C:/ruta/comparacion
+
     # varias cámaras en UNA lanzada (una por captura) y sucesos forzados a su hora
     python cripta3d/herramientas/godot3d.py escena res://cripta3d/cripta_3d.tscn --fotogramas 500 -- --capturas=C:/ruta --sin-marcador --cada=1.6 --toma=1.6,0.9,10.4/1.6,1.5,7.42/45 --toma=4.2,1.5,7.9/3.22,0.34,6.56/40 --guion=2.6:0:armar,3.0:0:tocar,3.3:0:platillo
 
@@ -47,6 +54,43 @@ dibujo y triángulos, un renglón por segundo.
 **Lo visual se mira, no se deduce.** Nadie da por bueno nada sin haber abierto
 la captura. Y las capturas NO se dejan dentro del repo: van a la carpeta
 temporal que se le diga a cada uno.
+
+## En el navegador
+
+Publicada en **https://danielux.es/cascabel-3d/?mesa=cripta** (sin `?mesa=`, la
+página sigue abriendo ÓRBITA). El build es el mismo «Web 3D» de siempre y
+arranca en `puerta_web.tscn`, que lee la dirección y abre la mesa pedida. Cómo
+se publica está en `WEB.md`.
+
+    # ENSAYAR en escritorio lo que solo pasa en web: el telón de carga, las luces
+    # de relleno, ninguna sombra y la letra de reserva en el marcador
+    python cripta3d/herramientas/godot3d.py escena res://cripta3d/cripta_3d.tscn --fotogramas 600 -- --como-web --medir
+
+    # lo que tardará un navegador de Windows en COMPILAR los sombreadores: el mismo
+    # traductor que Chrome (ANGLE) y una carpeta de usuario vacía, para que sea en frío
+    APPDATA=C:/ruta/vacia python cripta3d/herramientas/godot3d.py escena res://cripta3d/cripta_3d.tscn --fps 0 --fotogramas 2600 --tiempo 900 --lineas 200 --rendering-driver opengl3_angle -- --como-web --medir --demo
+
+    # EL BANCO: lo que tarda en compilar cada sombreador, uno a uno (--solo=texto filtra)
+    python cripta3d/herramientas/godot3d.py escena res://cripta3d/banco_sombreadores.tscn --fotogramas 600 --tiempo 1200 --lineas 90 --rendering-driver opengl3_angle
+
+**En un navegador un sombreador no es gratis.** WebGL en Windows compila por
+Direct3D y cada sombreador con la luz de Godot son segundos (la medida y el
+porqué están en la skill `prueba-3d` y en la cabecera de
+`banco_sombreadores.gd`). Tres reglas salen de ahí, y valen para lo que se
+añada:
+
+- **Con la luz entera de Godot solo van la piedra (`superficie`) y el suelo.**
+  Lo demás, `unshaded` (con su luz propia si la necesita) o `vertex_lighting`.
+- **Ni bucles ni ruido por código en un `fragment`:** el ruido se lee de las
+  texturas de la casa, y lo que no depende de la cámara ni del tiempo se hornea
+  una vez.
+- **Un sombreador nuevo se mide con el banco antes de darlo por bueno**, y
+  después se mira la carga entera: con `--medir`, «carga» dice lo que ha tardado
+  cada material detrás del telón, «destape» lo que tarda el primer fotograma a
+  la vista (centésimas, o algo se ha quedado sin compilar) y «pico» el
+  fotograma más largo de cada segundo jugando. Si jugando un fotograma pasa de
+  60 ms, «tirón» dice cuándo y qué material había en el mundo que la carga no
+  compiló; con `--tirones`, además, qué pieza se vio por primera vez en él.
 
 ## La mesa
 
@@ -201,7 +245,9 @@ que leer en 40 píxeles: silueta, color y ojos. La cámara mira desde arriba.
 
 | Fichero | Qué |
 |---|---|
-| `cripta_3d.tscn/.gd` | la escena: física, reglas, cámaras, piloto, capturas, calidad |
+| `cripta_3d.tscn/.gd` | la escena: física, reglas, cámaras, piloto, capturas, calidad y, en web, la carga por partes detrás de un telón |
+| `puerta_web.tscn/.gd` | la escena con la que arranca el build web: lee `?mesa=` y abre ÓRBITA o CRIPTA |
+| `banco_sombreadores.tscn/.gd` | mide lo que tarda en compilar cada sombreador (con ANGLE, lo que tardará un navegador) |
 | `marcador.gd` | el marcador entero (un `Control`): la escena le dice QUÉ pasa y él decide cómo se enseña |
 | `mesa_cripta.gd` | la mesa (hereda de `mesa_orbita.gd`) |
 | `mundo_cripta.gd` | el NÚCLEO del mundo: alturas, utilidades, carga los módulos, la caza |
@@ -217,7 +263,7 @@ que leer en 40 píxeles: silueta, color y ojos. La cámara mira desde arriba.
 | `criaturas/*.gd` | los cuerpos |
 | `blender/*.py` → `modelos/*.glb` | lo que se modela se genera por guion: el guion va al repo |
 | `texturas/` | texturas generadas (ruido, etc.) |
-| `herramientas/` | `godot3d.py` (lanzar sin ventana), `blender3d.py`, `hoja.py`, `gira.py` |
+| `herramientas/` | `godot3d.py` (lanzar sin ventana), `blender3d.py`, `hoja.py`, `gira.py`, `comparar.py` (el antes y el después, con números) |
 | `visor.tscn` | una criatura o un `.glb` solos, estado por estado |
 | `criaturas/*_banco.tscn`, `mundo/bola_prueba.tscn`, `materiales/muestrario.tscn` | bancos de prueba de quien hizo cada cosa: no los carga el juego. Su cabecera dice cómo se lanzan |
 | `sonda_cripta.gd`, `sonda_caza_cripta.gd`, `materiales/sonda_biblioteca.gd` | medidas (bola media, campana, caza determinista, la biblioteca): no fallan, informan |

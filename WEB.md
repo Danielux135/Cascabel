@@ -6,8 +6,9 @@ build se ha jugado en un navegador. Falta medir el rendimiento con el navegador
 a la vista y OÍRLO.
 
 **Y desde el 13-nov hay una segunda página, https://danielux.es/cascabel-3d/**,
-con la prueba 3D de la rama `prueba-3d`. No es el juego y no comparte nada con
-esta publicación: tiene su sección al final.
+con las pruebas 3D de la rama `prueba-3d`: ÓRBITA y, desde el 21-nov, CRIPTA
+(`?mesa=cripta`). No es el juego y no comparte nada con esta publicación: tienen
+sus secciones al final.
 
 ## Cómo se publica
 
@@ -315,3 +316,119 @@ Tres avisos, y los tres costaron una vuelta:
 - **Oírla y jugarla a mano** en el navegador.
 - **Otros navegadores y otros equipos.** Solo Chrome, y solo en este portátil.
 - Los sonidos de la caza son los del juego; no hay ninguno nuevo.
+
+## CRIPTA EN LA WEB (21-nov)
+
+**Publicada en https://danielux.es/cascabel-3d/?mesa=cripta.** Es la segunda
+prueba 3D (`cripta3d/`). La dirección sin `?mesa=` sigue abriendo ÓRBITA: quien
+tenía el enlace ve lo de siempre.
+
+### Una página, dos mesas
+
+El build «Web 3D» lleva las dos pruebas (CRIPTA usa la caza y las criaturas de
+`prueba3d/`, así que no podía ir sola) y ya no arranca en ÓRBITA sino en **la
+puerta**, `cripta3d/puerta_web.tscn` (`run/main_scene.prueba3d`): lee `?mesa=`
+de la dirección, pinta un fotograma con el nombre de la mesa y la abre. Lo que
+no conoce, o nada, es ÓRBITA. Los demás mandos se juntan con `&`:
+`?mesa=cripta&calidad=alta`, `?mesa=cripta&medir=1`, `?mesa=cripta&carga=0`
+(sin telón, para medir lo que se gana con él).
+
+**La receta que publica no se ha tocado** (`Danielux135/cascabel-3d`,
+`publicar.yml`): sigue bajando la rama `prueba-3d`, pasando la batería,
+arrancando ÓRBITA sin ventana y exportando «Web 3D». O sea que **no arranca
+CRIPTA antes de publicar**: eso se hace aquí a mano
+(`godot --headless --path . res://cripta3d/cripta_3d.tscn --quit-after 600`).
+Para que lo hiciera ella habría que editar esa receta, y el `gh` de este equipo
+no tiene permiso para tocar workflows.
+
+### EN UN NAVEGADOR, COMPILAR UN SOMBREADOR CUESTA SEGUNDOS
+
+Es lo que no se veía desde el escritorio y lo que más ha costado. WebGL en
+Windows pasa por ANGLE: el GLSL se traduce a HLSL y lo compila Direct3D, cien
+veces más lento que el OpenGL de escritorio. Y en una página no hay caché de
+Godot: lo paga cada visitante nuevo, con el lienzo congelado.
+
+- **Se mide sin exportar:** el Godot de escritorio trae ANGLE
+  (`--rendering-driver opengl3_angle`), y con `APPDATA` apuntando a una carpeta
+  vacía arranca en frío sin tocar la caché de verdad. La primera lanzada de
+  CRIPTA tardó así 212 s; la segunda, 15. **Eran 197 s de compilar.**
+- **El porqué** (leído en el código de Godot 4.7): la primera vez que se usa un
+  sombreador se compilan cuatro variantes «por defecto» con todos los tipos de
+  luz dentro —también las luces de área nuevas, que son las caras— y que una
+  escena sin lightmaps no usa nunca. Un sombreador VACÍO con luz son 5,6 s; sin
+  especular, 2,9; con luz por vértice, 0,9; sin luz, 0,3. Y el código propio se
+  paga tres a cinco veces, una por variante.
+- **Lo que se hizo:** con la luz entera de Godot solo quedan la piedra y el
+  suelo; lo demás pasó a luz por vértice, a luz propia o a no llevarla. El
+  ruido por código (la calavera eran 34,5 s ella sola) se lee ahora de
+  texturas. Cada malla usa UNA variante (dos luces de relleno que alcanzan todo
+  y no alumbran, y el entorno del reflejo igualado al principal). En web no hay
+  ninguna luz con sombra, en ninguna calidad. Y la mesa se monta detrás de un
+  telón que compila un material por fotograma y dice por cuál va.
+- **Con lo que queda:** la mesa entera, en frío y por ANGLE en el equipo de
+  Daniel, pasa de **197 s de parón a unos 40 s detrás del telón** (38,8 s con el
+  equipo libre; con otro juego abierto al lado, de 47 a 51). Son 41 pasos y solo
+  dos son largos: la piedra (5,7 s) y el suelo (4,6 s); ningún otro pasa de 2 s.
+  El primer fotograma a la vista tarda 0,06 s. Jugando tres minutos en frío con
+  todos los sucesos forzados no aparece ningún material sin compilar
+  (`--medir --tirones`): los fotogramas largos que quedan son sueltos, de 60 a
+  200 ms, y no se repiten de una lanzada a otra.
+- **«El aspecto no cambia» hubo que comprobarlo desde fuera.** Los agentes que
+  reescribieron los sombreadores informaron de que no se veía nada. Tres
+  críticos, con la gira de antes y la de después lado a lado, encontraron nueve
+  diferencias (la bóveda de la calavera sin grietas, el espectro mate, las
+  bombillas «de plástico», el carbón de la sala encendido…). Se arreglaron sin
+  volver a encarecer la compilación; lo que enseñó cada una está en la skill.
+
+El detalle, las medidas de cada modo y las herramientas (`banco_sombreadores`,
+`-- --como-web`, `--medir`) están en la skill `prueba-3d` y en
+`cripta3d/LEEME.md`.
+
+**ÓRBITA tiene el mismo problema y nadie lo había medido:** publicada, tarda
+55 s en arrancar en frío en el equipo de Daniel (GTX 1060, i5-6600K), con un
+parón de 40 s seguidos sin una palabra y otro de 10,7 s cuando el vigilante
+sube a ALTA y aparece la luz con sombra. No se ha tocado.
+
+### Mirado en un navegador
+
+Con el Chrome sin ventana de siempre (`cdp.mjs`), en el equipo de Daniel (GTX
+1060, i5-6600K) y contra la página publicada. **Ojo con las cifras: esa noche
+había otro juego abierto en el equipo**, que le quitaba procesador y gráfica;
+la misma carga medida en escritorio por ANGLE salía entre un 20 y un 30 % más
+lenta que con el equipo libre.
+
+- **Lo que se baja:** el motor, 9,8 MB (el mismo de antes), y el paquete, que
+  pasa de 1,4 a **7,4 MB** al llevar las dos mesas.
+- **Primera visita: se juega a los 72 s.** 7 s de bajar; **13,5 s con la
+  página parada en el logo de Godot** (arrancar el motor y montar la mesa: ahí
+  no hay telón todavía); y 51 s de telón, con su barra y su «30 / 41». Los dos
+  pasos largos, 9,2 y 7,8 s. Después, ni un parón: en el minuto y medio que se
+  miró jugando, solo dos fotogramas pasan de un cuarto de segundo (0,39 y
+  0,29 s).
+- **Segunda visita: se juega a los 17 s.** El navegador guarda los programas
+  compilados: el telón dura 10 s (cada paso, entre 0,15 y 0,75 s) y el arranque
+  del motor, 4,5.
+- **ÓRBITA, por la puerta, sigue abriendo** en la dirección de siempre, con su
+  parón de 41,6 s de antes: no se ha tocado.
+- **Lo que no vale de esta medida: los fotogramas por segundo.** Con la gráfica
+  compartida con el otro juego salían 28–35 en MEDIA y 60–75 en BAJA, y el
+  vigilante iba y venía entre las dos. En escritorio por ANGLE, con el equipo
+  libre, MEDIA va a 55. Hay que repetirlo con el equipo libre.
+
+**Cómo se midió y qué falló por el camino:** `medir_publicado.sh` lanza tres
+visitas (CRIPTA con perfil nuevo, CRIPTA otra vez con ese perfil, y la dirección
+de siempre). En la primera, el bucle que pregunta cada segundo se quedó
+esperando las fotos —con la página parada compilando, una foto tarda lo que dure
+el parón— y sacó 5 muestras en 150 s; la línea de tiempo se reconstruyó con la
+lista de huecos del hilo principal, que sí va apuntada dentro de la página. Las
+fotos ya no se esperan. Y la página apunta ahora sus hitos en `window.__hitos`
+(«puerta», «escena», «montada», «carga», «juego», en milisegundos desde que se
+pidió), para no tener que deducirlos.
+
+### Lo que falta de CRIPTA en web
+
+- **Jugarla a mano y oírla** en el navegador.
+- **Otros navegadores y una gráfica integrada.** Solo Chrome sin ventana, en un
+  equipo con GTX 1060: ahí el navegador usa la gráfica buena. En un portátil
+  dibujará con la integrada y el vigilante la bajará de calidad; no está medido.
+- **La letra del marcador es la de reserva de Godot**, como en ÓRBITA.
