@@ -447,7 +447,7 @@ func _ready() -> void:
 	camara_reflejo = Camera3D.new()
 	camara_reflejo.near = 0.1
 	camara_reflejo.far = 200.0
-	camara_reflejo.cull_mask = 1
+	camara_reflejo.cull_mask = 1 | MundoCripta.CAPA_A_SU_SOMBRA
 	camara_reflejo.environment = mundo.entorno_reflejo
 	vp_reflejo.add_child(camara_reflejo)
 	camara_reflejo.current = true
@@ -1637,7 +1637,8 @@ func _process(delta: float) -> void:
 	# que las ven pequeñas y desde arriba, se lo ahorra.
 	var de_cerca: bool = libre \
 		or (VISTAS[vista] != "SEGUIMIENTO" and VISTAS[vista] != "CENITAL")
-	camara_reflejo.cull_mask = 1 | (MundoCripta.CAPA_DETALLE if de_cerca else 0)
+	camara_reflejo.cull_mask = 1 | MundoCripta.CAPA_A_SU_SOMBRA \
+		| (MundoCripta.CAPA_DETALLE if de_cerca else 0)
 	camara_reflejo.fov = fov
 	camara_reflejo.look_at_from_position(
 		Vector3(pos.x, -pos.y, pos.z), Vector3(mira.x, -mira.y, mira.z), Vector3.UP)

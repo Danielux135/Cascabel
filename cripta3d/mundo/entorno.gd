@@ -192,6 +192,8 @@ const MULT_SALA := 0.3
 ##   palas         47,2   46,1   46,6    47,2    47,8
 ## Por 2 cae en medio de todas. `-- --sin-sombra-por=N` lo cambia para medir.
 const SIN_SOMBRA_POR := 2.0
+## Las capas de dibujo que alumbra una luz si no se le dice otra cosa: todas.
+const TODAS_LAS_CAPAS := 0xFFFFFFFF
 ## Media anchura de lo que es CAMPO, desde el eje x = 2. Las bandas van de 0,2 a
 ## 3,8 (1,8): lo que queda más afuera es albardilla.
 const MEDIO_CAMPO := 1.7
@@ -229,6 +231,9 @@ var _oculo_hecho := false
 ## Por cuánto se multiplica el fuego del campo que llevaría la sombra cuando no
 ## la lleva (MEDIA, BAJA y la web). Ver `_repartir_fuego`.
 var _sin_sombra_por := SIN_SOMBRA_POR
+## Si el fuego sin sombra deja de alumbrar a la campana (ver `_repartir_fuego`).
+## `-- --campana-al-fuego` lo quita, para volver a medirlo.
+var _campana_a_su_sombra := true
 var _agitacion := 0.0
 var _avivado := 0.0
 
@@ -240,6 +245,8 @@ func montar(mundo: Node3D) -> void:
 		elif arg.begins_with("--sin-sombra-por="):
 			# Para volver a medir la compensación del fuego sin sombra.
 			_sin_sombra_por = float(arg.trim_prefix("--sin-sombra-por="))
+		elif arg == "--campana-al-fuego":
+			_campana_a_su_sombra = false
 	_montar_ambiente()
 	_montar_luna()
 	_montar_rayos()
@@ -827,7 +834,8 @@ func _repartir_fuego() -> void:
 			ficha["energia_propia"] = float(ficha.get("energia", 1.0))
 		var propia: float = ficha["energia_propia"]
 		var zona := _peso_zona(luz.global_position)
-		ficha["energia"] = propia * zona		# Un fuego de la sala, a un cuarto pero con más alcance: con el suyo (2,3)
+		ficha["energia"] = propia * zona
+		# Un fuego de la sala, a un cuarto pero con más alcance: con el suyo (2,3)
 		# y un cuarto de la energía no llegaba ni al suelo de alrededor, y el
 		# brasero ardía sobre negro. Así deja un corro tenue y ancho.
 		if zona <= MULT_SALA and luz.omni_range < ALCANCE_SALA:
@@ -836,6 +844,7 @@ func _repartir_fuego() -> void:
 		if is_equal_approx(zona, MULT_ALBARDILLA):
 			luz.omni_attenuation = ATENUACION_ALBARDILLA
 		luz.shadow_enabled = false
+		luz.light_cull_mask = TODAS_LAS_CAPAS
 		# La sombra, para el fuego del campo que más alumbra cerca del centro.
 		if _del_campo(luz.global_position):
 			var d := Vector2(luz.global_position.x - 2.0, luz.global_position.z - 9.4).length()
@@ -866,3 +875,18 @@ func _repartir_fuego() -> void:
 		# a ese fuego la energía que pierde, para que el charco sea el mismo en
 		# las tres calidades y en la web. Las sombras de las lápidas no vuelven.
 		mejor_ficha["energia"] = float(mejor_ficha["energia"]) * _sin_sombra_por
+		# Y A LA CAMPANA, ESE FUEGO NO LA ALUMBRA. En ALTA la campana hace sombra y
+		# se tapa a sí misma con su boca: del fuego de debajo no le llega casi nada,
+		# y es un bronce viejo y oscuro. Sin sombra le llegaba entero, y doble: en
+		# la web salía un 28 % más clara (su caja, de 26,0 a 33,4 de luminancia) y
+		# con una raya naranja en el labio de cada moldura. Lo vio la tercera ronda
+		# de críticos, y lo aisló: pasaba igual en MEDIA de escritorio. La campana
+		# va en su capa (`Nucleo.CAPA_A_SU_SOMBRA`) y aquí se le quita a esta luz.
+		# Medido en la toma del ábside (la caja del cuerpo de la campana / la de su
+		# yugo): ALTA 27,3 / 10,4; web antes 39,1 / 41,4; web así 32,0 / 9,1. Las
+		# demás tomas fijas no se mueven (0,00–0,21), y ALTA tampoco (0,00).
+		# *Lo que se pierde:* el interior de la boca, que en ALTA el fuego alumbra
+		# desde abajo y aquí queda oscuro. Solo se ve mirando la campana desde
+		# debajo y de cerca; desde las cámaras de juego no.
+		if _campana_a_su_sombra:
+			mejor.light_cull_mask = TODAS_LAS_CAPAS & ~Nucleo.CAPA_A_SU_SOMBRA

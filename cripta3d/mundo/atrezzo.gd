@@ -331,8 +331,10 @@ func montar(mundo: Node3D) -> void:
 	_cera = _material_cera()
 	# Al reflejo solo va lo grande del ábside que se reconoce en el suelo
 	# mojado: la campana (cae a media mesa en el reflejo). Las llamas no: ver
-	# `_montar_llamas`.
-	_capa = 1
+	# `_montar_llamas`. Va en SU capa y no en la 1: se refleja igual, pero el
+	# fuego del campo no la alumbra cuando no lleva sombra, que es lo que pasa en
+	# ALTA, donde se tapa con su propia boca (`Nucleo.CAPA_A_SU_SOMBRA`).
+	_capa = Nucleo.CAPA_A_SU_SOMBRA
 	_montar_campana()
 	_capa = Nucleo.CAPA_SIN_REFLEJO
 	_montar_antorchas()
@@ -1421,7 +1423,7 @@ func _contar_en(gi: GeometryInstance3D, cuenta: Dictionary, gordas: Array[String
 	cuenta["tri"] = int(cuenta["tri"]) + tri
 	if gi.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
 		cuenta["sombra"] = int(cuenta["sombra"]) + tri
-	if (gi.layers & 1) != 0:
+	if (gi.layers & (1 | Nucleo.CAPA_A_SU_SOMBRA)) != 0:
 		cuenta["reflejo"] = int(cuenta["reflejo"]) + tri
 	if tri >= 3000:
 		var nombre := "?"

@@ -6,7 +6,14 @@ shader_type spatial;
 // por vértice, y para que la luz de un fuego cercano no se interpole a lo largo
 // de un plano de 0,8 de lado con solo cuatro esquinas, `calavera.gd` lo
 // subdivide (16 × 16). La sombra se sigue mirando por píxel.
-render_mode blend_mix, depth_draw_never, cull_back, vertex_lighting;
+// Y SIN ESPECULAR, como antes (22-nov-2026). Al pasar a luz por vértice se cayó
+// el `specular_disabled`, y con luz por vértice la rugosidad de las luces se lee
+// en `vertex()` y, si no se escribe, vale 1,0: un Blinn ancho de 0,04 de f0 que
+// a un negro de 0,004 de albedo le suma tres veces su propia difusa. El charco y
+// la fosa de la que sale la calavera salían grises: en c2_v5_01, caja
+// (800, 600)–(860, 680), luminancia 22,7 en la gira 5 y 44,4 en la 7 (crítica de
+// la gira 7). Con luz por vértice no cuesta nada (0,84 s contra 0,86).
+render_mode blend_mix, depth_draw_never, cull_back, vertex_lighting, specular_disabled;
 
 // CRIPTA — lo que la calavera lleva pintado en el suelo. En ÓRBITA era un aro de
 // neón; aquí es TIZA sobre la losa, como el cerco de un conjuro, y recibe la luz
@@ -64,8 +71,13 @@ void fragment() {
 	// pendiente 1,15 coinciden el 5 % y el 25 % de los dos). Probado y descartado:
 	// una lectura a 0,5 teselas (la tiza salía lisa) y otra a 0,45 (los hoyos del
 	// grano, a esa escala, mordían la raya a bocados y no a motas).
-	float g = 0.5 + ((texture(tex_grano, (p + semilla) * 1.2).r - 0.671) * 0.55
-		+ (texture(tex_grano, (p + semilla) * 2.4 + vec2(0.37, 0.61)).r - 0.671) * 0.45) * 1.15;
+	// SIN MIPMAP (`textureLod` 0, 22-nov-2026): el de antes se calculaba en cada
+	// píxel, sin filtrar. Leído con mipmap, la losa vista de lejos y sesgada
+	// promediaba la octava fina, el grano se quedaba en su media y la tiza salía
+	// lisa, «más pintura que tiza», con menos mordiscos y el borde blando
+	// (crítica de la gira 7, c2_02).
+	float g = 0.5 + ((textureLod(tex_grano, (p + semilla) * 1.2, 0.0).r - 0.671) * 0.55
+		+ (textureLod(tex_grano, (p + semilla) * 2.4 + vec2(0.37, 0.61), 0.0).r - 0.671) * 0.45) * 1.15;
 
 	// --- El arco del frente -----------------------------------------------------
 	float hacia = dot(u, normalize(direccion));

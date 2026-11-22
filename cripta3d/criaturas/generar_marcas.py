@@ -34,16 +34,21 @@ LOS CUATRO CANALES:
      (F2 − F1, la de antes) entre `RANGO_GRIETA`. El sombreador saca de ella la
      raya (de un píxel como mínimo, ver `grietas()`) y el cerco de mugre de
      alrededor, 1 − smoothstep(0,02, 0,10, F2 − F1) en celdas de 1/8,5.
-     Las celdas, LAS DE ANTES: 4×4 por tesela, de 1/8,5. (Las celdas 3D de antes,
-     cortadas por la superficie, cubrían más —la raya el 1,9 % y el cerco el 22 %,
-     contra el 1,3 % y el 15 % en 2D—, y hubo celdas 1,5 veces más menudas para
-     igualarlo; pero salían rayas cortas, una red de cuadritos, y la crítica de la
-     gira 6 pidió las de la gira 5: «largas y ramificadas». Lo que falta de
-     cobertura lo pone el parche, más abierto en la bóveda.)
+     Las celdas: 5×5 por tesela, de 1/10,6 (22-nov-2026). Las de antes eran de
+     1/8,5, pero en 3D: la bóveda, que es una cúpula, atraviesa celdas a distintas
+     alturas y en cada trozo corta otra, así que la red que se veía en la gira 5
+     tenía casi el doble de polígonos que un Voronoi 2D de las mismas celdas
+     (contado sobre una bóveda de mentira, `arreglos3_calavera/pruebas/esfera.py`:
+     12–13 contra 6–7). Con 4 por tesela la crítica de la gira 7 vio «menos líneas,
+     concentradas en un nudo en Y»; con 6, tramos gordos y negros donde el
+     temblor aprieta el dominio. Con 5, 9–10 polígonos, y la raya no engorda.
+     La distancia se sigue guardando EN CELDAS DE ANTES (1/8,5), para que la raya
+     y el cerco del sombreador midan lo mismo en el hueso.
   A  el PORO oscuro: motas sueltas, en la misma tesela que las grietas. Antes,
-     smoothstep(0,78, 0,95) de un ruido de valor 3D a 330 por unidad; aquí, un
-     ruido 3D igual cortado por un plano oblicuo (ver `poro()`), algo más menudo:
-     así las motas salen con canto duro y esquinas, como antes, y no redondas.
+     smoothstep(0,78, 0,95) de un ruido de valor 3D a 330 por unidad; aquí, EL
+     MISMO ruido (330 por unidad, los mismos umbrales) cortado por una superficie
+     ondulada (ver `poro()`): así las motas salen rayitas con esquinas, como
+     antes, y no puntitos redondos.
 
 POR QUÉ NO SALEN DE `ruido_celdas.png`: su canal A guarda la raíz de la
 distancia a la grieta SIN signo, a 11 celdas por tesela. Entre dos texeles la
@@ -77,9 +82,11 @@ Z0, Z1 = -0.1855, 0.0645
 RANGO = 0.0065
 
 # --- Grietas y poro: tesela periódica ------------------------------------------
-# La tesela mide lo que cuatro celdas de antes (8,5 por unidad), y las lleva.
+# La tesela mide lo que cuatro celdas de antes (8,5 por unidad), y lleva cinco
+# (ver «B» arriba).
 TESELA_GRIETA = 4.0 / 8.5         # 0,4706 unidades: no cambiar sin el sombreador
-CELDAS = 4
+CELDAS = 5
+CELDAS_ANTES = 4
 # B guarda la distancia a la grieta hasta aquí (en F2 − F1 de celda): donde
 # acaba el cerco de mugre, 0,10 como antes.
 RANGO_GRIETA = 0.10               # no cambiar sin el sombreador
@@ -176,11 +183,12 @@ def grietas():
     # ruido periódico, para que la raya no sea una recta de regla.
     k = F(2.0 * np.pi / CELDAS)
     # Las ondas, de 0,36 a 0,8 de celda (con más vueltas por celda la raya se
-    # rizaba en bucles y bolas negras, que las de antes no tenían).
-    tu = (np.sin(u * k * 5 + 1.3) * 0.5 + np.sin(v * k * 7 + 4.1) * 0.3
-          + np.sin((u + v) * k * 11 + 2.2) * 0.2).astype(np.float32)
-    tv = (np.sin(v * k * 5 + 5.7) * 0.5 + np.sin(u * k * 9 + 0.6) * 0.3
-          + np.sin((u - v) * k * 11 + 3.9) * 0.2).astype(np.float32)
+    # rizaba en bucles y bolas negras, que las de antes no tenían). Las de cuatro
+    # celdas por tesela (5, 7, 9 y 11 vueltas), en proporción a las cinco.
+    tu = (np.sin(u * k * 6 + 1.3) * 0.5 + np.sin(v * k * 9 + 4.1) * 0.3
+          + np.sin((u + v) * k * 14 + 2.2) * 0.2).astype(np.float32)
+    tv = (np.sin(v * k * 6 + 5.7) * 0.5 + np.sin(u * k * 11 + 0.6) * 0.3
+          + np.sin((u - v) * k * 14 + 3.9) * 0.2).astype(np.float32)
     u = u + tu * F(0.07)
     v = v + tv * F(0.07)
     iu = np.floor(u).astype(np.int64)
@@ -197,7 +205,8 @@ def grietas():
             d = ru * ru + rv * rv
             d2 = np.where(d < d1, d1, np.minimum(d2, d))
             d1 = np.minimum(d1, d)
-    celda = np.sqrt(d2) - np.sqrt(d1)
+    # En celdas DE ANTES (1/8,5): la raya y el cerco miden lo mismo en el hueso.
+    celda = (np.sqrt(d2) - np.sqrt(d1)) * F(CELDAS_ANTES / CELDAS)
     # LA DISTANCIA, NO LA RAYA (21-nov-2026, tras la crítica de la gira 6). Aquí
     # se guardaba ya la raya pintada, a la mitad de ancho y promediada; filtrada
     # (mipmap, triplanar) se quedaba en una fila de puntos claros y oscuros
@@ -241,13 +250,18 @@ def poro():
     u y v con un número entero de ondas por tesela (así la tesela P × P se
     repite sin costura): la inclinación va de 0 a unos 40° y cambia de un sitio a
     otro, como en el hueso de antes.
-    MÁS MENUDO QUE ANTES: 220 casillas por tesela, 470 por unidad del hueso y no
-    330, con los umbrales algo más bajos (0,77–0,94). Con las 330 de antes y sus
-    umbrales salían la mitad de motas que en la gira 5, y más gordas (en c2_02,
-    238 grupos de 6,5 píxeles contra 350 de 2,6): el corte de antes, casi
-    rasante en lo alto de la bóveda, partía cada mota en astillas.
+    EL TAMAÑO DE ANTES: 155 casillas por tesela, 330 por unidad del hueso, y los
+    umbrales de antes (0,78–0,95). Hubo 470 por unidad (0,77–0,94) para que
+    salieran tantas motas como en la gira 5, y la crítica de la gira 7 lo vio:
+    «el poro de la gira 5 son rayitas angulosas de largo variable y el de ahora
+    son puntitos más pequeños y redondos». A 470 la casilla mide 4,6 texeles y
+    los brazos de la estrella del ruido de valor (las rayitas) no caben: queda el
+    centro, redondo. A 330 caben, y sobre una bóveda de mentira pintada como la
+    gira 5 (`arreglos3_calavera/pruebas/esfera.py`) salen las mismas rayitas, eles
+    y cruces. Probado y descartado: la superficie tres veces más inclinada (todas
+    las motas salen estiradas hacia el mismo lado, como pelos).
     """
-    P = 220
+    P = 155
     rng = np.random.default_rng(3301)
     red = rng.random((P, P, P)).astype(np.float32)
     c = (np.arange(TAM, dtype=np.float32) + F(0.5)) / F(TAM) * F(P)
@@ -256,7 +270,7 @@ def poro():
     z = (F(9.0) * np.sin(u * k * 2 + 1.1) + F(9.0) * np.sin(v * k * 3 + 0.4)
          + F(6.0) * np.sin((u + v) * k * 2 + 2.6) + F(5.0) * np.sin((u - v) * k * 3 + 4.4))
     q = np.stack([u, v, z.astype(np.float32) + F(P / 2)], axis=-1)
-    return suave(0.77, 0.94, ruido3_periodico(q, red))
+    return suave(0.78, 0.95, ruido3_periodico(q, red))
 
 
 def ficha():

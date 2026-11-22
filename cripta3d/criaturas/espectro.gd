@@ -1014,6 +1014,13 @@ func _poner_luz() -> void:
 				_luces.append(l)
 	var p := global_transform * _centro_local()
 	var en_cuerpo: Array = []
+	# La sal (ver `espectro_sal.gdshader`) se pinta a mano el brillo de estas
+	# mismas luces, pero las mide en SU centro, en la losa, y no en el del cuerpo,
+	# que flota y se aparta de su cerco. (En las tomas de la gira da lo mismo que
+	# medirlas en el cuerpo, ±0,1 niveles; en la CPU no cuesta nada y no depende
+	# de dónde ande el cuerpo.)
+	var q := _sal.global_position if _sal != null else p
+	var en_sal: Array = []
 	for x in _luces:
 		if not is_instance_valid(x) or x == _luz:
 			continue
@@ -1036,6 +1043,7 @@ func _poner_luz() -> void:
 		if l is DirectionalLight3D:
 			var z := l.global_basis.z.normalized()
 			en_cuerpo.append([col.get_luminance(), Vector4(z.x, z.y, z.z, aparte), col, brillo])
+			en_sal.append([col.get_luminance(), Vector4(z.x, z.y, z.z, aparte), col, brillo])
 			continue
 		brillo *= 2.0
 		var at := _atenuacion(l, p)
@@ -1043,6 +1051,11 @@ func _poner_luz() -> void:
 			var hacia := (l.global_position - p).normalized()
 			en_cuerpo.append([(col * at).get_luminance(), Vector4(hacia.x, hacia.y, hacia.z, aparte),
 				col * at, brillo])
+		var at_sal := _atenuacion(l, q)
+		if at_sal > 0.0:
+			var hacia_sal := (l.global_position - q).normalized()
+			en_sal.append([(col * at_sal).get_luminance(),
+				Vector4(hacia_sal.x, hacia_sal.y, hacia_sal.z, aparte), col * at_sal, brillo])
 	en_cuerpo.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) > float(b[0]))
 	var dirs := PackedVector4Array()
 	var cols := PackedVector4Array()
@@ -1061,6 +1074,21 @@ func _poner_luz() -> void:
 		m.set_shader_parameter("luz_dir", dirs)
 		m.set_shader_parameter("luz_col", cols)
 		m.set_shader_parameter("luz_ambiente", amb)
+	# La sal: sus cuatro luces más fuertes, medidas en la losa. Sin ambiente, que
+	# ese ya se lo pone Godot (la sal es `vertex_lighting`, no `unshaded`).
+	if _mat_sal != null:
+		en_sal.sort_custom(func(a: Array, b: Array) -> bool: return float(a[0]) > float(b[0]))
+		var sal_dirs := PackedVector4Array()
+		var sal_cols := PackedVector4Array()
+		for i in mini(en_sal.size(), LUCES_PROPIAS):
+			var k: Color = en_sal[i][2]
+			sal_dirs.append(en_sal[i][1])
+			sal_cols.append(Vector4(k.r, k.g, k.b, float(en_sal[i][3])))
+		while sal_dirs.size() < LUCES_PROPIAS:
+			sal_dirs.append(Vector4(0.0, 1.0, 0.0, 0.0))
+			sal_cols.append(Vector4.ZERO)
+		_mat_sal.set_shader_parameter("luz_dir", sal_dirs)
+		_mat_sal.set_shader_parameter("luz_col", sal_cols)
 
 
 ## Lo que llega de una omni o un foco al punto `p` (0 si no llega): la

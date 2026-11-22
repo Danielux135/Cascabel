@@ -30,6 +30,7 @@ extends Node3D
 ##   E, H_PARED, H_ALTA, H_TUNEL          las medidas de la mesa
 ##   Y_SALA, Y_BOVEDA                     el suelo de la nave y por dónde cierra la bóveda
 ##   CAPA_BAJO_SUELO, CAPA_SIN_REFLEJO, CAPA_DETALLE   las capas de dibujo del reflejo
+##   CAPA_A_SU_SOMBRA                     la de la campana (el fuego sin sombra no la alumbra)
 ##
 ##   poner_calidad(n)           la escena la cambia; llama a `calidad(n)` de cada
 ##                              módulo y de cada cuerpo que la tenga
@@ -92,9 +93,17 @@ const Y_BOVEDA := 7.0
 ##                    unas treinta millonésimas de segundo, y el reflejo las repite
 ##   CAPA_DETALLE     lo menudo de las criaturas. El reflejo solo lo mira en las
 ##                    cámaras de cerca (`cripta_3d.gd`)
+##   CAPA_A_SU_SOMBRA lo que en ALTA queda a la sombra de SÍ MISMO frente al fuego
+##                    del campo: la campana, que cuelga encima y se tapa con su
+##                    propia boca. Se refleja igual que la capa 1. Cuando ese
+##                    fuego no lleva sombra (MEDIA, BAJA y la web) no la alumbra:
+##                    «entorno» le quita esta capa a esa luz (`_repartir_fuego`).
+##                    Sin esto la campana en reposo salía un 28 % más clara y con
+##                    una raya naranja en cada moldura (tercera mirada, 22-nov-2026)
 const CAPA_BAJO_SUELO := 2
 const CAPA_SIN_REFLEJO := 4
 const CAPA_DETALLE := 8
+const CAPA_A_SU_SOMBRA := 16
 
 ## El orden importa: el entorno va primero (los demás piden fuegos), el suelo
 ## antes que lo que se le pone encima, y los efectos al final.

@@ -129,9 +129,10 @@ const vec2 SUTURA_DESDE = vec2(-0.125, -0.1855);
 const vec2 SUTURA_MIDE = vec2(0.25, 0.25);
 // La distancia a la sutura va guardada hasta 0,0065 (donde acaba el cerco).
 const float SUTURA_RANGO = 0.0065;
-// Lo que mide la tesela de grietas y poro: 4 celdas de 1/8,5, las de antes.
+// Lo que mide la tesela de grietas y poro: 4 celdas de 1/8,5, las de antes (y
+// lleva 5).
 const float TESELA_GRIETA = 0.47059;
-// Hasta dónde va guardada la distancia a la grieta (F2 − F1 de celda).
+// Hasta dónde va guardada la distancia a la grieta (F2 − F1 en celdas de 1/8,5).
 const float RANGO_GRIETA = 0.10;
 const float TEXEL = 1.0 / 1024.0;
 
@@ -238,8 +239,9 @@ void fragment() {
 	vec4 ma = texture(tex_manchas, pm.zy + vec2(0.43, 0.29)) * w.x + texture(tex_manchas, pm.xz) * w.y
 		+ texture(tex_manchas, pm.xy + vec2(0.77, 0.51)) * w.z;
 	ma = clamp(0.5 + (ma - 0.5) * kw, 0.0, 1.0);
-	// Grietas (B, la distancia) y motas del poro (A), en su tesela: 4 celdas del
-	// tamaño de antes. SIN MIPMAP (`textureLod` 0), como se calculaban antes, a
+	// Grietas (B, la distancia) y motas del poro (A), en su tesela: 5 celdas, algo
+	// más menudas que las de antes porque la red de antes era 3D cortada por la
+	// cúpula (ver `generar_marcas.py`). SIN MIPMAP (`textureLod` 0), como se calculaban antes, a
 	// pelo en cada píxel: con mipmap la mota se emborronaba en una mancha blanda y
 	// redonda y la distancia a la grieta se quedaba sin su cero (la raya se iba).
 	// Cada plano por separado: la raya se saca de cada uno (ver «Grietas»).
@@ -270,8 +272,23 @@ void fragment() {
 	// bóveda el parche se abre: cubre casi todo, y entero más de la mitad. (Con
 	// las celdas de antes, 4 por tesela, eso da en la bóveda de c2_02 las seis o
 	// siete rayas largas de la gira 5.)
-	float parche = smoothstep(mix(0.37, 0.06, suturas), mix(0.97, 0.40, suturas), ma.a)
-		* grietas * (1.0 - diente);
+	// SOLO EN LA BÓVEDA (22-nov-2026). Abierto en todo el cráneo, una raya larga
+	// bajaba por la frente entre los ojos hasta la nariz y otra cruzaba la sien
+	// (crítica de la gira 7, c2_v5_01 y v1_01): «la frente blindada se ha
+	// agrietado». En la gira 5 la frente y la cara salían lisas, solo con poro,
+	// y las grietas se quedaban arriba. Así que en el cráneo el parche se apaga
+	// por delante de z = 0,015 —la frente que para la bola (`morro`, de z = 0,035
+	// en adelante) y la cara quedan fuera entera—, y lo que queda es la bóveda y
+	// la nuca. Los demás huesos (`suturas` = 0) siguen con sus pocas grietas.
+	// Y EN LA BÓVEDA, A TRES CUARTOS: la red de la gira 5 era de «marrón medio»
+	// porque su parche (un `fbm` por encima de 0,50–0,66) casi nunca llegaba a 1
+	// en el cráneo; con el parche entero, la raya salía al tono más oscuro y la
+	// crítica la vio «más oscura que cualquiera de la gira 5».
+	float boveda = mix(1.0, 0.75 * (1.0 - smoothstep(0.015, 0.045, local.z)), suturas);
+	// (En la bóveda, de 0,02 a 0,30: «una malla pareja por toda la bóveda», la
+	// gira 7 la tenía a parches, «concentrada en un nudo en Y».)
+	float parche = smoothstep(mix(0.37, 0.02, suturas), mix(0.97, 0.30, suturas), ma.a)
+		* grietas * (1.0 - diente) * boveda;
 	// LA RAYA, de la DISTANCIA (`generar_marcas.py`, en F2 − F1 de celda). La de
 	// antes era 1 − smoothstep(0,002, 0,008); aquí algo más fina, (0,001,
 	// 0,0065), porque la interpolación entre texeles ya la abre un poco (con la
@@ -284,10 +301,23 @@ void fragment() {
 	// salía una red de venas negras.
 	// Cada plano saca la suya; donde dos se mezclan van las dos (con la media de
 	// las distancias, se borraban en la franja de mezcla).
+	// Y TAMPOCO DE MÁS DE UN PÍXEL (22-nov-2026). Con el medio ancho fijo en
+	// 0,0065, donde el plano del triplanar cae sesgado sobre el hueso la distancia
+	// crece despacio en la pantalla y la raya salía de dos y tres píxeles, y
+	// oscura: «dos o tres tramos más oscuros y algo más gruesos que cualquiera de
+	// la gira 5» (crítica de la gira 7, c2_v5_03). Ahora el medio ancho va entre
+	// 0,5 y 0,9 píxeles (`fwidth`): ni se corta ni engorda. Su canto empieza en el
+	// 30 % de ese ancho, porque entre dos texeles la distancia no baja de cero
+	// (medio texel, ~0,004): con el canto en 0,001 la raya iba a tramos más y
+	// menos negros según cayera la línea sobre la rejilla. Lo que se ensancha
+	// para llegar al medio píxel se aclara, hasta el 60 %: la de antes, más fina
+	// que un píxel, se veía marrón medio. (Medido sobre una bóveda de mentira con
+	// la de antes al lado: `arreglos3_calavera/pruebas/esfera.py`, modo «tope».)
 	vec3 d_grieta = vec3(mc_x.b, mc_y.b, mc_z.b) * RANGO_GRIETA;
-	vec3 fuera = max(vec3(0.0065), fwidth(d_grieta) * 1.1);
-	vec3 raya = (1.0 - smoothstep(vec3(0.001), fuera, d_grieta)) * clamp(w * 1.6, 0.0, 1.0)
-		* clamp(0.0065 / fuera, 0.65, 1.0);
+	vec3 px_grieta = fwidth(d_grieta);
+	vec3 ancho = clamp(vec3(0.0060), px_grieta * 0.5, px_grieta * 0.9);
+	vec3 raya = (1.0 - smoothstep(ancho * 0.3, ancho + px_grieta * 0.5, d_grieta))
+		* clamp(w * 1.6, 0.0, 1.0) * clamp(0.0060 / ancho, 0.6, 1.0);
 	float grieta = max(max(raya.x, raya.y), raya.z) * parche;
 	// El cerco de mugre de alrededor: 1 − smoothstep(0,02, 0,10) de antes.
 	float junto_grieta = dot(1.0 - smoothstep(vec3(0.02), vec3(0.10), d_grieta), w) * parche;
@@ -328,7 +358,19 @@ void fragment() {
 	vec3 col = mix(hueso, hueso_luz, 0.10);
 	col = mix(col, hueso_medio, smoothstep(0.29, 0.90, u_manchas) * 0.55);
 	col = mix(col, hueso, (1.0 - smoothstep(0.13, 0.46, u_manchas)) * 0.55);
-	col = mix(col, hueso_luz, smoothstep(0.67, 1.0, u_moteado) * 0.22);
+	// El moteado claro, (0,76, 1,10) y no (0,67, 1,0): el percentil de los dos
+	// cortes no basta, porque el ruido de antes no se reparte igual —el `fbm`
+	// es casi normal y su smoothstep subía despacio—. Con (0,67, 1,0) aclaraba el
+	// DOBLE (media 0,165 contra 0,082; en el percentil 84, 0,52 contra 0,16) y
+	// la bóveda salía moteada a manchas claras y oscuras (crítica de la gira 7).
+	// El par nuevo sale de ajustar las dos curvas (`arreglos3_calavera/pruebas/
+	// ajuste.py`): media 0,078.
+	// Y CON LA MITAD DE FUERZA (0,10 y no 0,22): con la misma media, el canal A
+	// del grano hace manchas de canto duro, y el `fbm` de antes, nubes que se
+	// funden; pintadas sobre una bóveda de mentira (`pruebas/moteado.py`), las de
+	// antes casi no se ven y las de la textura salen a lunares claros. Con la
+	// mitad quedan tan quietas como las de la gira 5.
+	col = mix(col, hueso_luz, smoothstep(0.76, 1.10, u_moteado) * 0.10);
 	// Y manchas viejas, anchas y a parches: el hueso no envejece parejo. Es lo
 	// que hace el sprite con su trama de TIERRA_4 por el lado en sombra. Cubren
 	// lo que cubría el `fbm(p·3,3)` de antes sobre el cráneo: un 8 %. Salen de
@@ -465,7 +507,15 @@ void fragment() {
 	//     canto en el perfil de la bóveda, dejaba el cociente en casi cero y le
 	//     quitaba también el ambiente: puntitos negros a lo largo del borde de
 	//     arriba (gira 6). Antes ese labio solo perdía su luz directa.
-	float tope = mix(1.0, 1.5, smoothstep(0.10, 0.40, dot(n_mundo, v_mundo)));
+	//   · y la banda de 2–3 píxeles junto al perfil, donde el tope aún subía,
+	//     salía clara y crema en toda la silueta de la bóveda (crítica de la
+	//     gira 7, c2_02 y c2_03; la gira 5 no la tiene). Es este cociente: con
+	//     él a 1 la banda desaparece (comprobado en c2_v5_01, la misma postura que
+	//     la gira 5). Junto al perfil los vértices reciben la luz interpolada de
+	//     menos y el cociente la sube, pero Burley de verdad, mirado de refilón,
+	//     no aclara (su término de vista resta con la luz de lado o de atrás). Así
+	//     que el tope llega a 1,5 bien adentro, de N·V 0,45 a 0,75.
+	float tope = mix(1.0, 1.5, smoothstep(0.45, 0.75, dot(n_mundo, v_mundo)));
 	col *= clamp((luz_ahora + fondo) / (luz_antes + fondo), vec3(0.45 * cerco), vec3(tope));
 
 	vec3 albedo = col * sombra_propia * claridad;

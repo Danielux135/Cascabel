@@ -30,7 +30,8 @@ render_mode blend_mix, depth_draw_never, cull_back, vertex_lighting;
 //   · Una sombra muy floja, que FLOTA: lo que hay debajo es poco.
 //
 // La sal recibe la luz de la cripta como la losa (por vértice: ver el
-// `render_mode`); solo las runas emiten.
+// `render_mode`), y el brillo de esa luz se pinta a mano, por píxel (ver «EL
+// BRILLO DE LAS LUCES»); de lo suyo, solo las runas emiten.
 
 uniform vec3 c_sal : source_color = vec3(0.96, 0.91, 0.81);
 uniform vec3 c_polvo : source_color = vec3(0.63, 0.61, 0.54);
@@ -98,20 +99,74 @@ float runa_en(vec2 p, float r_cerco, float i) {
 	return runa(lq, i) * viva;
 }
 
-// LA RUGOSIDAD DE LAS LUCES, EN EL VÉRTICE (arreglo tras la gira 6). Con
-// `vertex_lighting` Godot alumbra en el vértice con la rugosidad que escriba
-// `vertex()`, y si no escribe nada usa 1,0 (`scene.glsl`: `float roughness =
-// 1.0`): la de `fragment()` no llega. Y no hace GGX: hace un Blinn normalizado
-// de exponente (1,2 − r)⁵·2000. Con 1,0 el exponente es 0,6, un brillo tan
-// abierto que no es brillo, y se perdía el brillo de las luces sobre la sombra
-// de debajo, que es casi negra: bajo el cuerpo la losa salía 30 niveles más
-// oscura que en la gira 5 (toma `c0_v5_00`, luminancia 142 → 111).
-// El GGX de antes (0,55, α = 0,30) tiene el lóbulo de un Blinn de ~20, y 20 sale
-// con 0,80; los dos dan el mismo pico (~2,8·f0). Devuelve un tercio (111 → 119):
-// el resto es la cola larga del GGX, que un Blinn no tiene (con 0,90, más
-// abierto, sale peor: 114). Medido el 21-nov-2026.
-void vertex() {
-	ROUGHNESS = 0.80;
+// EL BRILLO DE LAS LUCES, POR PÍXEL Y A MANO (arreglo tras la gira 7).
+// Con `vertex_lighting` Godot no hace el GGX de la gira 5: hace en el vértice un
+// Blinn de exponente (1,2 − r)⁵·2000 con la rugosidad de `vertex()` (1,0 si no
+// se escribe), y lo multiplica por f0 a secas, SIN FRESNEL (`scene.glsl`:
+// `specular_light_interp * f0`). Y lo que tapaba la sombra de debajo, que es
+// casi negra, era justo ese brillo con Fresnel: lo que se mira rasante lo sube
+// hasta f90 = 0,98, cincuenta veces f0. Sin él, bajo el cuerpo salía una mancha
+// violeta oscura con forma de sombra donde la gira 5 tenía losa clara y pareja
+// (toma `c0_v5_00`, caja (930,650)-(1130,720), luminancia y desviación: 144,9 y
+// 8,5 en la gira 5; 111 con la rugosidad de 1,0; 121,8 y 15,2 con la de 0,80 en
+// el vértice, que era el arreglo de la gira 6 y solo devolvía un tercio).
+// Así que el brillo se pinta aquí, como lo pintaba Godot por píxel en la gira 5
+// (D_GGX, V_GGX y Schlick con f90, lo mismo que `espectro_luz.gdshaderinc`),
+// con las luces que `espectro.gd` ya busca en cada cuadro para el cuerpo. Va en
+// EMISSION, que en `blend_mix` se mezcla con el mismo alfa que el resto de la
+// luz. El Blinn del vértice se queda con la rugosidad por defecto (1,0): con
+// f0 = 0,02 y sin Fresnel es un 0,2 % de la luz, y no se cuenta dos veces.
+// Con esto: 146,0 y 8,3 en ALTA; en la web 131,8 y 8,5, contra 130,0 y 8,8 de lo
+// de antes con `--como-web` (medido el 22-nov-2026). Cuesta 0,14 s de compilar en
+// un navegador (banco, ANGLE, en frío, en la misma lanzada que la de antes).
+// Probado y descartado: no pintar la sombra de debajo (la losa tal cual). Se
+// queda una banda violeta con la forma del cuerpo (desviación 11,3 contra 8,5):
+// en la gira 5 la sombra no era sombra, era un velo de brillo que IGUALABA la losa.
+// Y la primera versión, con la normal de verdad y las conversiones de color
+// enteras, costaba 0,64 s: la normal de un plano tendido es la vertical, y el
+// tramo recto de las conversiones no se ve.
+
+// Las cuatro luces que más le dan a la sal (`espectro.gd`, `_poner_luz`, con la
+// atenuación de Godot medida en el centro de la sal): `luz_dir` xyz hacia la
+// luz, w = 1 si Godot la pinta aparte (tiene sombra); `luz_col` rgb lo que le
+// llega, lineal, y a su `specular_amount`. Desde el centro, y no desde cada
+// píxel: la sal mide medio metro y los fuegos están a más de uno (probado: la
+// dirección sacada en cada píxel no cambia nada, +0,3 niveles dentro del cerco
+// de `c2_v5_01`).
+uniform vec4 luz_dir[4];
+uniform vec4 luz_col[4];
+
+// El SPECULAR 0,35 y el ROUGHNESS 0,55 de siempre, ya en las cuentas de Godot:
+// f0 = 0,16·0,35², f90 = min(50·f0, 1), α = 0,55².
+const float SAL_F0 = 0.0196;
+const float SAL_F90 = 0.98;
+const float SAL_A = 0.3025;
+
+// El brillo de UNA luz sobre la losa (lo que pinta Godot por píxel, sin el color):
+// la sal es un plano tendido en el suelo, así que la normal es la vertical y los
+// productos con ella son la componente y.
+float brillo_luz(vec3 l, vec3 v) {
+	vec3 h = normalize(v + l);
+	float ndl = max(l.y, 0.0);
+	float ndh = clamp(h.y, 0.0, 1.0);
+	float ldh = clamp(dot(l, h), 0.0, 1.0);
+	float ndv = max(v.y, 0.0001);
+	float k = SAL_A / (1.0 - ndh * ndh + ndh * ndh * SAL_A * SAL_A);
+	float g = 0.5 / mix(2.0 * ndl * ndv, ndl + ndv, SAL_A);
+	float f5 = 1.0 - ldh;
+	float f52 = f5 * f5;
+	return ndl * k * k * g * (SAL_F0 + (SAL_F90 - SAL_F0) * f52 * f52 * f5);
+}
+
+// Las dos conversiones de Godot: EMISSION se le da en sRGB y Godot la pasa a
+// lineal antes de sumarla a la luz. Sin el tramo recto de abajo (por debajo de
+// 0,003 en lineal: medio nivel de 255), que cuesta compilarlo y no se ve.
+vec3 sal_lineal(vec3 c) {
+	return pow((max(c, vec3(0.0)) + 0.055) * (1.0 / 1.055), vec3(2.4));
+}
+
+vec3 sal_srgb(vec3 c) {
+	return max(1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, vec3(0.0));
 }
 
 void fragment() {
@@ -175,12 +230,26 @@ void fragment() {
 	color = mix(vec3(0.01, 0.008, 0.015), color, pinta / max(alfa, 0.001));
 	color = mix(color, c_runa * 0.4, luz_runas * (1.0 - pinta));
 	ALBEDO = color;
-	// Esta rugosidad ya solo la usa el reflejo del cielo, que va por píxel; la de
-	// las luces va en `vertex()`.
+	// Estos dos ya solo los usa el reflejo del cielo, que Godot pone por píxel; el
+	// brillo de las luces va a mano, abajo, con los mismos.
 	ROUGHNESS = 0.55;
 	SPECULAR = 0.35;
+	vec3 v = normalize((INV_VIEW_MATRIX * vec4(VIEW, 0.0)).xyz);
+	// Cada luz, su brillo por su color y su `specular_amount`.
+	vec3 b0 = luz_col[0].rgb * (luz_col[0].a * brillo_luz(luz_dir[0].xyz, v));
+	vec3 b1 = luz_col[1].rgb * (luz_col[1].a * brillo_luz(luz_dir[1].xyz, v));
+	vec3 b2 = luz_col[2].rgb * (luz_col[2].a * brillo_luz(luz_dir[2].xyz, v));
+	vec3 b3 = luz_col[3].rgb * (luz_col[3].a * brillo_luz(luz_dir[3].xyz, v));
+	// Las luces CON SOMBRA (w = 1: en ALTA, el fuego de detrás) Godot las pinta en
+	// una pasada aparte y suma lo suyo ya en sRGB, que da más luz (lo cuenta
+	// `espectro_luz.gdshaderinc`); las demás, en lineal. Igual aquí: sin esto, en
+	// ALTA la losa de debajo se quedaba 8 niveles corta (136,9 contra 144,9) y en
+	// la web, que no tiene sombras, salía clavada.
+	vec3 aparte = b0 * luz_dir[0].w + b1 * luz_dir[1].w + b2 * luz_dir[2].w + b3 * luz_dir[3].w;
+	vec3 junta = b0 + b1 + b2 + b3 - aparte;
 	// Sin granos que destellen: a un píxel cada uno, era lo que hacía hormiguear el
 	// cerco. La sal solo se aviva entera cuando se repasa (`aviso`).
-	EMISSION = c_runa * luz_runas * 1.1 + c_sal * aviso * sal * 0.25;
+	vec3 propia = c_runa * luz_runas * 1.1 + c_sal * aviso * sal * 0.25;
+	EMISSION = sal_srgb(sal_lineal(propia) + junta) + sal_srgb(aparte);
 	ALPHA = alfa * (1.0 - smoothstep(0.97, 1.0, r));
 }
