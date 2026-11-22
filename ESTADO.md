@@ -150,8 +150,11 @@ escritorio lo mismo que en el navegador.
   tampoco al cambiar de calidad. Con otro juego abierto en el equipo sube hasta
   72 s. En el navegador MEDIA va a 59 fotogramas por segundo en la GTX 1060 y
   ALTA a 47 (en escritorio, 140 en ALTA): el vigilante prueba ALTA de vez en
-  cuando y vuelve. Todo en `WEB.md` («CRIPTA EN LA WEB») y las trampas, en la
-  skill.
+  cuando y vuelve. Tres rondas de críticos de fuera compararon con lo
+  aprobado: en escritorio las tomas quietas dan diferencia 0; lo que queda
+  distinto y se sabe es la red de grietas de la bóveda de la calavera (mismo
+  tono, otro dibujo) y, en web, la viga de la campana algo más oscura. Todo en
+  `WEB.md` («CRIPTA EN LA WEB») y las trampas, en la skill.
 
 - **Lo que hay:** la mesa con la mecánica entera de ÓRBITA más la CAMPANA MAYOR
   (la barra de carga: mientras toca, todo vale doble), un segundo torno y un
