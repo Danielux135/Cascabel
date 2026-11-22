@@ -366,19 +366,27 @@ Godot: lo paga cada visitante nuevo, con el lienzo congelado.
   ninguna luz con sombra, en ninguna calidad. Y la mesa se monta detrás de un
   telón que compila un material por fotograma y dice por cuál va.
 - **Con lo que queda:** la mesa entera, en frío y por ANGLE en el equipo de
-  Daniel, pasa de **197 s de parón a unos 40 s detrás del telón** (38,8 s con el
+  Daniel, pasa de **197 s de parón a 30 s detrás del telón** (29,7 s con el
   equipo libre; con otro juego abierto al lado, de 47 a 51). Son 41 pasos y solo
-  dos son largos: la piedra (5,7 s) y el suelo (4,6 s); ningún otro pasa de 2 s.
-  El primer fotograma a la vista tarda 0,06 s. Jugando tres minutos en frío con
-  todos los sucesos forzados no aparece ningún material sin compilar
-  (`--medir --tirones`): los fotogramas largos que quedan son sueltos, de 60 a
-  200 ms, y no se repiten de una lanzada a otra.
+  dos son largos: la piedra (4,2 s) y el suelo (3,9 s); ningún otro pasa de
+  1,4 s. El primer fotograma a la vista tarda 0,04 s y después ninguno pasa de
+  45 ms. En el banco, los sombreadores de `cripta3d/` suman 27 s (eran 146).
+  Jugando tres minutos en frío con todos los sucesos forzados no aparece ningún
+  material sin compilar (`--medir --tirones`); con el equipo ocupado salen
+  fotogramas sueltos de 60 a 200 ms, que no se repiten de una lanzada a otra.
 - **«El aspecto no cambia» hubo que comprobarlo desde fuera.** Los agentes que
   reescribieron los sombreadores informaron de que no se veía nada. Tres
   críticos, con la gira de antes y la de después lado a lado, encontraron nueve
   diferencias (la bóveda de la calavera sin grietas, el espectro mate, las
   bombillas «de plástico», el carbón de la sala encendido…). Se arreglaron sin
   volver a encarecer la compilación; lo que enseñó cada una está en la skill.
+  Una segunda ronda, ya con la gira «como en la web» al lado, dio por igual todo
+  lo demás (en las zonas quietas, diferencia 0,00) y encontró cuatro cosas más:
+  una grieta nueva en la frente de la calavera, que la había metido el arreglo;
+  su charco negro, más claro; la losa bajo el espectro, más oscura; y la
+  campana, un 28 % más clara y con una raya naranja en cada moldura en cuanto
+  falta la sombra del fuego (también en MEDIA de escritorio). Arregladas las
+  cuatro.
 
 El detalle, las medidas de cada modo y las herramientas (`banco_sombreadores`,
 `-- --como-web`, `--medir`) están en la skill `prueba-3d` y en
@@ -392,38 +400,63 @@ sube a ALTA y aparece la luz con sombra. No se ha tocado.
 ### Mirado en un navegador
 
 Con el Chrome sin ventana de siempre (`cdp.mjs`), en el equipo de Daniel (GTX
-1060, i5-6600K) y contra la página publicada. **Ojo con las cifras: esa noche
-había otro juego abierto en el equipo**, que le quitaba procesador y gráfica;
-la misma carga medida en escritorio por ANGLE salía entre un 20 y un 30 % más
-lenta que con el equipo libre.
+1060, i5-6600K) y contra la página publicada. Se midió cuatro veces en frío,
+porque **las tres primeras se hicieron con otro juego abierto en el equipo, a
+ratos**, que le quitaba procesador y gráfica. La que vale es la última, con el
+equipo libre y con la página apuntando sus hitos.
 
 - **Lo que se baja:** el motor, 9,8 MB (el mismo de antes), y el paquete, que
   pasa de 1,4 a **7,4 MB** al llevar las dos mesas.
-- **Primera visita: se juega a los 72 s.** 7 s de bajar; **13,5 s con la
-  página parada en el logo de Godot** (arrancar el motor y montar la mesa: ahí
-  no hay telón todavía); y 51 s de telón, con su barra y su «30 / 41». Los dos
-  pasos largos, 9,2 y 7,8 s. Después, ni un parón: en el minuto y medio que se
-  miró jugando, solo dos fotogramas pasan de un cuarto de segundo (0,39 y
-  0,29 s).
-- **Segunda visita: se juega a los 17 s.** El navegador guarda los programas
-  compilados: el telón dura 10 s (cada paso, entre 0,15 y 0,75 s) y el arranque
-  del motor, 4,5.
-- **ÓRBITA, por la puerta, sigue abriendo** en la dirección de siempre, con su
-  parón de 41,6 s de antes: no se ha tocado.
-- **Lo que no vale de esta medida: los fotogramas por segundo.** Con la gráfica
-  compartida con el otro juego salían 28–35 en MEDIA y 60–75 en BAJA, y el
-  vigilante iba y venía entre las dos. En escritorio por ANGLE, con el equipo
-  libre, MEDIA va a 55. Hay que repetirlo con el equipo libre.
+- **Primera visita, con el equipo libre: se juega a los 43 s.**
+
+  | tramo | dura | lo que se ve |
+  |---|---|---|
+  | bajar | 2,7 s | el logo de Godot y su barra |
+  | arrancar el motor | 5,7 s | el logo de Godot, parado |
+  | montar la mesa | 1,5 s | el rótulo de la puerta |
+  | compilar, detrás del telón | 32,9 s | «PREPARANDO LA CRIPTA · 30 / 41» |
+
+  Los dos pasos largos del telón son la piedra (5,0 s) y el suelo (4,4 s);
+  ningún otro pasa de 1,4 s. **Después de abrirse, ni un parón:** ningún hueco
+  de más de un cuarto de segundo y un solo fotograma de 72 ms. Con el equipo
+  ocupado, las otras tres dieron 53, 65 y 72 s (el telón, de 40 a 51 s, y el
+  arranque, de 11 a 15).
+- **Segunda visita: se juega a los 12 s.** El navegador guarda los programas
+  compilados: el telón dura 7,6 s (cada paso, entre 0,1 y 0,5 s), el motor
+  arranca en 2,2 y la mesa se monta en 1,5.
+- **Cambiar de calidad no compila nada.** Con la G, de MEDIA a BAJA y a ALTA:
+  ningún hueco, el fotograma más largo de 39 ms.
+- **LAS DOS LUCES DE RELLENO SE GANAN EL SITIO.** La misma página con
+  `?relleno=0` (cada malla con las luces que le tocan, o sea varias variantes
+  por sombreador): el telón tarda lo mismo, pero al abrirse la página se queda
+  **4,4 s congelada** y encadena tirones de 0,3 a 1,9 s durante los primeros
+  segundos, unos 11 s en total, y alguno más después. Con el relleno, ninguno.
+  Cuestan 1,7 fotogramas por segundo (47,8 contra 49,5 de media en MEDIA, las
+  dos medidas con el equipo ocupado).
+- **Fotogramas por segundo, con el equipo libre:** MEDIA (1366×768), 59 de
+  media, entre 47 y 68; ALTA (1920×1080), 47. El vigilante sube a ALTA cuando
+  va sobrado y baja por debajo de 47, así que en este equipo prueba ALTA unos
+  segundos de vez en cuando y vuelve a MEDIA, cada vez más de tarde en tarde.
+  (Con el equipo ocupado: MEDIA 48, BAJA de 65 a 94, ALTA 37.) En escritorio el
+  mismo equipo da 140 en ALTA. Doblar los píxeles, de MEDIA a ALTA, quita 4 ms
+  por fotograma de 17, así que lo que pesa no parece la gráfica sino las 470
+  llamadas de dibujo hechas desde WebAssembly; no está medido por separado ni
+  se ha tocado.
+- **ÓRBITA, por la puerta, sigue abriendo** en la dirección de siempre: primera
+  imagen a los 39 s con el equipo libre, con su parón de 22 s y otro de 9 al
+  subir a ALTA. No se ha tocado.
 
 **Cómo se midió y qué falló por el camino:** `medir_publicado.sh` lanza tres
 visitas (CRIPTA con perfil nuevo, CRIPTA otra vez con ese perfil, y la dirección
-de siempre). En la primera, el bucle que pregunta cada segundo se quedó
+de siempre). En la primera tanda, el bucle que pregunta cada segundo se quedó
 esperando las fotos —con la página parada compilando, una foto tarda lo que dure
 el parón— y sacó 5 muestras en 150 s; la línea de tiempo se reconstruyó con la
 lista de huecos del hilo principal, que sí va apuntada dentro de la página. Las
-fotos ya no se esperan. Y la página apunta ahora sus hitos en `window.__hitos`
+fotos ya no se esperan. Y la página apunta sus hitos en `window.__hitos`
 («puerta», «escena», «montada», «carga», «juego», en milisegundos desde que se
-pidió), para no tener que deducirlos.
+pidió), para no tener que deducirlos. Con `?medir=1&tirones=1` deja además en
+`window.__tirones` cada fotograma de más de 60 ms. **Y antes de medir se mira si
+el equipo está libre:** el mismo telón dio 51 s con un juego abierto y 33 sin él.
 
 ### Lo que falta de CRIPTA en web
 

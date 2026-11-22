@@ -172,7 +172,10 @@ página congelada más de tres minutos en la primera visita.
   tono dentro del sombreador (`APPLY_TONEMAPPING`: pasa cuando no lleva ni
   brillo ni ajustes, como el del reflejo). En web el núcleo pone dos luces de
   relleno que alcanzan todo y no alumbran, y le enciende al entorno del reflejo
-  unos ajustes neutros (`MundoCripta._unificar_variantes`).
+  unos ajustes neutros (`MundoCripta._unificar_variantes`). Medido en Chrome
+  contra la página publicada (`?relleno=0` las quita): sin ellas, al abrirse el
+  telón la página se queda 4,4 s congelada y encadena unos 11 s de tirones; con
+  ellas, ninguno, y cuestan 1,7 fotogramas por segundo de 49.
 - **UNA LUZ CON SOMBRA ES OTRA PASADA POR MATERIAL** (la aditiva): en web,
   ninguna, en ninguna calidad. ÓRBITA lo paga: 10,7 s de parón cuando el
   vigilante sube a ALTA.
@@ -185,6 +188,14 @@ página congelada más de tres minutos en la primera visita.
   el doble de energía cuando no tiene sombra (`entorno.gd`, `SIN_SOMBRA_POR`,
   con su tabla). «Las tres calidades se ven igual» se comprueba con las mismas
   tomas en las tres, no se da por hecho.
+- **Y LO QUE SE TAPABA A SÍ MISMO, SIN SOMBRA SE ENCIENDE.** La campana cuelga
+  encima del fuego del campo y en ALTA su propia boca le hace sombra: es un
+  bronce viejo y oscuro. Sin sombra ese fuego (y doble) la alumbraba entera
+  desde abajo: un 28 % más clara y con una raya naranja en el labio de cada
+  moldura. Va en su capa de dibujo (`Nucleo.CAPA_A_SU_SOMBRA`, que el reflejo
+  también mira) y a ese fuego, cuando no lleva sombra, se le quita esa capa
+  (`light_cull_mask`). La caja de la campana: ALTA 27,3; web antes 39,1; ahora
+  32,0. Se pierde la luz del interior de la boca vista desde debajo.
 - **LA CARGA POR PARTES** (`cripta_3d.gd`, `_preparar_carga`): la mesa se monta
   tapada y delante de la cámara se pone, uno por fotograma, un cuadradito con
   cada material del mundo —también los de lo que está escondido esperando su
@@ -259,6 +270,25 @@ página congelada más de tres minutos en la primera visita.
     Pintada y leída con mipmap, la grieta salía a puntos sueltos. Con la
     distancia, `textureLod` 0 y `fwidth`, sale continua y nunca de menos de un
     píxel.
+  - **Y hubo una tercera ronda, porque los arreglos también rompen.** Devolver
+    las grietas a la bóveda de la calavera las metió en la frente blindada, que
+    era lisa; y dos cosas se le habían pasado a todos: el charco negro del que
+    sale (22,7 → 44,4 de luminancia) y la losa bajo el espectro (144,9 → 121,8).
+    Lo que enseñó:
+    - **Con `vertex_lighting` el brillo de las luces va SIN FRESNEL** (el Blinn
+      del vértice por f0 a secas). Lo que la luz por píxel tapaba con el brillo
+      rasante (f90 son 50 veces f0) se queda a la vista: la sombra flotante del
+      espectro. Se pinta a mano el GGX de las cuatro luces más fuertes, en
+      `EMISSION` (`espectro_sal.gdshader`), y cuesta 0,07 s.
+    - **Al cambiar un `render_mode` se repasa ENTERO.** La tiza de la calavera
+      perdió su `specular_disabled` al pasar a luz por vértice, y un negro de
+      0,004 de albedo recibía tres veces su difusa en brillo.
+    - **Un ruido que antes se calculaba en cada píxel se lee con `textureLod`
+      0.** Con mipmap, visto sesgado se queda en su media: la tiza salía «más
+      pintura que tiza».
+    - **Las capturas de un informe, con el sombreador FINAL.** En la segunda
+      ronda se entregaron las de una versión intermedia y el crítico encontró
+      lo que el informe no contaba.
 - **LA GIRA «COMO EN LA WEB»:** `gira.py <carpeta> --con=--como-web
   --con=--calidad=media` saca las mismas tomas de siempre con lo que se
   publica (sin sombras, calidad media, letra de reserva).
@@ -269,7 +299,18 @@ página congelada más de tres minutos en la primera visita.
 - **Un Chrome sin ventana** (`WEB.md`) mide la página publicada. Si corre a la
   vez que un Godot le falsea la medida: que espere su turno con el mismo candado.
 - **El listón**: ÓRBITA, publicada, tarda 55 s en arrancar en frío en este
-  equipo, con un parón de 40 s seguidos sin una palabra.
+  equipo, con un parón de 40 s seguidos sin una palabra. CRIPTA quedó en 29,7 s
+  de telón con el equipo libre (eran 197 de parón), con el paso más largo de
+  4,2 s, y el banco de `cripta3d/` en 27 s (eran 146). En Chrome de verdad,
+  contra la página publicada: 32,9 s de telón y se juega a los 43 s de pedirla
+  (2,7 de bajar, 5,7 de arrancar el motor y 1,5 de montar la mesa); la segunda
+  visita, a los 12.
+- **EL EQUIPO NO SIEMPRE ESTÁ LIBRE, Y EL BANCO LLEVA SU REGLA.** El patrón
+  «vacío con luz» tarda 4,2 s con el equipo del todo libre, 5,5 con otros
+  agentes trabajando y 8,5 con un juego abierto al lado; lo demás de esa lanzada
+  va inflado en proporción (los sombreadores grandes con luz, más que los
+  pequeños). Un antes y un después se miden EN LA MISMA LANZADA (`--fichero` con
+  la copia de antes), y se apunta lo que dio el patrón.
 
 ## Lo que costó en CRIPTA (21-nov-2026)
 

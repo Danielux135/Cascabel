@@ -140,14 +140,18 @@ escritorio lo mismo que en el navegador.
 
 - **EN LA WEB (22-nov), y lo que costó:** en un navegador de Windows los
   sombreadores se compilan por Direct3D y CRIPTA tardaba **197 s** con la página
-  congelada. Ahora son **unos 40 s detrás de un telón con barra** (y 10 en la
-  segunda visita). Para eso: casi todos los sombreadores reescritos (la luz de
-  Godot por píxel solo queda en la piedra y el suelo), una carga por partes, y
-  **en web no hay sombras arrojadas** (el fuego del campo alumbra el doble para
-  compensar). Medido en Chrome contra lo publicado, con otro juego abierto en el
-  equipo: se juega a los 72 s la primera vez (7 de bajar, 13,5 de arranque con
-  el logo de Godot, 51 de telón) y a los 17 la segunda. Todo en `WEB.md`
-  («CRIPTA EN LA WEB») y las trampas, en la skill.
+  congelada. Ahora son **unos 30 s detrás de un telón con barra** (29,7 en
+  escritorio con el traductor de Chrome; 32,9 en Chrome de verdad). Para eso:
+  casi todos los sombreadores reescritos (la luz de Godot por píxel solo queda
+  en la piedra y el suelo), una carga por partes, y **en web no hay sombras
+  arrojadas** (el fuego del campo alumbra el doble para compensar). Medido en Chrome contra lo publicado, con el equipo libre: la
+  primera vez se juega a los **43 s** (3 de bajar, 7 de arranque con el logo de
+  Godot parado y 33 de telón) y la segunda a los 12; después no hay parones,
+  tampoco al cambiar de calidad. Con otro juego abierto en el equipo sube hasta
+  72 s. En el navegador MEDIA va a 59 fotogramas por segundo en la GTX 1060 y
+  ALTA a 47 (en escritorio, 140 en ALTA): el vigilante prueba ALTA de vez en
+  cuando y vuelve. Todo en `WEB.md` («CRIPTA EN LA WEB») y las trampas, en la
+  skill.
 
 - **Lo que hay:** la mesa con la mecánica entera de ÓRBITA más la CAMPANA MAYOR
   (la barra de carga: mientras toca, todo vale doble), un segundo torno y un
