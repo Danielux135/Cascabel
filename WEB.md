@@ -386,7 +386,11 @@ Godot: lo paga cada visitante nuevo, con el lienzo congelado.
   su charco negro, más claro; la losa bajo el espectro, más oscura; y la
   campana, un 28 % más clara y con una raya naranja en cada moldura en cuanto
   falta la sombra del fuego (también en MEDIA de escritorio). Arregladas las
-  cuatro.
+  cuatro. Y una última comprobación de fuera corrigió el arreglo de la campana,
+  que apagaba también el interior de su boca: ahora lleva un forro por dentro
+  que sí recibe ese fuego. Lo que queda distinto de lo aprobado y se sabe: la
+  red de grietas de la bóveda de la calavera es otra (mismo tono y grosor, otro
+  dibujo), y en web la viga de la campana queda algo más oscura.
 
 El detalle, las medidas de cada modo y las herramientas (`banco_sombreadores`,
 `-- --como-web`, `--medir`) están en la skill `prueba-3d` y en

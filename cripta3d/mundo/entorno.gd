@@ -885,8 +885,10 @@ func _repartir_fuego() -> void:
 		# Medido en la toma del ábside (la caja del cuerpo de la campana / la de su
 		# yugo): ALTA 27,3 / 10,4; web antes 39,1 / 41,4; web así 32,0 / 9,1. Las
 		# demás tomas fijas no se mueven (0,00–0,21), y ALTA tampoco (0,00).
-		# *Lo que se pierde:* el interior de la boca, que en ALTA el fuego alumbra
-		# desde abajo y aquí queda oscuro. Solo se ve mirando la campana desde
-		# debajo y de cerca; desde las cámaras de juego no.
+		# El interior de la boca, que ese fuego SÍ alumbra en ALTA (le entra por
+		# debajo), lo devuelve un forro en otra capa (`atrezzo.gd`,
+		# `_montar_luz_boca`). *Lo que se pierde:* la viga, que en ALTA lleva las
+		# puntas alumbradas por ese fuego, queda algo más oscura (10,2 contra 5,9
+		# en la toma del ábside).
 		if _campana_a_su_sombra:
 			mejor.light_cull_mask = TODAS_LAS_CAPAS & ~Nucleo.CAPA_A_SU_SOMBRA

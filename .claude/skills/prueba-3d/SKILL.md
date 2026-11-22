@@ -195,7 +195,15 @@ página congelada más de tres minutos en la primera visita.
   moldura. Va en su capa de dibujo (`Nucleo.CAPA_A_SU_SOMBRA`, que el reflejo
   también mira) y a ese fuego, cuando no lleva sombra, se le quita esa capa
   (`light_cull_mask`). La caja de la campana: ALTA 27,3; web antes 39,1; ahora
-  32,0. Se pierde la luz del interior de la boca vista desde debajo.
+  32,0. **Y lo de dentro, que ese fuego sí alumbra, va en un forro:** la pared
+  interior repetida 6 mm hacia dentro, con el mismo bronce, en una capa que esa
+  luz sí alcanza (`atrezzo.gd`, `_montar_luz_boca`). Una luz no distingue dentro
+  de fuera sin sombra; una malla sí. Sin él la boca se quedaba negra (su caja,
+  de 64,9 en ALTA a 32,2; con el forro, 53,5), y lo vio un crítico en las vistas
+  de la sala cuando yo había escrito que «solo se ve desde debajo». *Probado y
+  quitado:* un disco de luz pintada dentro de la boca (desde la sala se mira
+  casi de canto y queda detrás del labio) y devolver la viga a ese fuego (42,5
+  contra 12,6 en ALTA: se queda fuera, algo oscura).
 - **LA CARGA POR PARTES** (`cripta_3d.gd`, `_preparar_carga`): la mesa se monta
   tapada y delante de la cámara se pone, uno por fotograma, un cuadradito con
   cada material del mundo —también los de lo que está escondido esperando su

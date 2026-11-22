@@ -579,15 +579,25 @@ func _montar_campana() -> void:
 	raiz.position = EJE_CAMPANA
 	_mundo.add_child(raiz)
 	# Lo fijo: la viga y sus hierros. La madera, con la veta a lo largo.
+	# LA VIGA SE QUEDA EN LA CAPA DE LA CAMPANA. En ALTA el fuego del campo la
+	# alumbra por debajo solo en las puntas (en el centro la tapa la sombra de la
+	# campana). Sin sombra, o la alumbra entera y doble o no la alumbra: medida
+	# de cerca (`fijas`, 08), 12,6 en ALTA, 42,5 con ese fuego y 10,5 sin él. Sin
+	# él se parece más; en la toma del ábside queda algo oscura (10,2 contra
+	# 5,9), y eso se acepta.
 	_piezas_campana.append(_pieza(raiz, "viga", _mat("madera", {"veta": Vector3.RIGHT, "escala": 0.8}),
 		Transform3D()))
 	_piezas_campana.append(_pieza(raiz, "viga_herraje", _mat("hierro", {"escala": 0.3}), Transform3D()))
 	# Las dos cadenas que cuelgan la viga SUBEN HASTA LA BÓVEDA (decisión 2):
-	# antes subían a y = 5,6 y se perdían en un cielo que ya no existe.
+	# antes subían a y = 5,6 y se perdían en un cielo que ya no existe. Estas sí
+	# van en la capa 1: a las cadenas no las tapa nada.
+	var capa_de_la_campana := _capa
+	_capa = 1
 	var anclajes := _anclajes_boveda()
 	for x in ARMELLAS_X:
 		var desde := EJE_CAMPANA + Vector3(x, ARMELLA_Y, 0.0)
 		_cadena(desde, _techo_sobre(desde, anclajes), 1.7, false, "viga")
+	_capa = capa_de_la_campana
 
 	# Lo que voltea: el yugo, la campana y sus brasas. Todo con «local».
 	_campana = Node3D.new()
@@ -609,6 +619,7 @@ func _montar_campana() -> void:
 			_rugosidad_bronce = rug
 	_bronce_malla = _pieza(_campana, "campana", bronce, Transform3D(), true)
 	_piezas_campana.append(_bronce_malla)
+	_montar_luz_boca()
 	for i in 3:
 		# LA CENEFA ES UNA BANDA LISA DE ÁMBAR, con su sombreador propio
 		# (`atrezzo_cenefa.gdshader`, donde está el porqué). Antes era una copia
@@ -668,6 +679,79 @@ func _montar_resplandor() -> void:
 	_resplandor.visible = false
 	_mundo.add_child(_resplandor)
 	_mios.append(_resplandor)
+
+## LA BOCA DE LA CAMPANA, ALUMBRADA POR DENTRO CUANDO EL FUEGO NO LLEVA SOMBRA.
+## En ALTA el fuego del campo, que está debajo, le entra por la boca: la pared de
+## dentro es un óvalo dorado encendido y el cuerpo, que se tapa a sí mismo, queda
+## oscuro. Sin sombra (MEDIA, BAJA y la web) ese fuego no alumbra a la campana
+## (ver `Nucleo.CAPA_A_SU_SOMBRA`): el cuerpo queda bien, pero la boca se
+## quedaba negra, y se ve en las vistas de la sala y no solo desde debajo
+## (cuarta ronda de críticos: sala/06, la caja de la campana de 40,0 a 31,2).
+## Una luz no sabe alumbrar solo lo de dentro sin sombra; una malla sí puede
+## estar solo dentro. Así que la campana lleva un FORRO: la pared interior
+## repetida seis milímetros hacia dentro, con el mismo bronce, en una capa que
+## ese fuego sí alumbra. Voltea con la campana y se esconde con ella, el bronce
+## lo tapa por fuera, y no compila nada nuevo (es el material de la campana).
+## *Probado y quitado:* un disco de luz pintada dentro de la boca. Desde las
+## vistas de la sala la boca se mira casi de canto, y lo que se ve es la pared
+## del fondo, no el techo: el disco quedaba detrás del labio de delante.
+##
+## Medido en la toma de la campana vista desde abajo (`fijas`, 08), la caja de
+## la boca: ALTA 64,9; sin forro 32,2; con él 53,5. ALTA no cambia (0,00), y las
+## demás tomas de la web tampoco.
+##
+## El perfil de DENTRO (radio, altura), del labio hacia arriba: el de
+## `blender/atrezzo_modelos.py` (`campana_cuerpo`: el perfil base menos el
+## grueso), ya metido los seis milímetros.
+const FORRO_BOCA: Array[Vector2] = [Vector2(0.265, -0.690), Vector2(0.243, -0.640),
+	Vector2(0.219, -0.590), Vector2(0.195, -0.540), Vector2(0.177, -0.490),
+	Vector2(0.165, -0.440), Vector2(0.158, -0.390), Vector2(0.152, -0.340)]
+const LADOS_FORRO := 32
+var _luz_boca: MeshInstance3D = null
+
+func _montar_luz_boca() -> void:
+	if _bronce_malla == null:
+		return
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for k in FORRO_BOCA.size() - 1:
+		var bajo := FORRO_BOCA[k]
+		var alto := FORRO_BOCA[k + 1]
+		# La pared se cierra hacia arriba: la normal de dentro mira al eje y un
+		# poco hacia abajo, que es de donde le llega el fuego.
+		var cae := (alto.x - bajo.x) / (alto.y - bajo.y)
+		for i in LADOS_FORRO:
+			var a0 := TAU * float(i) / float(LADOS_FORRO)
+			var a1 := TAU * float(i + 1) / float(LADOS_FORRO)
+			var esquinas: Array[Vector3] = [
+				Vector3(cos(a0) * bajo.x, bajo.y, sin(a0) * bajo.x),
+				Vector3(cos(a1) * bajo.x, bajo.y, sin(a1) * bajo.x),
+				Vector3(cos(a1) * alto.x, alto.y, sin(a1) * alto.x),
+				Vector3(cos(a0) * alto.x, alto.y, sin(a0) * alto.x)]
+			var normales: Array[Vector3] = [
+				Vector3(-cos(a0), cae, -sin(a0)).normalized(),
+				Vector3(-cos(a1), cae, -sin(a1)).normalized(),
+				Vector3(-cos(a1), cae, -sin(a1)).normalized(),
+				Vector3(-cos(a0), cae, -sin(a0)).normalized()]
+			# En el orden de las agujas del reloj VISTO DESDE DENTRO, que es la
+			# cara de delante en Godot: al revés el bronce (que no pinta su
+			# espalda) no dibujaba nada.
+			for j: int in [0, 2, 1, 0, 3, 2]:
+				# R oclusión (dentro de la campana, algo tapado), G canto, B lo que
+				# se pone al rojo armada: nada.
+				st.set_color(Color(0.8, 0.0, 0.0))
+				st.set_normal(normales[j])
+				st.add_vertex(esquinas[j])
+	_luz_boca = MeshInstance3D.new()
+	_luz_boca.name = "ForroDeLaBoca"
+	_luz_boca.mesh = st.commit()
+	_luz_boca.material_override = _bronce_malla.material_override
+	_luz_boca.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# En una capa que el fuego sin sombra SÍ alumbra, y que no va al reflejo.
+	_luz_boca.layers = Nucleo.CAPA_SIN_REFLEJO
+	_luz_boca.visible = _mundo.en_web
+	_bronce_malla.add_child(_luz_boca)
+	_mios.append(_luz_boca)
 
 # ------------------------------------------------------------------ el fuego
 
@@ -1157,6 +1241,10 @@ func calidad(n: int) -> void:
 	if is_instance_valid(_bronce_malla):
 		_bronce_malla.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if n == 0 \
 			else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	# El forro de la boca, solo cuando el fuego no lleva sombra (en ALTA de
+	# escritorio la pared de verdad ya recibe ese fuego).
+	if is_instance_valid(_luz_boca):
+		_luz_boca.visible = n != 0 or _mundo.en_web
 	for nodo in _detalle:
 		if is_instance_valid(nodo):
 			nodo.visible = n < 2
